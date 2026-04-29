@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Check, ChevronRight, Heart, HeartHandshake, Loader2, Menu, MessagesSquare, QrCode, X } from "lucide-react";
 
@@ -97,19 +97,19 @@ function planEditorialDescription(plan: string): string {
 
 function LogoMark({ compact }: { compact?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       <div
-        className={`flex shrink-0 items-center justify-center rounded-[17%] shadow-[0_6px_18px_rgba(0,0,0,0.1)] ${compact ? "h-9 w-9" : "h-10 w-10"}`}
+        className={`flex shrink-0 items-center justify-center rounded-[17%] shadow-[0_6px_18px_rgba(0,0,0,0.1)] ${compact ? "h-12 w-12" : "h-14 w-14"}`}
         style={{ backgroundColor: BRAND_RED }}
         aria-hidden
       >
         <span className="inline-flex animate-logo-heart">
-          <Heart className={`text-white ${compact ? "h-4 w-4" : "h-5 w-5"}`} fill="none" stroke="currentColor" strokeWidth={2.25} aria-hidden />
+          <Heart className={`text-white ${compact ? "h-5 w-5" : "h-7 w-7"}`} fill="none" stroke="currentColor" strokeWidth={2.25} aria-hidden />
         </span>
       </div>
       <div className="min-w-0 leading-tight">
-        <div className="font-sans font-bold tracking-tight text-[0.95rem]" style={{ color: BRAND_RED }}>AIMEDIArt.com</div>
-        <div className="text-[11px] font-semibold italic text-muted-foreground">Art-mediation with AI</div>
+        <div className={`font-sans font-bold tracking-tight ${compact ? "text-[1.05rem]" : "text-[1.35rem]"}`} style={{ color: BRAND_RED }}>AIMEDIArt.com</div>
+        <div className={`${compact ? "text-[12px]" : "text-[15px]"} font-semibold italic`} style={{ color: BRAND_RED }}>Art-mediation with AI</div>
       </div>
     </div>
   );
@@ -234,6 +234,105 @@ function Section({
   );
 }
 
+function HeartsBackground() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let rafId = 0;
+    let width = 0;
+    let height = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    type HeartParticle = {
+      x: number;
+      y: number;
+      size: number;
+      speedY: number;
+      swayAmp: number;
+      swaySpeed: number;
+      phase: number;
+      opacity: number;
+      hueShift: number;
+    };
+
+    const particles: HeartParticle[] = [];
+    const targetCount = reduceMotion ? 16 : 34;
+
+    const resize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const createHeart = (initial = false): HeartParticle => ({
+      x: Math.random() * width,
+      y: initial ? Math.random() * height : height + 30 + Math.random() * 160,
+      size: 8 + Math.random() * 18,
+      speedY: 0.25 + Math.random() * 0.65,
+      swayAmp: 8 + Math.random() * 22,
+      swaySpeed: 0.004 + Math.random() * 0.01,
+      phase: Math.random() * Math.PI * 2,
+      opacity: 0.14 + Math.random() * 0.26,
+      hueShift: Math.random() * 8,
+    });
+
+    const drawHeart = (x: number, y: number, size: number, color: string, alpha: number) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x, y + size * 0.25);
+      ctx.bezierCurveTo(x, y, x - size * 0.5, y, x - size * 0.5, y + size * 0.25);
+      ctx.bezierCurveTo(x - size * 0.5, y + size * 0.52, x - size * 0.2, y + size * 0.72, x, y + size);
+      ctx.bezierCurveTo(x + size * 0.2, y + size * 0.72, x + size * 0.5, y + size * 0.52, x + size * 0.5, y + size * 0.25);
+      ctx.bezierCurveTo(x + size * 0.5, y, x, y, x, y + size * 0.25);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const tick = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      const now = performance.now();
+      for (let i = 0; i < particles.length; i += 1) {
+        const p = particles[i];
+        p.y -= p.speedY;
+        p.x += Math.sin(now * p.swaySpeed + p.phase) * 0.22;
+        const drawX = p.x + Math.sin(now * p.swaySpeed + p.phase) * p.swayAmp;
+        const color = `hsl(${354 + p.hueShift} 75% 55%)`;
+        drawHeart(drawX, p.y, p.size, color, p.opacity);
+
+        if (p.y < -40) {
+          particles[i] = createHeart(false);
+        }
+      }
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    resize();
+    for (let i = 0; i < targetCount; i += 1) particles.push(createHeart(true));
+    rafId = window.requestAnimationFrame(tick);
+    window.addEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      window.cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0" aria-hidden />;
+}
+
 export default function PublicHome() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [pricingLoading, setPricingLoading] = useState(true);
@@ -331,10 +430,12 @@ export default function PublicHome() {
   }, [pricingRows]);
 
   return (
-    <div className="min-h-screen bg-[#f3f0ea] text-[#1f1f1f]">
-      <FloatingNav isMobileOpen={mobileNavOpen} setIsMobileOpen={setMobileNavOpen} />
+    <div className="relative min-h-screen bg-white text-[#1f1f1f]">
+      <HeartsBackground />
+      <div className="relative z-10">
+        <FloatingNav isMobileOpen={mobileNavOpen} setIsMobileOpen={setMobileNavOpen} />
 
-      <div className="lg:pl-[305px]">
+        <div className="lg:pl-[305px]">
         <section className="pb-14 pt-20 sm:pb-18 lg:pt-6">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
@@ -841,6 +942,7 @@ export default function PublicHome() {
             </div>
           </div>
         </footer>
+        </div>
       </div>
     </div>
   );
