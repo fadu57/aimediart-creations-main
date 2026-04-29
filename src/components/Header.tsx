@@ -172,8 +172,8 @@ export default function Header() {
     <header
       className={
         isVisitorPage
-          ? "sticky top-0 z-50 mx-auto w-full max-w-[375px] border-b border-border/40 bg-white/80 backdrop-blur-md shadow-sm"
-          : "sticky top-0 z-50 w-full border-b border-border/40 bg-white/80 backdrop-blur-md shadow-sm"
+          ? "fixed top-0 left-1/2 z-50 w-full max-w-[375px] -translate-x-1/2 border-b border-border/40 bg-white/80 backdrop-blur-md shadow-sm"
+          : "fixed top-0 left-0 z-50 w-full border-b border-border/40 bg-white/80 backdrop-blur-md shadow-sm"
       }
     >
       <div

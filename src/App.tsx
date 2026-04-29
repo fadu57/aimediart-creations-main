@@ -69,9 +69,9 @@ function AppShell() {
     normalizedPathname === "/scan-work-first";
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-[#121212]">
       {!hideGlobalHeader && <Header />}
-      <main className="flex flex-1 flex-col bg-[#121212]">
+      <main className={`flex flex-1 flex-col bg-[#121212] ${hideGlobalHeader ? "" : "pt-[4.25rem]"}`}>
         <Outlet />
       </main>
     </div>
