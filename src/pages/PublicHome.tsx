@@ -261,8 +261,21 @@ function HeartsBackground() {
       hueShift: number;
     };
 
+    type CloudParticle = {
+      x: number;
+      y: number;
+      width: number;
+      speedX: number;
+      driftAmp: number;
+      driftSpeed: number;
+      phase: number;
+      opacity: number;
+    };
+
     const particles: HeartParticle[] = [];
+    const clouds: CloudParticle[] = [];
     const targetCount = reduceMotion ? 16 : 34;
+    const cloudCount = reduceMotion ? 12 : 30;
 
     const resize = () => {
       width = window.innerWidth;
@@ -301,10 +314,58 @@ function HeartsBackground() {
       ctx.restore();
     };
 
+    const createCloud = (initial = false): CloudParticle => ({
+      x: initial ? Math.random() * (width + 260) - 130 : -260 - Math.random() * 320,
+      y: 20 + Math.random() * Math.max(120, height * 0.55),
+      width: 130 + Math.random() * 250,
+      speedX: 0.22 + Math.random() * 0.55,
+      driftAmp: 8 + Math.random() * 28,
+      driftSpeed: 0.0018 + Math.random() * 0.0035,
+      phase: Math.random() * Math.PI * 2,
+      opacity: 0.28 + Math.random() * 0.34,
+    });
+
+    const drawCloud = (x: number, y: number, w: number, alpha: number) => {
+      const h = w * 0.42;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const cloudGradient = ctx.createLinearGradient(x, y, x, y + h);
+      cloudGradient.addColorStop(0, "rgba(255,255,255,0.95)");
+      cloudGradient.addColorStop(1, "rgba(208,222,242,0.9)");
+      ctx.fillStyle = cloudGradient;
+      ctx.shadowColor = "rgba(130, 150, 180, 0.35)";
+      ctx.shadowBlur = Math.max(10, w * 0.08);
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.28, y + h * 0.56, w * 0.24, h * 0.33, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + w * 0.47, y + h * 0.42, w * 0.23, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + w * 0.64, y + h * 0.53, w * 0.26, h * 0.35, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + w * 0.47, y + h * 0.68, w * 0.39, h * 0.24, 0, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.45, y + h * 0.46, w * 0.22, h * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
     const tick = () => {
       ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "rgba(228, 239, 255, 0.55)";
+      ctx.fillRect(0, 0, width, height);
 
       const now = performance.now();
+      for (let i = 0; i < clouds.length; i += 1) {
+        const c = clouds[i];
+        c.x += c.speedX;
+        const drawY = c.y + Math.sin(now * c.driftSpeed + c.phase) * c.driftAmp;
+        drawCloud(c.x, drawY, c.width, c.opacity);
+        if (c.x > width + c.width + 80) {
+          clouds[i] = createCloud(false);
+        }
+      }
+
       for (let i = 0; i < particles.length; i += 1) {
         const p = particles[i];
         p.y -= p.speedY;
@@ -321,6 +382,7 @@ function HeartsBackground() {
     };
 
     resize();
+    for (let i = 0; i < cloudCount; i += 1) clouds.push(createCloud(true));
     for (let i = 0; i < targetCount; i += 1) particles.push(createHeart(true));
     rafId = window.requestAnimationFrame(tick);
     window.addEventListener("resize", resize);
