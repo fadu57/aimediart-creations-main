@@ -1,0 +1,6 @@
+em1;Émerveillé;✨
+em2;Touché;💫
+em3;Intrigué;🔍
+em4;Apaisé;🌿
+em5;Troublé;🌊
+em6;Amusé;😄

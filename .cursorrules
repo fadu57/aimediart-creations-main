@@ -1,0 +1,74 @@
+# RÉFÉRENTIEL GLOBAL DE LA BASE DE DONNÉES (SCHEMA PUBLIC)
+
+## 0. TYPES PERSONNALISÉS (ENUMS)
+- **Type Age** : | enumlabel                              |
+| -------------------------------------- |
+| 0-12 ans (Enfant)                      |
+| 13-17 ans (adolescent)                 |
+| 18-24 ans (Jeunes adultes / Étudiants) |
+| 25-34 ans (Jeunes actifs)              |
+| 35-44 ans (Actifs confirmés)           |
+| 45-54 ans (Séniors actifs)             |
+| 55-64 ans (Pré-retraite)               |
+| 65 ans et plus (Retraités)             |
+
+
+## 1. STRUCTURE DES TABLES (Source de vérité)
+
+### Table: public.users
+- id (uuid, PK), role_id (int4), agency_id (uuid), created_at (timestamp)
+- user_email, user_phone, user_prenom, user_nom, user_photo_url, user_roles, user_expo_id, user_control, user_agencie (text), user_age (Age),
+
+### Table: public.roles_user
+- role_id (int4, PK), role_name (text), label (text), regles_accès (text), droits_acces (text)
+
+### Table: public.artworks
+- artwork_id (uuid, PK), artwork_agency_id (uuid), artwork_expo_id (uuid), artwork_artist_id (uuid), artwork_prompt_style_id (uuid)
+- artwork_title, artwork_status, artwork_room_name, artwork_fingerprint, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qrcode_image, artwork_qr_code_url (text)
+- artwork_description (jsonb), artwork_moyenne_coeurs (numeric), artwork_total_visites (int4)
+- artwork_created_at, artwork_deleted_at (timestamp)
+
+### Table: public.expos
+- id (uuid, PK), expo_id (uuid), agency_id (uuid)
+- expo_name, lieu_expo, city_expo, zip_expo, adress_expo (text)
+- date_expo_du, date_expo_au (date), created_at (timestamp)
+- curator, curator_name, logo_curator, logo_expo, logo2_expo, email_ref_expo, tel_ref_expo, ref_expo, bubble_id, agencie_name (text)
+
+### Table: public.agencies
+- id (uuid, PK), name_agency, mail_agency, phone_agency, web_agency, logo_agency, logo2_agency, acronyme_expo (text)
+- city_agency, zip_agency, adresse_agency, compl_adresse_agency, cedex_agency (text)
+- created_at (timestamp)
+
+### Table: public.artists
+- artist_id (uuid, PK), artist_firstname, artist_lastname, artist_nickname, artist_email, artist_phone (text)
+- artist_address, artist_adresse, artist_city, artist_ville, artist_zipcode, artist_pays, artist_bio, artist_photo_url, artist_typ, artist_control, artist_initiale_artist (text)
+- artist_birth_date (date), artist_created_at, artist_deleted_at (timestamp)
+
+### Table: public.visitor_feedback
+- id (uuid, PK), heart_rating (int4), comment_text (text), submitted_at (timestamp)
+- expo_id (uuid), agency_id (uuid), artwork_id (uuid), visitor_id (text), emotion_id (int4)
+
+### Table: public.visitors
+- id (uuid, PK), visitor_name, visitor_prenom, visitor_age, visitor_country, visitor_zipcode, visitor_ville, visitor_adresse (text)
+- ip_address, browser_name, device_type, city, country (text), first_seen_at (timestamp)
+
+### Table: public.prompt_style
+- id (uuid, PK), name, icon, persona_identity, system_instruction, style_rules (text)
+- agency_id (uuid), ordonnancement (numeric), max_tokens (int4), created_at (timestamp)
+
+### Autres tables (Structure simplifiée)
+- **matrice_securite**: id, role_id, ressource, lecture (bool), ecriture (bool)
+- **visit_logs**: id, visitor_id, artwork_id, emotion_id, session_token, visited_at
+- **social_links**: id, artist_id, link_type_id, url, type_link
+- **expo_user_role**: id, user_id, expo_id, assigned_at, notes
+- **daily_stats**: id, day, agency_id, expo_id, artwork_id, visits_count, avg_heart_rating
+- **app_settings**: key, value, max_tokens (numeric), max_caract (numeric)
+- **emotions**: id, name_emotion, icone_emotion
+- **postcode**: id, city_name, zip_codes, country
+- **curator_invitation**: id, expo_id, invited_email, invited_at
+- **social_link_types**: id, label
+
+## 2. CONSIGNES DE DÉVELOPPEMENT
+- **Sécurité RLS** : TOUJOURS utiliser `public.users` pour filtrer par `agency_id`. Ne JAMAIS utiliser `raw_user_metadata`.
+- **Nommage** : Respecter strictement les préfixes (ex: `artwork_`, `artist_`, `expo_name`).
+- **Jointures** : Utiliser les types UUID pour les clés étrangères.

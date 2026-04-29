@@ -1,0 +1,15 @@
+-- =============================================================================
+-- DÉPRÉCIÉ — ne plus utiliser cette table
+-- =============================================================================
+-- Les accès aux menus et aux pages sont stockés dans `public.matrice_securite`
+-- avec des lignes supplémentaires :
+--   ressource IN ('menu_home','menu_agence','menu_expos','menu_artiste',
+--                 'menu_catalogue','menu_stats','page_œuvre')
+--   lecture = case cochée (accès), ecriture = false pour ces lignes.
+--
+-- Si vous aviez déjà créé `matrice_navigation`, vous pouvez migrer puis supprimer :
+--   INSERT INTO matrice_securite (role_id, ressource, lecture, ecriture)
+--   SELECT role_id, cible, acces, false FROM matrice_navigation
+--   ON CONFLICT (role_id, ressource) DO UPDATE SET lecture = EXCLUDED.lecture, updated_at = now();
+--   DROP TABLE IF EXISTS public.matrice_navigation CASCADE;
+-- =============================================================================
