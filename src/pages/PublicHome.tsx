@@ -225,7 +225,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 py-16 sm:py-24">
+    <section id={id} className="scroll-mt-[68px] pb-16 pt-6 sm:pb-24 sm:pt-8">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
         {eyebrow ? (
           <p
