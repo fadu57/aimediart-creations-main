@@ -20,7 +20,7 @@ type PricingRow = {
 const BRAND_RED = "hsl(0 65% 48%)";
 const BRAND_RED_DARK = "hsl(0 62% 38%)";
 const UNSPLASH_HERO_IMAGE =
-  "/landing-hero-upload.png";
+  "/landing-hero-new.png";
 const UNSPLASH_GALLERY_IMAGE =
   "https://images.unsplash.com/photo-1768924401996-4c8d79462660?auto=format&fit=crop&w=1400&q=80";
 const UNSPLASH_DASHBOARD_IMAGE =
@@ -97,19 +97,19 @@ function planEditorialDescription(plan: string): string {
 
 function LogoMark({ compact }: { compact?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3.5">
       <div
-        className={`flex shrink-0 items-center justify-center rounded-[17%] shadow-[0_6px_18px_rgba(0,0,0,0.1)] ${compact ? "h-12 w-12" : "h-14 w-14"}`}
+        className={`flex shrink-0 items-center justify-center rounded-[17%] shadow-[0_6px_18px_rgba(0,0,0,0.1)] ${compact ? "h-[3.25rem] w-[3.25rem]" : "h-[3.75rem] w-[3.75rem]"}`}
         style={{ backgroundColor: BRAND_RED }}
         aria-hidden
       >
         <span className="inline-flex animate-logo-heart">
-          <Heart className={`text-white ${compact ? "h-5 w-5" : "h-7 w-7"}`} fill="none" stroke="currentColor" strokeWidth={2.25} aria-hidden />
+          <Heart className={`text-white ${compact ? "h-[1.4rem] w-[1.4rem]" : "h-[1.9rem] w-[1.9rem]"}`} fill="none" stroke="currentColor" strokeWidth={2.25} aria-hidden />
         </span>
       </div>
       <div className="min-w-0 leading-tight">
-        <div className={`font-sans font-bold tracking-tight ${compact ? "text-[1.05rem]" : "text-[1.35rem]"}`} style={{ color: BRAND_RED }}>AIMEDIArt.com</div>
-        <div className={`${compact ? "text-[12px]" : "text-[15px]"} font-semibold italic`} style={{ color: BRAND_RED }}>Art-mediation with AI</div>
+        <div className={`font-sans font-bold tracking-tight ${compact ? "text-[1.12rem]" : "text-[1.42rem]"}`} style={{ color: BRAND_RED }}>AIMEDIArt.com</div>
+        <div className={`${compact ? "text-[12.5px]" : "text-[15.5px]"} font-semibold italic`} style={{ color: BRAND_RED }}>Art-mediation with AI</div>
       </div>
     </div>
   );
@@ -123,7 +123,7 @@ function FloatingNav({
   setIsMobileOpen: (v: boolean) => void;
 }) {
   const NavItems = (
-    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1">
+    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-1">
       {ANCHORS.map((item) => (
         <a
           key={item.id}
@@ -131,48 +131,43 @@ function FloatingNav({
           className="group inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring"
           onClick={() => setIsMobileOpen(false)}
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-neutral-300 transition-colors group-hover:bg-neutral-500" aria-hidden />
+          <span className="h-2.5 w-2.5 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946]" aria-hidden />
           {item.label}
         </a>
       ))}
-      <div className="pt-2">
-        <Link
-          to="/login"
-          className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
-          onClick={() => setIsMobileOpen(false)}
-        >
-          Se connecter
-          <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
-        </Link>
-      </div>
     </nav>
   );
 
   return (
     <>
-      <aside className="fixed left-5 top-6 z-40 hidden w-[252px] rounded-[1.3rem] border border-neutral-300/70 bg-white/85 p-3 shadow-[0_12px_30px_rgba(0,0,0,0.08)] backdrop-blur-md lg:block">
-        <div className="pb-3">
-          <LogoMark />
-        </div>
-        <div className="rounded-[1rem] border border-neutral-200 bg-[#faf9f7] p-2.5">
-          <div className="px-2 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">
-            VITRINE PUBLIQUE
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-neutral-300/70 bg-white/85 backdrop-blur-md">
+        <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between px-5 sm:px-6">
+          <div className="shrink-0">
+            <LogoMark compact />
           </div>
-          {NavItems}
+          <div className="hidden items-center gap-2 lg:flex">
+            <div className="rounded-xl border border-neutral-200 bg-[#faf9f7] px-2 py-1">
+              {NavItems}
+            </div>
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              Se connecter
+              <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/90 px-3.5 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,0.08)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-ring lg:hidden"
+            onClick={() => setIsMobileOpen(true)}
+            aria-label="Ouvrir le menu"
+          >
+            <Menu className="h-4 w-4" aria-hidden />
+            Menu
+          </button>
         </div>
-      </aside>
-
-      <div className="fixed left-4 top-4 z-50 lg:hidden">
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/90 px-3.5 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,0.08)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-ring"
-          onClick={() => setIsMobileOpen(true)}
-          aria-label="Ouvrir le menu"
-        >
-          <Menu className="h-4 w-4" aria-hidden />
-          Menu
-        </button>
-      </div>
+      </header>
       {isMobileOpen && (
         <>
           <div
@@ -200,6 +195,16 @@ function FloatingNav({
             <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-2.5">
               <div className="px-2 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">VITRINE PUBLIQUE</div>
               {NavItems}
+              <div className="pt-2">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  Se connecter
+                  <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
+                </Link>
+              </div>
             </div>
           </aside>
         </>
@@ -223,9 +228,17 @@ function Section({
     <section id={id} className="scroll-mt-20 py-16 sm:py-24">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
         {eyebrow ? (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{eyebrow}</p>
+          <p
+            className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]"
+            style={{ textShadow: "0 0 8px rgba(255, 255, 255, 0.95)" }}
+          >
+            {eyebrow}
+          </p>
         ) : null}
-        <h2 className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
+        <h2
+          className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]"
+          style={{ textShadow: "0 0 12px rgba(230, 57, 70, 0.55)" }}
+        >
           {title}
         </h2>
         <div className="mt-9">{children}</div>
@@ -234,165 +247,52 @@ function Section({
   );
 }
 
-function HeartsBackground() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+function VantaCloudsBackground() {
+  const vantaRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const container = vantaRef.current;
+    if (!container) return;
 
-    const reduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let rafId = 0;
-    let width = 0;
-    let height = 0;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-    type HeartParticle = {
-      x: number;
-      y: number;
-      size: number;
-      speedY: number;
-      swayAmp: number;
-      swaySpeed: number;
-      phase: number;
-      opacity: number;
-      hueShift: number;
-    };
-
-    type CloudParticle = {
-      x: number;
-      y: number;
-      width: number;
-      speedX: number;
-      driftAmp: number;
-      driftSpeed: number;
-      phase: number;
-      opacity: number;
-    };
-
-    const particles: HeartParticle[] = [];
-    const clouds: CloudParticle[] = [];
-    const targetCount = reduceMotion ? 16 : 34;
-    const cloudCount = reduceMotion ? 12 : 30;
-
-    const resize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-
-    const createHeart = (initial = false): HeartParticle => ({
-      x: Math.random() * width,
-      y: initial ? Math.random() * height : height + 30 + Math.random() * 160,
-      size: 8 + Math.random() * 18,
-      speedY: 0.25 + Math.random() * 0.65,
-      swayAmp: 8 + Math.random() * 22,
-      swaySpeed: 0.004 + Math.random() * 0.01,
-      phase: Math.random() * Math.PI * 2,
-      opacity: 0.14 + Math.random() * 0.26,
-      hueShift: Math.random() * 8,
-    });
-
-    const drawHeart = (x: number, y: number, size: number, color: string, alpha: number) => {
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(x, y + size * 0.25);
-      ctx.bezierCurveTo(x, y, x - size * 0.5, y, x - size * 0.5, y + size * 0.25);
-      ctx.bezierCurveTo(x - size * 0.5, y + size * 0.52, x - size * 0.2, y + size * 0.72, x, y + size);
-      ctx.bezierCurveTo(x + size * 0.2, y + size * 0.72, x + size * 0.5, y + size * 0.52, x + size * 0.5, y + size * 0.25);
-      ctx.bezierCurveTo(x + size * 0.5, y, x, y, x, y + size * 0.25);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const createCloud = (initial = false): CloudParticle => ({
-      x: initial ? Math.random() * (width + 260) - 130 : -260 - Math.random() * 320,
-      y: 20 + Math.random() * Math.max(120, height * 0.55),
-      width: 130 + Math.random() * 250,
-      speedX: 0.22 + Math.random() * 0.55,
-      driftAmp: 8 + Math.random() * 28,
-      driftSpeed: 0.0018 + Math.random() * 0.0035,
-      phase: Math.random() * Math.PI * 2,
-      opacity: 0.28 + Math.random() * 0.34,
-    });
-
-    const drawCloud = (x: number, y: number, w: number, alpha: number) => {
-      const h = w * 0.42;
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      const cloudGradient = ctx.createLinearGradient(x, y, x, y + h);
-      cloudGradient.addColorStop(0, "rgba(255,255,255,0.95)");
-      cloudGradient.addColorStop(1, "rgba(208,222,242,0.9)");
-      ctx.fillStyle = cloudGradient;
-      ctx.shadowColor = "rgba(130, 150, 180, 0.35)";
-      ctx.shadowBlur = Math.max(10, w * 0.08);
-      ctx.beginPath();
-      ctx.ellipse(x + w * 0.28, y + h * 0.56, w * 0.24, h * 0.33, 0, 0, Math.PI * 2);
-      ctx.ellipse(x + w * 0.47, y + h * 0.42, w * 0.23, h * 0.3, 0, 0, Math.PI * 2);
-      ctx.ellipse(x + w * 0.64, y + h * 0.53, w * 0.26, h * 0.35, 0, 0, Math.PI * 2);
-      ctx.ellipse(x + w * 0.47, y + h * 0.68, w * 0.39, h * 0.24, 0, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.globalAlpha = alpha * 0.45;
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.beginPath();
-      ctx.ellipse(x + w * 0.45, y + h * 0.46, w * 0.22, h * 0.14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    const tick = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "rgba(228, 239, 255, 0.55)";
-      ctx.fillRect(0, 0, width, height);
-
-      const now = performance.now();
-      for (let i = 0; i < clouds.length; i += 1) {
-        const c = clouds[i];
-        c.x += c.speedX;
-        const drawY = c.y + Math.sin(now * c.driftSpeed + c.phase) * c.driftAmp;
-        drawCloud(c.x, drawY, c.width, c.opacity);
-        if (c.x > width + c.width + 80) {
-          clouds[i] = createCloud(false);
-        }
+    let effect: { destroy: () => void } | null = null;
+    let mounted = true;
+    const initVanta = async () => {
+      try {
+        const THREE = await import("three");
+        (window as unknown as { THREE?: unknown }).THREE = THREE;
+        const vantaModule = await import("vanta/dist/vanta.clouds.min");
+        const CLOUDS = (vantaModule.default ?? vantaModule) as (options: Record<string, unknown>) => { destroy: () => void };
+        if (!mounted || !container) return;
+        effect = CLOUDS({
+          el: container,
+          mouseControls: true,
+          touchControls: true,
+          gyroControls: false,
+          minHeight: 200,
+          minWidth: 200,
+          backgroundColor: 0xffffff,
+          skyColor: 0x68b8d7,
+          cloudColor: 0xadc1de,
+          cloudShadowColor: 0x183550,
+          sunColor: 0xff9919,
+          sunGlareColor: 0xff6633,
+          sunlightColor: 0xff9933,
+          speed: 0.6,
+        });
+      } catch (error) {
+        console.error("[PublicHome] Initialisation Vanta Clouds impossible:", error);
       }
-
-      for (let i = 0; i < particles.length; i += 1) {
-        const p = particles[i];
-        p.y -= p.speedY;
-        p.x += Math.sin(now * p.swaySpeed + p.phase) * 0.22;
-        const drawX = p.x + Math.sin(now * p.swaySpeed + p.phase) * p.swayAmp;
-        const color = `hsl(${354 + p.hueShift} 75% 55%)`;
-        drawHeart(drawX, p.y, p.size, color, p.opacity);
-
-        if (p.y < -40) {
-          particles[i] = createHeart(false);
-        }
-      }
-      rafId = window.requestAnimationFrame(tick);
     };
+    void initVanta();
 
-    resize();
-    for (let i = 0; i < cloudCount; i += 1) clouds.push(createCloud(true));
-    for (let i = 0; i < targetCount; i += 1) particles.push(createHeart(true));
-    rafId = window.requestAnimationFrame(tick);
-    window.addEventListener("resize", resize);
     return () => {
-      window.removeEventListener("resize", resize);
-      window.cancelAnimationFrame(rafId);
+      mounted = false;
+      effect?.destroy();
+      effect = null;
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0" aria-hidden />;
+  return <div ref={vantaRef} className="fixed inset-0 z-0" aria-hidden />;
 }
 
 export default function PublicHome() {
@@ -415,9 +315,7 @@ export default function PublicHome() {
         };
       };
       const pricingSelectCandidates = [
-        "pricing_label,pricing_plan,pricing_max_œuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis,pricing_annuel",
         "pricing_label,pricing_plan,pricing_max_oeuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis,pricing_annuel",
-        "pricing_label,pricing_plan,pricing_max_œuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis",
         "pricing_label,pricing_plan,pricing_max_oeuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis",
       ];
       const loadPricing = async () => {
@@ -493,11 +391,11 @@ export default function PublicHome() {
 
   return (
     <div className="relative min-h-screen bg-white text-[#1f1f1f]">
-      <HeartsBackground />
+      <VantaCloudsBackground />
       <div className="relative z-10">
         <FloatingNav isMobileOpen={mobileNavOpen} setIsMobileOpen={setMobileNavOpen} />
 
-        <div className="lg:pl-[305px]">
+        <div>
         <section className="pb-14 pt-20 sm:pb-18 lg:pt-6">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
@@ -509,7 +407,7 @@ export default function PublicHome() {
               <p className="mt-5 max-w-[72ch] text-[1rem] leading-relaxed text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.15rem]">
                 Le visiteur dialogue avec un assistant incarnant l’artiste via un simple QR code.
                 <span className="mt-3 block text-foreground/80">
-                  <span className="font-semibold text-foreground">Moins de jargon, plus d’attention</span> ; moins de discours vertical, plus de dialogue.
+                  <span className="font-semibold text-foreground">Moins de jargon, plus d’attention</span> ; moins de discours vertical, plus de feedback.
                 </span>
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -532,7 +430,7 @@ export default function PublicHome() {
                 <div className="rounded-2xl border border-neutral-300/70 bg-white p-4">
                   <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Scan QR-code</div>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <div className="max-w-[11ch] text-sm leading-relaxed text-foreground/85">Un geste simple devant l’œuvre</div>
+                    <div className="max-w-[16ch] text-sm leading-relaxed text-foreground/85">Un geste simple devant l’œuvre</div>
                     <div className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-2" aria-hidden>
                       <QrCode className="h-6 w-6 text-[#9d2525]" />
                     </div>
@@ -557,7 +455,7 @@ export default function PublicHome() {
                   <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Vote émotionnel</div>
                   <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">
                     De 1 à 5 cœurs
-                    <span className="mt-1 block text-[#9D2525]">♥♥♥♥♥</span>
+                    <span className="mt-1 block text-[#9D2525]">❤️❤️❤️❤️❤️</span>
                   </div>
                 </div>
               </div>
@@ -570,7 +468,9 @@ export default function PublicHome() {
                 />
               </figure>
               <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[48ch]">
-                « Une médiation qui n’écrase pas, qui accueille ; une parole qui n’impose pas, qui relie. »
+                « Une médiation qui n’écrase pas, qui accueille ;
+                <br />
+                une parole qui n’impose pas, qui relie. »
               </blockquote>
             </div>
           </div>
@@ -583,11 +483,11 @@ export default function PublicHome() {
                 <CardTitle className="font-serif text-xl">Cartels traditionnels</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2.5 text-sm leading-relaxed text-foreground/80">
-                <p>Illisibles, intimidants, trop descendants.</p>
+                <p>Complexes, intimidants, parfois confus ou inadaptés.</p>
                 <ul className="space-y-1">
                   <li className="flex gap-2">
                     <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
-                    <span>Jargon et sur-information</span>
+                    <span>Langage d&apos;initiés et sur-information</span>
                   </li>
                   <li className="flex gap-2">
                     <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
@@ -595,21 +495,23 @@ export default function PublicHome() {
                   </li>
                   <li className="flex gap-2">
                     <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
-                    <span>Peu d’accessibilité (FALC, publics variés)</span>
+                    <span>Accessibilité souvent limitée</span>
                   </li>
                 </ul>
               </CardContent>
             </Card>
             <Card className="rounded-3xl border-[rgba(168,23,29,0.22)] bg-[#fdfbf9] shadow-[0_12px_24px_rgba(0,0,0,0.05)]">
               <CardHeader>
-                <CardTitle className="font-serif text-xl">Solution AIMEDIArt</CardTitle>
+                <CardTitle className="font-serif text-xl">
+                  Solution <span className="text-[#E63946]">AIMEDIArt</span>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2.5 text-sm leading-relaxed text-foreground/80">
-                <p>Médiation personnalisée, émotionnelle, accessible et dialoguée.</p>
+                <p>Médiation personnalisée, émotionnelle, accessible.</p>
                 <ul className="space-y-1">
                   <li className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <span>Vous posez vos questions, à votre rythme</span>
+                    <span>Vous avancez à votre rythme</span>
                   </li>
                   <li className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
@@ -650,6 +552,16 @@ export default function PublicHome() {
           </figure>
           <div className="relative grid gap-4 lg:grid-cols-3">
             <div className="pointer-events-none absolute left-[16.66%] right-[16.66%] top-[30px] hidden h-px bg-neutral-300 lg:block" aria-hidden />
+            <div className="pointer-events-none absolute left-[33.33%] top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 lg:block" aria-hidden>
+              <div className="rounded-full border border-[#E63946]/35 bg-white/90 p-2 shadow-[0_8px_16px_rgba(230,57,70,0.25)]">
+                <ArrowRight className="h-5 w-5 text-[#E63946]" />
+              </div>
+            </div>
+            <div className="pointer-events-none absolute left-[66.66%] top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 lg:block" aria-hidden>
+              <div className="rounded-full border border-[#E63946]/35 bg-white/90 p-2 shadow-[0_8px_16px_rgba(230,57,70,0.25)]">
+                <ArrowRight className="h-5 w-5 text-[#E63946]" />
+              </div>
+            </div>
             {[
               {
                 step: "Étape 1",
@@ -660,13 +572,13 @@ export default function PublicHome() {
               {
                 step: "Étape 2",
                 title: "Choisir un mode de langage",
-                text: "Expert, Poète, Enfant de 5 ans… et même Simple / Essentiel si besoin.",
+                text: <>Expert, Poète, Enfant de 5 ans…<br />et même FALC* si besoin.</>,
                 icon: MessagesSquare,
               },
               {
                 step: "Étape 3",
                 title: "Dialoguer + voter",
-                text: "Questions suggérées par IA, puis vote émotionnel de 1 à 5 cœurs.",
+                text: "Emotions suggérées par IA, puis vote émotionnel de 1 à 5 cœurs ❤️❤️❤️❤️❤️",
                 icon: HeartHandshake,
               },
             ].map((x) => (
@@ -680,7 +592,12 @@ export default function PublicHome() {
                   </div>
                   <CardTitle className="font-serif text-xl">{x.title}</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm leading-relaxed text-foreground/80">{x.text}</CardContent>
+                <CardContent className="text-sm leading-relaxed text-foreground/80">
+                  {x.text}
+                  {x.step === "Étape 2" ? (
+                    <p className="mt-2 text-[11px] italic text-muted-foreground">*FALC : Facile À Lire et à Comprendre</p>
+                  ) : null}
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -697,7 +614,7 @@ export default function PublicHome() {
                   { kpi: "1 248", label: "scans sur l’exposition" },
                   { kpi: "4,3 / 5", label: "note émotionnelle moyenne" },
                   { kpi: "62%", label: "émotion dominante cartographiée" },
-                  { kpi: "+31%", label: "questions engageantes" },
+                  { kpi: "+31%", label: "questions ou retours engageants" },
                 ].map((item) => (
                   <div key={item.label} className="rounded-2xl border border-neutral-200 bg-white p-3">
                     <div className="font-serif text-xl leading-none text-foreground">{item.kpi}</div>
@@ -730,10 +647,6 @@ export default function PublicHome() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-2 px-1 text-xs text-muted-foreground">
-            <span className="inline-block h-[2px] w-10 rounded-full bg-neutral-300" aria-hidden />
-            Données lisibles, décisions curatoriales plus éclairées.
-          </div>
         </Section>
 
         <Section id="pour-qui" eyebrow="Pour qui ?" title="Un outil pensé pour des acteurs culturels différents">
@@ -750,12 +663,12 @@ export default function PublicHome() {
           </figure>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { title: "Artistes", text: "Une médiation fidèle, incarnée, qui respecte l’intention." },
-              { title: "Commissaires d’exposition", text: "Un tableau de bord utile, sans complexifier la visite." },
-              { title: "Galeries", text: "Une expérience premium et un retour sur la réception." },
-              { title: "Associations", text: "Une médiation accueillante, adaptable à tous les publics." },
+              { title: "Artistes", text: <>Une médiation fidèle, incarnée,<br />qui respecte l’intention.</> },
+              { title: "Commissaires d’exposition", text: <>Un tableau de bord utile,<br />sans complexifier la visite.</> },
+              { title: "Galeries", text: <>Une expérience premium<br />et un retour sur la réception.</> },
+              { title: "Associations", text: <>Une médiation accueillante,<br />adaptable à tous les publics.</> },
               { title: "Musées / institutions", text: "Un dispositif compatible multi-sites et multi-expos." },
-              { title: "Lieux multi-sites", text: "Un cadre cohérent, réplicable, et pilotable dans le temps." },
+              { title: "Lieux multi-sites", text: <>Un cadre cohérent, réplicable,<br />et pilotable dans le temps.</> },
             ].map((c, index) => (
               <Card
                 key={c.title}
@@ -788,17 +701,25 @@ export default function PublicHome() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
                 <div className="text-sm font-semibold">Paiement mensuel</div>
-                <p className="mt-1 text-sm leading-relaxed text-foreground/80">Souplesse. Résiliable à la fin de l’événement.</p>
+                <p className="mt-1 text-sm leading-relaxed text-foreground/80">
+                  Souplesse.
+                  <br />
+                  Résiliable à la fin de l’événement.
+                </p>
               </div>
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
                 <div className="text-sm font-semibold">Paiement annuel</div>
-                <p className="mt-1 text-sm leading-relaxed text-foreground/80">Avantage tarifaire. Le plus serein pour conserver catalogue et fiches d’œuvres.</p>
+                <p className="mt-1 text-sm leading-relaxed text-foreground/80">
+                  Avantage tarifaire.
+                  <br />
+                  Le plus serein pour conserver catalogue et fiches d’œuvres.
+                </p>
               </div>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">
+            <p className="mt-4 text-xs italic text-muted-foreground">
               En cas de résiliation, l’accès reste actif jusqu’à la fin de la période payée. À son terme, les données sont supprimées définitivement.
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs italic text-muted-foreground">
               Si vous souhaitez conserver votre catalogue et vos fiches d'œuvres pour une future exposition, l'abonnement Annuel est la solution la plus sereine (et la plus économique sur la durée !)
             </p>
           </div>
@@ -824,7 +745,10 @@ export default function PublicHome() {
             ) : (
               <>
                 <div className="grid gap-4 lg:grid-cols-2">
-                  {groupedPlans.map(({ planKey, variants }) => {
+                  {(() => {
+                    let testerBadgeCount = 0;
+                    let recommendedBadgeCount = 0;
+                    return groupedPlans.map(({ planKey, variants }) => {
                     const first = variants[0];
                     const displayPlan = first?.pricing_plan?.trim() || planKey;
                     const isHighlight = /HORIZON|ATELIER/.test(displayPlan.toUpperCase());
@@ -834,6 +758,14 @@ export default function PublicHome() {
                     const selectedIndexRaw = selectedVariantByPlan[planKey] ?? 0;
                     const selectedIndex = Math.min(Math.max(selectedIndexRaw, 0), Math.max(variants.length - 1, 0));
                     const selectedVariant = variants[selectedIndex];
+                    let badgeLabel = "Recommandé";
+                    if (isHighlight) {
+                      recommendedBadgeCount += 1;
+                      badgeLabel = recommendedBadgeCount === 1 ? "Créer" : recommendedBadgeCount === 2 ? "Conquérir" : "Recommandé";
+                    } else {
+                      testerBadgeCount += 1;
+                      badgeLabel = testerBadgeCount === 2 ? "Sublimer" : "Tester";
+                    }
                     return (
                       <Card
                         key={planKey}
@@ -844,7 +776,7 @@ export default function PublicHome() {
                         <CardHeader className="pb-3">
                           <div className="mb-2 flex items-center justify-between">
                             <span className="rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                              {isHighlight ? "Recommandé" : "Offre"}
+                              {badgeLabel}
                             </span>
                             <Link to="/login">
                               <Button
@@ -919,7 +851,8 @@ export default function PublicHome() {
                         </CardContent>
                       </Card>
                     );
-                  })}
+                  });
+                  })()}
                 </div>
               </>
             )}
@@ -941,7 +874,7 @@ export default function PublicHome() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { title: "Smartphone d’abord", text: "Pensé pour un usage sur place, en mobilité." },
-              { title: "Pour tous les publics", text: "Médiation adaptable à l’âge et au niveau." },
+              { title: "Pour tous les publics", text: "Sélectionneur de médiation interactive" },
               { title: "Attention FALC", text: "Facile à Lire et à Comprendre, quand c’est nécessaire." },
               { title: "Chaleureux & culturel", text: "Une tonalité éditoriale, premium et humaine." },
             ].map((x, i) => (
@@ -972,7 +905,9 @@ export default function PublicHome() {
           </figure>
           <div className="rounded-[2rem] border border-neutral-300/70 bg-[#faf9f7] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-8">
             <p className="max-w-[68ch] text-sm leading-relaxed text-foreground/80">
-              Vous préparez une exposition, une résidence, ou un parcours multi-sites ? AIMEDIArt s’adapte au contexte.
+              Vous préparez une exposition, une résidence, ou un parcours multi-sites ?
+              <br />
+              <span className="text-[#E63946]">AIMEDIArt</span> s’adapte au contexte.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a href="mailto:contact@aimediart.com" className="w-full sm:w-auto">
@@ -994,8 +929,7 @@ export default function PublicHome() {
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="font-serif text-lg font-semibold">AIMEDIArt</div>
-                <div className="text-sm text-muted-foreground">Médiation interactive via IA, simple et accessible.</div>
+                <LogoMark compact />
               </div>
               <div className="flex flex-wrap gap-3 text-sm">
                 <a href="#contact" className="text-foreground/80 hover:text-foreground">Contact</a>
