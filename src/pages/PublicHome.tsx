@@ -159,7 +159,7 @@ function FloatingNav({
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/90 px-3.5 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,0.08)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-ring lg:hidden"
+            className="inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/70 px-3.5 py-2 text-sm font-medium shadow-[0_6px_18px_rgba(0,0,0,0.08)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-ring lg:hidden"
             onClick={() => setIsMobileOpen(true)}
             aria-label="Ouvrir le menu"
           >
@@ -176,7 +176,7 @@ function FloatingNav({
             onClick={() => setIsMobileOpen(false)}
           />
           <aside
-            className="fixed left-0 top-0 z-50 h-full w-[82vw] max-w-[332px] border-r border-neutral-300 bg-[#fcfbfa] p-4 shadow-2xl"
+            className="fixed left-0 top-0 z-50 h-auto w-[82vw] max-w-[332px] rounded-br-xl border-r border-neutral-300 bg-[rgba(252,251,250,0.60)] p-4 shadow-2xl backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-label="Menu vitrine"
