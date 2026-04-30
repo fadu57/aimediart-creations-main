@@ -24,7 +24,7 @@ const UNSPLASH_HERO_IMAGE =
 const UNSPLASH_GALLERY_IMAGE =
   "https://images.unsplash.com/photo-1768924401996-4c8d79462660?auto=format&fit=crop&w=1400&q=80";
 const UNSPLASH_DASHBOARD_IMAGE =
-  "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1400&q=80";
+  "/landing-dashboard-new.png";
 const UNSPLASH_INCLUSIVE_IMAGE =
   "https://images.unsplash.com/photo-1770910200099-745991a725de?auto=format&fit=crop&w=1400&q=80";
 const UNSPLASH_MUSEUM_CROWD_IMAGE =
@@ -404,10 +404,13 @@ export default function PublicHome() {
               <h1 className="mt-4 max-w-[16ch] font-serif text-[2.05rem] font-semibold leading-[1.05] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:text-5xl lg:text-[3.5rem]">
                 L’art qui vous parle, littéralement
               </h1>
-              <p className="mt-5 max-w-[72ch] text-[1rem] leading-relaxed text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.15rem]">
-                Le visiteur dialogue avec un assistant incarnant l’artiste via un simple QR code.
+              <p className="mt-5 max-w-[92ch] text-[1rem] leading-relaxed text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.15rem]">
+                Le visiteur passe au-dessus des nuages avec un assistant incarnant l’artiste via un simple QR-code.
                 <span className="mt-3 block text-foreground/80">
-                  <span className="font-semibold text-foreground">Moins de jargon, plus d’attention</span> ; moins de discours vertical, plus de feedback.
+                  Les œuvres bénéficient d&apos;une toute autre lumière 🌤️!
+                </span>
+                <span className="mt-3 block text-foreground/80">
+                  Moins de jargon, plus d’attention ; moins de discours vertical, plus de feedback.
                 </span>
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
