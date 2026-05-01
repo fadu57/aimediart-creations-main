@@ -1,74 +1,152 @@
-# RÉFÉRENTIEL GLOBAL DE LA BASE DE DONNÉES (SCHEMA PUBLIC)
+You are assisting on a Supabase/PostgreSQL project for an art mediation and exhibition platform.
 
-## 0. TYPES PERSONNALISÉS (ENUMS)
-- **Type Age** : | enumlabel                              |
-| -------------------------------------- |
-| 0-12 ans (Enfant)                      |
-| 13-17 ans (adolescent)                 |
-| 18-24 ans (Jeunes adultes / Étudiants) |
-| 25-34 ans (Jeunes actifs)              |
-| 35-44 ans (Actifs confirmés)           |
-| 45-54 ans (Séniors actifs)             |
-| 55-64 ans (Pré-retraite)               |
-| 65 ans et plus (Retraités)             |
+## Global behavior
+- Answer concisely, in French by default.
+- Do NOT rewrite entire files unless explicitly asked.
+- When modifying code, return ONLY the modified blocks or a focused patch.
+- For unchanged parts, use short comments like: // unchanged
+- Do NOT perform large refactors unless requested.
+- For simple layout alignment/centering in UI, always use Flexbox.
 
+## Supabase & security (RLS)
+- Always use `public.users` to filter by `agency_id`.
+- NEVER use `raw_user_metadata` for access control or filters.
+- Any SQL or Supabase policy example must respect RLS.
+- Be cautious with destructive SQL (DELETE, UPDATE, ALTER). Prefer parameterized examples and explain the impact.
 
-## 1. STRUCTURE DES TABLES (Source de vérité)
+## Naming conventions
+- Respect existing prefixes exactly:
+  - `artwork_` for artwork fields
+  - `artist_` for artist fields
+  - `expo_` for exhibition fields
+- Do not rename columns or tables unless explicitly requested.
+- Keep SQL aliases short and clear.
 
-### Table: public.users
-- id (uuid, PK), role_id (int4), agency_id (uuid), created_at (timestamp)
-- user_email, user_phone, user_prenom, user_nom, user_photo_url, user_roles, user_expo_id, user_control, user_agencie (text), user_age (Age),
+## Joins & types
+- Use UUID foreign keys for joins:
+  - artworks.artwork_artist_id -> artists.artist_id
+  - artworks.artwork_expo_id   -> expos.id or expos.expo_id (according to existing usage)
+  - artworks.artwork_agency_id -> agencies.id
+  - daily_stats.agency_id      -> agencies.id
+  - daily_stats.artwork_id     -> artworks.artwork_id
+  - daily_stats.expo_id        -> expos.id or expos.expo_id
+  - expo_user_role.expo_id     -> expos.id or expos.expo_id
+- Prefer explicit JOINs (INNER/LEFT JOIN) with ON clauses.
+- Keep the number of joined tables minimal for readability.
 
-### Table: public.roles_user
-- role_id (int4, PK), role_name (text), label (text), regles_accès (text), droits_acces (text)
+## Domain enum – Age
+Enum `Age` values (use these exact labels, no variants):
+- `0-12 ans (Enfant)`
+- `13-17 ans (adolescent)`
+- `18-24 ans (Jeunes adultes / Étudiants)`
+- `25-34 ans (Jeunes actifs)`
+- `35-44 ans (Actifs confirmés)`
+- `45-54 ans (Actifs expérimentés)`
+- `55-64 ans (Actifs très expérimentés)`
+- `65 ans et plus (Retraités)`
 
-### Table: public.artworks
-- artwork_id (uuid, PK), artwork_agency_id (uuid), artwork_expo_id (uuid), artwork_artist_id (uuid), artwork_prompt_style_id (uuid)
-- artwork_title, artwork_status, artwork_room_name, artwork_fingerprint, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qrcode_image, artwork_qr_code_url (text)
-- artwork_description (jsonb), artwork_moyenne_coeurs (numeric), artwork_total_visites (int4)
-- artwork_created_at, artwork_deleted_at (timestamp)
+## Core tables (schema reference)
 
-### Table: public.expos
-- id (uuid, PK), expo_id (uuid), agency_id (uuid)
-- expo_name, lieu_expo, city_expo, zip_expo, adress_expo (text)
-- date_expo_du, date_expo_au (date), created_at (timestamp)
-- curator, curator_name, logo_curator, logo_expo, logo2_expo, email_ref_expo, tel_ref_expo, ref_expo, bubble_id, agencie_name (text)
+### agencies
+- `id` uuid NOT NULL
+- `name_agency` text NOT NULL
+- `logo_agency` text NULL
+- `created_at` timestamptz NULL
+- `logo2_agency` text NULL
+- `adresse_agency` text NULL
+- `compl_adresse_agency` text NULL
+- `zip_agency` text NULL
+- `city_agency` text NULL
+- `cedex_agency` text NULL
+- `phone_agency` text NULL
+- `mail_agency` text NULL
+- `web_agency` text NULL
+- `acronyme_expo` text NULL
 
-### Table: public.agencies
-- id (uuid, PK), name_agency, mail_agency, phone_agency, web_agency, logo_agency, logo2_agency, acronyme_expo (text)
-- city_agency, zip_agency, adresse_agency, compl_adresse_agency, cedex_agency (text)
-- created_at (timestamp)
+### artists
+- `artist_id` uuid NOT NULL
+- `artist_lastname` text NULL
+- `artist_firstname` text NULL
+- `artist_nickname` text NULL
+- `artist_bio` text NULL
+- `artist_email` text NULL
+- `artist_phone` text NULL
+- `artist_photo_url` text NULL
+- `artist_birth_date` date NULL
+- `artist_initiale_artist` text NULL
+- `artist_control` text NULL
+- `artist_created_at` timestamptz NULL
+- `artist_typ` text NULL
+- `artist_pays` text NULL
+- `artist_zipcode` text NULL
+- `artist_ville` text NULL
+- `artist_adresse` text NULL
+- `artist_address` text NULL
+- `artist_city` text NULL
+- `artist_deleted_at` timestamptz NULL
 
-### Table: public.artists
-- artist_id (uuid, PK), artist_firstname, artist_lastname, artist_nickname, artist_email, artist_phone (text)
-- artist_address, artist_adresse, artist_city, artist_ville, artist_zipcode, artist_pays, artist_bio, artist_photo_url, artist_typ, artist_control, artist_initiale_artist (text)
-- artist_birth_date (date), artist_created_at, artist_deleted_at (timestamp)
+### artworks
+- `artwork_id` uuid NOT NULL
+- `artwork_artist_id` uuid NULL
+- `artwork_expo_id` uuid NULL
+- `artwork_agency_id` uuid NULL
+- `artwork_description` jsonb NULL
+- `artwork_photo_url` text NULL
+- `artwork_qr_code_url` text NULL
+- `artwork_room_name` text NULL
+- `artwork_status` text NULL
+- `artwork_moyenne_coeurs` numeric NULL
+- `artwork_total_visites` integer NULL
+- `artwork_created_at` timestamptz NULL
+- `artwork_prompt_style_id` uuid NULL
+- `artwork_title` text NULL
+- `artwork_qrcode_image` text NULL
+- `artwork_fingerprint` text NULL
+- `artwork_source_material` text NULL
+- `artwork_image_url` text NULL
+- `artwork_deleted_at` timestamptz NULL
 
-### Table: public.visitor_feedback
-- id (uuid, PK), heart_rating (int4), comment_text (text), submitted_at (timestamp)
-- expo_id (uuid), agency_id (uuid), artwork_id (uuid), visitor_id (text), emotion_id (int4)
+### expos
+- `id` uuid NOT NULL
+- `agency_id` uuid NULL
+- `expo_name` text NOT NULL
+- `lieu_expo` text NULL
+- `logo_expo` text NULL
+- `curator_name` text NULL
+- `created_at` timestamptz NULL
+- `expo_id` uuid NULL
+- `curator` text NULL
+- `logo2_expo` text NULL
+- `date_expo_du` date NULL
+- `date_expo_au` date NULL
+- `adress_expo` text NULL
+- `zip_expo` text NULL
+- `city_expo` text NULL
 
-### Table: public.visitors
-- id (uuid, PK), visitor_name, visitor_prenom, visitor_age, visitor_country, visitor_zipcode, visitor_ville, visitor_adresse (text)
-- ip_address, browser_name, device_type, city, country (text), first_seen_at (timestamp)
+### daily_stats
+- `id` integer NOT NULL
+- `agency_id` uuid NULL
+- `artwork_id` uuid NULL
+- `expo_id` uuid NULL
+- `day` date NULL
+- `visits_count` integer NULL
+- `avg_heart_rating` numeric NULL
 
-### Table: public.prompt_style
-- id (uuid, PK), name, icon, persona_identity, system_instruction, style_rules (text)
-- agency_id (uuid), ordonnancement (numeric), max_tokens (int4), created_at (timestamp)
+### expo_user_role
+- `id` uuid NOT NULL
+- `expo_id` uuid NULL
+- `user_id` uuid NULL
+- `notes` text NULL
+- `assigned_at` timestamptz NULL
 
-### Autres tables (Structure simplifiée)
-- **matrice_securite**: id, role_id, ressource, lecture (bool), ecriture (bool)
-- **visit_logs**: id, visitor_id, artwork_id, emotion_id, session_token, visited_at
-- **social_links**: id, artist_id, link_type_id, url, type_link
-- **expo_user_role**: id, user_id, expo_id, assigned_at, notes
-- **daily_stats**: id, day, agency_id, expo_id, artwork_id, visits_count, avg_heart_rating
-- **app_settings**: key, value, max_tokens (numeric), max_caract (numeric)
-- **emotions**: id, name_emotion, icone_emotion
-- **postcode**: id, city_name, zip_codes, country
-- **curator_invitation**: id, expo_id, invited_email, invited_at
-- **social_link_types**: id, label
+## Query generation rules
+- Use the exact column names as defined above (no renaming, no guessing).
+- For filters by agency, derive `agency_id` through `public.users` and respect RLS.
+- Prefer `SELECT ... FROM ... LEFT JOIN ... ON ...` with explicit conditions.
+- If relationships or constraints are unclear, ask for clarification instead of guessing.
+- For front-end layout suggestions, default to Flexbox for simple alignment tasks.
 
-## 2. CONSIGNES DE DÉVELOPPEMENT
-- **Sécurité RLS** : TOUJOURS utiliser `public.users` pour filtrer par `agency_id`. Ne JAMAIS utiliser `raw_user_metadata`.
-- **Nommage** : Respecter strictement les préfixes (ex: `artwork_`, `artist_`, `expo_name`).
-- **Jointures** : Utiliser les types UUID pour les clés étrangères.
+## Output rules
+- When editing an existing file, show only the relevant diff/snippet.
+- Keep comments short and practical.
+- Follow the existing coding style in the project.

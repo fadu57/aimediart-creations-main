@@ -1217,7 +1217,7 @@ const VisitorView = () => {
             <span className="inline-flex h-6 w-6 items-center justify-center">
               <Heart className="h-3.5 w-3.5 text-[#E63946]" fill="none" strokeWidth={2} />
             </span>
-            <h3 className="font-bold text-[13px] whitespace-nowrap text-[#F0F0F0]">Quelle émotion suggère cette œuvre</h3>
+            <h3 className="font-bold text-[13px] whitespace-nowrap text-[#F0F0F0]">L'émotion ressentie devant cette oeuvre</h3>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {emotionsDb.map((emo) => {
@@ -1299,23 +1299,32 @@ const VisitorView = () => {
           ref={actionBarRef}
           className="œuvre-action-bar -mt-3 border-t border-white/10 bg-[rgba(18,18,18,0.9)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
         >
-          <div className="œuvre-action-row w-full min-w-0 flex-row">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleResetFeedbackSelection}
-              className="œuvre-action-btn h-12 shadow-none border-white/35 bg-[#1E1E1E] px-2 text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
-            >
-              Corriger
-            </Button>
-            <Button
-              type="button"
-              onClick={handleValidateFeeling}
-              disabled={submittingFeedback || !canSubmitFeedback}
-              className="œuvre-action-btn h-12 px-2 text-base leading-tight shadow-none transition-all duration-200 gradient-gold gradient-gold-hover-bg text-primary-foreground hover:brightness-105 hover:saturate-125"
-            >
-              {submittingFeedback ? "Enregistrement..." : "Je valide !"}
-            </Button>
+          <div className="œuvre-action-row w-full min-w-0 flex flex-row justify-between items-center px-4">
+            <div className="flex flex-row space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetFeedbackSelection}
+                className="w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
+              >
+                Corriger
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
+              >
+                Commenter
+              </Button>
+              <Button
+                type="button"
+                onClick={handleValidateFeeling}
+                disabled={submittingFeedback || !canSubmitFeedback}
+                className="w-[100px] h-12 text-base leading-tight shadow-none transition-all duration-200 gradient-gold gradient-gold-hover-bg text-primary-foreground hover:brightness-105 hover:saturate-125"
+              >
+                {submittingFeedback ? "Enregistrement..." : "Valider"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1472,7 +1481,9 @@ const VisitorView = () => {
                 </>
               )}
               <br />
-              Nous espérons vous revoir très bientôt !
+              Nous avons été ravi de vous présenter cette exposition.
+              <br />
+              Nous espérons vous revoir très bientôt ! Au plaisir !
             </p>
             <Button
               type="button"

@@ -574,10 +574,13 @@ const Catalogue = () => {
 
   const handleGenerateQrForArtwork = useCallback(
     async (artworkId: string) => {
+      console.log("handleGenerateQrForArtwork appelée pour artworkId:", artworkId);
       if (role_id === 7) return;
       if (generatingQrForArtworkId) return;
       const originOverride = await getQrBaseOriginFromSettings();
+      console.log("originOverride:", originOverride);
       const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
+      console.log("URL générée pour le QR code (from Catalogue.tsx):", targetUrl);
       if (!targetUrl) {
         toast.error("Impossible de construire l'URL du QR.");
         return;

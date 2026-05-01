@@ -1,10 +1,33 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, ChevronRight, Heart, HeartHandshake, Loader2, Menu, MessagesSquare, QrCode, X } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  ChevronRight,
+  Cloud,
+  Heart,
+  HeartHandshake,
+  Loader2,
+  Menu,
+  MessagesSquare,
+  MonitorPlay,
+  QrCode,
+  Smartphone,
+  ThermometerSun,
+  Wind,
+  X,
+} from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ForestCanopySketch } from "@/components/ForestCanopySketch";
+import expositionVivantePhoto from "@/assets/exposition-vivante.png";
+import outputCreatifPhoto from "@/assets/output-creatif.png";
+import parcoursPhoto from "@/assets/parcours.png";
+import tarifsPhoto from "@/assets/tarifs.png";
+import accessibilitePhoto from "@/assets/accessibilite.png";
+import contactPhoto from "@/assets/contact.png";
 
 type PricingRow = {
   pricing_label: string | null;
@@ -19,28 +42,31 @@ type PricingRow = {
 
 const BRAND_RED = "hsl(0 65% 48%)";
 const BRAND_RED_DARK = "hsl(0 62% 38%)";
+/** Rouge marque pour le mot « AIMEDIArt » sur la vitrine */
+const AIMEDIART_WORD_RED = "text-[#E63946]";
+
+function highlightAimediartWord(text: string): ReactNode {
+  const parts = text.split(/(AIMEDIArt)/g);
+  return parts.map((part, i) =>
+    part === "AIMEDIArt" ? (
+      <span key={`aim-${i}`} className={AIMEDIART_WORD_RED}>
+        AIMEDIArt
+      </span>
+    ) : (
+      <span key={`txt-${i}`}>{part}</span>
+    )
+  );
+}
+
 const UNSPLASH_HERO_IMAGE =
   "/landing-hero-new.png";
-const UNSPLASH_GALLERY_IMAGE =
-  "https://images.unsplash.com/photo-1768924401996-4c8d79462660?auto=format&fit=crop&w=1400&q=80";
 const UNSPLASH_DASHBOARD_IMAGE =
   "/landing-dashboard-new.png";
-const UNSPLASH_INCLUSIVE_IMAGE =
-  "https://images.unsplash.com/photo-1770910200099-745991a725de?auto=format&fit=crop&w=1400&q=80";
-const UNSPLASH_MUSEUM_CROWD_IMAGE =
-  "https://images.unsplash.com/photo-1758592376385-d5296e694beb?auto=format&fit=crop&w=1600&q=80";
-const UNSPLASH_ART_VIEWING_IMAGE =
-  "https://images.unsplash.com/photo-1770910200099-745991a725de?auto=format&fit=crop&w=1600&q=80";
-const UNSPLASH_EXHIBIT_WALK_IMAGE =
-  "https://images.unsplash.com/photo-1770910200099-745991a725de?auto=format&fit=crop&w=1600&q=80";
-const UNSPLASH_GALLERY_COUPLE_IMAGE =
-  "https://images.unsplash.com/photo-1518281053204-48de9654fb37?auto=format&fit=crop&w=1600&q=80";
-
 type AnchorItem = { id: string; label: string };
 const ANCHORS: AnchorItem[] = [
-  { id: "concept", label: "Concept" },
+  { id: "accueil", label: "Accueil" },
+  { id: "exposition-vivante", label: "Exposition vivante" },
   { id: "parcours", label: "Parcours" },
-  { id: "pour-qui", label: "Pour qui" },
   { id: "tarifs", label: "Tarifs" },
   { id: "accessibilite", label: "Accessibilité" },
   { id: "contact", label: "Contact" },
@@ -108,7 +134,10 @@ function LogoMark({ compact }: { compact?: boolean }) {
         </span>
       </div>
       <div className="min-w-0 leading-tight">
-        <div className={`font-sans font-bold tracking-tight ${compact ? "text-[1.12rem]" : "text-[1.42rem]"}`} style={{ color: BRAND_RED }}>AIMEDIArt.com</div>
+        <div className={`font-sans font-bold tracking-tight ${compact ? "text-[1.12rem]" : "text-[1.42rem]"}`}>
+          <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span>
+          <span style={{ color: BRAND_RED }}>.com</span>
+        </div>
         <div className={`${compact ? "text-[12.5px]" : "text-[15.5px]"} font-semibold italic`} style={{ color: BRAND_RED }}>Art-mediation with AI</div>
       </div>
     </div>
@@ -123,15 +152,18 @@ function FloatingNav({
   setIsMobileOpen: (v: boolean) => void;
 }) {
   const NavItems = (
-    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-1">
+    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-0.5 xl:gap-1">
       {ANCHORS.map((item) => (
         <a
           key={item.id}
           href={`#${item.id}`}
-          className="group inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          className="group inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring lg:gap-1 lg:px-1.5 lg:py-1 lg:text-[13px] lg:leading-tight"
           onClick={() => setIsMobileOpen(false)}
         >
-          <span className="h-2.5 w-2.5 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946]" aria-hidden />
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946] lg:h-1.5 lg:w-1.5"
+            aria-hidden
+          />
           {item.label}
         </a>
       ))}
@@ -141,12 +173,12 @@ function FloatingNav({
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 border-b border-neutral-300/70 bg-white/85 backdrop-blur-md">
-        <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between px-5 sm:px-6">
+        <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between gap-3 px-5 sm:px-6">
           <div className="shrink-0">
             <LogoMark compact />
           </div>
-          <div className="hidden items-center gap-2 lg:flex">
-            <div className="rounded-xl border border-neutral-200 bg-[#faf9f7] px-2 py-1">
+          <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 lg:flex">
+            <div className="max-w-full rounded-xl border border-neutral-200 bg-[#faf9f7] px-1 py-0.5 sm:px-1.5 sm:py-1">
               {NavItems}
             </div>
             <Link
@@ -218,30 +250,46 @@ function Section({
   eyebrow,
   title,
   children,
+  surfaceCard = false,
 }: {
   id: string;
   eyebrow?: string;
   title: string;
   children: ReactNode;
+  /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
+  surfaceCard?: boolean;
 }) {
+  const inner = (
+    <>
+      {eyebrow ? (
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">{eyebrow}</p>
+      ) : null}
+      <h2 className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
+        {title}
+      </h2>
+      <div className="mt-9">{children}</div>
+    </>
+  );
+
   return (
     <section id={id} className="scroll-mt-[68px] pb-16 pt-6 sm:pb-24 sm:pt-8">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
-        {eyebrow ? (
-          <p
-            className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]"
-            style={{ textShadow: "0 0 8px rgba(255, 255, 255, 0.95)" }}
-          >
-            {eyebrow}
-          </p>
-        ) : null}
-        <h2
-          className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]"
-          style={{ textShadow: "0 0 12px rgba(230, 57, 70, 0.55)" }}
-        >
-          {title}
-        </h2>
-        <div className="mt-9">{children}</div>
+        {surfaceCard ? (
+          <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
+            <div
+              className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
+              aria-hidden
+            />
+            <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+            <div
+              className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
+              aria-hidden
+            />
+            {inner}
+          </div>
+        ) : (
+          inner
+        )}
       </div>
     </section>
   );
@@ -396,52 +444,58 @@ export default function PublicHome() {
         <FloatingNav isMobileOpen={mobileNavOpen} setIsMobileOpen={setMobileNavOpen} />
 
         <div>
-        <section className="pb-14 pt-20 sm:pb-18 lg:pt-6">
+        <section id="accueil" className="scroll-mt-[68px] pb-14 pt-20 sm:pb-18 lg:pt-6">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
+              <div className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl" aria-hidden />
               <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
               <div className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]" aria-hidden />
-              <h1 className="mt-4 max-w-[16ch] font-serif text-[2.05rem] font-semibold leading-[1.05] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:text-5xl lg:text-[3.5rem]">
-                L’art qui vous parle, littéralement
-              </h1>
-              <p className="mt-5 max-w-[92ch] text-[1rem] leading-relaxed text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.15rem]">
-                Le visiteur passe au-dessus des nuages avec un assistant incarnant l’artiste via un simple QR-code.
-                <span className="mt-3 block text-foreground/80">
-                  Les œuvres bénéficient d&apos;une toute autre lumière 🌤️!
-                </span>
-                <span className="mt-3 block text-foreground/80">
-                  Moins de jargon, plus d’attention ; moins de discours vertical, plus de feedback.
-                </span>
+              <p className="mt-2 max-w-[52ch] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#E63946]/90">
+                Feedback invisible · Exposition vivante
               </p>
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <a href="#parcours" className="w-full sm:w-auto">
+              <h1 className="mt-4 max-w-[18ch] font-serif text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]">
+                Quand l&apos;expo respire
+                <br />
+                avec ses visiteurs
+              </h1>
+              <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.12rem]">
+                Dans une exposition classique, la récolte d&apos;avis casse souvent le rythme : formulaire à la sortie, borne froide, promesse de questionnaire.{" "}
+                <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> propose autre chose : une médiation qui continue, une oreille discrète, et un grand écran qui devient le{" "}
+                <strong className="font-semibold text-foreground">miroir de l&apos;âme</strong> de la salle — ce que le public ressent, sans qu&apos;il ait l&apos;impression d&apos;être « sondé ».
+              </p>
+              <p className="mt-4 max-w-[88ch] text-[1rem] leading-[1.75] text-foreground/78 sm:text-[1.05rem]">
+                Plus il y a de monde et d&apos;interactions sincères, plus la scénographie émotionnelle s&apos;enrichit. Le cercle vertueux commence : un geste sur le téléphone,
+                une réponse sur le mur — et l&apos;exposition vit.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <a href="#exposition-vivante" className="w-full sm:w-auto">
                   <Button
                     className="h-11 w-full rounded-xl px-5 text-sm font-semibold sm:w-auto"
                     style={{ backgroundColor: BRAND_RED_DARK, color: "white" }}
                   >
-                    Le parcours visiteur
+                    Découvrir la vision
                     <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                   </Button>
                 </a>
-                <a href="#concept" className="w-full sm:w-auto">
+                <a href="#parcours" className="w-full sm:w-auto">
                   <Button variant="outline" className="h-11 w-full rounded-xl border-neutral-300 bg-white/80 px-5 sm:w-auto">
-                    Une médiation dialoguée
+                    Le parcours visiteur
                   </Button>
                 </a>
               </div>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-neutral-300/70 bg-white p-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Scan QR-code</div>
+                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float">
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">QR sans application</div>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <div className="max-w-[16ch] text-sm leading-relaxed text-foreground/85">Un geste simple devant l’œuvre</div>
+                    <div className="max-w-[18ch] text-sm leading-relaxed text-foreground/85">Une web-app : scanner, dialoguer, ressentir.</div>
                     <div className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-2" aria-hidden>
                       <QrCode className="h-6 w-6 text-[#9d2525]" />
                     </div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-neutral-300/70 bg-white p-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Mode de langage</div>
-                  <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">Expert, Poète, Enfant…</div>
+                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float-delayed">
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Langage sur mesure</div>
+                  <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">Expert, Poète, Enfant, FALC… le ton suit le visiteur.</div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Icônes des modes de langage">
                     {(promptIcons.length > 0 ? promptIcons : ["🎓", "🪶", "🧒", "✨"]).map((icon, idx) => (
                       <span
@@ -454,10 +508,10 @@ export default function PublicHome() {
                     ))}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-neutral-300/70 bg-white p-4">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Vote émotionnel</div>
+                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float">
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Cœurs & émotions</div>
                   <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">
-                    De 1 à 5 cœurs
+                    Des « likes » narratifs qui nourrissent la salle en direct.
                     <span className="mt-1 block text-[#9D2525]">❤️❤️❤️❤️❤️</span>
                   </div>
                 </div>
@@ -470,87 +524,192 @@ export default function PublicHome() {
                   loading="eager"
                 />
               </figure>
-              <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[48ch]">
-                « Une médiation qui n’écrase pas, qui accueille ;
-                <br />
-                une parole qui n’impose pas, qui relie. »
+              <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
+                « Ce n&apos;est pas un tableau Excel dans le coin : c&apos;est une extension vivante de l&apos;expo — un double sens où la médiation et le ressenti ne font plus qu&apos;un. »
               </blockquote>
             </div>
           </div>
         </section>
 
-        <Section id="concept" eyebrow="Problème / solution" title="Des cartels illisibles… à une médiation dialoguée">
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card className="rounded-3xl border-neutral-300/70 bg-[#fdfdfc] shadow-[0_12px_24px_rgba(0,0,0,0.05)]">
-              <CardHeader>
-                <CardTitle className="font-serif text-xl">Cartels traditionnels</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2.5 text-sm leading-relaxed text-foreground/80">
-                <p>Complexes, intimidants, parfois confus ou inadaptés.</p>
-                <ul className="space-y-1">
-                  <li className="flex gap-2">
-                    <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
-                    <span>Langage d&apos;initiés et sur-information</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
-                    <span>Une lecture « obligatoire »</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px]">–</span>
-                    <span>Accessibilité souvent limitée</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-            <Card className="rounded-3xl border-[rgba(168,23,29,0.22)] bg-[#fdfbf9] shadow-[0_12px_24px_rgba(0,0,0,0.05)]">
-              <CardHeader>
-                <CardTitle className="font-serif text-xl">
-                  Solution <span className="text-[#E63946]">AIMEDIArt</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2.5 text-sm leading-relaxed text-foreground/80">
-                <p>Médiation personnalisée, émotionnelle, accessible.</p>
-                <ul className="space-y-1">
-                  <li className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <span>Vous avancez à votre rythme</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <span>Choix d’un ton (Expert, Poète, Enfant…)</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <span>Retour émotionnel simple (1 à 5 cœurs)</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
+        <Section surfaceCard id="exposition-vivante" eyebrow="Une exposition qui apprend" title="Le feedback devient une respiration collective">
+          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+            <p>
+              <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> installe une <strong className="font-semibold text-foreground">écoute scénographique</strong> : ce que la plupart des expositions devinent à peine — le vrai ressenti —
+              devient une matière visible et partagée. Le visiteur ne « remplit » rien : il poursuit la conversation commencée devant l&apos;œuvre.
+            </p>
+            <p>
+              L&apos;écran géant n&apos;affiche pas des statistiques froides ; il révèle le pouls de la salle. Même dans un silence feutré, on voit l&apos;activité émotionnelle bouillonner :
+              cela rassure, invite à s&apos;attarder, et replace chaque regard au centre du récit.
+            </p>
           </div>
-          <figure className="mt-5 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
-            <div className="relative">
+          <figure className="mt-8 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
-                src={UNSPLASH_GALLERY_IMAGE}
-                alt="Public dans une galerie d’art contemporain"
-                className="h-56 w-full object-cover object-[center_42%] sm:h-72"
+                src={expositionVivantePhoto}
+                alt="Visiteurs au sein d&apos;une installation d&apos;exposition, bannières et espace immersif"
+                className="home-hero-image"
                 loading="lazy"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.24),rgba(0,0,0,0.02)_55%)]" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
           </figure>
         </Section>
 
-        <Section id="parcours" eyebrow="Parcours visiteur" title="Un parcours en 3 étapes, lisible en un coup d’œil">
-          <figure className="mb-5 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative">
+        <Section surfaceCard id="oreille-attentive" eyebrow="Feedback invisible" title="L'oreille attentive — la suite naturelle du dialogue">
+          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+            <p>
+              Le « sondage » n&apos;est plus une insert brutale entre deux salles. <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> lit les <strong className="font-semibold text-foreground">réactions immédiates</strong>, les intonations du texte libre,
+              les battements de cœurs donnés à une œuvre : sans questionnaire imposé, le système comprend par exemple qu&apos;une technique a surpris, ému ou clarifié quelque chose pour le visiteur.
+            </p>
+            <p>
+              Pour le lieu et les partenaires, c&apos;est un rapport qui parle d&apos;efficacité et d&apos;engagement — le « pouls » de l&apos;expo en direct. Pour l&apos;artiste et le curateur,
+              c&apos;est un tableau de bord vivant : ajuster une lumière, préciser un cartel, répondre depuis l&apos;atelier quand la salle murmure son incompréhension ou son émerveillement.
+            </p>
+          </div>
+        </Section>
+
+        <Section surfaceCard id="output-creatif" eyebrow="L'écran géant" title="Trois visages pour le ressenti — au-delà du tableau Excel">
+          <p className="max-w-[72ch] text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+            Ce n&apos;est pas une extension de tableur collée au mur : c&apos;est une <strong className="font-semibold text-foreground">scénographie du feedback</strong>. Trois grammaires visuelles pour dire la même vérité — celle du public.
+          </p>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-violet-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 hover:-translate-y-0.5">
+              <CardHeader className="pb-2">
+                <div className="mb-3 flex h-24 items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-400/25 via-fuchsia-400/20 to-transparent ph-animate-float">
+                  <Cloud className="h-14 w-14 text-indigo-500/90" strokeWidth={1.25} aria-hidden />
+                </div>
+                <CardTitle className="font-serif text-lg">Nuage de particules</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm leading-relaxed text-foreground/80">
+                Chaque retour devient une particule colorée qui nourrit une forme mouvante : le mur respire avec les mots et les cœurs reçus.
+              </CardContent>
+            </Card>
+            <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-rose-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 hover:-translate-y-0.5">
+              <CardHeader className="pb-2">
+                <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-rose-300/25 to-amber-100/40 ph-animate-float-delayed">
+                  <Wind className="h-12 w-12 text-rose-600/85" strokeWidth={1.25} aria-hidden />
+                </div>
+                <CardTitle className="font-serif text-lg">Mur de murmures</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm leading-relaxed text-foreground/80">
+                Les phrases les plus poétiques captées par <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> apparaissent et s&apos;effacent comme une conversation collective — organique, imprévisible, humaine.
+              </CardContent>
+            </Card>
+            <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-sky-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 hover:-translate-y-0.5">
+              <CardHeader className="pb-2">
+                <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-400/30 to-emerald-300/15">
+                  <ThermometerSun className="h-12 w-12 text-sky-600/90 ph-animate-shimmer" strokeWidth={1.25} aria-hidden />
+                </div>
+                <CardTitle className="font-serif text-lg">Thermomètre émotionnel</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm leading-relaxed text-foreground/80">
+                Une jauge artistique qui montre l&apos;émotion collective de la salle en temps réel — partagée, lisible, sans jargon statistique.
+              </CardContent>
+            </Card>
+          </div>
+          <figure className="mt-10 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
-                src={UNSPLASH_ART_VIEWING_IMAGE}
-                alt="Visiteurs en train de parcourir une exposition d’art contemporain"
-                className="h-56 w-full object-cover object-[center_38%] sm:h-72"
+                src={outputCreatifPhoto}
+                alt="Visiteur en sweat à capuche bleu devant des peintures abstraites dans une galerie aux murs de pierre et poutres apparentes"
+                className="home-hero-image"
                 loading="lazy"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.2),rgba(0,0,0,0.01)_60%)]" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
+            </div>
+          </figure>
+        </Section>
+
+        <Section surfaceCard id="live-scenographie" eyebrow="L'avantage LIVE" title="Scénographie qui réagit — la forêt du climat émotionnel">
+          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+            <p>
+              La plupart des outils livrent des chiffres le lendemain. <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> joue la carte du <strong className="font-semibold text-foreground">direct</strong> : le feedback n&apos;est plus une corvée de fin de visite,
+              il devient le carburant de l&apos;exposition elle-même.
+            </p>
+            <p>
+              Imaginez une expo sur le climat : plus les visiteurs expriment de l&apos;espoir au fil du dialogue, plus l&apos;écran fait grandir une forêt lumineuse ; plus l&apos;inquiétude domine,
+              plus le paysage se fait dense et sombre. Le ressenti pilote une <strong className="font-semibold text-foreground">scénographie génératrice</strong> — le lieu et le message respirent ensemble.
+            </p>
+          </div>
+          <div className="relative mt-8 overflow-hidden rounded-2xl border border-emerald-900/25 bg-gradient-to-b from-slate-950 via-emerald-950/90 to-black px-5 py-6 sm:px-8">
+            <p className="relative z-10 max-w-[62ch] text-sm leading-relaxed text-emerald-50/95">
+              Ce que vous voyez ici est une métaphore animée : une canopée qui pulse au rythme collectif — comme votre mur pourrait pulser au rythme des visites.
+            </p>
+            <ForestCanopySketch className="relative mt-5 w-full overflow-hidden rounded-lg bg-black/20" />
+          </div>
+        </Section>
+
+        <Section surfaceCard id="sans-friction" eyebrow="Sans rupture" title="Du dernier échange à l'action — sans friction">
+          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+            <p>
+              À la fin de la médiation, <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> ne bascule pas vers « veuillez noter notre service ». Il reste dans son rôle : une voix qui demande si la passion a traversé la salle,
+              si le style reste mystérieux ou si la lumière a été comprise — <strong className="font-semibold text-foreground">questions naturelles</strong>, auxquelles on répond par émotions et cœurs, pas par cases à cocher.
+            </p>
+            <p>
+              Puis vient la transition fluide vers l&apos;utile : « Si vous souhaitez garder un souvenir de notre échange, je peux vous envoyer par e-mail la liste des œuvres qui vous ont touché ? »
+              Le visiteur laisse une adresse pour un <strong className="font-semibold text-foreground">service rendu</strong>, pas pour une intrusion marketing — une LeadGen qui naît du lien authentique.
+            </p>
+          </div>
+        </Section>
+
+        <Section surfaceCard id="pont-ecran" eyebrow="Smartphone → mur" title="Le pont temps réel entre la poche et la salle">
+          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+            <div className="space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
+              <p>
+                Chaque geste sur le téléphone déclenche une réaction sur l&apos;écran du lieu : les « cœurs » partent en <strong className="font-semibold text-foreground">pluie</strong> sur le mur quand le public liker une œuvre ;
+                une <strong className="font-semibold text-foreground">roue des émotions</strong> — ébloui, touché, intrigué, apaisé, troublé, amusé — transforme les intentions en paysage partagé.
+              </p>
+              <p>
+                Si dix personnes choisissent « apaisé » ensemble, l&apos;écran peut diffuser une onde de couleur ou une texture douce : l&apos;impact visuel porte la mémoire du groupe, pas seulement la note individuelle.
+              </p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl border border-neutral-300/80 bg-neutral-950 px-5 py-6 text-neutral-100 shadow-inner">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  <Smartphone className="h-4 w-4 text-emerald-400" aria-hidden />
+                  Visiteur
+                </div>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  <MonitorPlay className="h-4 w-4 text-sky-400" aria-hidden />
+                  Écran salle
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-4">
+                <div className="rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+                  <p className="text-[11px] font-medium text-neutral-500">Pluie de cœurs</p>
+                  <div className="ph-heart-rain-cell relative mt-3 h-24 rounded-lg bg-gradient-to-b from-rose-500/20 to-transparent">
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <span key={`h-${i}`} className="text-rose-400/90" style={{ "--i": i } as CSSProperties} aria-hidden>
+                        ♥
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+                  <p className="text-[11px] font-medium text-neutral-500">Roue des émotions</p>
+                  <div className="relative mt-3 flex h-24 items-center justify-center">
+                    <div className="ph-wave-pulse absolute h-20 w-20 rounded-full border-2 border-violet-400/40" aria-hidden />
+                    <div className="ph-wave-pulse absolute h-14 w-14 rounded-full border border-cyan-400/35 [animation-delay:0.6s]" aria-hidden />
+                    <span className="relative text-center text-xs font-medium leading-snug text-neutral-200">
+                      ébloui · touché · apaisé
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <Section surfaceCard id="parcours" eyebrow="Parcours visiteur" title="Un parcours en 3 étapes, lisible en un coup d’œil">
+          <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
+              <img
+                src={parcoursPhoto}
+                alt="Deux visiteurs dans une galerie entre deux grands portraits photographiques encadrés"
+                className="home-hero-image"
+                loading="lazy"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
           </figure>
           <div className="relative grid gap-4 lg:grid-cols-3">
@@ -652,52 +811,16 @@ export default function PublicHome() {
 
         </Section>
 
-        <Section id="pour-qui" eyebrow="Pour qui ?" title="Un outil pensé pour des acteurs culturels différents">
-          <figure className="mb-5 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative">
+        <Section surfaceCard id="tarifs" title="Des offres claires, adaptées au rythme des expositions">
+          <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
-                src={UNSPLASH_MUSEUM_CROWD_IMAGE}
-                alt="Public nombreux devant une œuvre dans un musée"
-                className="h-56 w-full object-cover object-[center_30%] sm:h-72"
+                src={tarifsPhoto}
+                alt="Visiteur observant un grand tirage paysage montagne dans une galerie"
+                className="home-hero-image"
                 loading="lazy"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.22),rgba(0,0,0,0.02)_58%)]" aria-hidden />
-            </div>
-          </figure>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { title: "Artistes", text: <>Une médiation fidèle, incarnée,<br />qui respecte l’intention.</> },
-              { title: "Commissaires d’exposition", text: <>Un tableau de bord utile,<br />sans complexifier la visite.</> },
-              { title: "Galeries", text: <>Une expérience premium<br />et un retour sur la réception.</> },
-              { title: "Associations", text: <>Une médiation accueillante,<br />adaptable à tous les publics.</> },
-              { title: "Musées / institutions", text: "Un dispositif compatible multi-sites et multi-expos." },
-              { title: "Lieux multi-sites", text: <>Un cadre cohérent, réplicable,<br />et pilotable dans le temps.</> },
-            ].map((c, index) => (
-              <Card
-                key={c.title}
-                className={`rounded-3xl border-neutral-300/70 shadow-[0_10px_22px_rgba(0,0,0,0.05)] transition-all hover:-translate-y-[1px] hover:shadow-[0_14px_28px_rgba(0,0,0,0.07)] focus-within:ring-1 focus-within:ring-[rgba(168,23,29,0.22)] ${
-                  index % 3 === 0 ? "bg-white" : index % 3 === 1 ? "bg-[#fbfaf8]" : "bg-[#f8f6f2]"
-                }`}
-              >
-                <CardHeader className="pb-2">
-                  <CardTitle className="font-serif text-lg">{c.title}</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm leading-relaxed text-foreground/80">{c.text}</CardContent>
-              </Card>
-            ))}
-          </div>
-        </Section>
-
-        <Section id="tarifs" title="Des offres claires, adaptées au rythme des expositions">
-          <figure className="mb-5 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative">
-              <img
-                src={UNSPLASH_EXHIBIT_WALK_IMAGE}
-                alt="Visiteurs qui circulent dans une exposition avec œuvres accrochées"
-                className="h-56 w-full object-cover object-[center_36%] sm:h-72"
-                loading="lazy"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.2),rgba(0,0,0,0.01)_60%)]" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
           </figure>
           <div className="rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
@@ -793,7 +916,7 @@ export default function PublicHome() {
                           </div>
                           <CardTitle className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{displayPlan}</CardTitle>
                           <p className="text-sm leading-relaxed text-muted-foreground">
-                            {subtitle}
+                            {highlightAimediartWord(subtitle)}
                           </p>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -862,24 +985,28 @@ export default function PublicHome() {
           </div>
         </Section>
 
-        <Section id="accessibilite" eyebrow="Réassurance" title="Une médiation pensée pour le confort de tous les publics">
-          <figure className="mb-4 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
-            <div className="relative">
+        <Section surfaceCard id="accessibilite" eyebrow="Connexion sans friction" title="Un parcours qui s’adapte à chaque regard">
+          <p className="max-w-[68ch] text-sm leading-relaxed text-foreground/80">
+            Scan près de l&apos;œuvre, aucune application à installer : la web-app s&apos;ouvre, propose des profils de lecture (enfant, expert, poète, langage simplifié…) ou suit la langue du téléphone,
+            puis ramène le visiteur vers le feedback sans jamais casser la déambulation.
+          </p>
+          <figure className="mb-4 mt-8 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
-                src={UNSPLASH_INCLUSIVE_IMAGE}
-                alt="Public varié découvrant un musée dans un espace inclusif"
-                className="h-56 w-full object-cover object-[center_38%] sm:h-72"
+                src={accessibilitePhoto}
+                alt="Visiteur senior avec canne parcourant une exposition photographique aux murs blancs"
+                className="home-hero-image"
                 loading="lazy"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.2),rgba(0,0,0,0.01)_62%)]" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
           </figure>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { title: "Smartphone d’abord", text: "Pensé pour un usage sur place, en mobilité." },
-              { title: "Pour tous les publics", text: "Sélectionneur de médiation interactive" },
-              { title: "Attention FALC", text: "Facile à Lire et à Comprendre, quand c’est nécessaire." },
-              { title: "Chaleureux & culturel", text: "Une tonalité éditoriale, premium et humaine." },
+              { title: "QR immédiat", text: "Aucune install : le geste devant l’œuvre ouvre la médiation." },
+              { title: "Profils de lecture", text: "Du ton expert au ton poétique, jusqu’au FALC si besoin." },
+              { title: "Cœurs narratifs", text: "Un bouton central, comme un live social — l’intérêt se lit en direct." },
+              { title: "Humain & précis", text: "Une voix chaleureuse qui transforme derrière le rideau les émotions en données utiles." },
             ].map((x, i) => (
               <div
                 key={x.title}
@@ -894,23 +1021,24 @@ export default function PublicHome() {
           </div>
         </Section>
 
-        <Section id="contact" eyebrow="Contact" title="Parlons de votre exposition">
-          <figure className="mb-5 overflow-hidden rounded-3xl border border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative">
+        <Section surfaceCard id="contact" eyebrow="Contact" title="Donnez une voix — et un écran — à votre prochaine exposition">
+          <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
-                src={UNSPLASH_GALLERY_COUPLE_IMAGE}
-                alt="Deux visiteurs observant une œuvre dans une galerie"
-                className="h-56 w-full object-cover object-[center_30%] sm:h-72"
+                src={contactPhoto}
+                alt="Deux visiteurs de dos, devant des photographies encadrées sur un mur de galerie"
+                className="home-hero-image"
                 loading="lazy"
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.23),rgba(0,0,0,0.01)_60%)]" aria-hidden />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
           </figure>
           <div className="rounded-[2rem] border border-neutral-300/70 bg-[#faf9f7] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-8">
-            <p className="max-w-[68ch] text-sm leading-relaxed text-foreground/80">
-              Vous préparez une exposition, une résidence, ou un parcours multi-sites ?
-              <br />
-              <span className="text-[#E63946]">AIMEDIArt</span> s’adapte au contexte.
+            <p className="max-w-[70ch] text-sm leading-relaxed text-foreground/80">
+              Résidence, musée, galerie ou itinérance multi-sites : racontez-nous votre scénographie et la manière dont vous voulez entendre votre public.
+              <span className="mt-2 block">
+                <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> fusionne médiation et feedback pour que l&apos;aller-retour soit aussi naturel qu&apos;une conversation dans la salle.
+              </span>
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
               <a href="mailto:contact@aimediart.com" className="w-full sm:w-auto">
