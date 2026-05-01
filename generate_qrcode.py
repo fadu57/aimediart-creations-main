@@ -47,21 +47,19 @@ def generate_qr_code(data: str, filename: str, file_format: str = 'png'):
 
 # --- Exemple d'utilisation ---
 if __name__ == "__main__":
-    url_example_short = "https://www.google.com"
-    url_example_long = "https://fr.wikipedia.org/wiki/Code_QR_et_code_barres_2D_-_Principes_de_fonctionnement_et_applications_dans_l%27industrie"
+    site_url = "https://www.aimediart.com/"
 
-    # Générer un QR code PNG avec une URL courte
-    print("Génération d'un QR code PNG avec une URL courte...")
-    generate_qr_code(url_example_short, "mon_qrcode_court", "png")
+    # Générer un QR code PNG pour le site
+    print("Génération d'un QR code PNG pour le site AI-MEDIArt.com...")
+    generate_qr_code(site_url, "qrcode_aimediart", "png")
 
-    # Générer un QR code SVG avec une URL courte
-    print("Génération d'un QR code SVG avec une URL courte...")
-    generate_qr_code(url_example_short, "mon_qrcode_court_svg", "svg")
+    # Générer un QR code SVG pour le site
+    print("Génération d'un QR code SVG pour le site AI-MEDIArt.com...")
+    generate_qr_code(site_url, "qrcode_aimediart_svg", "svg")
 
-    # Générer un QR code PNG avec une URL longue (cela déclenchera la suggestion)
-    print("\nGénération d'un QR code PNG avec une URL longue...")
-    generate_qr_code(url_example_long, "mon_qrcode_long", "png")
-
-    # Générer un QR code SVG avec une URL longue (cela déclenchera la suggestion)
-    print("\nGénération d'un QR code SVG avec une URL longue...")
-    generate_qr_code(url_example_long, "mon_qrcode_long_svg", "svg")
+    # Pour une URL qui pourrait être longue, je réutilise la même logique mais avec l'URL du site
+    # afin de démontrer que la suggestion de raccourcisseur de lien s'activera si la longueur dépasse le seuil défini.
+    # Note: L'URL de votre site est courte, donc la suggestion ne s'activera pas ici,
+    # mais le code est prêt si vous aviez une URL plus complexe pour AI-MEDIArt.com.
+    print("\nGénération d'un QR code PNG pour une URL potentiellement longue de AI-MEDIArt.com...")
+    generate_qr_code(site_url + "/quelque/chose/d/assez/long/pour/declencher/la/suggestion/de/raccourcisseur/de/lien/si/ca/depasse/le/seuil/de/70/caracteres", "qrcode_aimediart_long_test", "png")
