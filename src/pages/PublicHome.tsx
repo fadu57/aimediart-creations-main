@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -18,22 +19,26 @@ import {
   X,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ForestCanopySketch } from "@/components/ForestCanopySketch";
 import expositionVivantePhoto from "@/assets/exposition-vivante.png";
+import oreilleAttentivePhoto from "@/assets/oreille-attentive.png";
 import outputCreatifPhoto from "@/assets/output-creatif.png";
 import parcoursPhoto from "@/assets/parcours.png";
 import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
 
+/** Ligne `pricing` Supabase — colonnes alignées sur la table (annuel = généré, lecture seule). */
 type PricingRow = {
   pricing_label: string | null;
   pricing_plan: string | null;
-  pricing_max_œuvres: number | null;
-  pricing_max_oeuvres?: number | null;
+  pricing_max_oeuvres: number | null;
+  /** Faute « princing » = nom réel de la colonne en base. */
+  princing_max_visitors: number | null;
   pricing_is_unlimited: boolean | null;
   pricing_monthly_ttc_eur: number | null;
   pricing_annual_remis: number | null;
@@ -77,8 +82,45 @@ function formatEur(value: number | null | undefined): string {
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
 }
 
+/** Mensuel TTC : 0 → GRATUIT, NULL → Sur Devis, sinon montant + €/mois. */
+function formatMonthlyTtcDisplay(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "Sur Devis";
+  if (value === 0) return "GRATUIT";
+  const n = typeof value === "number" && !Number.isNaN(value) ? value : Number(value);
+  if (!Number.isFinite(n)) return "Sur Devis";
+  if (n === 0) return "GRATUIT";
+  return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(n)}\u00a0€/mois`;
+}
+
+function toPricingNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number" && !Number.isNaN(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 function normalizePlan(plan: string | null): string {
   return (plan ?? "").trim().toUpperCase();
+}
+
+/** Compare les noms de plan sans tenir compte des accents (ZÉNITH / ZENITH). */
+function planNameAsciiUpper(plan: string | null): string {
+  return normalizePlan(plan)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+/** Zénith / Zenith : non affiché sur la vitrine tarifs ; filtré avant le groupement. */
+function isZenithPlanName(plan: string | null): boolean {
+  return planNameAsciiUpper(plan).includes("ZENITH");
+}
+
+/** Offre Rayonnement : libellés et mise en page spécifiques sur la carte tarifs. */
+function isRayonnementPlanName(plan: string | null): boolean {
+  return planNameAsciiUpper(plan).includes("RAYONNEMENT");
 }
 
 const PLAN_ORDER: Record<string, number> = {
@@ -92,16 +134,21 @@ const PLAN_ORDER: Record<string, number> = {
   "LE RAYONNEMENT": 3,
 };
 
+/** Clé de tri croissante (les lignes Zénith sont exclues du rendu tarifs). */
 function planSortKey(plan: string | null): number {
   const key = normalizePlan(plan);
-  return PLAN_ORDER[key] ?? 999;
+  return PLAN_ORDER[key] ?? 100;
 }
 
 function capacityLabel(row: PricingRow): string {
-  if (row.pricing_is_unlimited) return "Nombre illimité d'œuvres";
-  const max = typeof row.pricing_max_œuvres === "number" ? row.pricing_max_œuvres : row.pricing_max_oeuvres;
-  if (typeof max === "number" && max > 0) return `${max} œuvres maxi`;
-  return "Sur mesure";
+  if (row.pricing_is_unlimited) return "∞ œuvres · ∞ visiteurs";
+  const maxOeuvres = row.pricing_max_oeuvres;
+  const maxVisitors = row.princing_max_visitors;
+  const oeuvresPart =
+    typeof maxOeuvres === "number" && maxOeuvres > 0 ? `${maxOeuvres} œuvres maxi` : "Œuvres sur mesure";
+  const visitorsPart =
+    typeof maxVisitors === "number" && maxVisitors > 0 ? `${maxVisitors} visiteurs maxi` : "Visiteurs sur mesure";
+  return `${oeuvresPart} · ${visitorsPart}`;
 }
 
 function planEditorialDescription(plan: string): string {
@@ -116,7 +163,7 @@ function planEditorialDescription(plan: string): string {
     return "Pour galeries, associations ou structures multi-projets.";
   }
   if (upper.includes("RAYONNEMENT")) {
-    return "Pour institutions, musées et besoins multi-sites.";
+    return "Une offre sur mesure pour de grands événements.";
   }
   return "Offre AIMEDIArt.";
 }
@@ -245,16 +292,96 @@ function FloatingNav({
   );
 }
 
+const surfaceCardMotionSpring = { type: "spring" as const, stiffness: 300, damping: 24 };
+
+/** Ombre au repos : très discrète */
+const surfaceCardShadowRest = "0 2px 8px rgba(0, 0, 0, 0.045)";
+/** Ombre au survol : soft shadow (tailwind-like depth) */
+const surfaceCardShadowHover =
+  "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)";
+
+const surfaceCardOuterVariants = {
+  rest: {
+    scale: 1,
+    boxShadow: surfaceCardShadowRest,
+    transition: surfaceCardMotionSpring,
+  },
+  hover: {
+    scale: 1.025,
+    boxShadow: surfaceCardShadowHover,
+    transition: surfaceCardMotionSpring,
+  },
+};
+
+/** Réduit le mouvement : pas d’échelle ni d’ombre animée ; ombre statique via classe. */
+const surfaceCardOuterVariantsReduced = {
+  rest: { scale: 1 },
+  hover: { scale: 1 },
+};
+
+const surfaceCardContentVariants = {
+  rest: { opacity: 0.92 },
+  hover: {
+    opacity: 1,
+    transition: { duration: 0.28, ease: "easeOut" as const },
+  },
+};
+
+const surfaceCardContentVariantsReduced = {
+  rest: { opacity: 0.92 },
+  hover: {
+    opacity: 1,
+    transition: { duration: 0.22, ease: "easeOut" as const },
+  },
+};
+
+function SurfaceCardMotion({
+  decorations,
+  children,
+}: {
+  decorations: ReactNode;
+  children: ReactNode;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <div className="mx-2 my-3 sm:mx-3 sm:my-4">
+      <motion.div
+        className={cn(
+          "relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 sm:p-10 lg:p-12",
+          prefersReducedMotion && "shadow-[0_12px_28px_rgba(0,0,0,0.06)]",
+        )}
+        variants={prefersReducedMotion ? surfaceCardOuterVariantsReduced : surfaceCardOuterVariants}
+        initial="rest"
+        whileHover="hover"
+        style={prefersReducedMotion ? undefined : { transformOrigin: "50% 50%" }}
+      >
+        {decorations}
+        <motion.div
+          variants={prefersReducedMotion ? surfaceCardContentVariantsReduced : surfaceCardContentVariants}
+          initial="rest"
+          className="relative z-10"
+        >
+          {children}
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
+
 function Section({
   id,
   eyebrow,
+  eyebrowClassName,
   title,
   children,
   surfaceCard = false,
 }: {
   id: string;
   eyebrow?: string;
-  title: string;
+  /** Classes additionnelles pour le surtitre (eyebrow), ex. alignement ou largeur ciblée */
+  eyebrowClassName?: string;
+  title: ReactNode;
   children: ReactNode;
   /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
   surfaceCard?: boolean;
@@ -262,7 +389,14 @@ function Section({
   const inner = (
     <>
       {eyebrow ? (
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">{eyebrow}</p>
+        <p
+          className={cn(
+            "text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]",
+            eyebrowClassName,
+          )}
+        >
+          {eyebrow}
+        </p>
       ) : null}
       <h2 className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
         {title}
@@ -275,18 +409,23 @@ function Section({
     <section id={id} className="scroll-mt-[68px] pb-16 pt-6 sm:pb-24 sm:pt-8">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
         {surfaceCard ? (
-          <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
-            <div
-              className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
-              aria-hidden
-            />
-            <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
-            <div
-              className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
-              aria-hidden
-            />
+          <SurfaceCardMotion
+            decorations={
+              <>
+                <div
+                  className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
+                  aria-hidden
+                />
+                <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+                <div
+                  className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
+                  aria-hidden
+                />
+              </>
+            }
+          >
             {inner}
-          </div>
+          </SurfaceCardMotion>
         ) : (
           inner
         )}
@@ -356,27 +495,16 @@ export default function PublicHome() {
     const run = async () => {
       setPricingLoading(true);
       setPricingError(null);
-      // Requêtes tolérantes: certains environnements exposent `pricing_annuel`, d'autres non.
       const sb = supabase as unknown as {
         from: (table: string) => {
           select: (columns: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
         };
       };
-      const pricingSelectCandidates = [
-        "pricing_label,pricing_plan,pricing_max_oeuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis,pricing_annuel",
-        "pricing_label,pricing_plan,pricing_max_oeuvres,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis",
-      ];
-      const loadPricing = async () => {
-        let lastRes: { data: unknown; error: { message?: string } | null } = { data: null, error: null };
-        for (const columns of pricingSelectCandidates) {
-          const res = await sb.from("pricing").select(columns);
-          lastRes = res;
-          if (!res.error) return res;
-        }
-        return lastRes;
-      };
+      /** Sélection lecture seule ; ne pas modifier pricing_annuel / pricing_annual_remis côté insert/update. */
+      const pricingColumns =
+        "pricing_label,pricing_plan,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis,pricing_annuel";
       const [pricingRes, promptIconsRes] = await Promise.all([
-        loadPricing(),
+        sb.from("pricing").select(pricingColumns),
         sb.from("prompt_style").select("icon"),
       ]);
       if (cancelled) return;
@@ -389,18 +517,18 @@ export default function PublicHome() {
       const iconRows = (promptIconsRes.data as Array<{ icon?: string | null }> | null) ?? [];
       const cleanedIcons = [...new Set(iconRows.map((r) => (r.icon ?? "").trim()).filter(Boolean))];
       setPromptIcons(cleanedIcons.slice(0, 8));
-      const rawPricingRows = (pricingRes.data as PricingRow[] | null) ?? [];
-      const normalizedPricingRows = rawPricingRows.map((row) => {
-        const maxWithLigature = row.pricing_max_œuvres;
-        const maxAscii = row.pricing_max_oeuvres;
-        return {
-          ...row,
-          pricing_max_œuvres:
-            typeof maxWithLigature === "number"
-              ? maxWithLigature
-              : (typeof maxAscii === "number" ? maxAscii : null),
-        };
-      });
+      const rawPricingRows = (pricingRes.data as Record<string, unknown>[] | null) ?? [];
+      const normalizedPricingRows: PricingRow[] = rawPricingRows.map((row) => ({
+        pricing_label: typeof row.pricing_label === "string" || row.pricing_label === null ? (row.pricing_label as string | null) : null,
+        pricing_plan: typeof row.pricing_plan === "string" || row.pricing_plan === null ? (row.pricing_plan as string | null) : null,
+        pricing_max_oeuvres: toPricingNumber(row.pricing_max_oeuvres),
+        princing_max_visitors: toPricingNumber(row.princing_max_visitors),
+        pricing_is_unlimited:
+          row.pricing_is_unlimited === true ? true : row.pricing_is_unlimited === false ? false : null,
+        pricing_monthly_ttc_eur: toPricingNumber(row.pricing_monthly_ttc_eur),
+        pricing_annual_remis: toPricingNumber(row.pricing_annual_remis),
+        pricing_annuel: toPricingNumber(row.pricing_annuel) ?? undefined,
+      }));
       setPricingRows(normalizedPricingRows);
       setPricingLoading(false);
     };
@@ -411,18 +539,21 @@ export default function PublicHome() {
   }, []);
 
   const groupedPlans = useMemo(() => {
-    const rows = [...pricingRows].filter((r) => (r.pricing_plan ?? "").trim().length > 0);
+    const rows = [...pricingRows].filter(
+      (r) => (r.pricing_plan ?? "").trim().length > 0 && !isZenithPlanName(r.pricing_plan),
+    );
     rows.sort((a, b) => {
       const p = planSortKey(a.pricing_plan) - planSortKey(b.pricing_plan);
       if (p !== 0) return p;
       const aUnlimited = Boolean(a.pricing_is_unlimited);
       const bUnlimited = Boolean(b.pricing_is_unlimited);
       if (aUnlimited !== bUnlimited) return aUnlimited ? 1 : -1; // illimité en dernier
-      const aMax = typeof a.pricing_max_œuvres === "number" ? a.pricing_max_œuvres : a.pricing_max_oeuvres;
-      const bMax = typeof b.pricing_max_œuvres === "number" ? b.pricing_max_œuvres : b.pricing_max_oeuvres;
-      const aCap = typeof aMax === "number" ? aMax : Number.POSITIVE_INFINITY;
-      const bCap = typeof bMax === "number" ? bMax : Number.POSITIVE_INFINITY;
-      return aCap - bCap;
+      const aOeuvres = typeof a.pricing_max_oeuvres === "number" ? a.pricing_max_oeuvres : 0;
+      const bOeuvres = typeof b.pricing_max_oeuvres === "number" ? b.pricing_max_oeuvres : 0;
+      if (aOeuvres !== bOeuvres) return aOeuvres - bOeuvres;
+      const aVis = typeof a.princing_max_visitors === "number" ? a.princing_max_visitors : 0;
+      const bVis = typeof b.princing_max_visitors === "number" ? b.princing_max_visitors : 0;
+      return aVis - bVis;
     });
 
     const map = new Map<string, PricingRow[]>();
@@ -446,10 +577,15 @@ export default function PublicHome() {
         <div>
         <section id="accueil" className="scroll-mt-[68px] pb-14 pt-20 sm:pb-18 lg:pt-6">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
-            <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_18px_40px_rgba(0,0,0,0.07)] sm:p-10 lg:p-12">
-              <div className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl" aria-hidden />
-              <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
-              <div className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]" aria-hidden />
+            <SurfaceCardMotion
+              decorations={
+                <>
+                  <div className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl" aria-hidden />
+                  <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+                  <div className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]" aria-hidden />
+                </>
+              }
+            >
               <p className="mt-2 max-w-[52ch] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#E63946]/90">
                 Feedback invisible · Exposition vivante
               </p>
@@ -459,13 +595,16 @@ export default function PublicHome() {
                 avec ses visiteurs
               </h1>
               <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.12rem]">
-                Dans une exposition classique, la récolte d&apos;avis casse souvent le rythme : formulaire à la sortie, borne froide, promesse de questionnaire.{" "}
+                Dans une exposition classique, la récolte d&apos;avis casse souvent le rythme : formulaire à la sortie, borne froide, promesse de questionnaire.
+                <br />
                 <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> propose autre chose : une médiation qui continue, une oreille discrète, et un grand écran qui devient le{" "}
                 <strong className="font-semibold text-foreground">miroir de l&apos;âme</strong> de la salle — ce que le public ressent, sans qu&apos;il ait l&apos;impression d&apos;être « sondé ».
               </p>
               <p className="mt-4 max-w-[88ch] text-[1rem] leading-[1.75] text-foreground/78 sm:text-[1.05rem]">
-                Plus il y a de monde et d&apos;interactions sincères, plus la scénographie émotionnelle s&apos;enrichit. Le cercle vertueux commence : un geste sur le téléphone,
-                une réponse sur le mur — et l&apos;exposition vit.
+                Plus il y a de monde et d&apos;interactions sincères, plus la scénographie émotionnelle s&apos;enrichit.
+                <br />
+                Le cercle vertueux commence : un geste sur le téléphone,
+                une réponse, une interaction — et l&apos;exposition vit.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a href="#exposition-vivante" className="w-full sm:w-auto">
@@ -485,7 +624,7 @@ export default function PublicHome() {
               </div>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">QR sans application</div>
+                  <div className="text-xs font-bold tracking-[0.12em] text-muted-foreground">QR-Code sans application</div>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
                     <div className="max-w-[18ch] text-sm leading-relaxed text-foreground/85">Une web-app : scanner, dialoguer, ressentir.</div>
                     <div className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-2" aria-hidden>
@@ -494,7 +633,7 @@ export default function PublicHome() {
                   </div>
                 </div>
                 <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float-delayed">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Langage sur mesure</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Langage adapté</div>
                   <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">Expert, Poète, Enfant, FALC… le ton suit le visiteur.</div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Icônes des modes de langage">
                     {(promptIcons.length > 0 ? promptIcons : ["🎓", "🪶", "🧒", "✨"]).map((icon, idx) => (
@@ -511,8 +650,7 @@ export default function PublicHome() {
                 <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float">
                   <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">Cœurs & émotions</div>
                   <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">
-                    Des « likes » narratifs qui nourrissent la salle en direct.
-                    <span className="mt-1 block text-[#9D2525]">❤️❤️❤️❤️❤️</span>
+                    Des « likes » narratifs qui nourrissent l&apos;expo en direct.
                   </div>
                 </div>
               </div>
@@ -525,20 +663,31 @@ export default function PublicHome() {
                 />
               </figure>
               <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
-                « Ce n&apos;est pas un tableau Excel dans le coin : c&apos;est une extension vivante de l&apos;expo — un double sens où la médiation et le ressenti ne font plus qu&apos;un. »
+                Un feedback dynamique — « Ce n&apos;est pas un tableau Excel dans le coin : c&apos;est une extension vivante de l&apos;expo — un double sens où la médiation et le ressenti ne font plus qu&apos;un. »
               </blockquote>
-            </div>
+            </SurfaceCardMotion>
           </div>
         </section>
 
-        <Section surfaceCard id="exposition-vivante" eyebrow="Une exposition qui apprend" title="Le feedback devient une respiration collective">
+        <Section
+          surfaceCard
+          id="exposition-vivante"
+          eyebrow="Une exposition qui vibre"
+          title={
+            <>
+              Le feedback devient
+              <br />
+              une respiration collective
+            </>
+          }
+        >
           <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
             <p>
-              <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> installe une <strong className="font-semibold text-foreground">écoute scénographique</strong> : ce que la plupart des expositions devinent à peine — le vrai ressenti —
+              <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> est une <strong className="font-semibold text-foreground">écoute scénographique</strong> : ce que la plupart des expositions devinent à peine — le vrai ressenti —
               devient une matière visible et partagée. Le visiteur ne « remplit » rien : il poursuit la conversation commencée devant l&apos;œuvre.
             </p>
             <p>
-              L&apos;écran géant n&apos;affiche pas des statistiques froides ; il révèle le pouls de la salle. Même dans un silence feutré, on voit l&apos;activité émotionnelle bouillonner :
+              Un écran qui n&apos;affiche pas des statistiques froides ; il révèle le pouls de la salle. Même dans un silence feutré, on voit l&apos;activité émotionnelle bouillonner :
               cela rassure, invite à s&apos;attarder, et replace chaque regard au centre du récit.
             </p>
           </div>
@@ -555,20 +704,55 @@ export default function PublicHome() {
           </figure>
         </Section>
 
-        <Section surfaceCard id="oreille-attentive" eyebrow="Feedback invisible" title="L'oreille attentive — la suite naturelle du dialogue">
-          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
-            <p>
-              Le « sondage » n&apos;est plus une insert brutale entre deux salles. <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> lit les <strong className="font-semibold text-foreground">réactions immédiates</strong>, les intonations du texte libre,
-              les battements de cœurs donnés à une œuvre : sans questionnaire imposé, le système comprend par exemple qu&apos;une technique a surpris, ému ou clarifié quelque chose pour le visiteur.
-            </p>
-            <p>
-              Pour le lieu et les partenaires, c&apos;est un rapport qui parle d&apos;efficacité et d&apos;engagement — le « pouls » de l&apos;expo en direct. Pour l&apos;artiste et le curateur,
-              c&apos;est un tableau de bord vivant : ajuster une lumière, préciser un cartel, répondre depuis l&apos;atelier quand la salle murmure son incompréhension ou son émerveillement.
-            </p>
+        <Section
+          surfaceCard
+          id="oreille-attentive"
+          eyebrow="Feedback invisible"
+          eyebrowClassName="text-left w-[500px]"
+          title={
+            <>
+              L&apos;oreille attentive,
+              <br />
+              la suite naturelle du dialogue
+            </>
+          }
+        >
+          <div className="flex w-full max-w-full flex-col gap-8 lg:w-[900px] lg:flex-row lg:items-start lg:gap-8">
+            <div className="w-full min-w-0 flex-1 space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem] lg:min-w-0">
+              <p>
+                Le « sondage » n&apos;est plus une insert brutale entre deux salles. <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> lit les <strong className="font-semibold text-foreground">réactions immédiates</strong>, les intonations du texte libre,
+                les battements de cœurs donnés à une œuvre : sans questionnaire imposé, le système comprend par exemple qu&apos;une technique a surpris, ému ou clarifié quelque chose pour le visiteur.
+              </p>
+              <p>
+                Pour le lieu et les partenaires, c&apos;est un rapport qui parle d&apos;efficacité et d&apos;engagement — le « pouls » de l&apos;expo en direct. Pour l&apos;artiste et le curateur,
+                c&apos;est un tableau de bord vivant : ajuster une lumière, préciser un cartel, répondre depuis l&apos;atelier quand la salle murmure son incompréhension ou son émerveillement.
+              </p>
+            </div>
+            <div className="w-full min-w-0 text-left lg:flex lg:h-[350px] lg:w-[300px] lg:shrink-0 lg:flex-col lg:items-end lg:justify-end lg:text-right">
+              <figure className="ml-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
+                <img
+                  src={oreilleAttentivePhoto}
+                  alt="Illustration — médiation et écoute au sein de l&apos;exposition"
+                  className="aspect-[4/3] w-full max-w-[300px] overflow-visible object-cover object-center object-bottom sm:aspect-[5/4] lg:aspect-auto lg:h-[350px] lg:min-h-[350px] lg:w-[300px]"
+                  loading="lazy"
+                />
+              </figure>
+            </div>
           </div>
         </Section>
 
-        <Section surfaceCard id="output-creatif" eyebrow="L'écran géant" title="Trois visages pour le ressenti — au-delà du tableau Excel">
+        <Section
+          surfaceCard
+          id="output-creatif"
+          eyebrow="L'écran géant"
+          title={
+            <>
+              Trois visages pour le ressenti
+              <br />
+              — au-delà du tableau Excel
+            </>
+          }
+        >
           <p className="max-w-[72ch] text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
             Ce n&apos;est pas une extension de tableur collée au mur : c&apos;est une <strong className="font-semibold text-foreground">scénographie du feedback</strong>. Trois grammaires visuelles pour dire la même vérité — celle du public.
           </p>
@@ -620,7 +804,18 @@ export default function PublicHome() {
           </figure>
         </Section>
 
-        <Section surfaceCard id="live-scenographie" eyebrow="L'avantage LIVE" title="Scénographie qui réagit — la forêt du climat émotionnel">
+        <Section
+          surfaceCard
+          id="live-scenographie"
+          eyebrow="L'avantage LIVE"
+          title={
+            <>
+              Une scénographie qui réagit :
+              <br />
+              une canopée du climat émotionnel
+            </>
+          }
+        >
           <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
             <p>
               La plupart des outils livrent des chiffres le lendemain. <span className={AIMEDIART_WORD_RED}>AIMEDIArt</span> joue la carte du <strong className="font-semibold text-foreground">direct</strong> : le feedback n&apos;est plus une corvée de fin de visite,
@@ -635,7 +830,10 @@ export default function PublicHome() {
             <p className="relative z-10 max-w-[62ch] text-sm leading-relaxed text-emerald-50/95">
               Ce que vous voyez ici est une métaphore animée : une canopée qui pulse au rythme collectif — comme votre mur pourrait pulser au rythme des visites.
             </p>
-            <ForestCanopySketch className="relative mt-5 w-full overflow-hidden rounded-lg bg-black/20" />
+            <p className="relative z-10 mt-5 w-full text-right text-sm font-semibold italic text-red-500 sm:text-base">
+              Cliquer sur le bloc ci-dessous pour voir l&apos;animation en plein écran
+            </p>
+            <ForestCanopySketch className="relative mt-3 w-full overflow-hidden rounded-lg bg-black/20" />
           </div>
         </Section>
 
@@ -652,7 +850,18 @@ export default function PublicHome() {
           </div>
         </Section>
 
-        <Section surfaceCard id="pont-ecran" eyebrow="Smartphone → mur" title="Le pont temps réel entre la poche et la salle">
+        <Section
+          surfaceCard
+          id="pont-ecran"
+          eyebrow="Smartphone → mur"
+          title={
+            <>
+              Le pont temps réel entre
+              <br />
+              smartphone et smart-expo !
+            </>
+          }
+        >
           <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
             <div className="space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
               <p>
@@ -700,7 +909,18 @@ export default function PublicHome() {
           </div>
         </Section>
 
-        <Section surfaceCard id="parcours" eyebrow="Parcours visiteur" title="Un parcours en 3 étapes, lisible en un coup d’œil">
+        <Section
+          surfaceCard
+          id="parcours"
+          eyebrow="Parcours visiteur"
+          title={
+            <>
+              Un parcours en 3 étapes,
+              <br />
+              lisible en un coup d&apos;œil
+            </>
+          }
+        >
           <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
@@ -811,7 +1031,17 @@ export default function PublicHome() {
 
         </Section>
 
-        <Section surfaceCard id="tarifs" title="Des offres claires, adaptées au rythme des expositions">
+        <Section
+          surfaceCard
+          id="tarifs"
+          title={
+            <>
+              Des offres claires,
+              <br />
+              adaptées au rythme des expositions
+            </>
+          }
+        >
           <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <img
@@ -880,10 +1110,16 @@ export default function PublicHome() {
                     const isHighlight = /HORIZON|ATELIER/.test(displayPlan.toUpperCase());
                     const rawLabel = first?.pricing_label?.trim() ?? "";
                     const repeatsPlanName = rawLabel.toUpperCase().includes(displayPlan.toUpperCase());
-                    const subtitle = rawLabel && !repeatsPlanName ? rawLabel : planEditorialDescription(displayPlan);
                     const selectedIndexRaw = selectedVariantByPlan[planKey] ?? 0;
                     const selectedIndex = Math.min(Math.max(selectedIndexRaw, 0), Math.max(variants.length - 1, 0));
                     const selectedVariant = variants[selectedIndex];
+                    const isRayonnementCard = isRayonnementPlanName(displayPlan);
+                    const subtitle =
+                      rawLabel && !repeatsPlanName
+                        ? rawLabel
+                        : isRayonnementCard
+                          ? "Une offre sur mesure pour de grands événements."
+                          : planEditorialDescription(displayPlan);
                     let badgeLabel = "Recommandé";
                     if (isHighlight) {
                       recommendedBadgeCount += 1;
@@ -895,9 +1131,10 @@ export default function PublicHome() {
                     return (
                       <Card
                         key={planKey}
-                        className={`rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ${
-                          isHighlight ? "ring-1 ring-[rgba(168,23,29,0.22)]" : ""
-                        }`}
+                        className={cn(
+                          "rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)]",
+                          isHighlight && "ring-1 ring-[rgba(168,23,29,0.22)]",
+                        )}
                       >
                         <CardHeader className="pb-3">
                           <div className="mb-2 flex items-center justify-between">
@@ -910,7 +1147,7 @@ export default function PublicHome() {
                                 className="h-8 rounded-lg px-3 text-xs font-semibold"
                                 style={{ backgroundColor: "#9D2525", color: "white" }}
                               >
-                                Commander
+                                {isRayonnementCard ? "Demander un devis" : "Commander"}
                               </Button>
                             </Link>
                           </div>
@@ -946,30 +1183,57 @@ export default function PublicHome() {
                           {selectedVariant ? (
                             <div className="rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
                               <div className="flex flex-col gap-3">
-                                <div className="flex items-center justify-between gap-3">
+                                <div
+                                  className={cn(
+                                    "flex items-center justify-between gap-3",
+                                    isRayonnementCard && "lg:justify-start",
+                                  )}
+                                >
                                   <div>
-                                    <div className="text-sm font-semibold">{capacityLabel(selectedVariant)}</div>
-                                  </div>
-                                  <span className="rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground/80">
-                                    Option {selectedIndex + 1}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-2">
-                                  <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
-                                    <div className="text-[11px] font-medium text-muted-foreground">Mensuel TTC</div>
-                                    <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">{formatEur(selectedVariant.pricing_monthly_ttc_eur)}</div>
-                                  </div>
-                                  <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
-                                    <div className="text-[11px] font-medium text-muted-foreground">Annuel TTC</div>
-                                    <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                                      <span className="text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">{formatEur(selectedVariant.pricing_annual_remis)}</span>
-                                      {typeof selectedVariant.pricing_annuel === "number" && !Number.isNaN(selectedVariant.pricing_annuel) ? (
-                                        <span className="text-[20px] font-bold italic leading-none text-[#9d2525] line-through">
-                                          {formatEur(selectedVariant.pricing_annuel)}
-                                        </span>
-                                      ) : null}
+                                    <div className="text-sm font-semibold leading-snug">
+                                      {isRayonnementCard
+                                        ? selectedVariant.pricing_label != null &&
+                                          selectedVariant.pricing_label.trim() !== ""
+                                          ? highlightAimediartWord(selectedVariant.pricing_label.trim())
+                                          : null
+                                        : capacityLabel(selectedVariant)}
                                     </div>
                                   </div>
+                                  {!isRayonnementCard ? (
+                                    <span className="rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground/80">
+                                      Option {selectedIndex + 1}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div
+                                  className={cn(
+                                    "grid gap-2",
+                                    isRayonnementCard
+                                      ? "grid-cols-1 sm:max-w-xs"
+                                      : "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]",
+                                  )}
+                                >
+                                  <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
+                                    <div className="text-[11px] font-medium text-muted-foreground">Mensuel TTC</div>
+                                    <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                      {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur)}
+                                    </div>
+                                  </div>
+                                  {!isRayonnementCard ? (
+                                    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
+                                      <div className="text-[11px] font-medium text-muted-foreground">Annuel TTC</div>
+                                      <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                                        <span className="text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                          {formatEur(selectedVariant.pricing_annual_remis)}
+                                        </span>
+                                        {typeof selectedVariant.pricing_annuel === "number" && !Number.isNaN(selectedVariant.pricing_annuel) ? (
+                                          <span className="text-[20px] font-bold italic leading-none text-[#9d2525] line-through">
+                                            {formatEur(selectedVariant.pricing_annuel)}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -985,7 +1249,18 @@ export default function PublicHome() {
           </div>
         </Section>
 
-        <Section surfaceCard id="accessibilite" eyebrow="Connexion sans friction" title="Un parcours qui s’adapte à chaque regard">
+        <Section
+          surfaceCard
+          id="accessibilite"
+          eyebrow="Connexion sans friction"
+          title={
+            <>
+              Un parcours
+              <br />
+              qui s&apos;adapte à chaque regard
+            </>
+          }
+        >
           <p className="max-w-[68ch] text-sm leading-relaxed text-foreground/80">
             Scan près de l&apos;œuvre, aucune application à installer : la web-app s&apos;ouvre, propose des profils de lecture (enfant, expert, poète, langage simplifié…) ou suit la langue du téléphone,
             puis ramène le visiteur vers le feedback sans jamais casser la déambulation.

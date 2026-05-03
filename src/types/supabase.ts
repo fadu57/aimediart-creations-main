@@ -17,26 +17,30 @@ export interface Database {
         Row: {
           pricing_label: string | null;
           pricing_plan: string | null;
-          pricing_max_œuvres: number | null;
+          pricing_max_oeuvres: number | null;
+          /** Nom de colonne tel que dans Supabase (faute « princing » conservée). */
+          princing_max_visitors: number | null;
           pricing_is_unlimited: boolean | null;
           pricing_monthly_ttc_eur: number | null;
-          pricing_annual_ttc_eur: number | null;
+          /** Colonnes générées : lecture seule, ne pas inclure dans insert/update. */
+          pricing_annual_remis: number | null;
+          pricing_annuel: number | null;
         };
         Insert: {
           pricing_label?: string | null;
           pricing_plan?: string | null;
-          pricing_max_œuvres?: number | null;
+          pricing_max_oeuvres?: number | null;
+          princing_max_visitors?: number | null;
           pricing_is_unlimited?: boolean | null;
           pricing_monthly_ttc_eur?: number | null;
-          pricing_annual_ttc_eur?: number | null;
         };
         Update: {
           pricing_label?: string | null;
           pricing_plan?: string | null;
-          pricing_max_œuvres?: number | null;
+          pricing_max_oeuvres?: number | null;
+          princing_max_visitors?: number | null;
           pricing_is_unlimited?: boolean | null;
           pricing_monthly_ttc_eur?: number | null;
-          pricing_annual_ttc_eur?: number | null;
         };
         Relationships: [];
       };
