@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -32,17 +31,22 @@ import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
 
-/** Ligne `pricing` Supabase — colonnes alignées sur la table (annuel = généré, lecture seule). */
+/**
+ * Ligne `pricing` Supabase (lecture vitrine).
+ * Colonnes générées : `pricing_annuel`, `pricing_annual_remis`, `éco_annuel` — lecture seule.
+ */
 type PricingRow = {
   pricing_label: string | null;
   pricing_plan: string | null;
   pricing_max_oeuvres: number | null;
-  /** Faute « princing » = nom réel de la colonne en base. */
+  /** Nom réel en base : `princing_max_visitors` (faute volontaire). */
   princing_max_visitors: number | null;
   pricing_is_unlimited: boolean | null;
   pricing_monthly_ttc_eur: number | null;
+  pricing_annuel: number | null;
   pricing_annual_remis: number | null;
-  pricing_annuel?: number | null;
+  /** Économie annuelle (mappé depuis `éco_annuel` ou `eco_annuel`). */
+  eco_annuel: number | null;
 };
 
 const BRAND_RED = "hsl(0 65% 48%)";
@@ -140,6 +144,32 @@ function planSortKey(plan: string | null): number {
   return PLAN_ORDER[key] ?? 100;
 }
 
+/** Première lettre du nom d’abonnement (ex. L’Horizon → H, L’Atelier → A), pour libellés H1, A2… */
+function planOptionLetter(plan: string | null): string {
+  let s = planNameAsciiUpper(plan).replace(/\u2019/g, "'");
+  s = s
+    .replace(/^L['']?\s*/i, "")
+    .replace(/^LE\s+/i, "")
+    .replace(/^LA\s+/i, "")
+    .replace(/^LES\s+/i, "")
+    .trim();
+  const m = s.match(/[A-Z]/);
+  return m?.[0] ?? "?";
+}
+
+function variantOptionCode(plan: string | null, optionIndexZeroBased: number): string {
+  return `${planOptionLetter(plan)}${optionIndexZeroBased + 1}`;
+}
+
+/** Colonne « Annuel TTC » : masquée si offre gratuite ou montants annuels nuls / absents. */
+function shouldShowAnnualPricingColumn(row: PricingRow, isRayonnement: boolean): boolean {
+  if (isRayonnement) return false;
+  if (row.pricing_monthly_ttc_eur === 0) return false;
+  const ar = row.pricing_annual_remis ?? 0;
+  const af = row.pricing_annuel ?? 0;
+  return !(ar === 0 && af === 0);
+}
+
 function capacityLabel(row: PricingRow): string {
   if (row.pricing_is_unlimited) return "∞ œuvres · ∞ visiteurs";
   const maxOeuvres = row.pricing_max_oeuvres;
@@ -166,6 +196,25 @@ function planEditorialDescription(plan: string): string {
     return "Une offre sur mesure pour de grands événements.";
   }
   return "Offre AIMEDIArt.";
+}
+
+/** Titre court en tête de carte : seul le nom du palier (Étincelle, Atelier, Horizon, Rayonnement). */
+function planCardTitleShort(plan: string | null): string {
+  const ascii = planNameAsciiUpper(plan);
+  const core = ascii
+    .replace(/^L['']?\s*/i, "")
+    .replace(/^LE\s+/i, "")
+    .trim();
+
+  if (core.includes("RAYONNEMENT")) return "Rayonnement";
+  if (core.includes("HORIZON")) return "Horizon";
+  if (core.includes("ATELIER")) return "Atelier";
+  if (core.includes("ETINCELLE")) return "Étincelle";
+
+  const raw = (plan ?? "").trim();
+  if (!raw) return "Offre";
+  const first = raw.split(/\s*[–—-]\s*/)[0]?.trim() ?? raw;
+  return first.replace(/^L['’]\s*/i, "L’").replace(/^Le\s+/i, "").replace(/^La\s+/i, "").trim() || raw;
 }
 
 function LogoMark({ compact }: { compact?: boolean }) {
@@ -292,79 +341,20 @@ function FloatingNav({
   );
 }
 
-const surfaceCardMotionSpring = { type: "spring" as const, stiffness: 300, damping: 24 };
-
-/** Ombre au repos : très discrète */
-const surfaceCardShadowRest = "0 2px 8px rgba(0, 0, 0, 0.045)";
-/** Ombre au survol : soft shadow (tailwind-like depth) */
-const surfaceCardShadowHover =
-  "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)";
-
-const surfaceCardOuterVariants = {
-  rest: {
-    scale: 1,
-    boxShadow: surfaceCardShadowRest,
-    transition: surfaceCardMotionSpring,
-  },
-  hover: {
-    scale: 1.025,
-    boxShadow: surfaceCardShadowHover,
-    transition: surfaceCardMotionSpring,
-  },
-};
-
-/** Réduit le mouvement : pas d’échelle ni d’ombre animée ; ombre statique via classe. */
-const surfaceCardOuterVariantsReduced = {
-  rest: { scale: 1 },
-  hover: { scale: 1 },
-};
-
-const surfaceCardContentVariants = {
-  rest: { opacity: 0.92 },
-  hover: {
-    opacity: 1,
-    transition: { duration: 0.28, ease: "easeOut" as const },
-  },
-};
-
-const surfaceCardContentVariantsReduced = {
-  rest: { opacity: 0.92 },
-  hover: {
-    opacity: 1,
-    transition: { duration: 0.22, ease: "easeOut" as const },
-  },
-};
-
-function SurfaceCardMotion({
+/** Enveloppe « surface » (hero / sections) — divs statiques, sans Framer Motion. */
+function SurfaceCardShell({
   decorations,
   children,
 }: {
   decorations: ReactNode;
   children: ReactNode;
 }) {
-  const prefersReducedMotion = useReducedMotion();
-
   return (
     <div className="mx-2 my-3 sm:mx-3 sm:my-4">
-      <motion.div
-        className={cn(
-          "relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 sm:p-10 lg:p-12",
-          prefersReducedMotion && "shadow-[0_12px_28px_rgba(0,0,0,0.06)]",
-        )}
-        variants={prefersReducedMotion ? surfaceCardOuterVariantsReduced : surfaceCardOuterVariants}
-        initial="rest"
-        whileHover="hover"
-        style={prefersReducedMotion ? undefined : { transformOrigin: "50% 50%" }}
-      >
+      <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.06)] sm:p-10 lg:p-12">
         {decorations}
-        <motion.div
-          variants={prefersReducedMotion ? surfaceCardContentVariantsReduced : surfaceCardContentVariants}
-          initial="rest"
-          className="relative z-10"
-        >
-          {children}
-        </motion.div>
-      </motion.div>
+        <div className="relative z-10">{children}</div>
+      </div>
     </div>
   );
 }
@@ -409,7 +399,7 @@ function Section({
     <section id={id} className="scroll-mt-[68px] pb-16 pt-6 sm:pb-24 sm:pt-8">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
         {surfaceCard ? (
-          <SurfaceCardMotion
+          <SurfaceCardShell
             decorations={
               <>
                 <div
@@ -425,7 +415,7 @@ function Section({
             }
           >
             {inner}
-          </SurfaceCardMotion>
+          </SurfaceCardShell>
         ) : (
           inner
         )}
@@ -500,9 +490,8 @@ export default function PublicHome() {
           select: (columns: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
         };
       };
-      /** Sélection lecture seule ; ne pas modifier pricing_annuel / pricing_annual_remis côté insert/update. */
       const pricingColumns =
-        "pricing_label,pricing_plan,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annual_remis,pricing_annuel";
+        "pricing_label,pricing_plan,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel";
       const [pricingRes, promptIconsRes] = await Promise.all([
         sb.from("pricing").select(pricingColumns),
         sb.from("prompt_style").select("icon"),
@@ -518,17 +507,22 @@ export default function PublicHome() {
       const cleanedIcons = [...new Set(iconRows.map((r) => (r.icon ?? "").trim()).filter(Boolean))];
       setPromptIcons(cleanedIcons.slice(0, 8));
       const rawPricingRows = (pricingRes.data as Record<string, unknown>[] | null) ?? [];
-      const normalizedPricingRows: PricingRow[] = rawPricingRows.map((row) => ({
-        pricing_label: typeof row.pricing_label === "string" || row.pricing_label === null ? (row.pricing_label as string | null) : null,
-        pricing_plan: typeof row.pricing_plan === "string" || row.pricing_plan === null ? (row.pricing_plan as string | null) : null,
-        pricing_max_oeuvres: toPricingNumber(row.pricing_max_oeuvres),
-        princing_max_visitors: toPricingNumber(row.princing_max_visitors),
-        pricing_is_unlimited:
-          row.pricing_is_unlimited === true ? true : row.pricing_is_unlimited === false ? false : null,
-        pricing_monthly_ttc_eur: toPricingNumber(row.pricing_monthly_ttc_eur),
-        pricing_annual_remis: toPricingNumber(row.pricing_annual_remis),
-        pricing_annuel: toPricingNumber(row.pricing_annuel) ?? undefined,
-      }));
+      const normalizedPricingRows: PricingRow[] = rawPricingRows.map((row) => {
+        const r = row as Record<string, unknown>;
+        const ecoFromDb = toPricingNumber(r["éco_annuel"] ?? r.eco_annuel);
+        return {
+          pricing_label: typeof row.pricing_label === "string" || row.pricing_label === null ? (row.pricing_label as string | null) : null,
+          pricing_plan: typeof row.pricing_plan === "string" || row.pricing_plan === null ? (row.pricing_plan as string | null) : null,
+          pricing_max_oeuvres: toPricingNumber(row.pricing_max_oeuvres),
+          princing_max_visitors: toPricingNumber(row.princing_max_visitors),
+          pricing_is_unlimited:
+            row.pricing_is_unlimited === true ? true : row.pricing_is_unlimited === false ? false : null,
+          pricing_monthly_ttc_eur: toPricingNumber(row.pricing_monthly_ttc_eur),
+          pricing_annuel: toPricingNumber(row.pricing_annuel),
+          pricing_annual_remis: toPricingNumber(row.pricing_annual_remis),
+          eco_annuel: ecoFromDb,
+        };
+      });
       setPricingRows(normalizedPricingRows);
       setPricingLoading(false);
     };
@@ -577,7 +571,7 @@ export default function PublicHome() {
         <div>
         <section id="accueil" className="scroll-mt-[68px] pb-14 pt-20 sm:pb-18 lg:pt-6">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
-            <SurfaceCardMotion
+            <SurfaceCardShell
               decorations={
                 <>
                   <div className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl" aria-hidden />
@@ -665,7 +659,7 @@ export default function PublicHome() {
               <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
                 Un feedback dynamique — « Ce n&apos;est pas un tableau Excel dans le coin : c&apos;est une extension vivante de l&apos;expo — un double sens où la médiation et le ressenti ne font plus qu&apos;un. »
               </blockquote>
-            </SurfaceCardMotion>
+            </SurfaceCardShell>
           </div>
         </section>
 
@@ -831,7 +825,7 @@ export default function PublicHome() {
               Ce que vous voyez ici est une métaphore animée : une canopée qui pulse au rythme collectif — comme votre mur pourrait pulser au rythme des visites.
             </p>
             <p className="relative z-10 mt-5 w-full text-right text-sm font-semibold italic text-red-500 sm:text-base">
-              Cliquer sur le bloc ci-dessous pour voir l&apos;animation en plein écran
+              Cliquer sur le bloc ci-dessous pour ouvrir la projection dans un nouvel onglet (TV / projecteur).
             </p>
             <ForestCanopySketch className="relative mt-3 w-full overflow-hidden rounded-lg bg-black/20" />
           </div>
@@ -1107,6 +1101,7 @@ export default function PublicHome() {
                     return groupedPlans.map(({ planKey, variants }) => {
                     const first = variants[0];
                     const displayPlan = first?.pricing_plan?.trim() || planKey;
+                    const cardTitleShort = planCardTitleShort(displayPlan);
                     const isHighlight = /HORIZON|ATELIER/.test(displayPlan.toUpperCase());
                     const rawLabel = first?.pricing_label?.trim() ?? "";
                     const repeatsPlanName = rawLabel.toUpperCase().includes(displayPlan.toUpperCase());
@@ -1114,6 +1109,7 @@ export default function PublicHome() {
                     const selectedIndex = Math.min(Math.max(selectedIndexRaw, 0), Math.max(variants.length - 1, 0));
                     const selectedVariant = variants[selectedIndex];
                     const isRayonnementCard = isRayonnementPlanName(displayPlan);
+                    const showAnnualColumn = shouldShowAnnualPricingColumn(selectedVariant, isRayonnementCard);
                     const subtitle =
                       rawLabel && !repeatsPlanName
                         ? rawLabel
@@ -1151,7 +1147,7 @@ export default function PublicHome() {
                               </Button>
                             </Link>
                           </div>
-                          <CardTitle className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{displayPlan}</CardTitle>
+                          <CardTitle className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
                           <p className="text-sm leading-relaxed text-muted-foreground">
                             {highlightAimediartWord(subtitle)}
                           </p>
@@ -1173,7 +1169,7 @@ export default function PublicHome() {
                               >
                                 {variants.map((option, idx) => (
                                   <option key={`${planKey}-opt-${idx}`} value={idx}>
-                                    Option {idx + 1} — {capacityLabel(option)}
+                                    Option {variantOptionCode(displayPlan, idx)} — {capacityLabel(option)}
                                   </option>
                                 ))}
                               </select>
@@ -1199,42 +1195,45 @@ export default function PublicHome() {
                                         : capacityLabel(selectedVariant)}
                                     </div>
                                   </div>
-                                  {!isRayonnementCard ? (
+                                  {!isRayonnementCard && selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
                                     <span className="rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground/80">
-                                      Option {selectedIndex + 1}
+                                      Option {variantOptionCode(displayPlan, selectedIndex)}
                                     </span>
                                   ) : null}
                                 </div>
-                                <div
-                                  className={cn(
-                                    "grid gap-2",
-                                    isRayonnementCard
-                                      ? "grid-cols-1 sm:max-w-xs"
-                                      : "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]",
-                                  )}
-                                >
-                                  <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
-                                    <div className="text-[11px] font-medium text-muted-foreground">Mensuel TTC</div>
-                                    <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
-                                      {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur)}
-                                    </div>
-                                  </div>
-                                  {!isRayonnementCard ? (
+                                {!isRayonnementCard ? (
+                                  <div
+                                    className={cn(
+                                      "grid gap-2",
+                                      showAnnualColumn
+                                        ? "grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+                                        : "grid-cols-1",
+                                    )}
+                                  >
                                     <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
-                                      <div className="text-[11px] font-medium text-muted-foreground">Annuel TTC</div>
-                                      <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                                        <span className="text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
-                                          {formatEur(selectedVariant.pricing_annual_remis)}
-                                        </span>
-                                        {typeof selectedVariant.pricing_annuel === "number" && !Number.isNaN(selectedVariant.pricing_annuel) ? (
-                                          <span className="text-[20px] font-bold italic leading-none text-[#9d2525] line-through">
-                                            {formatEur(selectedVariant.pricing_annuel)}
-                                          </span>
-                                        ) : null}
+                                      <div className="text-[11px] font-medium text-muted-foreground">Mensuel TTC</div>
+                                      <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                        {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur)}
                                       </div>
                                     </div>
-                                  ) : null}
-                                </div>
+                                    {showAnnualColumn ? (
+                                      <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
+                                        <div className="text-[11px] font-medium text-muted-foreground">Annuel TTC</div>
+                                        <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                                          <span className="text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                            {formatEur(selectedVariant.pricing_annual_remis)}
+                                          </span>
+                                          {typeof selectedVariant.pricing_annuel === "number" &&
+                                          !Number.isNaN(selectedVariant.pricing_annuel) ? (
+                                            <span className="text-[20px] font-bold italic leading-none text-[#9d2525] line-through">
+                                              {formatEur(selectedVariant.pricing_annuel)}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           ) : null}

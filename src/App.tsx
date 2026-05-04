@@ -42,6 +42,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import WorkScanner from "./pages/WorkScanner";
 import PublicHome from "./pages/PublicHome";
+import ExpoCastPage from "./pages/ExpoCastPage";
 import OeuvresArtiste from "./pages/OeuvresArtiste";
 import { Loader2 } from "lucide-react";
 
@@ -125,6 +126,7 @@ const AppRoutes = () => (
   <Routes>
     {/* Landing marketing publique (sans header) */}
     <Route path="/home" element={<PublicHome />} />
+    <Route path="/expo" element={<ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
       <Route index element={<RootEntryRoute />} />
       <Route path="login" element={<Login />} />

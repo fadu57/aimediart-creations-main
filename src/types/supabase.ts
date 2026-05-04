@@ -15,16 +15,22 @@ export interface Database {
     Tables: {
       pricing: {
         Row: {
+          /** Nom d’affichage du pack (lecture). */
           pricing_label: string | null;
+          /** Clé de regroupement / plan (lecture). */
           pricing_plan: string | null;
           pricing_max_oeuvres: number | null;
-          /** Nom de colonne tel que dans Supabase (faute « princing » conservée). */
+          /** Nom réel en base (faute « princing » conservée). */
           princing_max_visitors: number | null;
           pricing_is_unlimited: boolean | null;
           pricing_monthly_ttc_eur: number | null;
-          /** Colonnes générées : lecture seule, ne pas inclure dans insert/update. */
-          pricing_annual_remis: number | null;
+          /**
+           * Colonnes générées par la base (lecture seule) — ne jamais les envoyer en insert/update.
+           */
           pricing_annuel: number | null;
+          pricing_annual_remis: number | null;
+          /** Économie annuelle (généré, lecture seule) — en base souvent `éco_annuel`. */
+          eco_annuel: number | null;
         };
         Insert: {
           pricing_label?: string | null;
