@@ -43,7 +43,8 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { approxOutputTokensFromMaxChars } from "@/lib/charsToOutputTokens";
-import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users } from "lucide-react";
+import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2 } from "lucide-react";
+import RetentionSettings from "@/components/settings/RetentionSettings";
 
 type SettingSection = {
   id: string;
@@ -87,6 +88,12 @@ const SECTIONS: SettingSection[] = [
     title: "Sécurité et accès",
     description: "Gestion des droits, des rôles et des règles d'accès.",
     icon: Shield,
+  },
+  {
+    id: "retention",
+    title: "Corbeille & rétention",
+    description: "Durées de conservation et purge automatique des corbeilles.",
+    icon: Trash2,
   },
   {
     id: "prompts-ia",
@@ -400,7 +407,13 @@ export default function SettingsPage() {
   }, [appSettingsRows]);
 
   const filteredSections = useMemo(() => {
-    const base = canAccessGeneralSettings ? SECTIONS : SECTIONS.filter((s) => s.id !== "general");
+    let base = canAccessGeneralSettings
+      ? SECTIONS
+      : SECTIONS.filter((s) => s.id !== "general");
+    // La section "retention" est réservée aux rôles 1-3 uniquement
+    if (!canAccessGeneralSettings) {
+      base = base.filter((s) => s.id !== "retention");
+    }
     const q = search.trim().toLowerCase();
     if (!q) return base;
     return base.filter((section) => {
@@ -1538,6 +1551,8 @@ export default function SettingsPage() {
                       renderNotificationsContent()
                     ) : section.id === "œuvres-navigation" ? (
                       renderOeuvresNavigationContent()
+                    ) : section.id === "retention" ? (
+                      <RetentionSettings roleId={role_id} />
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         Section en cours de configuration.

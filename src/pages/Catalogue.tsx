@@ -354,7 +354,7 @@ const Catalogue = () => {
       .select(
         "artwork_id, artwork_title, artwork_description, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
       )
-      .is("artwork_deleted_at", null)
+      .is("deleted_at", null)
       .order("artwork_title", { ascending: true, nullsFirst: false });
 
     let artworkData: ArtworkRow[] | null = null;
@@ -370,7 +370,7 @@ const Catalogue = () => {
         .select(
           "artwork_id, artwork_title, artwork_description, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status",
         )
-        .is("artwork_deleted_at", null)
+        .is("deleted_at", null)
         .order("artwork_title", { ascending: true, nullsFirst: false });
 
       const fallbackResult = await fallbackQuery;

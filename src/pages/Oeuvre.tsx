@@ -201,7 +201,7 @@ const Oeuvre = () => {
       let query = supabase
         .from("artworks")
         .select("*")
-        .is("artwork_deleted_at", null)
+        .is("deleted_at", null)
         .limit(1);
 
       if (requestedArtworkId) {
@@ -209,7 +209,7 @@ const Oeuvre = () => {
           .from("artworks")
           .select("*")
           .eq("artwork_id", requestedArtworkId)
-          .is("artwork_deleted_at", null)
+          .is("deleted_at", null)
           .limit(1);
       } else if (role_id === 4 && agency_id) {
         query = query.eq("artwork_agency_id", agency_id);

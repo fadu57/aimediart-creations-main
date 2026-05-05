@@ -71,7 +71,7 @@ export default function Artists2() {
       const { data, error: qErr } = await supabase
         .from("artists")
         .select("artist_id, artist_firstname, artist_lastname, artist_nickname, artist_typ")
-        .is("artist_deleted_at", null)
+        .is("deleted_at", null)
         .order("artist_lastname", { ascending: true, nullsFirst: false });
       if (qErr) {
         setError(qErr.message);
@@ -86,23 +86,55 @@ export default function Artists2() {
   const archiveArtist = async () => {
     if (!archiveTarget) return;
     setArchiving(true);
-    const { error: updErr } = await supabase
-      .from("artists")
-      .update({ artist_deleted_at: new Date().toISOString() })
-      .eq("artist_id", archiveTarget.artist_id);
-    if (updErr) {
-      toast.error(updErr.message);
-    } else {
-      toast.success("Artiste archivé.");
-      setArchiveTarget(null);
-      const { data } = await supabase
+    try {
+      const { data, error: updErr } = await supabase
+        .from("artists")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("artist_id", archiveTarget.artist_id)
+        .select();
+
+      console.log("[Artists2] archive artist_id=", archiveTarget.artist_id, "→ data=", data, "error=", updErr);
+
+      if (updErr) {
+        toast.error(updErr.message);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn("[Artists2] update OK mais data vide — vérifier RLS sur artists (UPDATE / deleted_at)");
+        toast.warning("Archivage demandé mais aucune ligne modifiée (vérifier les permissions RLS).");
+        return;
+      }
+
+      // Rechargement de la liste avec filtre deleted_at IS NULL
+      const { data: refreshed, error: refreshErr } = await supabase
         .from("artists")
         .select("artist_id, artist_firstname, artist_lastname, artist_nickname, artist_typ")
-        .is("artist_deleted_at", null)
+        .is("deleted_at", null)
         .order("artist_lastname", { ascending: true, nullsFirst: false });
-      setRows((data as ArtistRow[] | null) ?? []);
+
+      console.log(
+        "[Artists2] refetch après archivage → refreshed=", refreshed,
+        "refreshErr=", refreshErr,
+        "ids=", (refreshed ?? []).map((r: ArtistRow) => r.artist_id),
+      );
+
+      if (refreshErr) {
+        console.error("[Artists2] refetch échoué :", refreshErr.message);
+        toast.error("Archivé mais rechargement échoué : " + refreshErr.message);
+        return;
+      }
+
+      const nextRows = (refreshed as ArtistRow[] | null) ?? [];
+      console.log("[Artists2] setRows → nb lignes=", nextRows.length);
+      setRows(nextRows);
+
+      // Fermeture de la dialog APRÈS setRows pour éviter un re-render intermédiaire
+      setArchiveTarget(null);
+      toast.success("Artiste archivé.");
+    } finally {
+      setArchiving(false);
     }
-    setArchiving(false);
   };
 
   const searchSuggestions = useMemo(() => {
@@ -117,18 +149,21 @@ export default function Artists2() {
 
   const filteredRows = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => {
-      const haystack = [
-        text(r.artist_firstname),
-        text(r.artist_lastname),
-        text(r.artist_nickname),
-        specialtyLabel(r),
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+    const result = q
+      ? rows.filter((r) => {
+          const haystack = [
+            text(r.artist_firstname),
+            text(r.artist_lastname),
+            text(r.artist_nickname),
+            specialtyLabel(r),
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(q);
+        })
+      : rows;
+    console.log("[Artists2] filteredRows recalcul → rows.length=", rows.length, "filteredRows.length=", result.length);
+    return result;
   }, [rows, searchTerm]);
 
   const sortedRows = useMemo(() => {
@@ -143,6 +178,7 @@ export default function Artists2() {
       const cmp = pick(a).localeCompare(pick(b), "fr", { sensitivity: "base" });
       return sortDir === "asc" ? cmp : -cmp;
     });
+    console.log("[Artists2] sortedRows recalcul → length=", list.length, "ids=", list.map((r) => r.artist_id));
     return list;
   }, [filteredRows, sortKey, sortDir]);
 
@@ -184,7 +220,13 @@ export default function Artists2() {
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
+  console.log("[Artists2 RENDER] sortedRows=", sortedRows.map(r => ({ id: r.artist_id, nom: r.artist_lastname, deleted: (r as ArtistRow & { deleted_at?: string | null }).deleted_at ?? "n/a" })));
+
   return (
+    <div>
+      <div style={{ position: "fixed", top: 0, right: 0, background: "red", color: "white", padding: "4px 8px", zIndex: 9999, fontSize: 12 }}>
+        Artists2 — {sortedRows.length} lignes
+      </div>
     <div className="mx-auto w-full max-w-[1100px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/artistes")}>
@@ -316,6 +358,7 @@ export default function Artists2() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
     </div>
   );
 }

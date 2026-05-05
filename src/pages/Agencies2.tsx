@@ -56,7 +56,7 @@ export default function Agencies2() {
     void (async () => {
       setLoading(true);
       setError(null);
-      let query = supabase.from("agencies").select("id, name_agency, logo_agency").order("name_agency", { ascending: true, nullsFirst: false });
+      let query = supabase.from("agencies").select("id, name_agency, logo_agency").is("deleted_at", null).order("name_agency", { ascending: true, nullsFirst: false });
       if (role_id === 4 && agency_id) query = query.eq("id", agency_id);
       const { data, error: qErr } = await query;
       if (qErr) {
@@ -74,7 +74,7 @@ export default function Agencies2() {
     setArchiving(true);
     const { error: updErr } = await supabase
       .from("agencies")
-      .update({ agency_deleted_at: new Date().toISOString() })
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", archiveTarget.id);
     if (updErr) {
       toast.error(updErr.message);

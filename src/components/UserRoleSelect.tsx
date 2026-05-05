@@ -20,7 +20,7 @@ type UserRoleSelectProps = {
 
 /**
  * Sélecteur de rôle restreint aux niveaux 4→7 (admin_agency à visiteur).
- * Au changement, met à jour `public.users.role_id`.
+ * Au changement, met à jour `public.agency_users.role_id`.
  */
 export function UserRoleSelect({
   userId,
@@ -84,7 +84,7 @@ export function UserRoleSelect({
     setLocalValue(nextValue);
     setSaving(true);
 
-    const { error } = await supabase.from("users").update({ role_id: nextRoleId }).eq("id", userId);
+    const { error } = await supabase.from("agency_users").update({ role_id: nextRoleId }).eq("user_id", userId);
     setSaving(false);
 
     if (error) {

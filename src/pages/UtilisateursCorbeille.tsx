@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArchiveRestore, ArrowLeft } from "lucide-react";
+import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { useRetentionSettings } from "@/hooks/useRetentionSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import RetentionBadge from "@/components/settings/RetentionBadge";
 
 type UserTrashRow = {
   id: string;
-  user_prenom?: string | null;
-  user_nom?: string | null;
-  user_email?: string | null;
-  user_deleted_at?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  deleted_at?: string | null;
 };
 
 export default function UtilisateursCorbeille() {
@@ -22,16 +23,20 @@ export default function UtilisateursCorbeille() {
   const { can, loading: navLoading } = useNavigationMatrix();
   const canAccess = can("menu_user");
   const canRestore = useMemo(() => role_id === 1 || role_id === 2 || role_id === 4, [role_id]);
+
+  const { retention } = useRetentionSettings();
+  const retentionEntry = retention["profiles"];
+
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UserTrashRow[]>([]);
 
   const loadTrash = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("users")
-      .select("id, user_prenom, user_nom, user_email, user_deleted_at")
-      .not("user_deleted_at", "is", null)
-      .order("user_deleted_at", { ascending: false });
+      .from("profiles")
+      .select("id, first_name, last_name, deleted_at")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: true }); // plus anciens en premier
     if (error) {
       toast.error(error.message);
       setRows([]);
@@ -48,7 +53,10 @@ export default function UtilisateursCorbeille() {
 
   const handleRestore = async (userId: string) => {
     if (!canRestore) return;
-    const { error } = await supabase.from("users").update({ user_deleted_at: null }).eq("id", userId);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ deleted_at: null })
+      .eq("id", userId);
     if (error) {
       toast.error(error.message);
       return;
@@ -76,6 +84,18 @@ export default function UtilisateursCorbeille() {
         </Button>
       </div>
 
+      {/* Bandeau d'information rétention */}
+      {retentionEntry && (
+        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {retentionEntry.auto_purge
+              ? <>Les fiches sont conservées <strong>{retentionEntry.retention_days} jours</strong> après archivage. La purge automatique s'exécute chaque nuit à 2h.</>
+              : "La purge automatique est désactivée pour cette entité."}
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : rows.length === 0 ? (
@@ -83,18 +103,23 @@ export default function UtilisateursCorbeille() {
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {rows.map((u) => {
-            const name = [u.user_prenom, u.user_nom].filter(Boolean).join(" ").trim() || u.user_email || u.id;
+            const name = [u.first_name, u.last_name].filter(Boolean).join(" ").trim() || u.id;
             return (
               <Card key={u.id} className="glass-card">
                 <CardContent className="p-5 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 space-y-1">
                     <p className="font-semibold truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Archive le {u.user_deleted_at ? new Date(u.user_deleted_at).toLocaleString("fr-FR") : "—"}
+                      Archivé le {u.deleted_at ? new Date(u.deleted_at).toLocaleString("fr-FR") : "—"}
                     </p>
+                    <RetentionBadge
+                      deleted_at={u.deleted_at}
+                      retention_days={retentionEntry?.retention_days}
+                      auto_purge={retentionEntry?.auto_purge}
+                    />
                   </div>
                   {canRestore ? (
-                    <Button type="button" className="gap-2" onClick={() => void handleRestore(u.id)}>
+                    <Button type="button" className="gap-2 shrink-0" onClick={() => void handleRestore(u.id)}>
                       <ArchiveRestore className="h-4 w-4" /> Restaurer
                     </Button>
                   ) : (
@@ -109,4 +134,3 @@ export default function UtilisateursCorbeille() {
     </div>
   );
 }
-

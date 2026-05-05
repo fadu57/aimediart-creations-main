@@ -173,7 +173,7 @@ const VisitorView = () => {
     const parsed = parseArtworkIdFromInput(raw);
     return parsed || raw;
   }, [artworkIdParam]);
-  const { session, loading: authLoading, role_id, role_name, user_prenom } = useAuthUser();
+  const { session, loading: authLoading, role_id, role_name, first_name } = useAuthUser();
   const { language, setLanguage } = useUiLanguage();
   const { can, loading: navMatrixLoading } = useNavigationMatrix();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -250,7 +250,7 @@ const VisitorView = () => {
         .from("artworks")
         .select("artwork_id")
         .eq("artwork_artist_id", artistId)
-        .is("artwork_deleted_at", null)
+        .is("deleted_at", null)
         .order("artwork_created_at", { ascending: true });
 
       if (cancelled || error) return;
@@ -307,7 +307,7 @@ const VisitorView = () => {
         let artworkQuery = supabase
           .from("artworks")
           .select("*")
-          .is("artwork_deleted_at", null)
+          .is("deleted_at", null)
           .limit(1);
 
         if (artworkId?.trim()) {
@@ -315,7 +315,7 @@ const VisitorView = () => {
             .from("artworks")
             .select("*")
             .eq("artwork_id", artworkId.trim())
-            .is("artwork_deleted_at", null)
+            .is("deleted_at", null)
             .limit(1);
         }
 
@@ -609,12 +609,10 @@ const VisitorView = () => {
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
   const userMeta = (session?.user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const headerFirstName =
-    (user_prenom?.trim() || "") ||
+    (first_name?.trim() || "") ||
     (typeof userMeta.full_name === "string" ? userMeta.full_name.trim() : "") ||
-    (typeof userMeta.user_prenom === "string" ? userMeta.user_prenom.trim() : "") ||
     (typeof userMeta.first_name === "string" ? userMeta.first_name.trim() : "") ||
-    (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "") ||
-    (typeof userMeta.prenom === "string" ? userMeta.prenom.trim() : "");
+    (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "");
   const headerLastName =
     (typeof userMeta.user_nom === "string" ? userMeta.user_nom.trim() : "") ||
     (typeof userMeta.nom === "string" ? userMeta.nom.trim() : "") ||

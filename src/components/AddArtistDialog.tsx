@@ -243,7 +243,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
           .from("artists")
           .select("*")
           .eq("artist_control", artistControlLive)
-          .is("artist_deleted_at", null);
+          .is("deleted_at", null);
         if (editingArtistId) {
           qb = qb.neq("artist_id", editingArtistId);
         }
@@ -297,12 +297,14 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
     if (!authUserId) return null;
 
     const { data, error } = await supabase
-      .from("users")
+      .from("agency_users")
       .select("agency_id")
-      .eq("id", authUserId)
+      .eq("user_id", authUserId)
+      .order("role_id", { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (error) {
-      console.warn("Résolution agency_id (users) :", error.message);
+      console.warn("Résolution agency_id (agency_users) :", error.message);
       return null;
     }
     const agencyFromProfile =

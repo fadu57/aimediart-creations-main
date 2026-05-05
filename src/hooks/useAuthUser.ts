@@ -10,13 +10,13 @@ export type AuthUserWithRole = {
   user: User | null;
   role_name: string | null;
   role_label: string | null;
-  /** Niveau réel issu de users.role_id. */
+  /** Niveau reel issu de agency_users.role_id. */
   role_id: number | null;
-  /** Prénom depuis `public.user.user_prenom`. */
-  user_prenom: string | null;
-  /** Périmètre métier : agence (obligatoire pour filtrer les écrans). */
+  /** Prenom depuis public.profiles.first_name. */
+  first_name: string | null;
+  /** Perimetre metier : agence (obligatoire pour filtrer les ecrans). */
   agency_id: string | null;
-  /** Périmètre métier : exposition (si absent, toutes les expos de l’agence). */
+  /** Perimetre metier : exposition (si absent, toutes les expos de l'agence). */
   expo_id: string | null;
   loading: boolean;
 };
@@ -27,18 +27,18 @@ const empty: AuthUserWithRole = {
   role_name: null,
   role_label: null,
   role_id: null,
-  user_prenom: null,
+  first_name: null,
   agency_id: null,
   expo_id: null,
   loading: true,
 };
 
-/** `getSession()` peut rester bloqué (refresh token, réseau) avant même la lecture du profil. */
+/** getSession() peut rester bloque (refresh token, reseau) avant meme la lecture du profil. */
 const AUTH_GET_SESSION_TIMEOUT_MS = 10_000;
 
-/** Évite un blocage infini si la requête `public.users` reste en attente (réseau, proxy, etc.). */
+/** Evite un blocage infini si la requete public.profiles reste en attente (reseau, proxy, etc.). */
 const FETCH_USER_PROFILE_TIMEOUT_MS = 5_000;
-const CURRENT_USER_PRENOM_KEY = "current_user_prenom";
+const CURRENT_USER_FIRST_NAME_KEY = "current_user_first_name";
 
 type DbProfile = Awaited<ReturnType<typeof fetchUserRoleFromDb>>;
 
@@ -61,11 +61,11 @@ async function fetchUserRoleFromDbWithTimeout(userId: string): Promise<DbProfile
 }
 
 /**
- * Session Supabase + `role_name` / `role_label` (tables `user` et `roles_user`).
+ * Session Supabase + role_name / role_label (tables profiles, agency_users et roles_user).
  */
 export function useAuthUser() {
   const [state, setState] = useState<AuthUserWithRole>(empty);
-  /** Incrémenté à chaque `applySession` : les résultats obsolètes (logout pendant un fetch) sont ignorés. */
+  /** Incremente a chaque applySession : les resultats obsoletes (logout pendant un fetch) sont ignores. */
   const applyGenerationRef = useRef(0);
 
   const applySession = useCallback(async (session: Session | null) => {
@@ -73,7 +73,7 @@ export function useAuthUser() {
 
     if (!session?.user) {
       if (typeof window !== "undefined") {
-        window.localStorage.removeItem(CURRENT_USER_PRENOM_KEY);
+        window.localStorage.removeItem(CURRENT_USER_FIRST_NAME_KEY);
       }
       setState({
         session: null,
@@ -81,7 +81,7 @@ export function useAuthUser() {
         role_name: null,
         role_label: null,
         role_id: null,
-        user_prenom: null,
+        first_name: null,
         agency_id: null,
         expo_id: null,
         loading: false,
@@ -99,16 +99,21 @@ export function useAuthUser() {
     try {
       let dbProfile: DbProfile;
       try {
-        // Toujours tenter la lecture `public.users` pour récupérer `user_prenom`,
-        // même si le rôle est déjà présent dans le JWT.
+        // Toujours tenter la lecture public.profiles pour recuperer first_name,
+        // meme si le role est deja present dans le JWT.
         dbProfile = await fetchUserRoleFromDbWithTimeout(session.user.id);
       } catch (e) {
         const isTimeout = e instanceof Error && e.message === "profile_fetch_timeout";
         if (import.meta.env.DEV) {
           const msg = e instanceof Error ? e.message : String(e);
-          console.warn(isTimeout ? "[auth] timeout lecture profil users, fallback JWT" : "[auth] erreur lecture profil users :", msg);
+          console.warn(
+            isTimeout
+              ? "[auth] timeout lecture profil profiles, fallback JWT"
+              : "[auth] erreur lecture profil profiles :",
+            msg,
+          );
         }
-        dbProfile = { role_name: null, role_label: null, role_id: null, user_prenom: null, agency_id: null, expo_id: null };
+        dbProfile = { role_name: null, role_label: null, role_id: null, first_name: null, agency_id: null, expo_id: null };
       }
       if (myGeneration !== applyGenerationRef.current) return;
 
@@ -119,15 +124,16 @@ export function useAuthUser() {
       );
       const role_id = dbProfile.role_id ?? getRoleIdFromJwt(session.user);
       const meta = session.user.user_metadata as Record<string, unknown> | undefined;
-      const user_prenom =
-        dbProfile.user_prenom ??
-        (typeof meta?.user_prenom === "string" ? meta.user_prenom.trim() || null : null) ??
-        (typeof meta?.prenom === "string" ? meta.prenom.trim() || null : null);
+      // Priorite : base de donnees -> metadonnees JWT (signUp avec options.data.first_name)
+      const first_name =
+        dbProfile.first_name ??
+        (typeof meta?.first_name === "string" ? meta.first_name.trim() || null : null);
+
       if (typeof window !== "undefined") {
-        if (user_prenom) {
-          window.localStorage.setItem(CURRENT_USER_PRENOM_KEY, user_prenom);
+        if (first_name) {
+          window.localStorage.setItem(CURRENT_USER_FIRST_NAME_KEY, first_name);
         } else {
-          window.localStorage.removeItem(CURRENT_USER_PRENOM_KEY);
+          window.localStorage.removeItem(CURRENT_USER_FIRST_NAME_KEY);
         }
       }
       const jwtScope = resolveAgencyExpoFromJwt(session.user);
@@ -141,31 +147,30 @@ export function useAuthUser() {
         role_name,
         role_label,
         role_id,
-        user_prenom,
+        first_name,
         agency_id,
         expo_id,
         loading: false,
       });
     } catch (e) {
       if (myGeneration !== applyGenerationRef.current) return;
-      // Bypass robuste: si la lecture DB (users) échoue (403/RLS), on continue avec le rôle JWT.
+      // Bypass robuste: si la lecture DB (profiles) echoue (403/RLS), on continue avec le role JWT.
       const { role_name, role_label } = mergeRoleFromDbAndJwt(session.user, null, null);
       const role_id = getRoleIdFromJwt(session.user);
       const meta = session.user.user_metadata as Record<string, unknown> | undefined;
-      const user_prenom =
-        (typeof meta?.user_prenom === "string" ? meta.user_prenom.trim() || null : null) ??
-        (typeof meta?.prenom === "string" ? meta.prenom.trim() || null : null);
+      const first_name =
+        typeof meta?.first_name === "string" ? meta.first_name.trim() || null : null;
       if (typeof window !== "undefined") {
-        if (user_prenom) {
-          window.localStorage.setItem(CURRENT_USER_PRENOM_KEY, user_prenom);
+        if (first_name) {
+          window.localStorage.setItem(CURRENT_USER_FIRST_NAME_KEY, first_name);
         } else {
-          window.localStorage.removeItem(CURRENT_USER_PRENOM_KEY);
+          window.localStorage.removeItem(CURRENT_USER_FIRST_NAME_KEY);
         }
       }
       const jwtScope = resolveAgencyExpoFromJwt(session.user);
       if (import.meta.env.DEV) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.warn("[auth] bypass profil DB (users) :", msg);
+        console.warn("[auth] bypass profil DB (profiles) :", msg);
       }
       setState({
         session,
@@ -173,7 +178,7 @@ export function useAuthUser() {
         role_name,
         role_label,
         role_id,
-        user_prenom,
+        first_name,
         agency_id: jwtScope.agency_id,
         expo_id: jwtScope.expo_id,
         loading: false,
@@ -184,8 +189,8 @@ export function useAuthUser() {
   useEffect(() => {
     let cancelled = false;
 
-    // Ne pas appeler getSession() en parallèle : il peut bloquer longtemps et entrer en course avec ce callback.
-    // `onAuthStateChange` est invoqué tout de suite avec la session courante (événement INITIAL_SESSION).
+    // Ne pas appeler getSession() en parallele : il peut bloquer longtemps et entrer en course avec ce callback.
+    // onAuthStateChange est invoque tout de suite avec la session courante (evenement INITIAL_SESSION).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {

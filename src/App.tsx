@@ -38,10 +38,12 @@ import Summary from "./pages/visitor/Summary";
 import VisitorRegister from "./pages/visitor/Register";
 import RegisterVisitor from "./pages/visitor/RegisterVisitor";
 import Login from "./pages/Login";
+import RegisterSaaS from "./pages/RegisterSaaS";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import WorkScanner from "./pages/WorkScanner";
 import PublicHome from "./pages/PublicHome";
+import PublicHomeCommencer from "./pages/PublicHomeCommencer";
 import ExpoCastPage from "./pages/ExpoCastPage";
 import OeuvresArtiste from "./pages/OeuvresArtiste";
 import { Loader2 } from "lucide-react";
@@ -126,10 +128,12 @@ const AppRoutes = () => (
   <Routes>
     {/* Landing marketing publique (sans header) */}
     <Route path="/home" element={<PublicHome />} />
+    <Route path="/home/commencer" element={<PublicHomeCommencer />} />
     <Route path="/expo" element={<ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
       <Route index element={<RootEntryRoute />} />
       <Route path="login" element={<Login />} />
+      <Route path="signup" element={<RegisterSaaS />} />
       <Route path="reset-password" element={<ResetPassword />} />
       <Route path="Oeuvre" element={<Navigate to="/œuvre" replace />} />
       <Route path="Œuvre" element={<Navigate to="/œuvre" replace />} />

@@ -283,7 +283,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_description, artwork_image_url",
         )
         .eq("artwork_id", id)
-        .is("artwork_deleted_at", null)
+        .is("deleted_at", null)
         .single();
       if (cancelled) return;
       if (error || !data) {

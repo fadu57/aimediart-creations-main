@@ -20,7 +20,7 @@ type ArtistRow = {
   artist_photo_url?: string | null;
   artist_specialty?: string | null;
   artist_typ?: string | null;
-  artist_deleted_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function formatArtistTyp(raw: string | null | undefined): string {
@@ -67,7 +67,7 @@ const Artists = () => {
       const { data, error: fetchError } = await supabase
         .from("artists")
         .select("*")
-        .is("artist_deleted_at", null)
+        .is("deleted_at", null)
         .order("artist_lastname");
 
       if (import.meta.env.DEV) {

@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { buildSignupTrackingPayload } from "@/lib/signupTrackingFromLogin";
+import { clearLoginTrackerSession } from "@/lib/visitorTracking";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { isVisitorRole } from "@/lib/authUser";
@@ -84,6 +86,7 @@ const Login = () => {
     }
 
     toast.success("Connexion réussie.");
+    clearLoginTrackerSession();
     /* Redirection : `session` + rôle via `useAuthUser` (bloc Navigate ci-dessus). */
   };
 
@@ -105,22 +108,46 @@ const Login = () => {
     toast.success("Si un compte existe pour cet e-mail, vous recevrez un lien pour choisir un nouveau mot de passe.");
   };
 
-  const upsertProfileForLevel4 = async (authUserId: string, targetAgencyId: string) => {
-    const payload = {
-      id: authUserId,
-      role_id: "4",
-      agency_id: targetAgencyId,
-    };
+  const upsertProfileForLevel4 = async (
+    authUserId: string,
+    targetAgencyId: string,
+    tracking: Record<string, unknown> | null,
+  ) => {
+    // Les donnees de profil vont dans public.profiles (le trigger signUp peut avoir deja cree la ligne)
+    const profilePayload: {
+      id: string;
+      first_name?: string | null;
+      last_name?: string | null;
+      username?: string | null;
+      avatar_url?: string | null;
+      phone?: string | null;
+      zip_code?: string | null;
+      city?: string | null;
+      country_code?: string | null;
+      language?: string | null;
+    } = { id: authUserId };
+    if (tracking) {
+      const allowed = ["first_name", "last_name", "username", "avatar_url", "phone", "zip_code", "city", "country_code", "language"] as const;
+      for (const key of allowed) {
+        if (key in tracking) {
+          const val = tracking[key];
+          (profilePayload as Record<string, unknown>)[key] = typeof val === "string" ? val : null;
+        }
+      }
+    }
+    const { error: profileErr } = await supabase
+      .from("profiles")
+      .upsert(profilePayload, { onConflict: "id" });
+    if (profileErr) {
+      throw new Error(`Mise a jour profil impossible : ${profileErr.message}`);
+    }
 
-    const firstTry = await supabase.from("user").upsert(payload, { onConflict: "id" });
-    if (!firstTry.error) return;
-
-    // Compatibilite schema: certains environnements exposent `public.users` au lieu de `public.user`.
-    const secondTry = await supabase.from("users").upsert(payload, { onConflict: "id" });
-    if (secondTry.error) {
-      throw new Error(
-        `Insertion profil impossible (tables user/users): ${firstTry.error.message} | ${secondTry.error.message}`,
-      );
+    // Le rattachement agence + role va dans agency_users (PK composite user_id, agency_id)
+    const { error: linkErr } = await supabase
+      .from("agency_users")
+      .upsert({ user_id: authUserId, agency_id: targetAgencyId, role_id: 4 }, { onConflict: "user_id,agency_id" });
+    if (linkErr) {
+      throw new Error(`Rattachement agence impossible : ${linkErr.message}`);
     }
   };
 
@@ -151,7 +178,9 @@ const Login = () => {
         throw new Error("ID utilisateur non retourné par Supabase après signUp.");
       }
 
-      await upsertProfileForLevel4(authUserId, targetAgencyId);
+      const tracking = buildSignupTrackingPayload(searchParams);
+      await upsertProfileForLevel4(authUserId, targetAgencyId, tracking);
+      clearLoginTrackerSession();
       toast.success("Compte créé. Vérifiez l’e-mail si la confirmation est activée.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Création du compte impossible.";

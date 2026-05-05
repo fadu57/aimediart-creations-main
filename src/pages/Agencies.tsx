@@ -17,7 +17,7 @@ type AgencyRow = {
   id: string;
   name_agency?: string | null;
   logo_agency?: string | null;
-  agency_deleted_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function agencyLabel(row: AgencyRow): string {
@@ -107,6 +107,7 @@ const Agencies = () => {
     const base = supabase
       .from("agencies")
       .select("id, name_agency, logo_agency")
+      .is("deleted_at", null)
       .order("name_agency", { ascending: true, nullsFirst: false });
     const { data, error: qErr } = await applyScope(base);
     if (qErr) {

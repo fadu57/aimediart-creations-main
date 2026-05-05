@@ -91,7 +91,7 @@ export default function Catalogue2() {
           supabase
             .from("artworks")
             .select("artwork_id, artwork_title, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status")
-            .is("artwork_deleted_at", null)
+            .is("deleted_at", null)
             .order("artwork_title", { ascending: true, nullsFirst: false }),
           supabase.from("artists").select("artist_id, artist_firstname, artist_lastname, artist_name, artist_prenom"),
           supabase.from("agencies").select("id, name_agency"),
@@ -115,7 +115,7 @@ export default function Catalogue2() {
     setArchiving(true);
     const { error: updErr } = await supabase
       .from("artworks")
-      .update({ artwork_deleted_at: new Date().toISOString() } as never)
+      .update({ deleted_at: new Date().toISOString() })
       .eq("artwork_id", archiveTarget.artwork_id);
     if (updErr) {
       toast.error(updErr.message);

@@ -32,7 +32,7 @@ type ExpoRow = {
   logo_expo?: string | null;
   /** Alias historique éventuel. */
   expo_logo?: string | null;
-  expo_deleted_at?: string | null;
+  deleted_at?: string | null;
 };
 
 function coerceLogoString(v: unknown): string | null {
@@ -262,7 +262,7 @@ const Expos = () => {
       return scoped;
     };
 
-    const query = applyScope(supabase.from("expos").select("*").order("id", { ascending: true }));
+    const query = applyScope(supabase.from("expos").select("*").is("deleted_at", null).order("id", { ascending: true }));
     const { data, error: qErr } = await query;
     if (qErr) {
       setError(qErr.message);

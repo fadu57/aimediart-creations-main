@@ -1,0 +1,227 @@
+---
+description: Schéma de base de données Supabase – structure de référence pour toutes les requêtes et accès aux données
+alwaysApply: true
+---
+
+# Schéma Supabase — Référence officielle
+
+## ⚠️ Règles absolues
+
+- L'ancienne table `users` a été renommée en **`users_legacy`** — ne **jamais** l'utiliser.
+- Toujours utiliser `auth.users.id` comme identifiant utilisateur de référence.
+- Ne **jamais** écrire de `role_id` dans `public.profiles` — ce champ n'existe pas dans cette table.
+
+---
+
+## Authentification et profils
+
+### `auth.users` (géré par Supabase Auth — ne pas modifier directement)
+
+| Colonne | Type | Notes |
+|---|---|---|
+| id | uuid | PK |
+| email | text | Source de vérité pour l'email — ne pas dupliquer dans profiles |
+| created_at | timestamptz | |
+| raw_user_meta_data | jsonb | Données passées via `signUp({ options: { data: {...} } })` |
+| raw_app_meta_data | jsonb | **Contient `role_id` pour les admins globaux (role_id 1-3)** |
+
+### `public.profiles` (lié 1:1 avec auth.users)
+
+Créé automatiquement par un trigger SQL au moment du `signUp()`. Ne pas insérer manuellement.
+
+| Colonne | Type | Notes |
+|---|---|---|
+| id | uuid | PK, FK → auth.users.id |
+| first_name | text | |
+| last_name | text | |
+| username | text | unique |
+| avatar_url | text | URL Supabase Storage (bucket selfies) |
+| phone | text | |
+| zip_code | text | |
+| city | text | |
+| country_code | text | default 'FR' |
+| timezone | text | |
+| language | text | default 'fr' |
+| birth_year | integer | nullable |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+---
+
+## Gestion des rôles — où est stocké role_id selon le profil
+
+### Admins globaux SaaS (role_id 1, 2, 3)
+
+| role_id | role_name | Stockage |
+|---|---|---|
+| 1 | admin_general | `auth.users.raw_app_meta_data.role_id` |
+| 2 | super_admin | `auth.users.raw_app_meta_data.role_id` |
+| 3 | developpeur | `auth.users.raw_app_meta_data.role_id` |
+
+- Accessibles via `user.app_metadata.role_id` dans le JWT côté client.
+- Ces utilisateurs **ne sont PAS** dans `agency_users` (ils ne sont rattachés à aucune agence).
+- Pour affecter ce rôle lors de la migration depuis `users_legacy` :
+
+```sql
+UPDATE auth.users
+SET raw_app_meta_data = jsonb_set(
+  COALESCE(raw_app_meta_data, '{}'),
+  '{role_id}',
+  '1'
+)
+WHERE id = '<uuid>';
+```
+
+- Pour affecter ce rôle via le dashboard Supabase : Auth > Users > Edit > `app_metadata` :
+```json
+{ "role_id": 1 }
+```
+
+### Rôles métier agence/expo (role_id 4, 5, 6)
+
+| role_id | role_name | Stockage |
+|---|---|---|
+| 4 | admin_agency | `public.agency_users.role_id` |
+| 5 | curator_expo | `public.agency_users.role_id` |
+| 6 | equipe_expo | `public.agency_users.role_id` |
+
+- Stockés dans `agency_users` (un user peut avoir plusieurs agences avec des rôles différents).
+- Récupérer le rôle le plus élevé (role_id le plus bas) :
+
+```typescript
+const { data } = await supabase
+  .from('agency_users')
+  .select('agency_id, role_id')
+  .eq('user_id', userId)
+  .order('role_id', { ascending: true })
+  .limit(1)
+  .maybeSingle();
+```
+
+### Visiteur (role_id 7)
+
+- Rôle affecté automatiquement à l'inscription publique (scan QR code).
+- Accès limité à `/œuvre` — aucun accès backoffice.
+- Pas de validation email immédiate requise pour ce flux.
+- **Non stocké** dans `agency_users` — déterminé uniquement par le JWT ou l'absence de tout autre rôle.
+
+---
+
+## Ordre de résolution du role_id dans useAuthUser
+
+```
+1. user.app_metadata.role_id   → admins globaux (role_id 1-3)
+2. agency_users.role_id        → rôles métier (role_id 4-6), prend le plus bas
+3. null                        → aucun rôle trouvé (accès visiteur ou bloqué)
+```
+
+**Conséquence :** ne jamais chercher `role_id` dans `public.profiles` — cette colonne n'existe pas.
+
+---
+
+## Rattachements métier
+
+### `public.agency_users` (jonction user ↔ agence)
+
+| Colonne | Type | Notes |
+|---|---|---|
+| user_id | uuid | FK → auth.users.id |
+| agency_id | uuid | FK → agencies.id |
+| role_id | integer | FK → roles_user.role_id — **source de vérité pour role_id 4-6** |
+| created_at | timestamptz | |
+
+PK composite : `(user_id, agency_id)`
+
+### `public.expo_user_role` (jonction user ↔ expo)
+
+| Colonne | Type | Notes |
+|---|---|---|
+| id | uuid | PK |
+| user_id | uuid | FK → auth.users.id |
+| expo_id | uuid | FK → expos.id |
+| notes | text | |
+| assigned_at | timestamptz | |
+
+### `public.roles_user` (catalogue des rôles)
+
+| Colonne | Type | Notes |
+|---|---|---|
+| role_id | serial | PK |
+| label | text | unique |
+| role_name | text | |
+| role_name_clair | text | |
+
+---
+
+## Patterns d'accès — exemples
+
+### Créer un utilisateur (flux public)
+
+```typescript
+// ✅ CORRECT — le trigger SQL crée automatiquement la ligne dans profiles
+const { data, error } = await supabase.auth.signUp({
+  email,
+  password,
+  options: {
+    data: { first_name, last_name, username, language: 'fr', timezone }
+  }
+});
+// Ne jamais passer role_id dans options.data — utiliser app_metadata (admin) ou agency_users (métier)
+```
+
+### Lire le role_id d'un utilisateur connecté
+
+```typescript
+// ✅ Admins globaux — depuis le JWT (synchrone, sans requête DB)
+const roleId = session.user.app_metadata?.role_id ?? null;
+
+// ✅ Rôles métier — depuis agency_users
+const { data } = await supabase
+  .from('agency_users')
+  .select('role_id, agency_id')
+  .eq('user_id', session.user.id)
+  .order('role_id', { ascending: true })
+  .limit(1)
+  .maybeSingle();
+```
+
+### Lire le profil de l'utilisateur connecté
+
+```typescript
+// ✅ CORRECT
+const { data } = await supabase
+  .from('profiles')
+  .select('*')
+  .eq('id', session.user.id)
+  .single();
+```
+
+### Profil complet avec agence
+
+```typescript
+// ✅ CORRECT
+const { data } = await supabase
+  .from('profiles')
+  .select(`
+    *,
+    agency_users(agency_id, role_id, agencies(*))
+  `)
+  .eq('id', userId)
+  .single();
+```
+
+### ❌ À ne jamais faire
+
+```typescript
+// ❌ INTERDIT — table obsolète
+supabase.from('users').select('*');
+
+// ❌ INTERDIT
+supabase.from('users_legacy').select('*');
+
+// ❌ INTERDIT — role_id n'existe pas dans profiles
+supabase.from('profiles').select('role_id');
+
+// ❌ INTERDIT — l'email est dans auth.users, pas dans profiles
+supabase.from('profiles').select('email');
+```

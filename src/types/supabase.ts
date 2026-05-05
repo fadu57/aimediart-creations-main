@@ -54,6 +54,7 @@ export interface Database {
         Row: {
           role_id: number;
           role_name: string | null;
+          role_name_clair: string | null;
           label: string | null;
           regles_accès: string | null;
           droits_acces: string | null;
@@ -61,6 +62,7 @@ export interface Database {
         Insert: {
           role_id: number;
           role_name?: string | null;
+          role_name_clair?: string | null;
           label?: string | null;
           regles_accès?: string | null;
           droits_acces?: string | null;
@@ -68,56 +70,109 @@ export interface Database {
         Update: {
           role_id?: number;
           role_name?: string | null;
+          role_name_clair?: string | null;
           label?: string | null;
           regles_accès?: string | null;
           droits_acces?: string | null;
         };
         Relationships: [];
       };
-      users: {
+      profiles: {
         Row: {
           id: string;
-          role_id: number | null;
-          agency_id: string | null;
-          user_expo_id: string | null;
-          email: string | null;
-          user_nom: string | null;
-          user_prenom: string | null;
-          user_age: string | null;
-          avatar: string | null;
-          user_roles: string | null;
-          user_control: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          username: string | null;
+          avatar_url: string | null;
+          phone: string | null;
+          zip_code: string | null;
+          city: string | null;
+          country_code: string | null;
+          timezone: string | null;
+          language: string | null;
+          birth_year: number | null;
           created_at: string | null;
+          updated_at: string | null;
         };
         Insert: {
           id: string;
-          role_id?: number | null;
-          agency_id?: string | null;
-          user_expo_id?: string | null;
-          email?: string | null;
-          user_nom?: string | null;
-          user_prenom?: string | null;
-          user_age?: string | null;
-          avatar?: string | null;
-          user_roles?: string | null;
-          user_control?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          username?: string | null;
+          avatar_url?: string | null;
+          phone?: string | null;
+          zip_code?: string | null;
+          city?: string | null;
+          country_code?: string | null;
+          timezone?: string | null;
+          language?: string | null;
+          birth_year?: number | null;
           created_at?: string | null;
+          updated_at?: string | null;
         };
         Update: {
           id?: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          username?: string | null;
+          avatar_url?: string | null;
+          phone?: string | null;
+          zip_code?: string | null;
+          city?: string | null;
+          country_code?: string | null;
+          timezone?: string | null;
+          language?: string | null;
+          birth_year?: number | null;
+          updated_at?: string | null;
+        };
+        Relationships: [{ foreignKeyName: "profiles_id_fkey"; columns: ["id"]; referencedRelation: "users"; referencedColumns: ["id"] }];
+      };
+      agency_users: {
+        Row: {
+          user_id: string;
+          agency_id: string;
+          role_id: number | null;
+          created_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          agency_id: string;
           role_id?: number | null;
-          agency_id?: string | null;
-          user_expo_id?: string | null;
-          email?: string | null;
-          user_nom?: string | null;
-          user_prenom?: string | null;
-          user_age?: string | null;
-          avatar?: string | null;
-          user_roles?: string | null;
-          user_control?: string | null;
           created_at?: string | null;
         };
-        Relationships: [];
+        Update: {
+          user_id?: string;
+          agency_id?: string;
+          role_id?: number | null;
+        };
+        Relationships: [
+          { foreignKeyName: "agency_users_user_id_fkey"; columns: ["user_id"]; referencedRelation: "users"; referencedColumns: ["id"] },
+          { foreignKeyName: "agency_users_role_id_fkey"; columns: ["role_id"]; referencedRelation: "roles_user"; referencedColumns: ["role_id"] }
+        ];
+      };
+      expo_user_role: {
+        Row: {
+          id: string;
+          user_id: string;
+          expo_id: string;
+          notes: string | null;
+          assigned_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          expo_id: string;
+          notes?: string | null;
+          assigned_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          expo_id?: string;
+          notes?: string | null;
+        };
+        Relationships: [
+          { foreignKeyName: "expo_user_role_user_id_fkey"; columns: ["user_id"]; referencedRelation: "users"; referencedColumns: ["id"] }
+        ];
       };
     };
     Views: Record<string, never>;

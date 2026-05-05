@@ -25,20 +25,28 @@ import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { USER_AGE_OPTIONS } from "@/lib/userAgeOptions";
 
+// ---------------------------------------------------------------------------
+// Nouveau modèle :
+//   - profiles       : données profil (first_name, last_name, username, avatar_url, phone)
+//   - agency_users   : rattachement agence + role_id
+//   - expo_user_role : rattachement expo
+//   - auth.users     : email + métadonnées auth (non accessible côté client)
+//
+// ⚠️  email : non pré-chargé depuis la DB (auth.users non accessible client-side).
+//     Le champ est éditable manuellement par l'admin et utilisé par les edge functions.
+// ---------------------------------------------------------------------------
 type UserRow = {
   id: string;
   role_id?: number | null;
   agency_id?: string | null;
-  user_photo_url?: string | null;
-  user_prenom?: string | null;
-  user_nom?: string | null;
-  user_pseudo?: string | null;
-  user_age?: string | null;
-  user_email?: string | null;
-  user_phone?: string | null;
-  user_expo_id?: string | null;
-   user_roles?: string | null;
-  user_control?: string | null;
+  avatar_url?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+  birth_year?: string | null;   // tranche d'âge UI (non mappée vers profiles.birth_year integer)
+  email?: string | null;        // saisie admin seulement — non pré-chargé
+  phone?: string | null;
+  expo_id?: string | null;      // depuis expo_user_role
 };
 
 type ExpoOption = {
@@ -106,7 +114,7 @@ function textOrDash(v: string | null | undefined): string {
 }
 
 function userFullName(row: UserRow): string {
-  const full = [row.user_prenom?.trim(), row.user_nom?.trim()].filter(Boolean).join(" ");
+  const full = [row.first_name?.trim(), row.last_name?.trim()].filter(Boolean).join(" ");
   return full || "Utilisateur";
 }
 
@@ -117,27 +125,13 @@ function roleLabelFromUserRow(row: UserRow, roleOptions: RoleOption[]): string {
   return option?.label || `Rôle ${roleId}`;
 }
 
-function buildUserControl(prenom: string, nom: string, email: string): string {
-  const raw = `${prenom}${nom}${email}`.trim().toLowerCase();
-  return raw
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9@]/g, "");
-}
-
 function safeTrim(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeRoleValue(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return "";
-}
-
 function roleIdFromValue(value: unknown): number | null {
-  const raw = normalizeRoleValue(value);
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const raw = typeof value === "string" ? value.trim() : "";
   const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -145,7 +139,6 @@ function roleIdFromValue(value: unknown): number | null {
 function toPublicStorageUrl(url: string | null | undefined): string {
   const raw = (url ?? "").trim();
   if (!raw) return "";
-  // Normalise les anciennes URLs storage non publiques vers le chemin public.
   return raw.replace("/storage/v1/object/images/", "/storage/v1/object/public/images/");
 }
 
@@ -180,6 +173,62 @@ async function uploadUserPhoto(file: File): Promise<string> {
   const first = await tryUpload(preferredBucket);
   if (first.ok) return first.publicUrl;
   throw new Error(`Envoi photo impossible sur le bucket "${preferredBucket}" : ${first.error.message}`);
+}
+
+// Lecture d'un utilisateur unique depuis les 3 tables du nouveau modèle.
+async function fetchUserById(targetId: string): Promise<UserRow | null> {
+  const [
+    { data: profile, error: profileErr },
+    { data: agencyRow },
+    { data: expoRow },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name, username, avatar_url, phone")
+      .eq("id", targetId)
+      .maybeSingle(),
+    supabase
+      .from("agency_users")
+      .select("agency_id, role_id")
+      .eq("user_id", targetId)
+      .order("role_id", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("expo_user_role")
+      .select("expo_id")
+      .eq("user_id", targetId)
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (profileErr || !profile) return null;
+
+  const p = profile as {
+    id?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+    phone?: string | null;
+  };
+  const a = agencyRow as { agency_id?: string | null; role_id?: number | null } | null;
+  const e = expoRow as { expo_id?: string | null } | null;
+
+  return {
+    id: String(p.id),
+    first_name: p.first_name ?? null,
+    last_name: p.last_name ?? null,
+    username: p.username ?? null,
+    avatar_url: p.avatar_url ?? null,
+    phone: p.phone ?? null,
+    email: null, // email vit dans auth.users — non accessible côté client
+    birth_year: null,
+    role_id: typeof a?.role_id === "number" ? a.role_id : null,
+    agency_id: a?.agency_id ?? null,
+    expo_id: e?.expo_id ?? null,
+  };
 }
 
 type UsersProps = {
@@ -234,23 +283,92 @@ const Users = ({
     [editing?.agency_id, connectedAgencyId],
   );
 
+  // -------------------------------------------------------------------------
+  // Chargement de la liste : profiles + agency_users + expo_user_role
+  // -------------------------------------------------------------------------
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: qErr } = await supabase
-      .from("users")
-      .select(
-        "id, role_id, agency_id, user_photo_url, user_prenom, user_nom, user_pseudo, user_age, user_email, user_phone, user_expo_id, user_roles, user_control",
-      )
-      .order("created_at", { ascending: false, nullsFirst: false });
 
-    if (qErr) {
+    const [
+      { data: profileData, error: profileErr },
+      { data: agencyData },
+      { data: expoData },
+    ] = await Promise.all([
+      supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone"),
+      supabase
+        .from("agency_users")
+        .select("user_id, agency_id, role_id")
+        .order("role_id", { ascending: true }),
+      supabase
+        .from("expo_user_role")
+        .select("user_id, expo_id")
+        .order("assigned_at", { ascending: false }),
+    ]);
+
+    if (profileErr) {
       setRows([]);
-      setError(qErr.message);
+      setError(profileErr.message);
       setLoading(false);
       return;
     }
-    setRows(((data as UserRow[] | null) ?? []).filter((r) => r.id));
+
+    // Construire des Maps : un seul rattachement par user (le plus prioritaire)
+    const agencyByUser = new Map<string, { agency_id: string | null; role_id: number | null }>();
+    for (const a of (agencyData ?? []) as Array<{
+      user_id?: string | null;
+      agency_id?: string | null;
+      role_id?: number | null;
+    }>) {
+      const uid = typeof a.user_id === "string" ? a.user_id : "";
+      if (uid && !agencyByUser.has(uid)) {
+        agencyByUser.set(uid, {
+          agency_id: a.agency_id ?? null,
+          role_id: typeof a.role_id === "number" ? a.role_id : null,
+        });
+      }
+    }
+    const expoByUser = new Map<string, string | null>();
+    for (const e of (expoData ?? []) as Array<{
+      user_id?: string | null;
+      expo_id?: string | null;
+    }>) {
+      const uid = typeof e.user_id === "string" ? e.user_id : "";
+      if (uid && !expoByUser.has(uid)) {
+        expoByUser.set(uid, typeof e.expo_id === "string" ? e.expo_id : null);
+      }
+    }
+
+    const merged: UserRow[] = (
+      (profileData as Array<{
+        id?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        username?: string | null;
+        avatar_url?: string | null;
+        phone?: string | null;
+      }> | null) ?? []
+    )
+      .filter((p) => typeof p.id === "string" && p.id.trim())
+      .map((p) => {
+        const uid = String(p.id);
+        const agRec = agencyByUser.get(uid);
+        return {
+          id: uid,
+          first_name: p.first_name ?? null,
+          last_name: p.last_name ?? null,
+          username: p.username ?? null,
+          avatar_url: p.avatar_url ?? null,
+          phone: p.phone ?? null,
+          email: null,
+          birth_year: null,
+          role_id: agRec?.role_id ?? null,
+          agency_id: agRec?.agency_id ?? null,
+          expo_id: expoByUser.get(uid) ?? null,
+        };
+      });
+
+    setRows(merged);
     setLoading(false);
   }, []);
 
@@ -351,18 +469,19 @@ const Users = ({
     };
   }, [currentRoleId]);
 
+  // Résolution de l'agency_id depuis l'expo si l'utilisateur n'en a pas encore une.
   useEffect(() => {
     if (!editing) return;
     if (editing.agency_id?.trim()) return;
-    const userExpoId = editing.user_expo_id?.trim() || "";
-    if (!userExpoId) return;
+    const expoId = editing.expo_id?.trim() || "";
+    if (!expoId) return;
 
     let cancelled = false;
     void (async () => {
       const { data, error: qErr } = await supabase
         .from("expos")
         .select("agency_id")
-        .or(`expo_id.eq.${userExpoId},id.eq.${userExpoId}`)
+        .or(`expo_id.eq.${expoId},id.eq.${expoId}`)
         .limit(1)
         .maybeSingle();
       if (cancelled) return;
@@ -376,15 +495,14 @@ const Users = ({
     return () => {
       cancelled = true;
     };
-  }, [editing?.agency_id, editing?.user_expo_id, editing?.id]);
+  }, [editing?.agency_id, editing?.expo_id, editing?.id]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const targetAgencyId = resolvedAgencyId;
-      const selectedExpoId = editing?.user_expo_id?.trim() || "";
+      const selectedExpoId = editing?.expo_id?.trim() || "";
       if (!targetAgencyId) {
-        // Fallback: si l'agence n'est pas résolue mais qu'une expo est déjà renseignée, on tente de la charger.
         if (selectedExpoId) {
           const { data: oneExpo, error: oneErr } = await supabase
             .from("expos")
@@ -422,7 +540,6 @@ const Users = ({
             value: (e.expo_id?.trim() || e.id?.trim() || ""),
             expo_name: e.expo_name?.trim() || String(e.id),
           })) ?? [];
-      // Fallback robuste : si la liste d'agence est vide mais user_expo_id existe, injecter au moins l'expo courante.
       if (mapped.length === 0 && selectedExpoId) {
         const { data: oneExpo, error: oneErr } = await supabase
           .from("expos")
@@ -449,15 +566,15 @@ const Users = ({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const userExpoId = editing?.user_expo_id?.trim() || "";
-      if (!userExpoId) {
+      const expoId = editing?.expo_id?.trim() || "";
+      if (!expoId) {
         setExpoLogoUrl("");
         return;
       }
       const { data, error: qErr } = await supabase
         .from("expos")
         .select("*")
-        .or(`expo_id.eq.${userExpoId},id.eq.${userExpoId}`)
+        .or(`expo_id.eq.${expoId},id.eq.${expoId}`)
         .limit(1)
         .maybeSingle();
       if (cancelled) return;
@@ -470,7 +587,7 @@ const Users = ({
     return () => {
       cancelled = true;
     };
-  }, [editing?.user_expo_id]);
+  }, [editing?.expo_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -529,17 +646,16 @@ const Users = ({
 
   const searchableTermsForUser = useCallback(
     (u: UserRow): string[] => {
-      const roleId = Number(u.role_id ?? Number.parseInt(normalizeRoleValue(u.user_roles), 10));
+      const roleId = Number(u.role_id ?? NaN);
       const roleName = Number.isFinite(roleId) ? roleNameById.get(roleId) || `Rôle ${roleId}` : "";
       const agencyName = (u.agency_id && agencyNameById.get(u.agency_id)) || "";
-      const expoKey = safeTrim(u.user_expo_id);
+      const expoKey = safeTrim(u.expo_id);
       const expoName = (expoKey && expoNameByValue.get(expoKey)) || expoKey;
       return [
         userFullName(u),
-        safeTrim(u.user_prenom),
-        safeTrim(u.user_nom),
-        safeTrim(u.user_email),
-        safeTrim(u.user_phone),
+        safeTrim(u.first_name),
+        safeTrim(u.last_name),
+        safeTrim(u.phone),
         roleName,
         roleId ? String(roleId) : "",
         agencyName,
@@ -576,22 +692,20 @@ const Users = ({
   }, [resolvedAgencyId, agenciesRef]);
 
   const canEditAgency = useMemo(() => {
-    const targetRoleId = roleIdFromValue(editing?.user_roles);
+    const targetRoleId = typeof editing?.role_id === "number" ? editing.role_id : null;
     const targetIsLevel123 = targetRoleId != null && targetRoleId >= 1 && targetRoleId <= 3;
     if (saving || targetIsLevel123) return false;
-    // Cas de secours: si un admin organisation n'a pas d'agency_id côté session,
-    // on autorise la sélection d'organisation en mode création pour débloquer Expo.
     if (currentRoleId === 4) return mode === "create" && !connectedAgencyId;
     return currentRoleId === 1 || currentRoleId === 2 || currentRoleId === 3;
-  }, [editing?.user_roles, saving, currentRoleId, mode, connectedAgencyId]);
+  }, [editing?.role_id, saving, currentRoleId, mode, connectedAgencyId]);
 
   const canEditExpo = useMemo(() => {
-    const targetRoleId = roleIdFromValue(editing?.user_roles);
+    const targetRoleId = typeof editing?.role_id === "number" ? editing.role_id : null;
     const targetIsLevel123 = targetRoleId != null && targetRoleId >= 1 && targetRoleId <= 3;
     const targetIsOrgAdmin = targetRoleId === 4;
     if (saving || targetIsLevel123 || targetIsOrgAdmin) return false;
     return Boolean(resolvedAgencyId);
-  }, [editing?.user_roles, saving, resolvedAgencyId]);
+  }, [editing?.role_id, saving, resolvedAgencyId]);
 
   const openEdit = (row: UserRow) => {
     console.log("Tentative d'ouverture du modal pour l'user:", row.id);
@@ -615,6 +729,7 @@ const Users = ({
     setDialogOpen(true);
   };
 
+  // Ouverture en edit via URL param ?edit_user_id=
   useEffect(() => {
     const prefillUser = (location.state as { prefillUser?: UserRow } | null)?.prefillUser;
     if (prefillUser?.id) {
@@ -631,7 +746,6 @@ const Users = ({
     if (handledEditUserIdRef.current === targetId) return;
     handledEditUserIdRef.current = targetId;
 
-    // Fallback direct: si la ligne est déjà chargée, ouvrir tout de suite sans requête dédiée.
     const existing = rows.find((r) => r.id === targetId);
     if (existing) {
       openEdit(existing);
@@ -643,22 +757,16 @@ const Users = ({
 
     let cancelled = false;
     void (async () => {
-      const { data, error: qErr } = await supabase
-        .from("users")
-        .select(
-          "id, role_id, agency_id, user_photo_url, user_prenom, user_nom, user_pseudo, user_age, user_email, user_phone, user_expo_id, user_roles, user_control",
-        )
-        .eq("id", targetId)
-        .maybeSingle();
+      const user = await fetchUserById(targetId);
       if (cancelled) return;
-      if (qErr || !data) {
+      if (!user) {
         const next = new URLSearchParams(searchParams);
         next.delete("edit_user_id");
         setSearchParams(next, { replace: true });
         toast.error("Utilisateur introuvable.");
         return;
       }
-      openEdit((data as unknown) as UserRow);
+      openEdit(user);
       const next = new URLSearchParams(searchParams);
       next.delete("edit_user_id");
       setSearchParams(next, { replace: true });
@@ -668,6 +776,7 @@ const Users = ({
     };
   }, [rows, searchParams, setSearchParams, location.state, location.pathname, location.search, navigate]);
 
+  // Ouverture forcée en mode embedded (prop forcedEditUserId)
   useEffect(() => {
     if (!embeddedDialogOnly) return;
     const targetId = (forcedEditUserId || "").trim();
@@ -686,20 +795,14 @@ const Users = ({
 
     let cancelled = false;
     void (async () => {
-      const { data, error: qErr } = await supabase
-        .from("users")
-        .select(
-          "id, role_id, agency_id, user_photo_url, user_prenom, user_nom, user_pseudo, user_age, user_email, user_phone, user_expo_id, user_roles, user_control",
-        )
-        .eq("id", targetId)
-        .maybeSingle();
+      const user = await fetchUserById(targetId);
       if (cancelled) return;
-      if (qErr || !data) {
+      if (!user) {
         toast.error("Utilisateur introuvable.");
         onDialogClosed?.();
         return;
       }
-      openEdit((data as unknown) as UserRow);
+      openEdit(user);
     })();
     return () => {
       cancelled = true;
@@ -708,34 +811,21 @@ const Users = ({
 
   const openCreate = () => {
     setMode("create");
-    setEditing({
+    const emptyRow: UserRow = {
       id: crypto.randomUUID(),
       agency_id: connectedAgencyId || null,
-      user_photo_url: "",
-      user_prenom: "",
-      user_nom: "",
-      user_pseudo: "",
-      user_age: "",
-      user_email: "",
-      user_phone: "",
-      user_expo_id: "",
-      user_roles: "",
-      user_control: "",
-    });
-    setInitialEditing({
-      id: "",
-      agency_id: connectedAgencyId || null,
-      user_photo_url: "",
-      user_prenom: "",
-      user_nom: "",
-      user_pseudo: "",
-      user_age: "",
-      user_email: "",
-      user_phone: "",
-      user_expo_id: "",
-      user_roles: "",
-      user_control: "",
-    });
+      avatar_url: "",
+      first_name: "",
+      last_name: "",
+      username: "",
+      birth_year: "",
+      email: "",
+      phone: "",
+      expo_id: "",
+      role_id: null,
+    };
+    setEditing(emptyRow);
+    setInitialEditing({ ...emptyRow, id: "" });
     setPhotoFile(null);
     if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoPreview("");
@@ -765,20 +855,11 @@ const Users = ({
     setEditing((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  // Vérification d'unicité du pseudo (username) dans profiles.
   useEffect(() => {
     if (!editing) return;
-    const prenom = editing.user_prenom?.trim() || "";
-    const nom = editing.user_nom?.trim() || "";
-    const email = editing.user_email?.trim() || "";
-    const computed = buildUserControl(prenom, nom, email);
-    if (computed === (editing.user_control ?? "")) return;
-    setEditing((prev) => (prev ? { ...prev, user_control: computed } : prev));
-  }, [editing?.user_prenom, editing?.user_nom, editing?.user_email, editing?.user_control]);
-
-  useEffect(() => {
-    if (!editing) return;
-    const control = editing.user_control?.trim() || "";
-    if (!control) {
+    const usernameVal = editing.username?.trim() || "";
+    if (!usernameVal) {
       setCheckingControl(false);
       setControlExists(false);
       return;
@@ -789,9 +870,9 @@ const Users = ({
       void (async () => {
         setCheckingControl(true);
         const { data, error: qErr } = await supabase
-          .from("users")
+          .from("profiles")
           .select("id")
-          .eq("user_control", control)
+          .eq("username", usernameVal)
           .limit(1)
           .maybeSingle();
         if (cancelled) return;
@@ -809,67 +890,41 @@ const Users = ({
       cancelled = true;
       window.clearTimeout(t);
     };
-  }, [editing?.id, editing?.user_control]);
+  }, [editing?.id, editing?.username]);
 
+  // -------------------------------------------------------------------------
+  // Sauvegarde : écriture multi-tables (profiles + agency_users + expo_user_role)
+  // -------------------------------------------------------------------------
   const save = async () => {
     if (!editing) return;
     setSaving(true);
     try {
-      let nextPhoto = toPublicStorageUrl(editing.user_photo_url);
+      let nextPhoto = toPublicStorageUrl(editing.avatar_url);
       if (photoFile) {
         nextPhoto = await uploadUserPhoto(photoFile);
       }
 
-      const normalizedEmail = safeTrim(editing.user_email).toLowerCase();
-      if (!normalizedEmail) {
-        toast.error("L'email utilisateur est requis.");
-        setSaving(false);
-        return;
-      }
-      if (!phoneValid) {
-        toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
-        setSaving(false);
-        return;
-      }
-      let effectiveEmail = normalizedEmail;
-
-      // Dérogation test: si l'email existe déjà sur un autre utilisateur,
-      // on bascule immédiatement vers un alias unique.
-      const { data: duplicateRows, error: dupErr } = await supabase
-        .from("users")
-        .select("id")
-        .eq("user_email", normalizedEmail)
-        .neq("id", editing.id)
-        .limit(1);
-      if (!dupErr && ((duplicateRows as Array<{ id?: string }> | null) ?? []).length > 0) {
-        effectiveEmail = buildTestEmailAlias(normalizedEmail, editing.id);
-        setEditing((prev) => (prev ? { ...prev, user_email: effectiveEmail } : prev));
-        toast.warning(`Email déjà utilisé : connexion à faire avec l'alias ${effectiveEmail}`);
-      }
-
-      const selectedRole = normalizeRoleValue(editing.user_roles);
-      const parsedRoleId = Number.parseInt(selectedRole, 10);
-      const nextRoleId = Number.isFinite(parsedRoleId) && parsedRoleId > 0 ? parsedRoleId : null;
-      const isAdminOrganisation = selectedRole === "4";
+      const nextRoleId =
+        typeof editing.role_id === "number" && editing.role_id > 0 ? editing.role_id : null;
+      const isAdminOrganisation = nextRoleId === 4;
       const isLevel123 = nextRoleId != null && nextRoleId >= 1 && nextRoleId <= 3;
-      const payload = {
-        agency_id: isLevel123 ? null : editing.agency_id?.trim() || connectedAgencyId || null,
-        user_photo_url: nextPhoto || null,
-        user_prenom: editing.user_prenom?.trim() || null,
-        user_nom: editing.user_nom?.trim() || null,
-        user_pseudo: editing.user_pseudo?.trim() || null,
-        user_age: normalizeAgeForEnum(editing.user_age),
-        user_email: effectiveEmail,
-        user_phone: editing.user_phone?.trim() || null,
-        user_expo_id: isLevel123 || isAdminOrganisation ? null : editing.user_expo_id?.trim() || null,
-        ...(nextRoleId != null ? { role_id: nextRoleId } : {}),
-        user_roles: selectedRole || null,
-        user_control: editing.user_control?.trim() || null,
+      const effectiveAgencyId = isLevel123
+        ? null
+        : editing.agency_id?.trim() || connectedAgencyId || null;
+      const effectiveExpoId =
+        isLevel123 || isAdminOrganisation ? null : editing.expo_id?.trim() || null;
+
+      const profilePayload = {
+        first_name: editing.first_name?.trim() || null,
+        last_name: editing.last_name?.trim() || null,
+        username: editing.username?.trim() || null,
+        avatar_url: nextPhoto || null,
+        phone: editing.phone?.trim() || null,
       };
 
       if (mode === "create") {
-        const prenom = editing.user_prenom?.trim() || "";
-        const nom = editing.user_nom?.trim() || "";
+        const prenom = editing.first_name?.trim() || "";
+        const nom = editing.last_name?.trim() || "";
         if (!prenom || !nom) {
           toast.error("Le prénom et le nom sont requis.");
           setSaving(false);
@@ -880,22 +935,29 @@ const Users = ({
           setSaving(false);
           return;
         }
+        const effectiveEmail = (editing.email?.trim() || "").toLowerCase();
+        if (!effectiveEmail) {
+          toast.error("L'email utilisateur est requis.");
+          setSaving(false);
+          return;
+        }
         const tempPassword = temporaryPassword.trim();
         if (tempPassword.length < 6) {
           toast.error("Le mot de passe provisoire doit contenir au moins 6 caractères.");
           setSaving(false);
           return;
         }
+        if (!phoneValid) {
+          toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+          setSaving(false);
+          return;
+        }
 
-        const { data: createAuthData, error: createAuthErr } = await supabase.functions.invoke("admin-create-user", {
-          body: {
-            email: effectiveEmail,
-            password: tempPassword,
-            prenom,
-            nom,
-            role_id: nextRoleId,
-          },
-        });
+        // Création Auth via edge function
+        const { data: createAuthData, error: createAuthErr } = await supabase.functions.invoke(
+          "admin-create-user",
+          { body: { email: effectiveEmail, password: tempPassword, prenom, nom, role_id: nextRoleId } },
+        );
         if (createAuthErr) throw createAuthErr;
 
         const createdUserId =
@@ -906,23 +968,69 @@ const Users = ({
           throw new Error("Création Auth réussie mais identifiant utilisateur introuvable.");
         }
 
-        const { error: upsertErr } = await supabase
-          .from("users")
-          .upsert({ id: createdUserId, ...payload }, { onConflict: "id" });
-        if (upsertErr) throw upsertErr;
-      } else {
-        const { error: upErr } = await supabase.from("users").update(payload).eq("id", editing.id);
-        if (upErr) throw upErr;
-      }
+        // Écriture profil
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .upsert({ id: createdUserId, ...profilePayload }, { onConflict: "id" });
+        if (profileErr) throw profileErr;
 
-      if (mode === "create") {
+        // Rattachement agence + rôle
+        if (effectiveAgencyId && nextRoleId) {
+          const { error: agencyErr } = await supabase
+            .from("agency_users")
+            .upsert(
+              { user_id: createdUserId, agency_id: effectiveAgencyId, role_id: nextRoleId },
+              { onConflict: "user_id,agency_id" },
+            );
+          if (agencyErr) throw agencyErr;
+        }
+
+        // Rattachement expo
+        if (effectiveExpoId) {
+          const { error: expoErr } = await supabase
+            .from("expo_user_role")
+            .insert({ user_id: createdUserId, expo_id: effectiveExpoId });
+          if (expoErr) throw expoErr;
+        }
+
         toast.success(`Utilisateur créé. Email de connexion : ${effectiveEmail}`);
       } else {
+        if (!phoneValid) {
+          toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+          setSaving(false);
+          return;
+        }
+
+        // Mise à jour profil
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .update(profilePayload)
+          .eq("id", editing.id);
+        if (profileErr) throw profileErr;
+
+        // Remplace le rattachement agence (delete + insert pour gérer les changements d'agence)
+        await supabase.from("agency_users").delete().eq("user_id", editing.id);
+        if (effectiveAgencyId && nextRoleId) {
+          const { error: agencyErr } = await supabase
+            .from("agency_users")
+            .insert({ user_id: editing.id, agency_id: effectiveAgencyId, role_id: nextRoleId });
+          if (agencyErr) throw agencyErr;
+        }
+
+        // Remplace le rattachement expo
+        await supabase.from("expo_user_role").delete().eq("user_id", editing.id);
+        if (effectiveExpoId) {
+          const { error: expoErr } = await supabase
+            .from("expo_user_role")
+            .insert({ user_id: editing.id, expo_id: effectiveExpoId });
+          if (expoErr) throw expoErr;
+        }
+
         toast.success("Utilisateur mis à jour.");
       }
+
       closeDialog(false);
       await load();
-      // Force la relecture SQL du profil courant (rôles/droits) après modification des infos perso.
       await refreshAuthUser();
       onUserSaved?.();
     } catch (e) {
@@ -946,7 +1054,7 @@ const Users = ({
       toast.error("Créez d'abord l'utilisateur avant de réparer son accès Auth.");
       return;
     }
-    const loginEmail = safeTrim(editing.user_email).toLowerCase();
+    const loginEmail = safeTrim(editing.email).toLowerCase();
     if (!loginEmail) {
       toast.error("L'email est requis pour réparer l'accès Auth.");
       return;
@@ -956,8 +1064,10 @@ const Users = ({
       toast.error("Le mot de passe provisoire doit contenir au moins 6 caractères.");
       return;
     }
-    const parsedRoleId = Number.parseInt(normalizeRoleValue(editing.user_roles), 10);
-    const nextRoleId = Number.isFinite(parsedRoleId) && parsedRoleId > 0 ? parsedRoleId : Number(editing.role_id ?? NaN);
+    const nextRoleId =
+      typeof editing.role_id === "number" && editing.role_id > 0
+        ? editing.role_id
+        : Number(editing.role_id ?? NaN);
     if (!Number.isFinite(nextRoleId)) {
       toast.error("Rôle utilisateur introuvable.");
       return;
@@ -974,15 +1084,15 @@ const Users = ({
           user_id: editing.id,
           email: loginEmail,
           password: tempPassword,
-          prenom: safeTrim(editing.user_prenom),
-          nom: safeTrim(editing.user_nom),
+          prenom: safeTrim(editing.first_name),
+          nom: safeTrim(editing.last_name),
           role_id: nextRoleId,
         },
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error || "Réparation Auth impossible.");
       const resolvedLoginEmail = (data.login_email || loginEmail).trim().toLowerCase();
-      setEditing((prev) => (prev ? { ...prev, user_email: resolvedLoginEmail } : prev));
+      setEditing((prev) => (prev ? { ...prev, email: resolvedLoginEmail } : prev));
       toast.success(`Accès Auth réparé. Connexion: ${resolvedLoginEmail}`);
     } catch (e) {
       let fnMessage = "";
@@ -1021,20 +1131,22 @@ const Users = ({
     };
     const keys: Array<keyof UserRow> = [
       "agency_id",
-      "user_photo_url",
-      "user_prenom",
-      "user_nom",
-      "user_pseudo",
-      "user_age",
-      "user_email",
-      "user_phone",
-      "user_expo_id",
-      "user_roles",
-      "user_control",
+      "avatar_url",
+      "first_name",
+      "last_name",
+      "username",
+      "birth_year",
+      "email",
+      "phone",
+      "expo_id",
+      "role_id",
     ];
     return keys.some((key) => normalize(editing[key]) !== normalize(initialEditing[key]));
   })();
 
+  // =========================================================================
+  // JSX — dialog embedded (utilisé depuis d'autres pages)
+  // =========================================================================
   if (embeddedDialogOnly) {
     return (
       <Dialog open={DEBUG_FORCE_DIALOG_OPEN ? true : dialogOpen} onOpenChange={(nextOpen) => closeDialog(nextOpen)}>
@@ -1106,9 +1218,9 @@ const Users = ({
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
                 <div className="space-y-2">
                   <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                    {photoPreview || toPublicStorageUrl(editing.user_photo_url) ? (
+                    {photoPreview || toPublicStorageUrl(editing.avatar_url) ? (
                       <img
-                        src={photoPreview || toPublicStorageUrl(editing.user_photo_url)}
+                        src={photoPreview || toPublicStorageUrl(editing.avatar_url)}
                         alt=""
                         className="h-full w-full object-cover"
                         loading="lazy"
@@ -1155,8 +1267,8 @@ const Users = ({
                     <Input
                       id="user-prenom"
                       autoComplete="given-name"
-                      value={editing.user_prenom ?? ""}
-                      onChange={(e) => setField("user_prenom", e.target.value)}
+                      value={editing.first_name ?? ""}
+                      onChange={(e) => setField("first_name", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
@@ -1168,8 +1280,8 @@ const Users = ({
                     <Input
                       id="user-nom"
                       autoComplete="family-name"
-                      value={editing.user_nom ?? ""}
-                      onChange={(e) => setField("user_nom", e.target.value)}
+                      value={editing.last_name ?? ""}
+                      onChange={(e) => setField("last_name", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
@@ -1180,8 +1292,8 @@ const Users = ({
                     </Label>
                     <Input
                       id="user-pseudo"
-                      value={editing.user_pseudo ?? ""}
-                      onChange={(e) => setField("user_pseudo", e.target.value)}
+                      value={editing.username ?? ""}
+                      onChange={(e) => setField("username", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
@@ -1190,9 +1302,9 @@ const Users = ({
                     <Label htmlFor="user-age" className="w-[70px] shrink-0 text-xs">
                       Tranche d'âge
                     </Label>
-                    <Select value={editing.user_age ?? ""} onValueChange={(v) => setField("user_age", v)} disabled={saving}>
+                    <Select value={editing.birth_year ?? ""} onValueChange={(v) => setField("birth_year", v)} disabled={saving}>
                       <SelectTrigger id="user-age" className="h-9 flex-1">
-                        <SelectValue placeholder="Choisir une tranche d’âge" />
+                        <SelectValue placeholder="Choisir une tranche d'âge" />
                       </SelectTrigger>
                       <SelectContent>
                         {USER_AGE_OPTIONS.map((age) => (
@@ -1209,8 +1321,8 @@ const Users = ({
                     </Label>
                     <SmartPhoneInput
                       id="user-phone"
-                      value={editing.user_phone ?? ""}
-                      onChange={(value) => setField("user_phone", value)}
+                      value={editing.phone ?? ""}
+                      onChange={(value) => setField("phone", value)}
                       onValidityChange={setPhoneValid}
                       disabled={saving}
                       className="flex-1"
@@ -1226,8 +1338,8 @@ const Users = ({
                     id="user-email"
                     type="email"
                     autoComplete="email"
-                    value={editing.user_email ?? ""}
-                    onChange={(e) => setField("user_email", e.target.value)}
+                    value={editing.email ?? ""}
+                    onChange={(e) => setField("email", e.target.value)}
                     disabled={saving || currentRoleId === 4}
                   />
                 </div>
@@ -1251,13 +1363,13 @@ const Users = ({
               <div className="space-y-1.5 w-[302px]">
                 <Label htmlFor="user-roles">Rôles</Label>
                 <Select
-                  value={normalizeRoleValue(editing.user_roles)}
+                  value={editing.role_id != null ? String(editing.role_id) : ""}
                   onValueChange={(v) => {
-                    setField("user_roles", v);
                     const roleId = roleIdFromValue(v);
+                    setEditing((prev) => (prev ? { ...prev, role_id: roleId } : prev));
                     if (roleId != null && roleId >= 1 && roleId <= 4) {
                       setField("agency_id", "");
-                      setField("user_expo_id", "");
+                      setField("expo_id", "");
                     }
                   }}
                   disabled={saving}
@@ -1287,7 +1399,7 @@ const Users = ({
                     value={editing.agency_id ?? ""}
                     onValueChange={(v) => {
                       setField("agency_id", v);
-                      setField("user_expo_id", "");
+                      setField("expo_id", "");
                     }}
                     disabled={!canEditAgency}
                   >
@@ -1311,14 +1423,14 @@ const Users = ({
                 <div className="space-y-1.5">
                   <Label htmlFor="user-expo">Expo</Label>
                   <Select
-                    value={editing.user_expo_id ?? ""}
-                    onValueChange={(v) => setField("user_expo_id", v)}
+                    value={editing.expo_id ?? ""}
+                    onValueChange={(v) => setField("expo_id", v)}
                     disabled={!canEditExpo}
                   >
                     <SelectTrigger id="user-expo">
                       <SelectValue
                         placeholder={
-                          roleIdFromValue(editing.user_roles) === 4
+                          editing.role_id === 4
                             ? "Non applicable pour ce rôle"
                             : resolvedAgencyId
                             ? "Choisir une exposition"
@@ -1345,10 +1457,10 @@ const Users = ({
                 </div>
               </div>
 
-              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du contrôle utilisateur…</p>}
+              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
               {!checkingControl && controlExists && (
                 <p className="text-xs text-destructive">
-                  Ce contrôle existe déjà. Le bouton Enregistrer est désactivé.
+                  Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.
                 </p>
               )}
 
@@ -1360,6 +1472,9 @@ const Users = ({
     );
   }
 
+  // =========================================================================
+  // JSX — page complète /user
+  // =========================================================================
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
@@ -1432,9 +1547,9 @@ const Users = ({
               }}
             >
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/40">
-                {toPublicStorageUrl(u.user_photo_url) ? (
+                {toPublicStorageUrl(u.avatar_url) ? (
                   <img
-                    src={toPublicStorageUrl(u.user_photo_url)}
+                    src={toPublicStorageUrl(u.avatar_url)}
                     alt=""
                     className="h-full w-full object-cover"
                     loading="lazy"
@@ -1446,17 +1561,16 @@ const Users = ({
               </div>
               <div className="min-w-0 flex-1 space-y-1">
                 <h3 className="font-serif font-bold text-lg">{userFullName(u)}</h3>
-                {u.user_pseudo?.trim() ? (
+                {u.username?.trim() ? (
                   <p
                     className="font-sans text-[12px] font-bold italic text-[#000091]"
                     style={{ fontFamily: "Inter, sans-serif" }}
                   >
-                    {`alias "${u.user_pseudo.trim()}"`}
+                    {`alias "${u.username.trim()}"`}
                   </p>
                 ) : null}
                 <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
-                {u.user_email?.trim() ? <p className="text-sm">{u.user_email.trim()}</p> : null}
-                {u.user_phone?.trim() ? <p className="text-sm">{u.user_phone.trim()}</p> : null}
+                {u.phone?.trim() ? <p className="text-sm">{u.phone.trim()}</p> : null}
               </div>
               <div className="ml-auto flex w-24 shrink-0 flex-col gap-1">
                 <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-muted/20">
@@ -1477,9 +1591,9 @@ const Users = ({
                     <span className="px-1 text-center text-[10px] leading-tight text-muted-foreground">
                       Responsable de toutes les expos de l'organisation
                     </span>
-                  ) : u.user_expo_id && expoLogosByKey.get(u.user_expo_id) ? (
+                  ) : u.expo_id && expoLogosByKey.get(u.expo_id) ? (
                     <img
-                      src={expoLogosByKey.get(u.user_expo_id) || ""}
+                      src={expoLogosByKey.get(u.expo_id) || ""}
                       alt=""
                       className="h-full w-full object-contain p-1"
                       loading="lazy"
@@ -1564,9 +1678,9 @@ const Users = ({
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
                 <div className="space-y-2">
                   <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                    {photoPreview || toPublicStorageUrl(editing.user_photo_url) ? (
+                    {photoPreview || toPublicStorageUrl(editing.avatar_url) ? (
                       <img
-                        src={photoPreview || toPublicStorageUrl(editing.user_photo_url)}
+                        src={photoPreview || toPublicStorageUrl(editing.avatar_url)}
                         alt=""
                         className="h-full w-full object-cover"
                         loading="lazy"
@@ -1576,13 +1690,13 @@ const Users = ({
                       <UserRound className="h-14 w-14 text-muted-foreground" aria-hidden />
                     )}
                     <label
-                      htmlFor="user-photo-upload-overlay"
+                      htmlFor="user-photo-upload-main"
                       className="absolute inset-x-0 top-0 z-10 cursor-pointer bg-black/30 px-3 py-2 text-center text-xs font-medium text-white backdrop-blur-[1px] transition hover:bg-black/45"
                     >
                       Changer la photo
                     </label>
                     <Input
-                      id="user-photo-upload-overlay"
+                      id="user-photo-upload-main"
                       type="file"
                       accept="image/*"
                       disabled={saving}
@@ -1607,50 +1721,50 @@ const Users = ({
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="user-prenom" className="w-[70px] shrink-0 text-xs">
+                    <Label htmlFor="user-prenom-main" className="w-[70px] shrink-0 text-xs">
                       Prénom
                     </Label>
                     <Input
-                      id="user-prenom"
+                      id="user-prenom-main"
                       autoComplete="given-name"
-                      value={editing.user_prenom ?? ""}
-                      onChange={(e) => setField("user_prenom", e.target.value)}
+                      value={editing.first_name ?? ""}
+                      onChange={(e) => setField("first_name", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="user-nom" className="w-[70px] shrink-0 text-xs">
+                    <Label htmlFor="user-nom-main" className="w-[70px] shrink-0 text-xs">
                       Nom
                     </Label>
                     <Input
-                      id="user-nom"
+                      id="user-nom-main"
                       autoComplete="family-name"
-                      value={editing.user_nom ?? ""}
-                      onChange={(e) => setField("user_nom", e.target.value)}
+                      value={editing.last_name ?? ""}
+                      onChange={(e) => setField("last_name", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="user-pseudo" className="w-[70px] shrink-0 text-xs">
+                    <Label htmlFor="user-pseudo-main" className="w-[70px] shrink-0 text-xs">
                       Pseudo
                     </Label>
                     <Input
-                      id="user-pseudo"
-                      value={editing.user_pseudo ?? ""}
-                      onChange={(e) => setField("user_pseudo", e.target.value)}
+                      id="user-pseudo-main"
+                      value={editing.username ?? ""}
+                      onChange={(e) => setField("username", e.target.value)}
                       disabled={saving}
                       className="h-9 flex-1"
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="user-age" className="w-[70px] shrink-0 text-xs">
+                    <Label htmlFor="user-age-main" className="w-[70px] shrink-0 text-xs">
                       Tranche d'âge
                     </Label>
-                    <Select value={editing.user_age ?? ""} onValueChange={(v) => setField("user_age", v)} disabled={saving}>
-                      <SelectTrigger id="user-age" className="h-9 flex-1">
-                        <SelectValue placeholder="Choisir une tranche d’âge" />
+                    <Select value={editing.birth_year ?? ""} onValueChange={(v) => setField("birth_year", v)} disabled={saving}>
+                      <SelectTrigger id="user-age-main" className="h-9 flex-1">
+                        <SelectValue placeholder="Choisir une tranche d'âge" />
                       </SelectTrigger>
                       <SelectContent>
                         {USER_AGE_OPTIONS.map((age) => (
@@ -1662,13 +1776,13 @@ const Users = ({
                     </Select>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label htmlFor="user-phone" className="w-[70px] shrink-0 text-xs">
+                    <Label htmlFor="user-phone-main" className="w-[70px] shrink-0 text-xs">
                       Tél.
                     </Label>
                     <SmartPhoneInput
-                      id="user-phone"
-                      value={editing.user_phone ?? ""}
-                      onChange={(value) => setField("user_phone", value)}
+                      id="user-phone-main"
+                      value={editing.phone ?? ""}
+                      onChange={(value) => setField("phone", value)}
                       onValidityChange={setPhoneValid}
                       disabled={saving}
                       className="flex-1"
@@ -1679,23 +1793,23 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-email">Email</Label>
+                  <Label htmlFor="user-email-main">Email</Label>
                   <Input
-                    id="user-email"
+                    id="user-email-main"
                     type="email"
                     autoComplete="email"
-                    value={editing.user_email ?? ""}
-                    onChange={(e) => setField("user_email", e.target.value)}
+                    value={editing.email ?? ""}
+                    onChange={(e) => setField("email", e.target.value)}
                     disabled={saving || currentRoleId === 4}
                   />
                 </div>
                 {(mode === "create" || mode === "edit") && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="user-temporary-password">
+                    <Label htmlFor="user-temporary-password-main">
                       {mode === "create" ? "Mot de passe provisoire" : "Nouveau mot de passe provisoire"}
                     </Label>
                     <Input
-                      id="user-temporary-password"
+                      id="user-temporary-password-main"
                       type="password"
                       autoComplete="new-password"
                       value={temporaryPassword}
@@ -1707,20 +1821,20 @@ const Users = ({
                 )}
               </div>
               <div className="space-y-1.5 w-[302px]">
-                <Label htmlFor="user-roles">Rôles</Label>
+                <Label htmlFor="user-roles-main">Rôles</Label>
                 <Select
-                  value={normalizeRoleValue(editing.user_roles)}
+                  value={editing.role_id != null ? String(editing.role_id) : ""}
                   onValueChange={(v) => {
-                    setField("user_roles", v);
                     const roleId = roleIdFromValue(v);
+                    setEditing((prev) => (prev ? { ...prev, role_id: roleId } : prev));
                     if (roleId != null && roleId >= 1 && roleId <= 4) {
                       setField("agency_id", "");
-                      setField("user_expo_id", "");
+                      setField("expo_id", "");
                     }
                   }}
                   disabled={saving}
                 >
-                  <SelectTrigger id="user-roles">
+                  <SelectTrigger id="user-roles-main">
                     <SelectValue placeholder="Choisir un rôle" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1740,17 +1854,16 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-agency">Organisation</Label>
+                  <Label htmlFor="user-agency-main">Organisation</Label>
                   <Select
                     value={editing.agency_id ?? ""}
                     onValueChange={(v) => {
                       setField("agency_id", v);
-                      // Lors d'un changement d'organisation, on réinitialise l'expo sélectionnée.
-                      setField("user_expo_id", "");
+                      setField("expo_id", "");
                     }}
                     disabled={!canEditAgency}
                   >
-                    <SelectTrigger id="user-agency">
+                    <SelectTrigger id="user-agency-main">
                       <SelectValue placeholder="Choisir une organisation" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1768,16 +1881,16 @@ const Users = ({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-expo">Expo</Label>
+                  <Label htmlFor="user-expo-main">Expo</Label>
                   <Select
-                    value={editing.user_expo_id ?? ""}
-                    onValueChange={(v) => setField("user_expo_id", v)}
+                    value={editing.expo_id ?? ""}
+                    onValueChange={(v) => setField("expo_id", v)}
                     disabled={!canEditExpo}
                   >
-                    <SelectTrigger id="user-expo">
+                    <SelectTrigger id="user-expo-main">
                       <SelectValue
                         placeholder={
-                          roleIdFromValue(editing.user_roles) === 4
+                          editing.role_id === 4
                             ? "Non applicable pour ce rôle"
                             : resolvedAgencyId
                             ? "Choisir une exposition"
@@ -1804,10 +1917,10 @@ const Users = ({
                 </div>
               </div>
 
-              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du contrôle utilisateur…</p>}
+              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
               {!checkingControl && controlExists && (
                 <p className="text-xs text-destructive">
-                  Ce contrôle existe déjà. Le bouton Enregistrer est désactivé.
+                  Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.
                 </p>
               )}
 
@@ -1824,7 +1937,3 @@ const Users = ({
 };
 
 export default Users;
-
-
-
-

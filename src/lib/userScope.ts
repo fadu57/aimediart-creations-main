@@ -64,34 +64,38 @@ export function resolveAgencyExpoFromJwt(user: User | null): {
 }
 
 /**
- * Complète avec `public.users.agency_id` / `user_expo_id` si les colonnes existent (sinon erreur ignorée, on garde le JWT).
+ * Complete avec agency_users.agency_id et expo_user_role.expo_id si disponibles
+ * (sinon erreur ignoree, on garde le JWT).
  */
 export async function mergeAgencyExpoFromUserTable(
   authUserId: string,
   fromJwt: { agency_id: string | null; expo_id: string | null },
 ): Promise<{ agency_id: string | null; expo_id: string | null }> {
-  const { data, error } = await supabase
-    .from("users")
-    .select("agency_id, user_expo_id")
-    .eq("id", authUserId)
+  const { data: agencyData, error: agencyErr } = await supabase
+    .from("agency_users")
+    .select("agency_id")
+    .eq("user_id", authUserId)
+    .order("role_id", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  if (error) {
+  if (agencyErr) {
     if (import.meta.env.DEV) {
-      console.warn("[auth] agency_id / expo_id (table users) :", error.message);
+      console.warn("[auth] agency_id (agency_users) :", agencyErr.message);
     }
     return fromJwt;
   }
 
-  const row = data as { agency_id?: string | null; user_expo_id?: string | null } | null;
-  if (!row || typeof row !== "object") {
-    return fromJwt;
-  }
-  const user = { ...row, expo_id: row.user_expo_id };
+  const { data: expoData } = await supabase
+    .from("expo_user_role")
+    .select("expo_id")
+    .eq("user_id", authUserId)
+    .order("assigned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const agencyDb = typeof row.agency_id === "string" ? row.agency_id.trim() : "";
-  // Mapping volontaire: on conserve `expo_id` côté app, alimenté depuis `user_expo_id` en base.
-  const expoDb = typeof user.expo_id === "string" ? user.expo_id.trim() : "";
+  const agencyDb = agencyData?.agency_id?.trim() ?? "";
+  const expoDb = expoData?.expo_id?.trim() ?? "";
 
   return {
     agency_id: agencyDb || fromJwt.agency_id,

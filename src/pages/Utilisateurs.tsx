@@ -21,17 +21,27 @@ import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { supabase } from "@/lib/supabase";
 import Users from "@/pages/Users";
 
+// ---------------------------------------------------------------------------
+// Nouveau modèle :
+//   profiles        → first_name, last_name, phone
+//   agency_users    → agency_id, role_id
+//   expo_user_role  → expo_id
+//   auth.users      → email (non accessible côté client — non affiché ici)
+//
+// Soft-delete : profiles.deleted_at — colonne unifiée pour toutes les corbeilles.
+// La suppression retire les rattachements agence + expo (agency_users, expo_user_role).
+// Le profil (profiles) est conservé pour préserver l'historique auth.
+// ---------------------------------------------------------------------------
 type AdminUserRow = {
   id: string;
   role_id: number | null;
   agency_id: string | null;
-  user_expo_id: string | null;
-  user_prenom: string | null;
-  user_nom: string | null;
-  user_age: string | null;
-  user_phone: string | null;
-  user_email: string | null;
-  user_deleted_at?: string | null;
+  expo_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  birth_year: string | null;
+  phone: string | null;
+  email: string | null; // non pré-chargé — saisie admin via edge function seulement
 };
 
 type RoleOption = {
@@ -50,7 +60,7 @@ type ExpoOption = {
   expo_name: string | null;
 };
 
-type SortKey = "user_nom" | "user_prenom" | "agency" | "expo" | "role";
+type SortKey = "last_name" | "first_name" | "agency" | "expo" | "role";
 type SortDir = "asc" | "desc";
 
 function normalizeRoleLabel(roleId: number, label: string | null | undefined): string {
@@ -70,8 +80,8 @@ function extractRoleNameClair(
 }
 
 function getAllowedRoleIds(currentRoleId: number | null): number[] {
-  if (currentRoleId === 1) return []; // role 1 voit tous les rôles, géré côté requête
-  if (currentRoleId === 2) return []; // role 2 peut affecter les rôles > 2
+  if (currentRoleId === 1) return [];
+  if (currentRoleId === 2) return [];
   if (currentRoleId === 4) return [4, 5, 6];
   return [];
 }
@@ -92,7 +102,7 @@ export default function Utilisateurs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("user_nom");
+  const [sortKey, setSortKey] = useState<SortKey>("last_name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -119,30 +129,31 @@ export default function Utilisateurs() {
     }
     return map;
   }, [expoOptions]);
+
   const searchSuggestions = useMemo(() => {
     const set = new Set<string>();
     for (const row of rows) {
       const roleLabel = row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "";
       const agencyLabel = (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
-      const expoLabel = (row.user_expo_id && expoLabelById.get(row.user_expo_id)) || "";
-      [row.user_nom, row.user_prenom, row.user_email, roleLabel, agencyLabel, expoLabel]
+      const expoLabel = (row.expo_id && expoLabelById.get(row.expo_id)) || "";
+      [row.last_name, row.first_name, roleLabel, agencyLabel, expoLabel]
         .map((v) => (typeof v === "string" ? v.trim() : ""))
         .filter(Boolean)
         .forEach((v) => set.add(v));
     }
     return Array.from(set).slice(0, 200);
   }, [rows, roleLabelById, agencyLabelById, expoLabelById]);
+
   const filteredRows = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter((row) => {
       const roleLabel = row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "";
       const agencyLabel = (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
-      const expoLabel = (row.user_expo_id && expoLabelById.get(row.user_expo_id)) || "";
+      const expoLabel = (row.expo_id && expoLabelById.get(row.expo_id)) || "";
       const haystack = [
-        row.user_nom || "",
-        row.user_prenom || "",
-        row.user_email || "",
+        row.last_name || "",
+        row.first_name || "",
         roleLabel,
         agencyLabel,
         expoLabel,
@@ -152,16 +163,16 @@ export default function Utilisateurs() {
       return haystack.includes(needle);
     });
   }, [rows, searchTerm, roleLabelById, agencyLabelById, expoLabelById]);
+
   const sortedRows = useMemo(() => {
     const pinnedRole1 = filteredRows.filter((r) => Number(r.role_id) === 1);
     const pinnedRole4 = filteredRows.filter((r) => Number(r.role_id) === 4);
     const others = filteredRows.filter((r) => Number(r.role_id) !== 1 && Number(r.role_id) !== 4);
     const pick = (row: AdminUserRow): string => {
-      if (sortKey === "user_nom") return row.user_nom?.trim() || "";
-      if (sortKey === "user_prenom") return row.user_prenom?.trim() || "";
+      if (sortKey === "last_name") return row.last_name?.trim() || "";
+      if (sortKey === "first_name") return row.first_name?.trim() || "";
       if (sortKey === "agency") return (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
-      if (sortKey === "expo") return (row.user_expo_id && expoLabelById.get(row.user_expo_id)) || "";
-      // Tri rôle basé sur la valeur numérique role_id, pas sur le libellé.
+      if (sortKey === "expo") return (row.expo_id && expoLabelById.get(row.expo_id)) || "";
       return row.role_id != null ? String(row.role_id).padStart(3, "0") : "999";
     };
     const cmp = (a: AdminUserRow, b: AdminUserRow) => {
@@ -173,7 +184,6 @@ export default function Utilisateurs() {
     pinnedRole1.sort(cmp);
     pinnedRole4.sort(cmp);
     others.sort(cmp);
-    // Priorité stricte: role 1 toujours en haut, puis role 4, puis le reste.
     return [...pinnedRole1, ...pinnedRole4, ...others];
   }, [filteredRows, sortKey, sortDir, agencyLabelById, expoLabelById, roleLabelById]);
 
@@ -270,6 +280,11 @@ export default function Utilisateurs() {
     };
   }, [canAccess]);
 
+  // -------------------------------------------------------------------------
+  // Chargement de la liste via RPC get_all_users_with_roles
+  // La fonction SQL retourne role_id unifié (agency_users ou app_metadata),
+  // agency_id, expo_id, first_name, last_name, phone pour chaque utilisateur.
+  // -------------------------------------------------------------------------
   const loadUsers = async () => {
     if (!canAccess) {
       setRows([]);
@@ -278,25 +293,52 @@ export default function Utilisateurs() {
     }
     setLoading(true);
     setError(null);
-    const runQuery = async () => {
-      let q = supabase
-        .from("users")
-        .select("id, role_id, agency_id, user_expo_id, user_prenom, user_nom, user_age, user_phone, user_email")
-        .order("user_nom", { ascending: true, nullsFirst: false });
-      if (currentRoleId === 2) return q.neq("role_id", 1);
-      if (visibleRoleIds === null) return q;
-      if (visibleRoleIds.length === 0) return q;
-      return q.in("role_id", visibleRoleIds);
-    };
 
-    const { data, error: qErr } = await runQuery();
-    if (qErr) {
+    const { data, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
+
+    if (rpcErr) {
       setRows([]);
-      setError(qErr.message);
+      setError(rpcErr.message);
       setLoading(false);
       return;
     }
-    setRows((data as AdminUserRow[] | null) ?? []);
+
+    // Mapping du résultat RPC vers AdminUserRow
+    let merged: AdminUserRow[] = (
+      (data as Array<{
+        id?: string | null;
+        role_id?: number | null;
+        agency_id?: string | null;
+        expo_id?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        phone?: string | null;
+      }> | null) ?? []
+    )
+      .filter((r) => typeof r.id === "string" && r.id.trim())
+      .map((r) => ({
+        id: String(r.id),
+        role_id: typeof r.role_id === "number" ? r.role_id : null,
+        agency_id: r.agency_id ?? null,
+        expo_id: r.expo_id ?? null,
+        first_name: r.first_name ?? null,
+        last_name: r.last_name ?? null,
+        birth_year: null,
+        phone: r.phone ?? null,
+        email: null, // auth.users.email non accessible côté client
+      }));
+
+    // Filtrage par rôle visible (même logique que l'ancienne requête SQL)
+    if (currentRoleId === 2) {
+      merged = merged.filter((r) => r.role_id !== 1);
+    } else if (visibleRoleIds !== null && visibleRoleIds.length > 0) {
+      merged = merged.filter((r) => r.role_id != null && visibleRoleIds.includes(r.role_id));
+    }
+
+    // Tri initial par nom
+    merged.sort((a, b) => (a.last_name || "").localeCompare(b.last_name || "", "fr"));
+
+    setRows(merged);
     setLoading(false);
   };
 
@@ -308,29 +350,45 @@ export default function Utilisateurs() {
     setDialogUserId(row.id);
   };
 
+  // -------------------------------------------------------------------------
+  // Suppression douce : marque profiles.deleted_at = now().
+  // La fiche reste dans la base et est restaurable via /utilisateurs-corbeille.
+  // Le RPC get_all_users_with_roles doit filtrer profiles.deleted_at IS NULL.
+  // -------------------------------------------------------------------------
   const deleteUser = async () => {
     if (!deleteTarget || !canDeleteUsers) return;
+
+    const roleId = deleteTarget.role_id;
+    if (currentRoleId === 2 && roleId === 1) {
+      toast.error("Suppression non autorisée pour ce rôle.");
+      return;
+    }
+    if (currentRoleId === 4 && roleId != null && ![4, 5, 6].includes(roleId)) {
+      toast.error("Suppression non autorisée pour ce rôle.");
+      return;
+    }
+
     setDeleting(true);
     try {
-      const delQuery = supabase
-        .from("users")
-        .update({ user_deleted_at: new Date().toISOString() })
-        .eq("id", deleteTarget.id);
-      const { error: delErr } =
-        currentRoleId === 1
-          ? await delQuery.neq("role_id", 1)
-          : currentRoleId === 2
-            ? await delQuery.gt("role_id", 2)
-            : await delQuery.in("role_id", allowedRoleIds);
-      if (delErr) throw delErr;
-      toast.success("Utilisateur archivé dans la corbeille.");
+      const uid = deleteTarget.id;
+
+      const { error: softErr } = await supabase
+        .from("profiles")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", uid);
+      if (softErr) throw softErr;
+
+      toast.success("Utilisateur envoyé en corbeille.");
       setDeleteTarget(null);
       await loadUsers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Suppression impossible.");
     } finally {
       setDeleting(false);
     }
   };
 
+  // Vérifie si l'utilisateur ciblé est le dernier admin organisation de son agence.
   useEffect(() => {
     if (!deleteTarget) {
       setDeleteLastRole4InOrg(false);
@@ -343,18 +401,18 @@ export default function Utilisateurs() {
     let cancelled = false;
     void (async () => {
       const { data, error: qErr } = await supabase
-        .from("users")
-        .select("id")
+        .from("agency_users")
+        .select("user_id")
         .eq("role_id", 4)
         .eq("agency_id", deleteTarget.agency_id)
-        .neq("id", deleteTarget.id)
+        .neq("user_id", deleteTarget.id)
         .limit(1);
       if (cancelled) return;
       if (qErr) {
         setDeleteLastRole4InOrg(false);
         return;
       }
-      const remaining = (data as Array<{ id?: string }> | null) ?? [];
+      const remaining = (data as Array<{ user_id?: string }> | null) ?? [];
       setDeleteLastRole4InOrg(remaining.length === 0);
     })();
     return () => {
@@ -404,7 +462,7 @@ export default function Utilisateurs() {
               list="utilisateurs-search-suggestions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher (nom, prénom, email, rôle...)"
+              placeholder="Rechercher (nom, prénom, rôle...)"
               className="h-8 pr-8"
             />
             {searchTerm.trim().length > 0 && (
@@ -436,11 +494,11 @@ export default function Utilisateurs() {
                 <tr className="border-b text-left">
                   <th className="w-36 px-2 py-1">
                     Prénom
-                    <SortButtons column="user_prenom" />
+                    <SortButtons column="first_name" />
                   </th>
                   <th className="w-36 px-2 py-1">
                     Nom
-                    <SortButtons column="user_nom" />
+                    <SortButtons column="last_name" />
                   </th>
                   <th className="w-44 px-2 py-1">
                     Organisation
@@ -475,13 +533,13 @@ export default function Utilisateurs() {
                   return (
                     <tr key={row.id} className={`border-b ${rowClass}`} onClick={handleOpen}>
                       <td className="w-36 px-2 py-1">
-                        <span className="block truncate whitespace-nowrap" title={row.user_prenom || "—"}>
-                          {row.user_prenom || "—"}
+                        <span className="block truncate whitespace-nowrap" title={row.first_name || "—"}>
+                          {row.first_name || "—"}
                         </span>
                       </td>
                       <td className="w-36 px-2 py-1">
-                        <span className="block truncate whitespace-nowrap" title={row.user_nom || "—"}>
-                          {row.user_nom || "—"}
+                        <span className="block truncate whitespace-nowrap" title={row.last_name || "—"}>
+                          {row.last_name || "—"}
                         </span>
                       </td>
                       <td className="w-44 px-2 py-1">
@@ -495,9 +553,9 @@ export default function Utilisateurs() {
                       <td className="w-44 px-2 py-1">
                         <span
                           className="block truncate whitespace-nowrap"
-                          title={(row.user_expo_id && expoLabelById.get(row.user_expo_id)) || "—"}
+                          title={(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
                         >
-                          {(row.user_expo_id && expoLabelById.get(row.user_expo_id)) || "—"}
+                          {(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
                         </span>
                       </td>
                       <td className="w-40 px-2 py-1">
@@ -558,18 +616,18 @@ export default function Utilisateurs() {
                   {deleteLastRole4InOrg ? (
                     <>
                       Cet utilisateur semble être le dernier `role_id = 4` de cette organisation.
-                      La suppression peut laisser l’organisation sans administrateur.
+                      La suppression peut laisser l'organisation sans administrateur.
                     </>
                   ) : (
                     "Confirmez-vous la suppression de cet Admin organisation ?"
                   )}
                   <br />
-                  {deleteTarget ? `Utilisateur ciblé : ${deleteTarget.user_prenom || ""} ${deleteTarget.user_nom || ""}` : ""}
+                  {deleteTarget ? `Utilisateur ciblé : ${deleteTarget.first_name || ""} ${deleteTarget.last_name || ""}` : ""}
                 </>
               ) : (
                 <>
                   Voulez-vous vraiment supprimer cet utilisateur ?
-                  {deleteTarget ? ` (${deleteTarget.user_prenom || ""} ${deleteTarget.user_nom || ""})` : ""}
+                  {deleteTarget ? ` (${deleteTarget.first_name || ""} ${deleteTarget.last_name || ""})` : ""}
                 </>
               )}
             </AlertDialogDescription>

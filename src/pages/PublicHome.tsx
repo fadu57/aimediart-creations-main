@@ -1137,7 +1137,13 @@ export default function PublicHome() {
                             <span className="rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                               {badgeLabel}
                             </span>
-                            <Link to="/login">
+                            <Link
+                              to={
+                                isRayonnementCard
+                                  ? "/home/commencer?intent=devis"
+                                  : `/home/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
+                              }
+                            >
                               <Button
                                 size="sm"
                                 className="h-8 rounded-lg px-3 text-xs font-semibold"

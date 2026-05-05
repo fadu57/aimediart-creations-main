@@ -113,7 +113,7 @@ export default function Header() {
     pathname.startsWith("/summary/") ||
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
-  const { session, user_prenom, user, role_name, role_id, loading: authLoading } = useAuthUser();
+  const { session, first_name, user, role_name, role_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/home";
   const { can } = useNavigationMatrix();
   const { language, setLanguage, t } = useUiLanguage();
@@ -129,9 +129,8 @@ export default function Header() {
   const jwtDisplayName =
     (typeof userMeta.full_name === "string" ? userMeta.full_name.trim() : "") ||
     (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "") ||
-    (typeof userMeta.first_name === "string" ? userMeta.first_name.trim() : "") ||
-    (typeof userMeta.prenom === "string" ? userMeta.prenom.trim() : "");
-  const displayUserPrenom = user_prenom?.trim() || jwtDisplayName || "Visiteur";
+    (typeof userMeta.first_name === "string" ? userMeta.first_name.trim() : "");
+  const displayUserPrenom = first_name?.trim() || jwtDisplayName || "Visiteur";
 
   const handleLogout = async () => {
     // Déconnexion tolérante hors-ligne: évite l'appel réseau `logout?scope=global`

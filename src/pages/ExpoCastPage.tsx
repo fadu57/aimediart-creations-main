@@ -42,7 +42,7 @@ export default function ExpoCastPage() {
     document.addEventListener("visibilitychange", onVis);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
-      void wakeLock?.release().catch(() => {});
+      void wakeLock?.release()?.catch(() => {});
     };
   }, []);
 

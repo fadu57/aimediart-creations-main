@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { ArchiveRestore, ArrowLeft } from "lucide-react";
+import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
+import { useRetentionSettings } from "@/hooks/useRetentionSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import RetentionBadge from "@/components/settings/RetentionBadge";
 
 type ArtworkRow = {
   artwork_id: string;
   artwork_title?: string | null;
-  artwork_deleted_at?: string | null;
+  deleted_at?: string | null;
 };
 
 export default function CatalogueCorbeille() {
@@ -22,6 +24,9 @@ export default function CatalogueCorbeille() {
     return role_id === 1 || role_id === 2 || role_id === 3 || hasFullDataAccess(role_name);
   }, [authLoading, role_id, role_name]);
 
+  const { retention } = useRetentionSettings();
+  const retentionEntry = retention["artworks"];
+
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ArtworkRow[]>([]);
 
@@ -29,9 +34,9 @@ export default function CatalogueCorbeille() {
     setLoading(true);
     const { data, error } = await supabase
       .from("artworks")
-      .select("artwork_id, artwork_title, artwork_deleted_at")
-      .not("artwork_deleted_at", "is", null)
-      .order("artwork_deleted_at", { ascending: false });
+      .select("artwork_id, artwork_title, deleted_at")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: true }); // plus anciens en premier
     if (error) {
       toast.error(error.message);
       setRows([]);
@@ -49,7 +54,10 @@ export default function CatalogueCorbeille() {
   const handleRestore = async (artworkId: string) => {
     if (!canAccess) return;
     try {
-      const { error } = await supabase.from("artworks").update({ artwork_deleted_at: null }).eq("artwork_id", artworkId);
+      const { error } = await supabase
+        .from("artworks")
+        .update({ deleted_at: null })
+        .eq("artwork_id", artworkId);
       if (error) throw error;
       toast.success("Œuvre restaurée.");
       await loadTrash();
@@ -81,6 +89,18 @@ export default function CatalogueCorbeille() {
         </Button>
       </div>
 
+      {/* Bandeau d'information rétention */}
+      {retentionEntry && (
+        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {retentionEntry.auto_purge
+              ? <>Les fiches sont conservées <strong>{retentionEntry.retention_days} jours</strong> après archivage. La purge automatique s'exécute chaque nuit à 2h.</>
+              : "La purge automatique est désactivée pour cette entité."}
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : rows.length === 0 ? (
@@ -92,13 +112,18 @@ export default function CatalogueCorbeille() {
             return (
               <Card key={a.artwork_id} className="glass-card">
                 <CardContent className="p-5 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 space-y-1">
                     <p className="font-semibold truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Archivé le {a.artwork_deleted_at ? new Date(a.artwork_deleted_at).toLocaleString("fr-FR") : "—"}
+                      Archivé le {a.deleted_at ? new Date(a.deleted_at).toLocaleString("fr-FR") : "—"}
                     </p>
+                    <RetentionBadge
+                      deleted_at={a.deleted_at}
+                      retention_days={retentionEntry?.retention_days}
+                      auto_purge={retentionEntry?.auto_purge}
+                    />
                   </div>
-                  <Button type="button" className="gap-2" onClick={() => void handleRestore(a.artwork_id)}>
+                  <Button type="button" className="gap-2 shrink-0" onClick={() => void handleRestore(a.artwork_id)}>
                     <ArchiveRestore className="h-4 w-4" /> Restaurer
                   </Button>
                 </CardContent>
@@ -110,4 +135,3 @@ export default function CatalogueCorbeille() {
     </div>
   );
 }
-

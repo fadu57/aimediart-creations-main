@@ -76,7 +76,7 @@ export default function Expos2() {
     setLoading(true);
     setError(null);
 
-    let exposQuery = supabase.from("expos").select("*").order("expo_name", { ascending: true, nullsFirst: false });
+    let exposQuery = supabase.from("expos").select("*").is("deleted_at", null).order("expo_name", { ascending: true, nullsFirst: false });
     if (currentRoleId === 4 && currentAgencyId) exposQuery = exposQuery.eq("agency_id", currentAgencyId);
     const { data: exposData, error: exposErr } = await exposQuery;
     const { data: agenciesData } = await supabase.from("agencies").select("id, name_agency");
@@ -101,7 +101,7 @@ export default function Expos2() {
     setArchiving(true);
     const { error: updErr } = await supabase
       .from("expos")
-      .update({ expo_deleted_at: new Date().toISOString() })
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", archiveTarget.id);
     if (updErr) {
       toast.error(updErr.message);

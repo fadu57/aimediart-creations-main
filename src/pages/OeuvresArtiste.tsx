@@ -60,7 +60,7 @@ const OeuvresArtiste = () => {
         .from("artworks")
         .select("artwork_id, artwork_title, artwork_image_url, artwork_description, artwork_artist_id")
         .eq("artwork_artist_id", resolvedArtistId)
-        .is("artwork_deleted_at", null)
+        .is("deleted_at", null)
         .order("artwork_created_at", { ascending: true })
         .returns<ArtworkRow[]>();
 
@@ -70,7 +70,7 @@ const OeuvresArtiste = () => {
           .from("artworks")
           .select("artwork_id, artwork_artist_id")
           .eq("artwork_id", routeParam)
-          .is("artwork_deleted_at", null)
+          .is("deleted_at", null)
           .maybeSingle<{ artwork_id: string; artwork_artist_id: string | null }>();
 
         const candidateArtistId = seedArtwork?.artwork_artist_id?.trim();
@@ -82,7 +82,7 @@ const OeuvresArtiste = () => {
             .from("artworks")
             .select("artwork_id, artwork_title, artwork_image_url, artwork_description, artwork_artist_id")
             .eq("artwork_artist_id", resolvedArtistId)
-            .is("artwork_deleted_at", null)
+            .is("deleted_at", null)
             .order("artwork_created_at", { ascending: true })
             .returns<ArtworkRow[]>();
 
