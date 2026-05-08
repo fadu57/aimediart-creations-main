@@ -3,6 +3,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtworkModal } from "@/components/ArtworkModal";
 import { supabase } from "@/lib/supabase";
@@ -17,7 +27,7 @@ import QRCode from "qrcode";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { cn } from "@/lib/utils";
-import { useUiLanguage } from "@/providers/UiLanguageProvider";
+import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 
 type ArtworkRow = {
@@ -157,7 +167,7 @@ function computePdfTitleUpToTwoLines(
 }
 
 const Catalogue = () => {
-  const { t } = useUiLanguage();
+  const { t } = useTranslation("catalogue");
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
@@ -172,6 +182,7 @@ const Catalogue = () => {
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
   const [generatingQrForArtworkId, setGeneratingQrForArtworkId] = useState<string | null>(null);
+  const [qrConfirmArtworkId, setQrConfirmArtworkId] = useState<string | null>(null);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
   const navigate = useNavigate();
@@ -381,7 +392,7 @@ const Catalogue = () => {
         return;
       }
       artworkData = (fallbackResult.data as ArtworkRow[] | null) ?? null;
-      setError(`Jointure artistes indisponible (${artworksError.message}). Affichage via fallback.`);
+      setError(t("error_artist_join", { message: artworksError.message }));
     }
 
     if (import.meta.env.DEV) {
@@ -471,9 +482,11 @@ const Catalogue = () => {
       ],
     [artworks],
   );
+  // Sentinel supprimée : le placeholder n'est plus injecté comme option datalist.
+  // La réinitialisation du filtre se fait uniquement via le bouton X ou en vidant le champ.
   const expoFilterSuggestions = useMemo(
-    () => [t("Filtrer par exposition"), ...new Set(expoOptions.map((expo) => expo.name))],
-    [expoOptions, t],
+    () => [...new Set(expoOptions.map((expo) => expo.name))],
+    [expoOptions],
   );
 
   useEffect(() => {
@@ -489,7 +502,7 @@ const Catalogue = () => {
     setExpoFilterInput(value);
     const normalized = value.trim().toLowerCase();
 
-    if (!normalized || normalized === t("Filtrer par exposition").toLowerCase()) {
+    if (!normalized) {
       setSelectedExpoFilter("all");
       return;
     }
@@ -553,7 +566,7 @@ const Catalogue = () => {
       .eq("artwork_id", artworkId);
 
     if (updateError) {
-      setError(`Mise à jour du statut impossible : ${updateError.message}`);
+      setError(t("error_status_update", { message: updateError.message }));
     } else {
       setArtworks((prev) =>
         prev.map((row) =>
@@ -582,7 +595,7 @@ const Catalogue = () => {
       const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
       console.log("URL générée pour le QR code (from Catalogue.tsx):", targetUrl);
       if (!targetUrl) {
-        toast.error("Impossible de construire l'URL du QR.");
+        toast.error(t("qr_error_no_url"));
         return;
       }
       setGeneratingQrForArtworkId(artworkId);
@@ -616,10 +629,9 @@ const Catalogue = () => {
               : row,
           ),
         );
-        toast.success("QR code généré et enregistré.");
+        toast.success(t("qr_success"));
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Génération du QR code impossible.";
-        toast.error(msg);
+        toast.error(e instanceof Error ? e.message : t("qr_error_generate"));
       } finally {
         setGeneratingQrForArtworkId(null);
       }
@@ -630,7 +642,7 @@ const Catalogue = () => {
   const handleGeneratePDF = async (aw: ArtworkRow) => {
     const artworkId = aw.artwork_id?.trim();
     if (!artworkId) {
-      alert("Identifiant de l'œuvre indisponible.");
+      toast.error(t("pdf_error_no_id"));
       return;
     }
 
@@ -639,7 +651,7 @@ const Catalogue = () => {
       [artist?.artist_firstname ?? artist?.artist_prenom, artist?.artist_lastname ?? artist?.artist_name]
         .filter(Boolean)
         .join(" ")
-        .trim() || "Artiste inconnu";
+        .trim() || t("artist_unknown");
 
     try {
       const pdf = new jsPDF({
@@ -651,9 +663,9 @@ const Catalogue = () => {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const titleText = (aw.artwork_title ?? "Œuvre sans titre").trim();
+      const titleText = (aw.artwork_title ?? t("artwork_untitled")).trim();
       const artistText = artistLabel;
-      const explorationLines = ["Explorez l'œuvre", "avec l'assistant de l'artiste"];
+      const explorationLines = [t("pdf_explore_line1"), t("pdf_explore_line2")];
 
       const margin = 10;
       const bottomSafe = pageHeight - margin;
@@ -663,7 +675,7 @@ const Catalogue = () => {
       const originOverride = await getQrBaseOriginFromSettings();
       const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
       if (!targetUrl) {
-        alert("Impossible de construire l’URL du QR pour cette œuvre.");
+        toast.error(t("pdf_error_no_qr_url"));
         return;
       }
       const qrDataUrl = await QRCode.toDataURL(targetUrl, {
@@ -746,8 +758,7 @@ const Catalogue = () => {
       const blobUrl = pdf.output("bloburl");
       window.open(blobUrl, "_blank");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Impossible de générer le cartel PDF.";
-      alert(msg);
+      toast.error(e instanceof Error ? e.message : t("pdf_error_generate"));
     }
   };
 
@@ -756,14 +767,14 @@ const Catalogue = () => {
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
         <div className="flex w-full items-center gap-4 md:max-w-[760px]">
           <div>
-            <h2 className="text-3xl font-serif font-bold text-white">{t("Œuvre")}</h2>
+            <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
           </div>
           <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
               list="catalogue-search-suggestions"
-              placeholder={t("Rechercher une œuvre...")}
+              placeholder={t("search_placeholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-9 h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white"
@@ -773,7 +784,7 @@ const Catalogue = () => {
                 type="button"
                 onClick={() => setSearch("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label="Effacer la recherche"
+                aria-label={t("search_clear_aria")}
                 title="Effacer"
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
@@ -790,7 +801,7 @@ const Catalogue = () => {
             <Input
               type="text"
               list="catalogue-expo-filter-suggestions"
-              placeholder={t("Filtrer par exposition")}
+              placeholder={t("expo_filter_placeholder")}
               value={expoFilterInput}
               onChange={(e) => handleExpoFilterInputChange(e.target.value)}
               className="pl-9 pr-9 h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white"
@@ -803,8 +814,8 @@ const Catalogue = () => {
                   setSelectedExpoFilter("all");
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label={t("Effacer le filtre exposition")}
-                title={t("Effacer le filtre")}
+                aria-label={t("expo_filter_clear_aria")}
+                title={t("expo_filter_clear_title")}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -818,10 +829,10 @@ const Catalogue = () => {
         </div>
         <div>
           {!authLoading && scope.mode === "agency" && (
-            <p className="text-xs text-muted-foreground mt-1">Expos de l’agence {scope.agencyId}.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("scope_agency_hint", { agencyId: scope.agencyId })}</p>
           )}
           {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">Exposition {scope.expoId} uniquement.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -830,20 +841,18 @@ const Catalogue = () => {
             onClick={() => openCreateArtwork()}
           >
             <Plus className="h-4 w-4" />
-            {t("Nouvelle œuvre")}
+            {t("btn_new_artwork")}
           </Button>
           <Button type="button" variant="outline" className="gap-2" asChild>
-            <Link to="/catalogue/catalogue2">Tableau</Link>
+            <Link to="/catalogue/catalogue2">{t("btn_table_view")}</Link>
           </Button>
         </div>
       </div>
 
       {showScopeHint && (
         <Alert>
-          <AlertTitle>Périmètre vide</AlertTitle>
-          <AlertDescription>
-            Renseignez les identifiants agence / expo attendus pour votre rôle (voir configuration Supabase ou variables d’environnement de dev).
-          </AlertDescription>
+          <AlertTitle>{t("alert_empty_scope_title")}</AlertTitle>
+          <AlertDescription>{t("alert_empty_scope_desc")}</AlertDescription>
         </Alert>
       )}
 
@@ -854,10 +863,10 @@ const Catalogue = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {loading && <p className="col-span-full text-sm text-muted-foreground text-center py-12">{t("Chargement du catalogue…")}</p>}
+        {loading && <p className="col-span-full text-sm text-muted-foreground text-center py-12">{t("loading_catalogue")}</p>}
         {filtered.length === 0 && !showScopeHint && !error && (
           <p className="col-span-full text-sm text-muted-foreground text-center py-12">
-            {t("Aucune œuvre ne correspond à votre recherche ou à votre périmètre.")}
+            {t("empty_search")}
           </p>
         )}
         {filtered.map((aw) => {
@@ -877,12 +886,12 @@ const Catalogue = () => {
             [artist?.artist_firstname ?? artist?.artist_prenom, artist?.artist_lastname ?? artist?.artist_name]
               .filter(Boolean)
               .join(" ")
-              .trim() || "Artiste inconnu";
+              .trim() || t("artist_unknown");
           const artworkImage = aw.artwork_image_url || aw.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
           const qrImage = aw.artwork_qrcode_image || aw.artwork_qr_code_url || null;
           const currentStatusRaw = (aw.artwork_status ?? "").trim();
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
-          const statusLabel = currentStatusRaw || "vide";
+          const statusLabel = currentStatusRaw || t("status_empty");
           const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
           const generatedTextsCount = countGeneratedMediationTexts(aw.artwork_description);
           const hasGeneratedMediation = generatedTextsCount > 0;
@@ -912,7 +921,7 @@ const Catalogue = () => {
                           className="h-20 w-20 object-contain"
                         />
                       ) : (
-                        <span className="text-[11px] text-muted-foreground px-1 text-center">QR indisponible</span>
+                        <span className="text-[11px] text-muted-foreground px-1 text-center">{t("qr_unavailable")}</span>
                       )}
                     </div>
                   ) : (
@@ -926,11 +935,15 @@ const Catalogue = () => {
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleGenerateQrForArtwork(aw.artwork_id);
+                        if (qrImage) {
+                          setQrConfirmArtworkId(aw.artwork_id);
+                        } else {
+                          void handleGenerateQrForArtwork(aw.artwork_id);
+                        }
                       }}
                       disabled={Boolean(generatingQrForArtworkId)}
-                      title={qrImage ? "Cliquer pour régénérer le QR code" : "Cliquer pour générer le QR code"}
-                      aria-label={qrImage ? "Régénérer le QR code de l'œuvre" : "Générer le QR code de l'œuvre"}
+                      title={qrImage ? t("qr_regenerate_title") : t("qr_generate_title")}
+                      aria-label={qrImage ? t("qr_regenerate_aria") : t("qr_generate_aria")}
                     >
                       {generatingQrForArtworkId === aw.artwork_id ? (
                         <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
@@ -945,16 +958,16 @@ const Catalogue = () => {
                         <>
                           <QrCode className="h-9 w-9 text-muted-foreground/80 shrink-0" aria-hidden />
                           <span className="mt-0.5 text-[10px] leading-tight text-muted-foreground px-0.5">
-                            Générer le QR
+                            {t("qr_generate_label")}
                           </span>
                         </>
                       )}
                     </button>
                   )}
                   <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
-                    <span className="whitespace-nowrap">en cliquant ci-dessus</span>
+                    <span className="whitespace-nowrap">{t("qr_click_hint_line1")}</span>
                     <br />
-                    <span>un nouveau QR-Code est généré</span>
+                    <span>{t("qr_click_hint_line2")}</span>
                   </p>
                 </div>
 
@@ -980,11 +993,11 @@ const Catalogue = () => {
                       <SelectTrigger
                         className="h-7 w-full max-w-[112px] px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate"
                       >
-                        <SelectValue placeholder="Exposition" />
+                        <SelectValue placeholder={t("expo_selector_placeholder")} />
                       </SelectTrigger>
                       <SelectContent className="rounded-none shadow-none z-[60]">
                         <SelectItem value="__none__" className="text-xs">
-                          <span className="italic">pas d&apos;expo affectée</span>
+                          <span className="italic">{t("expo_selector_none")}</span>
                         </SelectItem>
                         {availableExpoOptions.length > 0 ? (
                           availableExpoOptions.map((expo) => (
@@ -994,7 +1007,7 @@ const Catalogue = () => {
                           ))
                         ) : (
                           <SelectItem value="__empty__" disabled className="text-xs">
-                            Aucune expo de cette agence
+                            {t("expo_selector_empty")}
                           </SelectItem>
                         )}
                       </SelectContent>
@@ -1010,13 +1023,13 @@ const Catalogue = () => {
                       navigate(`/œuvre/${encodeURIComponent(aw.artwork_id)}`);
                     }}
                   >
-                    Ouvrir
+                    {t("btn_open")}
                   </Button>
                 </div>
 
                 <div className="flex min-w-0 flex-1 self-stretch items-start gap-4">
                   <div className="flex min-h-full flex-1 min-w-0 flex-col">
-                    <h3 className="line-clamp-2 w-[200px] font-serif font-bold text-lg">{aw.artwork_title ?? "Œuvre sans titre"}</h3>
+                    <h3 className="line-clamp-2 w-[200px] font-serif font-bold text-lg">{aw.artwork_title ?? t("artwork_untitled")}</h3>
                     <p className="text-sm text-primary italic">{artistLabel}</p>
                     <div
                       className="mt-2 inline-flex items-center gap-2"
@@ -1045,7 +1058,7 @@ const Catalogue = () => {
                             : "border-[#E63946] bg-[#E63946] text-white",
                         )}
                       >
-                        {hasImageAnalysis ? "Image analysée par l'IA : Oui" : "Image analysée par l'IA : Non"}
+                        {t(hasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
                       </span>
                       <span
                         className={cn(
@@ -1055,9 +1068,7 @@ const Catalogue = () => {
                             : "border-[#E63946] bg-[#E63946] text-white",
                         )}
                       >
-                        {hasGeneratedMediation
-                          ? `Médiations générées par l'IA : ${generatedTextsCount} généré${generatedTextsCount > 1 ? "s" : ""}`
-                          : "Médiations générées par l'IA : 0 généré"}
+                        {t("badge_ia_mediation", { count: generatedTextsCount })}
                       </span>
                     </div>
                   </div>
@@ -1079,7 +1090,7 @@ const Catalogue = () => {
                         navigate(`/scan-work2?${q.toString()}`);
                       }}
                     >
-                      Tester le QR-Code
+                      {t("btn_test_qr")}
                     </Button>
                     <Button
                       type="button"
@@ -1092,7 +1103,7 @@ const Catalogue = () => {
                       }}
                       disabled={!aw.artwork_qrcode_image && !aw.artwork_qr_code_url}
                     >
-                      Imprimer cartel
+                      {t("btn_print_cartel")}
                     </Button>
                   </div>
                 </div>
@@ -1101,6 +1112,38 @@ const Catalogue = () => {
           );
         })}
       </div>
+
+      <AlertDialog
+        open={Boolean(qrConfirmArtworkId)}
+        onOpenChange={(open) => !open && setQrConfirmArtworkId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("qr_confirm_title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="block font-semibold text-destructive mb-2">
+                {t("qr_confirm_warning")}
+              </span>
+              {t("qr_confirm_description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setQrConfirmArtworkId(null)}>
+              {t("qr_confirm_cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => {
+                const id = qrConfirmArtworkId;
+                setQrConfirmArtworkId(null);
+                if (id) void handleGenerateQrForArtwork(id);
+              }}
+            >
+              {t("qr_confirm_action")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ArtworkModal
         open={artworkModalOpen}

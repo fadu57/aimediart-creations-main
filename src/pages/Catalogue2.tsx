@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,8 +34,7 @@ type ArtistRow = {
   artist_id: string;
   artist_firstname?: string | null;
   artist_lastname?: string | null;
-  artist_name?: string | null;
-  artist_prenom?: string | null;
+  artist_nickname?: string | null;
 };
 
 type AgencyRow = { id: string; name_agency?: string | null };
@@ -48,6 +48,7 @@ function text(v: string | null | undefined): string {
 }
 
 export default function Catalogue2() {
+  const { t } = useTranslation("catalogue");
   const navigate = useNavigate();
   const { loading: authLoading, role_id, role_name } = useAuthUser();
   const canAccess = (typeof role_id === "number" && role_id >= 1 && role_id <= 6) || hasFullDataAccess(role_name);
@@ -67,9 +68,9 @@ export default function Catalogue2() {
   const artistById = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of artists) {
-      const label =
-        `${text(a.artist_firstname) || text(a.artist_prenom)} ${text(a.artist_lastname) || text(a.artist_name)}`.trim() ||
-        a.artist_id;
+      const fullname = `${text(a.artist_firstname)} ${text(a.artist_lastname)}`.trim();
+      const nickname = text(a.artist_nickname);
+      const label = (fullname || a.artist_id) + (nickname ? ` alias ${nickname}` : "");
       map.set(a.artist_id, label);
     }
     return map;
@@ -93,7 +94,7 @@ export default function Catalogue2() {
             .select("artwork_id, artwork_title, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status")
             .is("deleted_at", null)
             .order("artwork_title", { ascending: true, nullsFirst: false }),
-          supabase.from("artists").select("artist_id, artist_firstname, artist_lastname, artist_name, artist_prenom"),
+          supabase.from("artists").select("artist_id, artist_firstname, artist_lastname, artist_nickname"),
           supabase.from("agencies").select("id, name_agency"),
           supabase.from("expos").select("id, expo_name"),
         ]);
@@ -183,20 +184,20 @@ export default function Catalogue2() {
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" onClick={() => navigate("/catalogue")}>Retour</Button>
+        <Button type="button" variant="outline" onClick={() => navigate("/catalogue")}>{t("tableau_back")}</Button>
         <Button type="button" variant="outline" asChild>
           <Link to="/catalogue-corbeille" className="inline-flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4" /> Corbeille
+            <ArchiveRestore className="h-4 w-4" /> {t("tableau_corbeille")}
           </Link>
         </Button>
       </div>
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>Catalogue — Tableau complet</CardTitle>
+          <CardTitle>{t("tableau_title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
-            <Input type="text" list="catalogue2-search-suggestions" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Rechercher (titre, artiste, agence, expo...)" className="h-8 pr-8" />
+            <Input type="text" list="catalogue2-search-suggestions" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t("tableau_search")} className="h-8 pr-8" />
             {searchTerm.trim().length > 0 && (
-              <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" aria-label="Effacer la recherche" title="Effacer">
+              <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" aria-label={t("tableau_clear_search")} title={t("tableau_clear")}>
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -204,15 +205,15 @@ export default function Catalogue2() {
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          {loading ? <p className="text-sm text-muted-foreground">Chargement...</p> : error ? <p className="text-sm text-destructive">{error}</p> : (
+          {loading ? <p className="text-sm text-muted-foreground">{t("tableau_loading")}</p> : error ? <p className="text-sm text-destructive">{error}</p> : (
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-64 px-2 py-1">Titre <SortButtons column="titre" /></th>
-                  <th className="w-52 px-2 py-1">Artiste <SortButtons column="artiste" /></th>
-                  <th className="w-52 px-2 py-1">Organisation <SortButtons column="agency" /></th>
-                  <th className="w-52 px-2 py-1">Expo <SortButtons column="expo" /></th>
-                  <th className="w-28 px-2 py-1">Statut <SortButtons column="status" /></th>
+                  <th className="w-64 px-2 py-1">{t("tableau_col_titre")} <SortButtons column="titre" /></th>
+                  <th className="w-52 px-2 py-1">{t("tableau_col_artiste")} <SortButtons column="artiste" /></th>
+                  <th className="w-52 px-2 py-1">{t("tableau_col_organisation")} <SortButtons column="agency" /></th>
+                  <th className="w-52 px-2 py-1">{t("tableau_col_expo")} <SortButtons column="expo" /></th>
+                  <th className="w-28 px-2 py-1">{t("tableau_col_statut")} <SortButtons column="status" /></th>
                   <th className="w-10 px-2 py-1" />
                 </tr>
               </thead>
@@ -238,8 +239,8 @@ export default function Catalogue2() {
                           e.stopPropagation();
                           setArchiveTarget(r);
                         }}
-                        aria-label="Archiver l'œuvre"
-                        title="Archiver"
+                        aria-label={t("tableau_archive_aria")}
+                        title={t("tableau_archive_title")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -247,7 +248,7 @@ export default function Catalogue2() {
                   </tr>
                 ))}
                 {sortedRows.length === 0 && (
-                  <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">Aucune œuvre visible.</td></tr>
+                  <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t("tableau_empty")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -257,14 +258,11 @@ export default function Catalogue2() {
       <AlertDialog open={Boolean(archiveTarget)} onOpenChange={(open) => !open && setArchiveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ATTENTION - La suppression est définitive. Supprimer avec le maximum de discernement sinon vous risquez
-              de problèmes avec votre application
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("tableau_warning")}</AlertDialogTitle>
             <AlertDialogDescription />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("tableau_cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -273,7 +271,7 @@ export default function Catalogue2() {
                 void archiveArtwork();
               }}
             >
-              {archiving ? "Archivage..." : "Supprimer"}
+              {archiving ? t("tableau_archiving") : t("tableau_confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

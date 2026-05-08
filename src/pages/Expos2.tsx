@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,6 +49,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 export default function Expos2() {
+  const { t } = useTranslation("expos");
   const navigate = useNavigate();
   const { loading: authLoading, role_id: currentRoleId, agency_id: currentAgencyId } = useAuthUser();
   const canAccess = currentRoleId === 1 || currentRoleId === 2 || currentRoleId === 3 || currentRoleId === 4;
@@ -202,25 +204,25 @@ export default function Expos2() {
     <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/expos")}>
-          Retour
+          {t("tableau.back")}
         </Button>
         <Button type="button" variant="outline" asChild>
           <Link to="/expos-corbeille" className="inline-flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4" /> Corbeille
+            <ArchiveRestore className="h-4 w-4" /> {t("tableau.corbeille")}
           </Link>
         </Button>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>Expositions — Tableau complet</CardTitle>
+          <CardTitle>{t("tableau.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
             <Input
               type="text"
               list="expos2-search-suggestions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher (expo, agence, commissaire...)"
+              placeholder={t("tableau.search")}
               className="h-8 pr-8"
             />
             {searchTerm.trim().length > 0 && (
@@ -228,8 +230,8 @@ export default function Expos2() {
                 type="button"
                 onClick={() => setSearchTerm("")}
                 className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label="Effacer la recherche"
-                title="Effacer"
+                aria-label={t("page.clearSearch")}
+                title={t("page.clear")}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -243,18 +245,18 @@ export default function Expos2() {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Chargement...</p>
+            <p className="text-sm text-muted-foreground">{t("tableau.loading")}</p>
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : (
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-64 px-2 py-1">Exposition <SortButtons column="expo_name" /></th>
-                  <th className="w-56 px-2 py-1">Organisation <SortButtons column="agency" /></th>
-                  <th className="w-52 px-2 py-1">Commissaire <SortButtons column="curator" /></th>
-                  <th className="w-32 px-2 py-1">Du <SortButtons column="date_du" /></th>
-                  <th className="w-32 px-2 py-1">Au <SortButtons column="date_au" /></th>
+                  <th className="w-64 px-2 py-1">{t("tableau.colExposition")} <SortButtons column="expo_name" /></th>
+                  <th className="w-56 px-2 py-1">{t("tableau.colOrganisation")} <SortButtons column="agency" /></th>
+                  <th className="w-52 px-2 py-1">{t("tableau.colCommissaire")} <SortButtons column="curator" /></th>
+                  <th className="w-32 px-2 py-1">{t("tableau.colDu")} <SortButtons column="date_du" /></th>
+                  <th className="w-32 px-2 py-1">{t("tableau.colAu")} <SortButtons column="date_au" /></th>
                   <th className="w-10 px-2 py-1" />
                 </tr>
               </thead>
@@ -284,8 +286,8 @@ export default function Expos2() {
                             e.stopPropagation();
                             setArchiveTarget(row);
                           }}
-                          aria-label="Archiver l'exposition"
-                          title="Archiver"
+                        aria-label={t("tableau.archiveAriaLabel")}
+                        title={t("tableau.archiveTitle")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -296,7 +298,7 @@ export default function Expos2() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-2 py-2 text-muted-foreground">
-                      Aucune exposition visible.
+                      {t("tableau.empty")}
                     </td>
                   </tr>
                 )}
@@ -308,14 +310,11 @@ export default function Expos2() {
       <AlertDialog open={Boolean(archiveTarget)} onOpenChange={(open) => !open && setArchiveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ATTENTION - La suppression est définitive. Supprimer avec le maximum de discernement sinon vous risquez
-              de problèmes avec votre application
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("tableau.archiveWarning")}</AlertDialogTitle>
             <AlertDialogDescription />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("tableau.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -324,7 +323,7 @@ export default function Expos2() {
                 void archiveExpo();
               }}
             >
-              {archiving ? "Archivage..." : "Supprimer"}
+              {archiving ? t("tableau.archiving") : t("tableau.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

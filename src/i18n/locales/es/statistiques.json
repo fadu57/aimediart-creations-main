@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Estadísticas",
+    "subtitle": "Análisis detallado de los datos de visita y retroalimentación emocional",
+    "print": "Imprimir estadísticas seleccionadas"
+  },
+  "filter": {
+    "organisation": "Organización",
+    "exposition": "Exposición",
+    "allExpos": "Todas las exposiciones del ámbito"
+  },
+  "emotions": {
+    "title": "Distribución de emociones",
+    "subtitle": "Desglose de los sentimientos de los visitantes",
+    "empty": "Sin comentarios para este ámbito."
+  },
+  "timeline": {
+    "title": "Evolución temporal",
+    "subtitle": "Visitantes a lo largo de los días",
+    "prevWeek": "Semana anterior",
+    "nextWeek": "Semana siguiente"
+  },
+  "hourly": {
+    "title": "Asistencia por horas",
+    "subtitle": "Visitantes a lo largo de las horas (clic en el gráfico azul)"
+  },
+  "cross": {
+    "title": "Tabla cruzada emociones / obras",
+    "subtitle": "Correlaciones entre las obras y las emociones de los visitantes",
+    "colArtwork": "Obra",
+    "empty": "Sin datos reales en este ámbito."
+  },
+  "top": {
+    "title": "Clasificación de obras",
+    "subtitle": "Rango, visitas y promedio de corazones (datos reales filtrados)",
+    "colRank": "Rango",
+    "colArtwork": "Obra",
+    "colVisits": "Visitas",
+    "colAvgHearts": "Prom. corazones",
+    "empty": "Sin datos reales en este ámbito."
+  },
+  "common": {
+    "chartNoData": "Datos insuficientes para un gráfico."
+  }
+}

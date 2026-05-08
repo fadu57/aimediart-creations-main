@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import { useUiLanguage } from "@/providers/UiLanguageProvider";
+import { useTranslation } from "react-i18next";
 
 type ArtistRow = {
   artist_id: string;
@@ -33,7 +33,7 @@ function formatArtistTyp(raw: string | null | undefined): string {
 }
 
 const Artists = () => {
-  const { t } = useUiLanguage();
+  const { t } = useTranslation("artists");
   const { loading: authLoading, role_name } = useAuthUser();
   const canAddArtist = !authLoading && canCreateArtist(role_name);
 
@@ -57,7 +57,7 @@ const Artists = () => {
       );
       if (!urlOk) {
         setError(
-          "Configuration Supabase manquante : renseignez VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans .env.",
+          t("error_supabase_config"),
         );
         setArtists([]);
         setLoading(false);
@@ -88,7 +88,7 @@ const Artists = () => {
       if (import.meta.env.DEV) {
         console.error("[Artistes] chargement :", e);
       }
-      setError("Erreur inattendue lors du chargement des artistes.");
+      setError(t("error_load_unexpected"));
       setArtists([]);
       setLoading(false);
     }
@@ -99,7 +99,7 @@ const Artists = () => {
   }, [loadArtists]);
 
   if (!artists && !loading) {
-    return <div>Erreur de chargement</div>;
+    return <div>{t("error_load_crash")}</div>;
   }
 
   const filteredArtists = (artists ?? []).filter((artist) => {
@@ -127,7 +127,7 @@ const Artists = () => {
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
         <div className="flex w-full items-center gap-4 md:max-w-[680px]">
           <div>
-          <h2 className="text-3xl font-serif font-bold text-white">{t("Artistes")}</h2>
+          <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
           </div>
           <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
             <Input
@@ -135,7 +135,7 @@ const Artists = () => {
               list="artists-search-suggestions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={t("Rechercher un artiste...")}
+              placeholder={t("search_placeholder")}
               className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
             />
             {searchTerm.trim().length > 0 && (
@@ -143,8 +143,8 @@ const Artists = () => {
                 type="button"
                 onClick={() => setSearchTerm("")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label={t("Effacer la recherche")}
-                title={t("Effacer")}
+                aria-label={t("search_clear_aria")}
+                title={t("search_clear_title")}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -166,11 +166,11 @@ const Artists = () => {
                 setDialogOpen(true);
               }}
             >
-              <Plus className="h-4 w-4" /> {t("Nouvel artiste")}
+              <Plus className="h-4 w-4" /> {t("btn_new_artist")}
             </Button>
           )}
           <Button type="button" variant="outline" className="gap-2" asChild>
-            <Link to="/artistes/artistes2">Tableau</Link>
+            <Link to="/artistes/artistes2">{t("btn_table_view")}</Link>
           </Button>
         </div>
       </div>
@@ -186,7 +186,7 @@ const Artists = () => {
       />
 
       {loading && (
-        <p className="text-sm text-muted-foreground">{t("Chargement des artistes…")}</p>
+        <p className="text-sm text-muted-foreground">{t("loading_artists")}</p>
       )}
 
       {error && (
@@ -197,14 +197,14 @@ const Artists = () => {
 
       {!loading && !error && filteredArtists.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-12">
-          {t("Aucun artiste trouvé.")}
+          {t("empty_artists")}
         </p>
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {filteredArtists.map((artist) => {
           const fullName =
-            [artist?.artist_firstname, artist?.artist_lastname].filter(Boolean).join(" ").trim() || "Sans nom";
+            [artist?.artist_firstname, artist?.artist_lastname].filter(Boolean).join(" ").trim() || t("artist_no_name");
           const label = (artist?.artist_nickname ?? "").trim() || fullName;
           const typLine = formatArtistTyp(artist?.artist_specialty ?? artist?.artist_typ ?? null);
           const photoSrc = (artist?.artist_photo_url ?? "").trim() || ARTIST_PHOTO_PLACEHOLDER;
@@ -241,7 +241,7 @@ const Artists = () => {
     </div>
   ) : (
     <div className="container py-8">
-      <p className="text-sm text-muted-foreground">Aucun artiste trouvé.</p>
+      <p className="text-sm text-muted-foreground">{t("empty_artists")}</p>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Building2, Plus, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { sortAgencyFieldKeys } from "@/lib/agencyFormUtils";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
-import { useUiLanguage } from "@/providers/UiLanguageProvider";
+import { useTranslation } from "react-i18next";
 
 type AgencyRow = {
   id: string;
@@ -50,7 +50,7 @@ function AgencyLogoThumb({ logoUrl, title }: { logoUrl: string | null | undefine
 }
 
 const Agencies = () => {
-  const { t } = useUiLanguage();
+  const { t } = useTranslation("agencies");
   const [searchParams] = useSearchParams();
   const agencyPopupId = searchParams.get("agency")?.trim() || "";
   const [rows, setRows] = useState<AgencyRow[]>([]);
@@ -172,12 +172,12 @@ const Agencies = () => {
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-serif font-bold text-white">{t("Organisation")}</h2>
+          <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           {!authLoading && scope.mode === "agency" && (
-            <p className="text-xs text-muted-foreground mt-1">Périmètre agence {scope.agencyId}.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("page.scopeAgency", { agencyId: scope.agencyId })}</p>
           )}
           {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">Agence liée à l’exposition {scope.expoId}.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("page.scopeExpo", { expoId: scope.expoId })}</p>
           )}
         </div>
         <div className="relative w-[210px] min-w-[210px] max-w-[210px] md:mr-auto">
@@ -186,7 +186,7 @@ const Agencies = () => {
             list="agencies-search-suggestions"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={t("Rechercher une organisation...")}
+            placeholder={t("page.search")}
             className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
           />
           {searchTerm.trim().length > 0 && (
@@ -194,8 +194,8 @@ const Agencies = () => {
               type="button"
               onClick={() => setSearchTerm("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-              aria-label={t("Effacer la recherche")}
-              title={t("Effacer")}
+              aria-label={t("page.clearSearch")}
+              title={t("page.clear")}
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -214,10 +214,10 @@ const Agencies = () => {
               onClick={openCreate}
             >
               <Plus className="h-4 w-4" />
-              {t("Nouvelle organisation")}
+              {t("page.create")}
             </Button>
             <Button type="button" variant="outline" className="gap-2" asChild>
-              <Link to="/agencies/agencies2">Tableau</Link>
+              <Link to="/agencies/agencies2">{t("page.tableau")}</Link>
             </Button>
           </div>
         )}
@@ -225,10 +225,8 @@ const Agencies = () => {
 
       {showScopeHint && (
         <Alert>
-          <AlertTitle>{t("Périmètre vide")}</AlertTitle>
-          <AlertDescription>
-            {t("Renseignez les identifiants agence / exposition attendus pour votre rôle.")}
-          </AlertDescription>
+          <AlertTitle>{t("page.scopeTitle")}</AlertTitle>
+          <AlertDescription>{t("page.scopeDesc")}</AlertDescription>
         </Alert>
       )}
 
@@ -239,9 +237,9 @@ const Agencies = () => {
       )}
 
       <div className="space-y-4">
-        {loading && <p className="text-sm text-muted-foreground text-center py-12">{t("Chargement des agences…")}</p>}
+        {loading && <p className="text-sm text-muted-foreground text-center py-12">{t("page.loading")}</p>}
         {!loading && !error && filteredAgencies.length === 0 && !showScopeHint && (
-          <p className="text-sm text-muted-foreground text-center py-12">{t("Aucune agence dans votre périmètre.")}</p>
+          <p className="text-sm text-muted-foreground text-center py-12">{t("page.empty")}</p>
         )}
         {filteredAgencies.map((ag) => {
           const editable = canEditAgency(ag.id);
@@ -264,18 +262,18 @@ const Agencies = () => {
                   }}
                 >
                   <div className="pointer-events-none">
-                    <AgencyLogoThumb logoUrl={ag.logo_agency} title={agencyLabel(ag)} />
+                    <AgencyLogoThumb logoUrl={ag.logo_agency} title={ag.name_agency?.trim() || t("page.noName")} />
                   </div>
                   <div className="flex-1 min-w-0 pointer-events-none">
-                    <h3 className="font-serif font-bold text-lg">{agencyLabel(ag)}</h3>
+                    <h3 className="font-serif font-bold text-lg">{ag.name_agency?.trim() || t("page.noName")}</h3>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 p-4 w-full md:w-auto md:items-center shrink-0 md:max-w-[min(100%,22rem)] bg-muted/20 md:bg-transparent">
                   <Button type="button" variant="outline" size="sm" className="w-full sm:w-44 justify-center" asChild>
-                    <Link to={`/expos?agency=${encodeURIComponent(ag.id)}`}>{t("Voir les expos")}</Link>
+                    <Link to={`/expos?agency=${encodeURIComponent(ag.id)}`}>{t("page.viewExpos")}</Link>
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="w-full sm:w-44 justify-center" asChild>
-                    <Link to="/catalogue">{t("Catalogue des œuvres")}</Link>
+                    <Link to="/catalogue">{t("page.viewCatalogue")}</Link>
                   </Button>
                 </div>
               </CardContent>

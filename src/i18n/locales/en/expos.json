@@ -1,0 +1,59 @@
+{
+  "page": {
+    "title": "Exhibitions",
+    "search": "Search an exhibition...",
+    "clearSearch": "Clear search",
+    "clear": "Clear",
+    "create": "New exhibition",
+    "tableau": "Table",
+    "loading": "Loading exhibitions…",
+    "empty": "No exhibition in your scope.",
+    "scopeTitle": "Empty scope",
+    "scopeDesc": "Fill in the agency / exhibition identifiers expected for your role.",
+    "filteredAgency": "Filtered on agency {{agencyFilter}}.",
+    "scopedExpoOnly": "Exhibition {{label}} only."
+  },
+  "card": {
+    "qrGenerate": "Generate QR",
+    "qrClickHint1": "by clicking above",
+    "qrClickHint2": "an expo QR code is generated",
+    "qrGenerateTitle": "Click to generate the exhibition QR code",
+    "qrRegenerateTitle": "Click to regenerate the exhibition QR code",
+    "qrGenerateAriaLabel": "Generate the exhibition QR code",
+    "qrRegenerateAriaLabel": "Regenerate the exhibition QR code",
+    "testQr": "Test QR code",
+    "printPanel": "Print expo panel",
+    "viewCatalogue": "Artwork catalogue",
+    "curatorLabel": "Curator: {{name}}",
+    "agencyPrefix": "Agency:",
+    "viewAgencyTitle": "View agency profile",
+    "qrConfirmTitle": "Regenerate the QR code?",
+    "qrConfirmWarning": "Warning: a new QR code will permanently invalidate the existing one.",
+    "qrConfirmDescription": "Any QR code already printed or displayed for this exhibition will need to be replaced so visitors can access the artworks.",
+    "qrConfirmAction": "Regenerate anyway",
+    "qrConfirmCancel": "Cancel"
+  },
+  "panel": {
+    "chooseFormat": "Choose the panel format to print",
+    "cancel": "Cancel"
+  },
+  "tableau": {
+    "title": "Exhibitions — Full table",
+    "back": "Back",
+    "corbeille": "Trash",
+    "search": "Search (exhibition, agency, curator...)",
+    "loading": "Loading...",
+    "colExposition": "Exhibition",
+    "colOrganisation": "Organisation",
+    "colCommissaire": "Curator",
+    "colDu": "From",
+    "colAu": "To",
+    "empty": "No exhibition visible.",
+    "archiveAriaLabel": "Archive the exhibition",
+    "archiveTitle": "Archive",
+    "archiveWarning": "WARNING - Deletion is permanent. Delete with maximum discernment otherwise you risk problems with your application",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "archiving": "Archiving..."
+  }
+}

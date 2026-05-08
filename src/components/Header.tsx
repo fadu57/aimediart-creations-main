@@ -7,9 +7,39 @@ import { normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 
 const LOGO_RED = "hsl(0 65% 48%)";
+
+/** Mapping label français HEADER_NAV_ITEMS → clé i18next namespace "header". */
+const NAV_LABEL_TO_KEY: Record<string, string> = {
+  Accueil: "nav_home",
+  Organisation: "nav_organisation",
+  User: "nav_users",
+  Expos: "nav_expos",
+  Artistes: "nav_artists",
+  Catalogue: "nav_catalogue",
+  Statistiques: "nav_stats",
+};
+
+/**
+ * Résout la clé i18next pour un label de navigation.
+ * En mode DEV, logue un avertissement si le label n'est pas dans NAV_LABEL_TO_KEY
+ * (ex. un nouveau menu ajouté dans HEADER_NAV_ITEMS sans entrée de traduction correspondante).
+ * En production, retourne le label français en dernier recours — visible, donc détectable.
+ */
+function navKey(label: string): string {
+  const key = NAV_LABEL_TO_KEY[label];
+  if (key) return key;
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[i18n] Header: label nav "${label}" absent de NAV_LABEL_TO_KEY — ` +
+      `ajouter une entrée et une clé dans src/i18n/locales/*/header.json`,
+    );
+  }
+  return label;
+}
 const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
   { value: "fr", label: "FR", flagClass: "fi fi-fr" },
   { value: "en", label: "EN", flagClass: "fi fi-gb" },
@@ -116,7 +146,8 @@ export default function Header() {
   const { session, first_name, user, role_name, role_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/home";
   const { can } = useNavigationMatrix();
-  const { language, setLanguage, t } = useUiLanguage();
+  const { language, setLanguage } = useUiLanguage();
+  const { t } = useTranslation("header");
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [isDesktopHeader, setIsDesktopHeader] = useState(
@@ -192,8 +223,8 @@ export default function Header() {
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as UiLanguage)}
                 className="h-7 w-[64px] bg-transparent text-[10px] font-semibold outline-none"
-                aria-label={t("Langue de l'interface")}
-                title={t("Langue de l'interface")}
+                aria-label={t("language_label")}
+                title={t("language_label")}
               >
                 {UI_LANGUAGE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -203,7 +234,7 @@ export default function Header() {
               </select>
             </div>
             <span className="whitespace-nowrap text-[11px] text-gray-700">
-              {t("Bonjour")}
+              {t("greeting")}
               {session ? (
                 <>
                   {" "}
@@ -232,7 +263,7 @@ export default function Header() {
                   }`
                 }
               >
-                {t("Accueil")}
+                {t("nav_home")}
               </NavLink>
             )}
             {hasFullHeader &&
@@ -249,7 +280,7 @@ export default function Header() {
                       }`
                     }
                   >
-                    {t(item.label)}
+                    {t(navKey(item.label))}
                   </NavLink>
                 );
               })}
@@ -261,8 +292,8 @@ export default function Header() {
                     isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                   }`
                 }
-                aria-label={t("Configuration")}
-                title={t("Configuration")}
+                aria-label={t("settings")}
+                title={t("settings")}
               >
                 <Settings className="h-5 w-5" aria-hidden />
               </NavLink>
@@ -275,7 +306,7 @@ export default function Header() {
                   void handleLogout();
                 }}
               >
-                {t("Déconnexion")}
+                {t("logout")}
               </button>
             ) : (
               <NavLink
@@ -286,7 +317,7 @@ export default function Header() {
                   }`
                 }
               >
-                {t("Connexion")}
+                {t("login")}
               </NavLink>
             )}
           </nav>
@@ -302,9 +333,9 @@ export default function Header() {
           <div className={`fab-container fab-top-right ${isFabOpen ? "active" : ""}`}>
           <div className="fab-links">
             {canSeeHomeMenu && (
-              <NavLink to={homePath} className="fab-item" title={t("Accueil")} onClick={() => setIsFabOpen(false)}>
+              <NavLink to={homePath} className="fab-item" title={t("nav_home")} onClick={() => setIsFabOpen(false)}>
                 <House className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("Accueil")}</span>
+                <span className="fab-item-label">{t("nav_home")}</span>
               </NavLink>
             )}
             {hasFullHeader &&
@@ -330,19 +361,19 @@ export default function Header() {
                     <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
                   );
                 return (
-                  <NavLink key={`fab-nav-${item.key}`} to={item.to} className="fab-item" title={t(item.label)} onClick={() => setIsFabOpen(false)}>
+                  <NavLink key={`fab-nav-${item.key}`} to={item.to} className="fab-item" title={t(navKey(item.label))} onClick={() => setIsFabOpen(false)}>
                     {icon}
-                    <span className="fab-item-label">{t(item.label)}</span>
+                    <span className="fab-item-label">{t(navKey(item.label))}</span>
                   </NavLink>
                 );
               })}
             {hasFullHeader && canSeeSettings && (
-              <NavLink to="/settings" className="fab-item" title={t("Configuration")} onClick={() => setIsFabOpen(false)}>
+              <NavLink to="/settings" className="fab-item" title={t("settings")} onClick={() => setIsFabOpen(false)}>
                 <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("Configuration")}</span>
+                <span className="fab-item-label">{t("settings")}</span>
               </NavLink>
             )}
-            <div className="fab-item px-2" title={t("Langue de l'interface")}>
+            <div className="fab-item px-2" title={t("language_label")}>
               <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
                 <span className={activeLanguage.flagClass} aria-hidden />
                 <select
@@ -350,8 +381,8 @@ export default function Header() {
                   value={language}
                   onChange={(e) => setLanguage(e.target.value as UiLanguage)}
                   className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
-                  aria-label={t("Langue de l'interface")}
-                  title={t("Langue de l'interface")}
+                  aria-label={t("language_label")}
+                  title={t("language_label")}
                 >
                   {UI_LANGUAGE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -365,19 +396,19 @@ export default function Header() {
               <button
                 type="button"
                 className="fab-item"
-                title={t("Déconnexion")}
+                title={t("logout")}
                 onClick={() => {
                   setIsFabOpen(false);
                   void handleLogout();
                 }}
               >
                 <LogOut className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("Déconnexion")}</span>
+                <span className="fab-item-label">{t("logout")}</span>
               </button>
             ) : (
-              <NavLink to="/login" className="fab-item" title={t("Connexion")} onClick={() => setIsFabOpen(false)}>
+              <NavLink to="/login" className="fab-item" title={t("login")} onClick={() => setIsFabOpen(false)}>
                 <LogIn className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("Connexion")}</span>
+                <span className="fab-item-label">{t("login")}</span>
               </NavLink>
             )}
           </div>

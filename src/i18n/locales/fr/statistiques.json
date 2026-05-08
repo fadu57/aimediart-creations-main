@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Statistiques",
+    "subtitle": "Analyse détaillée des données de visite et feedback émotionnel",
+    "print": "Imprimer les statistiques sélectionnées"
+  },
+  "filter": {
+    "organisation": "Organisation",
+    "exposition": "Exposition",
+    "allExpos": "Toutes les expos du périmètre"
+  },
+  "emotions": {
+    "title": "Distribution des émotions",
+    "subtitle": "Répartition des ressentis des visiteurs",
+    "empty": "Aucun feedback pour ce périmètre."
+  },
+  "timeline": {
+    "title": "Évolution temporelle",
+    "subtitle": "Visiteurs au fil des jours",
+    "prevWeek": "Semaine précédente",
+    "nextWeek": "Semaine suivante"
+  },
+  "hourly": {
+    "title": "Fréquentation horaire",
+    "subtitle": "Visiteurs au fil des heures (cliquer sur le graphique bleu)"
+  },
+  "cross": {
+    "title": "Tableau croisé émotions / œuvres",
+    "subtitle": "Corrélations entre les œuvres et les émotions ressenties par les visiteurs",
+    "colArtwork": "Œuvre",
+    "empty": "Aucune donnée réelle dans ce périmètre."
+  },
+  "top": {
+    "title": "Classement des œuvres",
+    "subtitle": "Rang, visites et moyenne des cœurs (données réelles filtrées)",
+    "colRank": "Rang",
+    "colArtwork": "Œuvre",
+    "colVisits": "Visites",
+    "colAvgHearts": "Moy. cœurs",
+    "empty": "Aucune donnée réelle dans ce périmètre."
+  },
+  "common": {
+    "chartNoData": "Pas assez de données pour un graphique."
+  }
+}

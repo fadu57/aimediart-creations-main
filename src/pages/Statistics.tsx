@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ function artworkExpoId(aw: unknown): string | null {
 }
 
 const Statistics = () => {
+  const { t } = useTranslation("statistiques");
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name } = useAuthUser();
   const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; name: string }>>([]);
@@ -883,8 +885,8 @@ const Statistics = () => {
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start">
         <div>
-          <h2 className="text-3xl font-serif font-bold text-white">Statistiques</h2>
-          <p className="text-muted-foreground">Analyse détaillée des données de visite et feedback émotionnel</p>
+          <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+          <p className="text-muted-foreground">{t("page.subtitle")}</p>
           <Button
             type="button"
             variant="outline"
@@ -893,7 +895,7 @@ const Statistics = () => {
               if (typeof window !== "undefined") window.print();
             }}
           >
-            Imprimer les statistiques sélectionnées
+            {t("page.print")}
           </Button>
           {!authLoading && scope.mode === "agency" && (
             <p className="text-xs text-muted-foreground mt-1">Agence {scope.agencyId} — toutes les expos (filtre expo optionnel).</p>
@@ -906,7 +908,7 @@ const Statistics = () => {
           {showOrganizationFilter && (
             <div>
               <label htmlFor="statistics-scope-org" className="text-xs text-muted-foreground font-medium">
-                Organisation
+                {t("filter.organisation")}
               </label>
               <select
                 id="statistics-scope-org"
@@ -938,7 +940,7 @@ const Statistics = () => {
           )}
           <div>
             <label htmlFor="statistics-scope-expo" className="text-xs text-muted-foreground font-medium">
-              Exposition
+              {t("filter.exposition")}
             </label>
             <select
               id="statistics-scope-expo"
@@ -951,7 +953,7 @@ const Statistics = () => {
                 setDrillExpoId(v === "all" ? "all" : v);
               }}
             >
-              {canDrillExpo && <option value="all">Toutes les expos du périmètre</option>}
+              {canDrillExpo && <option value="all">{t("filter.allExpos")}</option>}
               {expoOptionsForSelect.map((ex) => (
                 <option key={ex.id} value={ex.id}>
                   {ex.expo_name}
@@ -990,8 +992,8 @@ const Statistics = () => {
         {/* Emotion distribution */}
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-lg">Distribution des émotions</CardTitle>
-            <p className="text-xs text-muted-foreground">Répartition des ressentis des visiteurs</p>
+            <CardTitle className="text-lg">{t("emotions.title")}</CardTitle>
+            <p className="text-xs text-muted-foreground">{t("emotions.subtitle")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {emotionCatalog.length === 0 ? (
@@ -999,7 +1001,7 @@ const Statistics = () => {
                 {emotionCatalogError || "Impossible d'afficher les émotions de la table emotions."}
               </p>
             ) : feedbackTotal === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Aucun feedback pour ce périmètre.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{t("emotions.empty")}</p>
             ) : (
               emotionSeries.map((emo) => (
                 <div key={emo.id} className="flex items-center gap-3">
@@ -1019,11 +1021,11 @@ const Statistics = () => {
         <Card className="glass-card">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-lg">Évolution temporelle</CardTitle>
+              <CardTitle className="text-lg">{t("timeline.title")}</CardTitle>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  aria-label="Semaine précédente"
+                  aria-label={t("timeline.prevWeek")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
                   onClick={() => setWeekOffset((v) => v - 1)}
                 >
@@ -1031,7 +1033,7 @@ const Statistics = () => {
                 </button>
                 <button
                   type="button"
-                  aria-label="Semaine suivante"
+                  aria-label={t("timeline.nextWeek")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
                   onClick={() => setWeekOffset((v) => Math.min(0, v + 1))}
                   disabled={weekOffset >= 0}
@@ -1040,11 +1042,11 @@ const Statistics = () => {
                 </button>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Visiteurs au fil des jours</p>
+            <p className="text-xs text-muted-foreground">{t("timeline.subtitle")}</p>
           </CardHeader>
           <CardContent>
             {temporalSeries.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-12">Pas assez de données pour un graphique.</p>
+              <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={temporalSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -1087,16 +1089,16 @@ const Statistics = () => {
         {/* Hourly attendance chart */}
         <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-lg">Fréquentation horaire</CardTitle>
+            <CardTitle className="text-lg">{t("hourly.title")}</CardTitle>
             <p className="text-xs text-muted-foreground">
               {selectedTemporalDayLabel
                 ? `Visiteurs au fil des heures (${selectedTemporalDayLabel}) (cliquer sur le graphique bleu)`
-                : "Visiteurs au fil des heures (cliquer sur le graphique bleu)"}
+                : t("hourly.subtitle")}
             </p>
           </CardHeader>
           <CardContent>
             {hourlySeries.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-12">Pas assez de données pour un graphique.</p>
+              <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={hourlySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -1115,19 +1117,19 @@ const Statistics = () => {
       {/* Cross table */}
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="text-lg">Tableau croisé émotions / œuvres</CardTitle>
-          <p className="text-xs text-muted-foreground">Corrélations entre les œuvres et les émotions ressenties par les visiteurs</p>
+          <CardTitle className="text-lg">{t("cross.title")}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t("cross.subtitle")}</p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {crossError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{crossError}</p>
           ) : crossRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Aucune donnée réelle dans ce périmètre.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t("cross.empty")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">Œuvre</th>
+                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("cross.colArtwork")}</th>
                   {crossEmotionColumns.map((emotion) => (
                     <th key={emotion.id} className="text-center py-3 px-2 font-medium text-muted-foreground">
                       <button
@@ -1169,27 +1171,27 @@ const Statistics = () => {
       {/* Top artworks table */}
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle className="text-lg">Classement des œuvres</CardTitle>
-          <p className="text-xs text-muted-foreground">Rang, visites et moyenne des cœurs (données réelles filtrées)</p>
+          <CardTitle className="text-lg">{t("top.title")}</CardTitle>
+          <p className="text-xs text-muted-foreground">{t("top.subtitle")}</p>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {topArtworksError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{topArtworksError}</p>
           ) : topArtworks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Aucune donnée réelle dans ce périmètre.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">{t("top.empty")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">Rang</th>
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">Œuvre</th>
+                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("top.colRank")}</th>
+                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("top.colArtwork")}</th>
                   <th className="text-right py-3 px-2 font-medium text-muted-foreground">
                     <button
                       type="button"
                       className="inline-flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleTopSort("visits")}
                     >
-                      <span>Visites</span>
+                      <span>{t("top.colVisits")}</span>
                       {topSortKey === "visits" && topSortDirection === "asc" ? (
                         <ArrowUp className="h-3.5 w-3.5" />
                       ) : (
@@ -1203,7 +1205,7 @@ const Statistics = () => {
                       className="inline-flex items-center gap-1 hover:text-foreground"
                       onClick={() => toggleTopSort("avgHearts")}
                     >
-                      <span>Moy. cœurs</span>
+                      <span>{t("top.colAvgHearts")}</span>
                       {topSortKey === "avgHearts" && topSortDirection === "asc" ? (
                         <ArrowUp className="h-3.5 w-3.5" />
                       ) : (

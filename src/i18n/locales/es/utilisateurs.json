@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "Usuarios",
+    "back": "Volver",
+    "corbeille": "Papelera",
+    "search": "Buscar (nombre, apellido, rol...)",
+    "clearSearch": "Borrar búsqueda",
+    "clear": "Borrar",
+    "loading": "Cargando...",
+    "colPrenom": "Nombre",
+    "colNom": "Apellido",
+    "colOrganisation": "Organización",
+    "colExpo": "Exposición",
+    "colRole": "Rol",
+    "empty": "Ningún usuario visible.",
+    "deleteAriaLabel": "Eliminar usuario",
+    "deleteTitle": "Eliminar"
+  },
+  "dialog": {
+    "title": "Confirmar eliminación",
+    "cancel": "Cancelar",
+    "confirm": "Eliminar",
+    "deleting": "Eliminando...",
+    "adminOrgWarning": "Advertencia crítica: está a punto de eliminar un Admin organización.",
+    "lastAdminWarning": "Este usuario parece ser el último administrador de esta organización. La eliminación puede dejar la organización sin administrador.",
+    "confirmAdminOrg": "¿Confirma la eliminación de este Admin organización?",
+    "targetUser": "Usuario objetivo: {{name}}",
+    "confirmDeleteUser": "¿Realmente desea eliminar este usuario?",
+    "confirmDeleteUserNamed": "¿Realmente desea eliminar a {{name}}?"
+  }
+}

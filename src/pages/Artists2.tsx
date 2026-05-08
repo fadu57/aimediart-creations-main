@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +47,7 @@ function specialtyLabel(row: ArtistRow): string {
 }
 
 export default function Artists2() {
+  const { t } = useTranslation("artists");
   const navigate = useNavigate();
   const { loading: authLoading, role_id } = useAuthUser();
   const canAccess = role_id !== 7;
@@ -230,25 +232,25 @@ export default function Artists2() {
     <div className="mx-auto w-full max-w-[1100px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/artistes")}>
-          Retour
+          {t("tableau_back")}
         </Button>
         <Button type="button" variant="outline" asChild>
           <Link to="/artistes-corbeille" className="inline-flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4" /> Corbeille
+            <ArchiveRestore className="h-4 w-4" /> {t("tableau_corbeille")}
           </Link>
         </Button>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>Artistes — Tableau complet</CardTitle>
+          <CardTitle>{t("tableau_title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
             <Input
               type="text"
               list="artists2-search-suggestions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher (nom, prénom, pseudo, spécialité...)"
+              placeholder={t("tableau_search")}
               className="h-8 pr-8"
             />
             {searchTerm.trim().length > 0 && (
@@ -256,8 +258,8 @@ export default function Artists2() {
                 type="button"
                 onClick={() => setSearchTerm("")}
                 className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label="Effacer la recherche"
-                title="Effacer"
+                aria-label={t("tableau_clear_search")}
+                title={t("tableau_clear")}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -271,17 +273,17 @@ export default function Artists2() {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Chargement...</p>
+            <p className="text-sm text-muted-foreground">{t("tableau_loading")}</p>
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : (
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-44 px-2 py-1">Prénom <SortButtons column="prenom" /></th>
-                  <th className="w-44 px-2 py-1">Nom <SortButtons column="nom" /></th>
-                  <th className="w-44 px-2 py-1">Pseudo <SortButtons column="pseudo" /></th>
-                  <th className="px-2 py-1">Spécialité <SortButtons column="specialite" /></th>
+                  <th className="w-44 px-2 py-1">{t("tableau_col_prenom")} <SortButtons column="prenom" /></th>
+                  <th className="w-44 px-2 py-1">{t("tableau_col_nom")} <SortButtons column="nom" /></th>
+                  <th className="w-44 px-2 py-1">{t("tableau_col_pseudo")} <SortButtons column="pseudo" /></th>
+                  <th className="px-2 py-1">{t("tableau_col_specialite")} <SortButtons column="specialite" /></th>
                   <th className="w-10 px-2 py-1" />
                 </tr>
               </thead>
@@ -314,8 +316,8 @@ export default function Artists2() {
                           e.stopPropagation();
                           setArchiveTarget(r);
                         }}
-                        aria-label="Archiver l'artiste"
-                        title="Archiver"
+                        aria-label={t("tableau_archive_aria")}
+                        title={t("tableau_archive_title")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -325,7 +327,7 @@ export default function Artists2() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-2 py-2 text-muted-foreground">
-                      Aucun artiste visible.
+                      {t("tableau_empty")}
                     </td>
                   </tr>
                 )}
@@ -337,14 +339,11 @@ export default function Artists2() {
       <AlertDialog open={Boolean(archiveTarget)} onOpenChange={(open) => !open && setArchiveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ATTENTION - La suppression est définitive. Supprimer avec le maximum de discernement sinon vous risquez
-              de problèmes avec votre application
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("tableau_warning")}</AlertDialogTitle>
             <AlertDialogDescription />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("tableau_cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -353,7 +352,7 @@ export default function Artists2() {
                 void archiveArtist();
               }}
             >
-              {archiving ? "Archivage..." : "Supprimer"}
+              {archiving ? t("tableau_archiving") : t("tableau_confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

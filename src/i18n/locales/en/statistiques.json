@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Statistics",
+    "subtitle": "Detailed analysis of visit data and emotional feedback",
+    "print": "Print selected statistics"
+  },
+  "filter": {
+    "organisation": "Organisation",
+    "exposition": "Exhibition",
+    "allExpos": "All exhibitions in scope"
+  },
+  "emotions": {
+    "title": "Emotion distribution",
+    "subtitle": "Breakdown of visitor feelings",
+    "empty": "No feedback for this scope."
+  },
+  "timeline": {
+    "title": "Timeline",
+    "subtitle": "Visitors over the days",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week"
+  },
+  "hourly": {
+    "title": "Hourly attendance",
+    "subtitle": "Visitors over the hours (click on the blue chart)"
+  },
+  "cross": {
+    "title": "Emotions / artworks cross table",
+    "subtitle": "Correlations between artworks and emotions felt by visitors",
+    "colArtwork": "Artwork",
+    "empty": "No real data in this scope."
+  },
+  "top": {
+    "title": "Artwork ranking",
+    "subtitle": "Rank, visits and average hearts (real filtered data)",
+    "colRank": "Rank",
+    "colArtwork": "Artwork",
+    "colVisits": "Visits",
+    "colAvgHearts": "Avg. hearts",
+    "empty": "No real data in this scope."
+  },
+  "common": {
+    "chartNoData": "Not enough data for a chart."
+  }
+}

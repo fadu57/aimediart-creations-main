@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Organisation",
+    "search": "Organisation suchen...",
+    "clearSearch": "Suche löschen",
+    "clear": "Löschen",
+    "create": "Neue Organisation",
+    "tableau": "Tabelle",
+    "viewExpos": "Ausstellungen anzeigen",
+    "viewCatalogue": "Kunstwerkkatalog",
+    "loading": "Agenturen werden geladen…",
+    "empty": "Keine Agentur in Ihrem Bereich.",
+    "scopeTitle": "Leerer Bereich",
+    "scopeDesc": "Geben Sie die für Ihre Rolle erwarteten Agentur-/Ausstellungskennungen ein.",
+    "scopeAgency": "Agenturbereich {{agencyId}}.",
+    "scopeExpo": "Agentur verknüpft mit Ausstellung {{expoId}}.",
+    "noName": "Ohne Namen"
+  },
+  "tableau": {
+    "title": "Organisationen — Vollständige Tabelle",
+    "back": "Zurück",
+    "corbeille": "Papierkorb",
+    "search": "Suchen (Name, ID...)",
+    "loading": "Laden...",
+    "colOrganisation": "Organisation",
+    "colId": "ID",
+    "empty": "Keine Organisation sichtbar.",
+    "archiveAriaLabel": "Organisation archivieren",
+    "archiveTitle": "Archivieren",
+    "archiveWarning": "ACHTUNG - Die Löschung ist endgültig. Löschen Sie mit größter Sorgfalt, da Sie sonst Probleme mit Ihrer Anwendung riskieren",
+    "cancel": "Abbrechen",
+    "confirm": "Löschen",
+    "archiving": "Archivierung..."
+  }
+}

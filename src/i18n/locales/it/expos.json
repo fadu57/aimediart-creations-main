@@ -1,0 +1,59 @@
+{
+  "page": {
+    "title": "Esposizioni",
+    "search": "Cerca un'esposizione...",
+    "clearSearch": "Cancella ricerca",
+    "clear": "Cancella",
+    "create": "Nuova esposizione",
+    "tableau": "Tabella",
+    "loading": "Caricamento esposizioni…",
+    "empty": "Nessuna esposizione nel tuo ambito.",
+    "scopeTitle": "Ambito vuoto",
+    "scopeDesc": "Compila gli identificatori di agenzia / esposizione previsti per il tuo ruolo.",
+    "filteredAgency": "Filtrato per agenzia {{agencyFilter}}.",
+    "scopedExpoOnly": "Solo esposizione {{label}}."
+  },
+  "card": {
+    "qrGenerate": "Genera QR",
+    "qrClickHint1": "cliccando qui sopra",
+    "qrClickHint2": "viene generato un QR-Code expo",
+    "qrGenerateTitle": "Clicca per generare il QR code dell'esposizione",
+    "qrRegenerateTitle": "Clicca per rigenerare il QR code dell'esposizione",
+    "qrGenerateAriaLabel": "Genera il QR code dell'esposizione",
+    "qrRegenerateAriaLabel": "Rigenera il QR code dell'esposizione",
+    "testQr": "Testa il QR-Code",
+    "printPanel": "Stampa pannello expo",
+    "viewCatalogue": "Catalogo opere",
+    "curatorLabel": "Curatore: {{name}}",
+    "agencyPrefix": "Agenzia:",
+    "viewAgencyTitle": "Visualizza scheda agenzia",
+    "qrConfirmTitle": "Rigenerare il codice QR?",
+    "qrConfirmWarning": "Attenzione: un nuovo codice QR rende definitivamente inutilizzabile quello esistente.",
+    "qrConfirmDescription": "Qualsiasi codice QR già stampato o esposto per questa mostra dovrà essere sostituito affinché i visitatori possano accedere alle opere.",
+    "qrConfirmAction": "Rigenera comunque",
+    "qrConfirmCancel": "Annulla"
+  },
+  "panel": {
+    "chooseFormat": "Scegli il formato del pannello da stampare",
+    "cancel": "Annulla"
+  },
+  "tableau": {
+    "title": "Esposizioni — Tabella completa",
+    "back": "Indietro",
+    "corbeille": "Cestino",
+    "search": "Cerca (expo, agenzia, curatore...)",
+    "loading": "Caricamento...",
+    "colExposition": "Esposizione",
+    "colOrganisation": "Organizzazione",
+    "colCommissaire": "Curatore",
+    "colDu": "Dal",
+    "colAu": "Al",
+    "empty": "Nessuna esposizione visibile.",
+    "archiveAriaLabel": "Archivia l'esposizione",
+    "archiveTitle": "Archivia",
+    "archiveWarning": "ATTENZIONE - L'eliminazione è definitiva. Elimina con il massimo discernimento altrimenti rischi problemi con la tua applicazione",
+    "cancel": "Annulla",
+    "confirm": "Elimina",
+    "archiving": "Archiviazione..."
+  }
+}

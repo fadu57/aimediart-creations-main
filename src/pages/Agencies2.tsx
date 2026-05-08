@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ function text(v: string | null | undefined): string {
 }
 
 export default function Agencies2() {
+  const { t } = useTranslation("agencies");
   const navigate = useNavigate();
   const { loading: authLoading, role_id, role_name, agency_id } = useAuthUser();
   const canAccess = (typeof role_id === "number" && role_id >= 1 && role_id <= 6) || hasFullDataAccess(role_name);
@@ -120,20 +122,20 @@ export default function Agencies2() {
   return (
     <div className="mx-auto w-full max-w-[1000px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" onClick={() => navigate("/agencies")}>Retour</Button>
+        <Button type="button" variant="outline" onClick={() => navigate("/agencies")}>{t("tableau.back")}</Button>
         <Button type="button" variant="outline" asChild>
           <Link to="/agencies-corbeille" className="inline-flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4" /> Corbeille
+            <ArchiveRestore className="h-4 w-4" /> {t("tableau.corbeille")}
           </Link>
         </Button>
       </div>
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>Organisations — Tableau complet</CardTitle>
+          <CardTitle>{t("tableau.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
-            <Input type="text" list="agencies2-search-suggestions" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Rechercher (nom, id...)" className="h-8 pr-8" />
+            <Input type="text" list="agencies2-search-suggestions" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t("tableau.search")} className="h-8 pr-8" />
             {searchTerm.trim().length > 0 && (
-              <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" aria-label="Effacer la recherche" title="Effacer">
+              <button type="button" onClick={() => setSearchTerm("")} className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground" aria-label={t("page.clearSearch")} title={t("page.clear")}>
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -141,12 +143,12 @@ export default function Agencies2() {
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          {loading ? <p className="text-sm text-muted-foreground">Chargement...</p> : error ? <p className="text-sm text-destructive">{error}</p> : (
+          {loading ? <p className="text-sm text-muted-foreground">{t("tableau.loading")}</p> : error ? <p className="text-sm text-destructive">{error}</p> : (
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-64 px-2 py-1">Organisation <SortButtons column="name" /></th>
-                  <th className="w-72 px-2 py-1">ID <SortButtons column="id" /></th>
+                  <th className="w-64 px-2 py-1">{t("tableau.colOrganisation")} <SortButtons column="name" /></th>
+                  <th className="w-72 px-2 py-1">{t("tableau.colId")} <SortButtons column="id" /></th>
                   <th className="w-10 px-2 py-1" />
                 </tr>
               </thead>
@@ -169,8 +171,8 @@ export default function Agencies2() {
                           e.stopPropagation();
                           setArchiveTarget(r);
                         }}
-                        aria-label="Archiver l'organisation"
-                        title="Archiver"
+                        aria-label={t("tableau.archiveAriaLabel")}
+                        title={t("tableau.archiveTitle")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -178,7 +180,7 @@ export default function Agencies2() {
                   </tr>
                 ))}
                 {sortedRows.length === 0 && (
-                  <tr><td colSpan={3} className="px-2 py-2 text-muted-foreground">Aucune organisation visible.</td></tr>
+                  <tr><td colSpan={3} className="px-2 py-2 text-muted-foreground">{t("tableau.empty")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -188,14 +190,11 @@ export default function Agencies2() {
       <AlertDialog open={Boolean(archiveTarget)} onOpenChange={(open) => !open && setArchiveTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              ATTENTION - La suppression est définitive. Supprimer avec le maximum de discernement sinon vous risquez
-              de problèmes avec votre application
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("tableau.archiveWarning")}</AlertDialogTitle>
             <AlertDialogDescription />
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("tableau.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -204,7 +203,7 @@ export default function Agencies2() {
                 void archiveAgency();
               }}
             >
-              {archiving ? "Archivage..." : "Supprimer"}
+              {archiving ? t("tableau.archiving") : t("tableau.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

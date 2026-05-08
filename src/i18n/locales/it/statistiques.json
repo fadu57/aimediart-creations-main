@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Statistiche",
+    "subtitle": "Analisi dettagliata dei dati di visita e del feedback emotivo",
+    "print": "Stampa le statistiche selezionate"
+  },
+  "filter": {
+    "organisation": "Organizzazione",
+    "exposition": "Esposizione",
+    "allExpos": "Tutte le esposizioni dell'ambito"
+  },
+  "emotions": {
+    "title": "Distribuzione delle emozioni",
+    "subtitle": "Ripartizione delle sensazioni dei visitatori",
+    "empty": "Nessun feedback per questo ambito."
+  },
+  "timeline": {
+    "title": "Evoluzione temporale",
+    "subtitle": "Visitatori nel corso dei giorni",
+    "prevWeek": "Settimana precedente",
+    "nextWeek": "Settimana successiva"
+  },
+  "hourly": {
+    "title": "Frequenza oraria",
+    "subtitle": "Visitatori nel corso delle ore (clicca sul grafico blu)"
+  },
+  "cross": {
+    "title": "Tabella incrociata emozioni / opere",
+    "subtitle": "Correlazioni tra le opere e le emozioni dei visitatori",
+    "colArtwork": "Opera",
+    "empty": "Nessun dato reale in questo ambito."
+  },
+  "top": {
+    "title": "Classifica delle opere",
+    "subtitle": "Posizione, visite e media cuori (dati reali filtrati)",
+    "colRank": "Pos.",
+    "colArtwork": "Opera",
+    "colVisits": "Visite",
+    "colAvgHearts": "Media cuori",
+    "empty": "Nessun dato reale in questo ambito."
+  },
+  "common": {
+    "chartNoData": "Dati insufficienti per un grafico."
+  }
+}

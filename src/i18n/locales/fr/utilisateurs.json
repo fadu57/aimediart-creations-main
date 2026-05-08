@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "Utilisateurs",
+    "back": "Retour",
+    "corbeille": "Corbeille",
+    "search": "Rechercher (nom, prénom, rôle...)",
+    "clearSearch": "Effacer la recherche",
+    "clear": "Effacer",
+    "loading": "Chargement...",
+    "colPrenom": "Prénom",
+    "colNom": "Nom",
+    "colOrganisation": "Organisation",
+    "colExpo": "Expo",
+    "colRole": "Rôle",
+    "empty": "Aucun utilisateur visible.",
+    "deleteAriaLabel": "Supprimer l'utilisateur",
+    "deleteTitle": "Supprimer"
+  },
+  "dialog": {
+    "title": "Confirmer la suppression",
+    "cancel": "Annuler",
+    "confirm": "Supprimer",
+    "deleting": "Suppression...",
+    "adminOrgWarning": "Attention critique : vous êtes sur le point de supprimer un Admin organisation.",
+    "lastAdminWarning": "Cet utilisateur semble être le dernier admin de cette organisation. La suppression peut laisser l'organisation sans administrateur.",
+    "confirmAdminOrg": "Confirmez-vous la suppression de cet Admin organisation ?",
+    "targetUser": "Utilisateur ciblé : {{name}}",
+    "confirmDeleteUser": "Voulez-vous vraiment supprimer cet utilisateur ?",
+    "confirmDeleteUserNamed": "Voulez-vous vraiment supprimer {{name}} ?"
+  }
+}

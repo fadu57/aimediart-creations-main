@@ -1,0 +1,14 @@
+{
+  "greeting": "Ciao",
+  "language_label": "Lingua dell'interfaccia",
+  "nav_home": "Home",
+  "nav_organisation": "Organizzazione",
+  "nav_users": "Utenti",
+  "nav_expos": "Esposizioni",
+  "nav_artists": "Artisti",
+  "nav_catalogue": "Catalogo",
+  "nav_stats": "Statistiche",
+  "settings": "Impostazioni",
+  "logout": "Disconnetti",
+  "login": "Accedi"
+}

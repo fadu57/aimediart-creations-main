@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 /** Astérisque rouge pour les champs obligatoires. */
 function RequiredAsterisk() {
@@ -154,6 +155,7 @@ export type AddArtistDialogProps = {
 };
 
 export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artistIdProp }: AddArtistDialogProps) {
+  const { t } = useTranslation("artists");
   const { user, role_name, role_id, agency_id } = useAuthUser();
   const bioSpellLang = useMemo(() => resolveSpellcheckLang(user), [user]);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
@@ -747,7 +749,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
         {...(!editingArtistId || ficheReadOnly ? { "aria-describedby": undefined } : {})}
       >
         <DialogTitle className="sr-only">
-          {editingArtistId ? `Fiche de ${artistTitleName || "l’artiste"}` : "Création de la biographie de l’artiste"}
+          {editingArtistId
+            ? t("dialog_title_edit", { name: artistTitleName || t("dialog_title_artist_fallback") })
+            : t("dialog_title_create")}
         </DialogTitle>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-2 px-4 sm:px-5 pb-4">
@@ -755,8 +759,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
               <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <h2 className="min-w-0 shrink font-serif text-xl text-white sm:text-2xl sm:pr-2">
                   {editingArtistId
-                    ? `Fiche de ${artistTitleName || "l’artiste"}`
-                    : "Création de la biographie de l’artiste"}
+                    ? t("dialog_title_edit", { name: artistTitleName || t("dialog_title_artist_fallback") })
+                    : t("dialog_title_create")
+                  }
                 </h2>
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   {editingArtistId && ficheReadOnly && (
@@ -765,7 +770,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                       className="h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
                       onClick={() => setFicheReadOnly(false)}
                     >
-                      Modifier
+                      {t("btn_modify")}
                     </Button>
                   )}
                   {canShowGenerateBio && (
@@ -779,10 +784,10 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                       {generatingBio ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Génération…
+                          {t("btn_generating_bio")}
                         </>
                       ) : (
-                        "Générer la bio avec l’IA"
+                        t("btn_generate_bio")
                       )}
                     </Button>
                   )}
@@ -792,7 +797,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     className="h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
                     onClick={() => onOpenChange(false)}
                   >
-                    Annuler
+                    {t("btn_cancel")}
                   </Button>
                   {!ficheReadOnly && (
                     <Button
@@ -806,13 +811,11 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                           : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
                       }
                     >
-                      {isSubmitting ? (
-                        "Enregistrement…"
-                      ) : editingArtistId ? (
-                        "Enregistrer les modifications"
-                      ) : (
-                        "Enregistrer"
-                      )}
+                      {isSubmitting
+                        ? t("btn_submitting")
+                        : editingArtistId
+                          ? t("btn_save_changes")
+                          : t("btn_save")}
                     </Button>
                   )}
                 </div>
@@ -826,10 +829,10 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
               name="artist_bio"
               render={({ field }) => (
                 <FormItem className="flex min-h-0 min-w-0 flex-col space-y-0">
-                  <FormLabel className="sr-only">Biographie</FormLabel>
+                  <FormLabel className="sr-only">{t("bio_label")}</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Texte éditable après génération ou saisie manuelle."
+                      placeholder={t("bio_placeholder")}
                       className={cn(
                         "w-full min-h-[250px] min-w-0 resize-y overflow-y-auto p-2 text-xs leading-snug shadow-none",
                       )}
@@ -846,18 +849,18 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
 
             {!ficheReadOnly && (
               <p className="text-xs text-destructive -mt-0.5">
-                <span className="font-semibold">*</span> Champs obligatoires
+                <span className="font-semibold">*</span> {t("required_fields_note")}
               </p>
             )}
 
             {duplicateRow && !editingArtistId && !ficheReadOnly && (
               <Alert variant="destructive" className="border-destructive/60">
-                <AlertTitle>Doublon détecté</AlertTitle>
+                <AlertTitle>{t("duplicate_title")}</AlertTitle>
                 <AlertDescription className="space-y-3">
-                  <p>La fiche artiste existe déjà. La modifier ?</p>
+                  <p>{t("duplicate_desc")}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={handleDuplicateNo}>
-                      Non
+                      {t("btn_duplicate_no")}
                     </Button>
                     <Button
                       type="button"
@@ -865,7 +868,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                       className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
                       onClick={handleDuplicateYes}
                     >
-                      Oui
+                      {t("btn_duplicate_yes")}
                     </Button>
                   </div>
                 </AlertDescription>
@@ -875,14 +878,14 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
             {needsAgencyPicker && (
               <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-3">
                 <Label htmlFor="artist-target-agency" className="inline-flex items-center">
-                  Agence concernée
+                  {t("agency_label")}
                   {!ficheReadOnly && <RequiredAsterisk />}
                 </Label>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  Votre compte n’est pas rattaché à une agence : sélectionnez celle concernée par cette fiche (bio par agence).
+                  {t("agency_hint")}
                 </p>
                 {loadingAgencies ? (
-                  <p className="text-xs text-muted-foreground">Chargement des agences…</p>
+                  <p className="text-xs text-muted-foreground">{t("agency_loading")}</p>
                 ) : (
                   <Select
                     value={selectedAgencyId}
@@ -890,7 +893,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     disabled={ficheReadOnly || agencyOptions.length === 0}
                   >
                     <SelectTrigger id="artist-target-agency" disabled={ficheReadOnly || agencyOptions.length === 0}>
-                      <SelectValue placeholder={agencyOptions.length ? "Choisir une agence" : "Aucune agence disponible"} />
+                      <SelectValue placeholder={agencyOptions.length ? t("agency_select_placeholder") : t("agency_select_empty")} />
                     </SelectTrigger>
                     <SelectContent className="max-h-72">
                       {agencyOptions.map((a) => (
@@ -907,14 +910,14 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <div className="group relative h-40 w-40 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
                 {previewSrc ? (
-                  <img src={previewSrc} alt="Aperçu" className="h-full w-full object-cover" />
+                  <img src={previewSrc} alt={t("photo_alt_preview")} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
                     <ImageIcon className="h-10 w-10 text-muted-foreground" />
                   </div>
                 )}
                 {processingPhoto && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/75" aria-busy aria-label="Traitement de l’image">
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/75" aria-busy aria-label={t("photo_processing_aria")}>
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 )}
@@ -928,7 +931,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                       disabled={processingPhoto}
                       onClick={() => photoFileInputRef.current?.click()}
                     >
-                      {pendingPhotoFile || (photoUrl ?? "").trim() ? "Remplacer la photo" : "Changer la photo"}
+                      {pendingPhotoFile || (photoUrl ?? "").trim() ? t("btn_photo_replace") : t("btn_photo_change")}
                     </Button>
                   </div>
                 )}
@@ -974,12 +977,12 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="inline-flex items-center">
-                          Prénom
+                          {t("form_firstname_label")}
                           <RequiredAsterisk />
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Prénom"
+                            placeholder={t("form_firstname_placeholder")}
                             {...field}
                             disabled={ficheReadOnly || Boolean(editingArtistId)}
                           />
@@ -994,12 +997,12 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="inline-flex items-center">
-                          Nom
+                          {t("form_lastname_label")}
                           <RequiredAsterisk />
                         </FormLabel>
                         <FormControl>
                           <Input
-                            placeholder="Nom"
+                            placeholder={t("form_lastname_placeholder")}
                             {...field}
                             disabled={ficheReadOnly || Boolean(editingArtistId)}
                           />
@@ -1013,9 +1016,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     name="artist_nickname"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pseudo</FormLabel>
+                        <FormLabel>{t("form_nickname_label")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Optionnel" {...field} disabled={ficheReadOnly} />
+                          <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={ficheReadOnly} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1031,11 +1034,11 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                     <FormItem className="flex flex-col gap-[5px] space-y-0">
                       <FormLabel className="inline-flex min-h-[1.25rem] flex-wrap items-center gap-x-1 gap-y-0.5">
                         <span className="inline-flex items-center">
-                          Types d’art
+                          {t("form_art_types_label")}
                           <RequiredAsterisk />
                         </span>
                         <span className="text-xs font-normal text-muted-foreground">
-                          (plusieurs types d’art peuvent être sélectionnés)
+                          {t("form_art_types_hint")}
                         </span>
                       </FormLabel>
                       <Popover open={typesPopoverOpen} onOpenChange={setTypesPopoverOpen}>
@@ -1051,8 +1054,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                               )}
                             >
                               {artistTyp?.length
-                                ? `${artistTyp.length} type(s) sélectionné(s)`
-                                : "Choisir un ou plusieurs types"}
+                                ? t("form_art_types_count", { count: artistTyp.length })
+                                : t("form_art_types_empty")}
                               <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                             </Button>
                           </FormControl>
@@ -1094,7 +1097,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                       name="birth_date"
                       render={({ field }) => (
                         <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
-                          <FormLabel className="min-h-[1.25rem]">Date de naissance</FormLabel>
+                          <FormLabel className="min-h-[1.25rem]">{t("form_birthdate_label")}</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -1110,7 +1113,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                                   {field.value ? (
                                     format(field.value, "PPP", { locale: fr })
                                   ) : (
-                                    <span>Choisir une date</span>
+                                    <span>{t("form_birthdate_placeholder")}</span>
                                   )}
                                   <CalendarIcon className="ml-auto h-4 w-4 shrink-0 opacity-60" />
                                 </Button>
@@ -1140,9 +1143,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="artist_address"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-5">
-                    <FormLabel>Adresse</FormLabel>
+                    <FormLabel>{t("form_address_label")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Adresse" {...field} disabled={ficheReadOnly} />
+                      <Input placeholder={t("form_address_placeholder")} {...field} disabled={ficheReadOnly} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1153,9 +1156,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="artist_zipcode"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel data-i18n="form.postalCode">Code postal</FormLabel>
+                    <FormLabel>{t("form_zipcode_label")}</FormLabel>
                     <FormControl>
-                      <Input data-i18n-placeholder="form.postalCodePlaceholder" placeholder="Code postal" {...field} disabled={ficheReadOnly} />
+                      <Input placeholder={t("form_zipcode_placeholder")} {...field} disabled={ficheReadOnly} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1166,9 +1169,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="artist_city"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-3">
-                    <FormLabel data-i18n="form.city">Ville</FormLabel>
+                    <FormLabel>{t("form_city_label")}</FormLabel>
                     <FormControl>
-                      <Input data-i18n-placeholder="form.cityPlaceholder" placeholder="Ville" {...field} disabled={ficheReadOnly} />
+                      <Input placeholder={t("form_city_placeholder")} {...field} disabled={ficheReadOnly} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1179,7 +1182,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
             {checkingDuplicate && (
               <p className="text-xs text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Vérification des doublons…
+                {t("checking_duplicate")}
               </p>
             )}
 
@@ -1189,11 +1192,11 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="pays"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel data-i18n="form.country">Pays</FormLabel>
+                    <FormLabel>{t("form_country_label")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={ficheReadOnly}>
                       <FormControl>
                         <SelectTrigger disabled={ficheReadOnly}>
-                          <SelectValue data-i18n-placeholder="form.countryPlaceholder" placeholder="Pays" />
+                          <SelectValue placeholder={t("form_country_placeholder")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="max-h-72">
@@ -1216,7 +1219,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Téléphone</FormLabel>
+                    <FormLabel>{t("form_phone_label")}</FormLabel>
                     <FormControl>
                       <SmartPhoneInput
                         value={field.value ?? ""}
@@ -1238,9 +1241,9 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>E-mail</FormLabel>
+                    <FormLabel>{t("form_email_label")}</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="contact@…" {...field} disabled={ficheReadOnly} />
+                      <Input type="email" placeholder={t("form_email_placeholder")} {...field} disabled={ficheReadOnly} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1254,12 +1257,12 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
               {!editingArtistId ? (
                 <div className="mb-[5px] flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                   <span className="min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
-                    Liens &amp; réseaux sociaux
+                    {t("form_social_label")}
                   </span>
                 </div>
               ) : (
                 <Label className="mb-1 block text-sm font-medium leading-tight">
-                  Liens &amp; réseaux sociaux
+                  {t("form_social_label")}
                 </Label>
               )}
               <div className="grid max-h-[140px] gap-1 overflow-y-auto overflow-x-hidden pr-1">

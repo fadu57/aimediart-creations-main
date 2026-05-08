@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Organisation",
+    "search": "Search an organisation...",
+    "clearSearch": "Clear search",
+    "clear": "Clear",
+    "create": "New organisation",
+    "tableau": "Table",
+    "viewExpos": "View exhibitions",
+    "viewCatalogue": "Artwork catalogue",
+    "loading": "Loading agencies…",
+    "empty": "No agency in your scope.",
+    "scopeTitle": "Empty scope",
+    "scopeDesc": "Fill in the agency / exhibition identifiers expected for your role.",
+    "scopeAgency": "Agency scope {{agencyId}}.",
+    "scopeExpo": "Agency linked to exhibition {{expoId}}.",
+    "noName": "Unnamed"
+  },
+  "tableau": {
+    "title": "Organisations — Full table",
+    "back": "Back",
+    "corbeille": "Trash",
+    "search": "Search (name, id...)",
+    "loading": "Loading...",
+    "colOrganisation": "Organisation",
+    "colId": "ID",
+    "empty": "No organisation visible.",
+    "archiveAriaLabel": "Archive the organisation",
+    "archiveTitle": "Archive",
+    "archiveWarning": "WARNING - Deletion is permanent. Delete with maximum discernment otherwise you risk problems with your application",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "archiving": "Archiving..."
+  }
+}

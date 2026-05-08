@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "Users",
+    "back": "Back",
+    "corbeille": "Trash",
+    "search": "Search (name, first name, role...)",
+    "clearSearch": "Clear search",
+    "clear": "Clear",
+    "loading": "Loading...",
+    "colPrenom": "First name",
+    "colNom": "Last name",
+    "colOrganisation": "Organisation",
+    "colExpo": "Exhibition",
+    "colRole": "Role",
+    "empty": "No user visible.",
+    "deleteAriaLabel": "Delete user",
+    "deleteTitle": "Delete"
+  },
+  "dialog": {
+    "title": "Confirm deletion",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "deleting": "Deleting...",
+    "adminOrgWarning": "Critical warning: you are about to delete an Organisation Admin.",
+    "lastAdminWarning": "This user appears to be the last admin of this organisation. Deletion may leave the organisation without an administrator.",
+    "confirmAdminOrg": "Do you confirm the deletion of this Organisation Admin?",
+    "targetUser": "Targeted user: {{name}}",
+    "confirmDeleteUser": "Do you really want to delete this user?",
+    "confirmDeleteUserNamed": "Do you really want to delete {{name}}?"
+  }
+}

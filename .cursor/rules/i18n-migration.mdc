@@ -1,0 +1,47 @@
+---
+description: Migration i18next progressive pour React
+globs:
+  - "src/**/*.{js,jsx,ts,tsx}"
+alwaysApply: false
+---
+
+# i18n migration React
+
+Le projet migre progressivement de `useUiLanguage` + `FALLBACK_TRANSLATIONS` vers `i18next` + `react-i18next`.
+
+## Statuts
+- `brouillon` : migrer seulement les textes visibles simples ajoutés/modifiés récemment dans le composant React demandé ; laisser le reste en legacy.
+- `presque stable` : migrer tout le visible simple du composant et des composants directement montés ; laisser les cas sensibles en legacy.
+- `stable` : finaliser aussi les cas sensibles du périmètre demandé.
+
+## Cas sensibles
+Ne pas migrer silencieusement :
+- toasts, alert, confirm
+- erreurs et validations
+- interpolations / variables
+- pluriels / compteurs
+- dates / locales
+- exports PDF/CSV
+- chaînes utilisées dans la logique
+- valeurs venant de la base
+- helpers métier hors composants
+
+## Règles React
+- Utiliser `useTranslation("<namespace>")` dans les composants React.
+- Organiser les traductions par feature / domaine avec un namespace dédié.
+- Utiliser des clés sémantiques stables.
+- Ne pas concaténer des chaînes.
+- Utiliser interpolation i18next pour les variables et la pluralisation avec `count`.
+- Ne pas utiliser `useTranslation()` hors composant React ; signaler le cas au lieu d'improviser.
+- Ne jamais faire de refactor global sans demande explicite.
+- Ne jamais supprimer largement le legacy.
+- En cas d'ambiguïté, poser une question et s'arrêter.
+
+## Réponse attendue
+Toujours indiquer :
+- statut supposé
+- périmètre traité
+- composants/fichiers modifiés
+- ce qui a été migré
+- ce qui reste en legacy
+- risques / TODO i18n

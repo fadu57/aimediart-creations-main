@@ -1,0 +1,31 @@
+{
+  "page": {
+    "title": "Benutzer",
+    "back": "Zurück",
+    "corbeille": "Papierkorb",
+    "search": "Suchen (Name, Vorname, Rolle...)",
+    "clearSearch": "Suche löschen",
+    "clear": "Löschen",
+    "loading": "Laden...",
+    "colPrenom": "Vorname",
+    "colNom": "Nachname",
+    "colOrganisation": "Organisation",
+    "colExpo": "Ausstellung",
+    "colRole": "Rolle",
+    "empty": "Kein Benutzer sichtbar.",
+    "deleteAriaLabel": "Benutzer löschen",
+    "deleteTitle": "Löschen"
+  },
+  "dialog": {
+    "title": "Löschung bestätigen",
+    "cancel": "Abbrechen",
+    "confirm": "Löschen",
+    "deleting": "Löschen...",
+    "adminOrgWarning": "Kritische Warnung: Sie sind dabei, einen Organisations-Admin zu löschen.",
+    "lastAdminWarning": "Dieser Benutzer scheint der letzte Admin dieser Organisation zu sein. Die Löschung kann die Organisation ohne Administrator zurücklassen.",
+    "confirmAdminOrg": "Bestätigen Sie die Löschung dieses Organisations-Admins?",
+    "targetUser": "Zielbenutzer: {{name}}",
+    "confirmDeleteUser": "Möchten Sie diesen Benutzer wirklich löschen?",
+    "confirmDeleteUserNamed": "Möchten Sie {{name}} wirklich löschen?"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "page": {
+    "title": "Organizzazione",
+    "search": "Cerca un'organizzazione...",
+    "clearSearch": "Cancella ricerca",
+    "clear": "Cancella",
+    "create": "Nuova organizzazione",
+    "tableau": "Tabella",
+    "viewExpos": "Vedi esposizioni",
+    "viewCatalogue": "Catalogo opere",
+    "loading": "Caricamento agenzie…",
+    "empty": "Nessuna agenzia nel tuo ambito.",
+    "scopeTitle": "Ambito vuoto",
+    "scopeDesc": "Compila gli identificatori di agenzia / esposizione previsti per il tuo ruolo.",
+    "scopeAgency": "Ambito agenzia {{agencyId}}.",
+    "scopeExpo": "Agenzia collegata all'esposizione {{expoId}}.",
+    "noName": "Senza nome"
+  },
+  "tableau": {
+    "title": "Organizzazioni — Tabella completa",
+    "back": "Indietro",
+    "corbeille": "Cestino",
+    "search": "Cerca (nome, id...)",
+    "loading": "Caricamento...",
+    "colOrganisation": "Organizzazione",
+    "colId": "ID",
+    "empty": "Nessuna organizzazione visibile.",
+    "archiveAriaLabel": "Archivia l'organizzazione",
+    "archiveTitle": "Archivia",
+    "archiveWarning": "ATTENZIONE - L'eliminazione è definitiva. Elimina con il massimo discernimento altrimenti rischi problemi con la tua applicazione",
+    "cancel": "Annulla",
+    "confirm": "Elimina",
+    "archiving": "Archiviazione..."
+  }
+}

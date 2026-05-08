@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import i18n from "@/i18n/config";
 
 export type UiLanguage = "fr" | "en" | "es" | "de" | "it";
 
@@ -95,6 +96,9 @@ export function UiLanguageProvider({ children }: { children: React.ReactNode }) 
 
   const setLanguage = (lang: UiLanguage) => {
     setLanguageState(lang);
+    // Synchronise i18next pour que les composants migrés (useTranslation) reçoivent
+    // immédiatement la bonne langue, quel que soit le composant qui initie le changement.
+    void i18n.changeLanguage(lang);
   };
 
   useEffect(() => {

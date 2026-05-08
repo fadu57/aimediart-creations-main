@@ -1,0 +1,59 @@
+{
+  "page": {
+    "title": "Ausstellungen",
+    "search": "Ausstellung suchen...",
+    "clearSearch": "Suche löschen",
+    "clear": "Löschen",
+    "create": "Neue Ausstellung",
+    "tableau": "Tabelle",
+    "loading": "Ausstellungen werden geladen…",
+    "empty": "Keine Ausstellung in Ihrem Bereich.",
+    "scopeTitle": "Leerer Bereich",
+    "scopeDesc": "Geben Sie die für Ihre Rolle erwarteten Agentur-/Ausstellungskennungen ein.",
+    "filteredAgency": "Gefiltert nach Agentur {{agencyFilter}}.",
+    "scopedExpoOnly": "Nur Ausstellung {{label}}."
+  },
+  "card": {
+    "qrGenerate": "QR generieren",
+    "qrClickHint1": "durch Klicken oben",
+    "qrClickHint2": "wird ein Expo-QR-Code generiert",
+    "qrGenerateTitle": "Klicken, um den QR-Code der Ausstellung zu generieren",
+    "qrRegenerateTitle": "Klicken, um den QR-Code der Ausstellung neu zu generieren",
+    "qrGenerateAriaLabel": "QR-Code der Ausstellung generieren",
+    "qrRegenerateAriaLabel": "QR-Code der Ausstellung neu generieren",
+    "testQr": "QR-Code testen",
+    "printPanel": "Ausstellungstafel drucken",
+    "viewCatalogue": "Kunstwerkkatalog",
+    "curatorLabel": "Kurator: {{name}}",
+    "agencyPrefix": "Agentur:",
+    "viewAgencyTitle": "Agenturprofil anzeigen",
+    "qrConfirmTitle": "QR-Code neu generieren?",
+    "qrConfirmWarning": "Achtung: Ein neuer QR-Code macht den vorhandenen dauerhaft ungültig.",
+    "qrConfirmDescription": "Jeder bereits gedruckte oder ausgestellte QR-Code für diese Ausstellung muss ersetzt werden, damit Besucher auf die Kunstwerke zugreifen können.",
+    "qrConfirmAction": "Trotzdem neu generieren",
+    "qrConfirmCancel": "Abbrechen"
+  },
+  "panel": {
+    "chooseFormat": "Wählen Sie das zu druckende Tabellenformat",
+    "cancel": "Abbrechen"
+  },
+  "tableau": {
+    "title": "Ausstellungen — Vollständige Tabelle",
+    "back": "Zurück",
+    "corbeille": "Papierkorb",
+    "search": "Suchen (Ausstellung, Agentur, Kurator...)",
+    "loading": "Laden...",
+    "colExposition": "Ausstellung",
+    "colOrganisation": "Organisation",
+    "colCommissaire": "Kurator",
+    "colDu": "Von",
+    "colAu": "Bis",
+    "empty": "Keine Ausstellung sichtbar.",
+    "archiveAriaLabel": "Ausstellung archivieren",
+    "archiveTitle": "Archivieren",
+    "archiveWarning": "ACHTUNG - Die Löschung ist endgültig. Löschen Sie mit größter Sorgfalt, da Sie sonst Probleme mit Ihrer Anwendung riskieren",
+    "cancel": "Abbrechen",
+    "confirm": "Löschen",
+    "archiving": "Archivierung..."
+  }
+}

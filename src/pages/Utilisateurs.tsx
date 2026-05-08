@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -94,6 +95,7 @@ function getVisibleRoleIds(currentRoleId: number | null): number[] | null {
 }
 
 export default function Utilisateurs() {
+  const { t } = useTranslation("utilisateurs");
   const navigate = useNavigate();
   const { loading: authLoading, role_id: currentRoleId, user } = useAuthUser();
   const { can, loading: navLoading } = useNavigationMatrix();
@@ -444,25 +446,25 @@ export default function Utilisateurs() {
     <div className="mx-auto w-full max-w-[980px] px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/user")}>
-          Retour
+          {t("page.back")}
         </Button>
         <Button type="button" variant="outline" className="gap-2" asChild>
           <Link to="/utilisateurs-corbeille">
-            <ArchiveRestore className="h-4 w-4" /> Corbeille
+            <ArchiveRestore className="h-4 w-4" /> {t("page.corbeille")}
           </Link>
         </Button>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>Utilisateurs</CardTitle>
+          <CardTitle>{t("page.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
             <Input
               type="text"
               list="utilisateurs-search-suggestions"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher (nom, prénom, rôle...)"
+              placeholder={t("page.search")}
               className="h-8 pr-8"
             />
             {searchTerm.trim().length > 0 && (
@@ -470,8 +472,8 @@ export default function Utilisateurs() {
                 type="button"
                 onClick={() => setSearchTerm("")}
                 className="absolute right-2 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label="Effacer la recherche"
-                title="Effacer"
+                aria-label={t("page.clearSearch")}
+                title={t("page.clear")}
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
               </button>
@@ -485,7 +487,7 @@ export default function Utilisateurs() {
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Chargement...</p>
+            <p className="text-sm text-muted-foreground">{t("page.loading")}</p>
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : (
@@ -493,23 +495,23 @@ export default function Utilisateurs() {
               <thead>
                 <tr className="border-b text-left">
                   <th className="w-36 px-2 py-1">
-                    Prénom
+                    {t("page.colPrenom")}
                     <SortButtons column="first_name" />
                   </th>
                   <th className="w-36 px-2 py-1">
-                    Nom
+                    {t("page.colNom")}
                     <SortButtons column="last_name" />
                   </th>
                   <th className="w-44 px-2 py-1">
-                    Organisation
+                    {t("page.colOrganisation")}
                     <SortButtons column="agency" />
                   </th>
                   <th className="w-44 px-2 py-1">
-                    Expo
+                    {t("page.colExpo")}
                     <SortButtons column="expo" />
                   </th>
                   <th className="w-40 px-2 py-1 whitespace-nowrap">
-                    Rôle
+                    {t("page.colRole")}
                     <SortButtons column="role" />
                   </th>
                   <th className="w-10 px-2 py-1" aria-label="Actions" />
@@ -577,8 +579,8 @@ export default function Utilisateurs() {
                               e.stopPropagation();
                               setDeleteTarget(row);
                             }}
-                            aria-label="Supprimer l'utilisateur"
-                            title="Supprimer"
+                            aria-label={t("page.deleteAriaLabel")}
+                            title={t("page.deleteTitle")}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden />
                           </Button>
@@ -592,7 +594,7 @@ export default function Utilisateurs() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-2 py-1.5 text-muted-foreground">
-                      Aucun utilisateur visible.
+                      {t("page.empty")}
                     </td>
                   </tr>
                 )}
@@ -605,35 +607,36 @@ export default function Utilisateurs() {
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogTitle>{t("dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && Number(deleteTarget.role_id) === 4 ? (
                 <>
                   <span className="font-semibold text-destructive">
-                    Attention critique : vous êtes sur le point de supprimer un Admin organisation.
+                    {t("dialog.adminOrgWarning")}
                   </span>
                   <br />
                   {deleteLastRole4InOrg ? (
-                    <>
-                      Cet utilisateur semble être le dernier `role_id = 4` de cette organisation.
-                      La suppression peut laisser l'organisation sans administrateur.
-                    </>
+                    <>{t("dialog.lastAdminWarning")}</>
                   ) : (
-                    "Confirmez-vous la suppression de cet Admin organisation ?"
+                    t("dialog.confirmAdminOrg")
                   )}
                   <br />
-                  {deleteTarget ? `Utilisateur ciblé : ${deleteTarget.first_name || ""} ${deleteTarget.last_name || ""}` : ""}
+                  {deleteTarget
+                    ? t("dialog.targetUser", {
+                        name: `${deleteTarget.first_name || ""} ${deleteTarget.last_name || ""}`.trim() || "—",
+                      })
+                    : ""}
                 </>
-              ) : (
-                <>
-                  Voulez-vous vraiment supprimer cet utilisateur ?
-                  {deleteTarget ? ` (${deleteTarget.first_name || ""} ${deleteTarget.last_name || ""})` : ""}
-                </>
-              )}
+              ) : (() => {
+                  const targetName = `${deleteTarget?.first_name || ""} ${deleteTarget?.last_name || ""}`.trim();
+                  return targetName
+                    ? t("dialog.confirmDeleteUserNamed", { name: targetName })
+                    : t("dialog.confirmDeleteUser");
+                })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("dialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               className="bg-red-600 text-white hover:bg-red-700"
@@ -642,7 +645,7 @@ export default function Utilisateurs() {
                 void deleteUser();
               }}
             >
-              {deleting ? "Suppression..." : "Supprimer"}
+              {deleting ? t("dialog.deleting") : t("dialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

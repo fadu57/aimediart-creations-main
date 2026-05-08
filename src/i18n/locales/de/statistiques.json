@@ -1,0 +1,45 @@
+{
+  "page": {
+    "title": "Statistiken",
+    "subtitle": "Detaillierte Analyse der Besuchs- und Emotionsfeedback-Daten",
+    "print": "Ausgewählte Statistiken drucken"
+  },
+  "filter": {
+    "organisation": "Organisation",
+    "exposition": "Ausstellung",
+    "allExpos": "Alle Ausstellungen im Bereich"
+  },
+  "emotions": {
+    "title": "Emotionsverteilung",
+    "subtitle": "Aufschlüsselung der Besucherempfindungen",
+    "empty": "Kein Feedback für diesen Bereich."
+  },
+  "timeline": {
+    "title": "Zeitlicher Verlauf",
+    "subtitle": "Besucher im Tagesverlauf",
+    "prevWeek": "Vorherige Woche",
+    "nextWeek": "Nächste Woche"
+  },
+  "hourly": {
+    "title": "Stündliche Besucherzahlen",
+    "subtitle": "Besucher im Stundenverlauf (auf das blaue Diagramm klicken)"
+  },
+  "cross": {
+    "title": "Emotionen / Kunstwerke Kreuztabelle",
+    "subtitle": "Korrelationen zwischen Kunstwerken und Besucheremotionen",
+    "colArtwork": "Kunstwerk",
+    "empty": "Keine realen Daten in diesem Bereich."
+  },
+  "top": {
+    "title": "Kunstwerk-Ranking",
+    "subtitle": "Rang, Besuche und durchschnittliche Herzen (gefilterte Realdaten)",
+    "colRank": "Rang",
+    "colArtwork": "Kunstwerk",
+    "colVisits": "Besuche",
+    "colAvgHearts": "Ø Herzen",
+    "empty": "Keine realen Daten in diesem Bereich."
+  },
+  "common": {
+    "chartNoData": "Nicht genug Daten für ein Diagramm."
+  }
+}

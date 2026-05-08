@@ -1,10 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Images, Loader2, Plus, QrCode, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ExpoFormDialog } from "@/components/ExpoFormDialog";
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -12,7 +22,7 @@ import { sortExpoFieldKeys } from "@/lib/expoFormUtils";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
-import { useUiLanguage } from "@/providers/UiLanguageProvider";
+import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
@@ -188,6 +198,25 @@ function expoQrKeys(row: ExpoRow): string[] {
   return [...new Set(keys)];
 }
 
+/**
+ * Cherche une URL de QR code déjà sauvegardée dans les colonnes de la row expo
+ * (générée et uploadée lors d'une session précédente dans Supabase Storage).
+ */
+function expoQrRawFromRow(row: Record<string, unknown>): string | null {
+  const priority = ["qr_image_url", "qr_code_url", "qrcode_url", "qr_url", "expo_qr_url", "qr_code"];
+  for (const k of priority) {
+    const v = row[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  for (const [key, val] of Object.entries(row)) {
+    if (!/\bqr\b/i.test(key)) continue;
+    if (typeof val !== "string" || !val.trim()) continue;
+    const s = val.trim();
+    if (s.startsWith("https://") || s.startsWith("data:image")) return s;
+  }
+  return null;
+}
+
 function formatExpoDate(value: string | null | undefined): string {
   const raw = (value ?? "").trim();
   if (!raw) return "";
@@ -197,7 +226,7 @@ function formatExpoDate(value: string | null | undefined): string {
 }
 
 const Expos = () => {
-  const { t } = useUiLanguage();
+  const { t } = useTranslation("expos");
   const [searchParams] = useSearchParams();
   const agencyFilter = searchParams.get("agency")?.trim() || "";
   const expoPopupId = searchParams.get("expo")?.trim() || "";
@@ -218,7 +247,7 @@ const Expos = () => {
       if (!parsed || typeof parsed !== "object") return {};
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-        if (typeof v === "string" && v.startsWith("data:image")) out[k] = v;
+        if (typeof v === "string" && v.trim()) out[k] = v;
       }
       return out;
     } catch {
@@ -226,6 +255,7 @@ const Expos = () => {
     }
   });
   const [generatingQrForExpoId, setGeneratingQrForExpoId] = useState<string | null>(null);
+  const [qrConfirmExpoKey, setQrConfirmExpoKey] = useState<string | null>(null);
   const [panelFormatExpo, setPanelFormatExpo] = useState<ExpoRow | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const popupOpenedRef = useRef(false);
@@ -559,12 +589,12 @@ const Expos = () => {
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-serif font-bold text-white">{t("Expositions")}</h2>
+          <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           {agencyFilter && (
-            <p className="text-xs text-muted-foreground mt-1">Filtré sur l’agence {agencyFilter}.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
           )}
           {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">Exposition {scopedExpoLabel} uniquement.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
           )}
         </div>
         <div className="relative w-[210px] min-w-[210px] max-w-[210px] md:mr-auto">
@@ -573,7 +603,7 @@ const Expos = () => {
             list="expo-search-suggestions"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={t("Rechercher une exposition...")}
+            placeholder={t("page.search")}
             className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
           />
           {searchTerm.trim().length > 0 && (
@@ -581,8 +611,8 @@ const Expos = () => {
               type="button"
               onClick={() => setSearchTerm("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-              aria-label={t("Effacer la recherche")}
-              title={t("Effacer")}
+              aria-label={t("page.clearSearch")}
+              title={t("page.clear")}
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -601,10 +631,10 @@ const Expos = () => {
               onClick={openCreate}
             >
               <Plus className="h-4 w-4" />
-              {t("Nouvelle exposition")}
+              {t("page.create")}
             </Button>
             <Button type="button" variant="outline" className="gap-2" asChild>
-              <Link to="/expos/expos2">Tableau</Link>
+              <Link to="/expos/expos2">{t("page.tableau")}</Link>
             </Button>
           </div>
         )}
@@ -612,10 +642,8 @@ const Expos = () => {
 
       {showScopeHint && (
         <Alert>
-          <AlertTitle>{t("Périmètre vide")}</AlertTitle>
-          <AlertDescription>
-            {t("Renseignez les identifiants agence / exposition attendus pour votre rôle.")}
-          </AlertDescription>
+          <AlertTitle>{t("page.scopeTitle")}</AlertTitle>
+          <AlertDescription>{t("page.scopeDesc")}</AlertDescription>
         </Alert>
       )}
 
@@ -626,15 +654,16 @@ const Expos = () => {
       )}
 
       <div className="space-y-4">
-        {loading && <p className="text-sm text-muted-foreground text-center py-12">{t("Chargement des expos…")}</p>}
+        {loading && <p className="text-sm text-muted-foreground text-center py-12">{t("page.loading")}</p>}
         {!loading && !error && filteredExpos.length === 0 && !showScopeHint && (
-          <p className="text-sm text-muted-foreground text-center py-12">{t("Aucune exposition dans votre périmètre.")}</p>
+          <p className="text-sm text-muted-foreground text-center py-12">{t("page.empty")}</p>
         )}
         {filteredExpos.map((ex) => {
           const agencyLinked = ex.agency_id ?? null;
           const agencyLabel = agencyLinked ? (agencyNameById[agencyLinked] ?? agencyLinked) : "";
           const logoRaw = expoLogoRawFromRow(ex as Record<string, unknown>);
-          const qrImage = expoQrKeys(ex).map((k) => expoQrImages[k]).find((v) => typeof v === "string" && v.startsWith("data:image")) ?? null;
+          const qrInMemory = expoQrKeys(ex).map((k) => expoQrImages[k]).find((v) => typeof v === "string" && v.trim()) ?? null;
+          const qrImage = qrInMemory ?? expoQrRawFromRow(ex as Record<string, unknown>);
           const exRecord = ex as Record<string, unknown>;
           const curatorFirstName =
             (typeof ex.curator_firstname === "string" ? ex.curator_firstname : "") ||
@@ -674,11 +703,15 @@ const Expos = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       const key = expoQrKeys(ex)[0] || ex.id;
-                      void handleGenerateQrForExpo(key);
+                      if (qrImage) {
+                        setQrConfirmExpoKey(key);
+                      } else {
+                        void handleGenerateQrForExpo(key);
+                      }
                     }}
                     disabled={Boolean(generatingQrForExpoId)}
-                    title={qrImage ? "Cliquer pour régénérer le QR code de l'exposition" : "Cliquer pour générer le QR code de l'exposition"}
-                    aria-label={qrImage ? "Régénérer le QR code de l'exposition" : "Générer le QR code de l'exposition"}
+                    title={qrImage ? t("card.qrRegenerateTitle") : t("card.qrGenerateTitle")}
+                    aria-label={qrImage ? t("card.qrRegenerateAriaLabel") : t("card.qrGenerateAriaLabel")}
                   >
                     {generatingQrForExpoId === ex.id ? (
                       <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
@@ -693,15 +726,15 @@ const Expos = () => {
                       <>
                         <QrCode className="h-9 w-9 text-muted-foreground/80 shrink-0" aria-hidden />
                         <span className="mt-0.5 text-[10px] leading-tight text-muted-foreground px-0.5">
-                          Générer le QR
+                          {t("card.qrGenerate")}
                         </span>
                       </>
                     )}
                   </button>
                   <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
-                    <span className="whitespace-nowrap">en cliquant ci-dessus</span>
+                    <span className="whitespace-nowrap">{t("card.qrClickHint1")}</span>
                     <br />
-                    <span>un QR-Code expo est généré</span>
+                    <span>{t("card.qrClickHint2")}</span>
                   </p>
                 </div>
                 <ExpoLogoThumb
@@ -714,16 +747,16 @@ const Expos = () => {
                   <h3 className="font-serif font-bold text-lg">{expoTitle(ex)}</h3>
                   {curatorLabel && (
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Commissaire : {curatorLabel}
+                      {t("card.curatorLabel", { name: curatorLabel })}
                     </p>
                   )}
                   {agencyLinked && (
                     <p className="mt-2 text-sm text-muted-foreground">
-                      Agence :{" "}
+                      {t("card.agencyPrefix")}{" "}
                       <Link
                         className="text-primary underline-offset-2 hover:underline"
                         to={`/agencies?agency=${encodeURIComponent(agencyLinked)}`}
-                        title="Voir la fiche de l'agence"
+                        title={t("card.viewAgencyTitle")}
                         onClick={(e) => e.stopPropagation()}
                       >
                         {agencyLabel}
@@ -742,7 +775,7 @@ const Expos = () => {
                       window.open(`/scan?expo_id=${encodeURIComponent(ex.id)}`, "_blank");
                     }}
                   >
-                    Tester le QR-Code
+                    {t("card.testQr")}
                   </Button>
                   <Button
                     type="button"
@@ -754,11 +787,11 @@ const Expos = () => {
                       setPanelFormatExpo(ex);
                     }}
                   >
-                    Print panneau expo
+                    {t("card.printPanel")}
                   </Button>
                   <Button type="button" variant="default" size="sm" className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground" asChild>
                     <Link to={`/catalogue?expo=${encodeURIComponent(ex.id)}`} onClick={(e) => e.stopPropagation()}>
-                      Catalogue des œuvres
+                      {t("card.viewCatalogue")}
                     </Link>
                   </Button>
                 </div>
@@ -790,7 +823,7 @@ const Expos = () => {
             aria-label="Choix du format du panneau expo"
           >
             <p className="text-sm font-semibold text-gray-900">
-              Choisissez le format du panneau à imprimer
+              {t("panel.chooseFormat")}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Button
@@ -818,11 +851,45 @@ const Expos = () => {
               className="mt-2 w-full"
               onClick={() => setPanelFormatExpo(null)}
             >
-              Annuler
+              {t("panel.cancel")}
             </Button>
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(qrConfirmExpoKey)}
+        onOpenChange={(open) => !open && setQrConfirmExpoKey(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("card.qrConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div>
+                <p className="font-semibold text-destructive mb-2">
+                  {t("card.qrConfirmWarning")}
+                </p>
+                <p>{t("card.qrConfirmDescription")}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setQrConfirmExpoKey(null)}>
+              {t("card.qrConfirmCancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 text-white hover:bg-amber-700"
+              onClick={() => {
+                const key = qrConfirmExpoKey;
+                setQrConfirmExpoKey(null);
+                if (key) void handleGenerateQrForExpo(key);
+              }}
+            >
+              {t("card.qrConfirmAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
