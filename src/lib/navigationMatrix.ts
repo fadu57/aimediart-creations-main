@@ -46,6 +46,18 @@ export const NAV_MATRIX_MENU_ROWS: { key: NavMatrixCible; label: string; to: str
 
 export type NavAccessMap = Record<NavMatrixCible, boolean>;
 
+/**
+ * Première entrée de menu autorisée pour la matrice courante, sinon `/settings` (hors matrice).
+ * Utilisé pour les redirections « route interdite » : évite de cibler `/dashboard` si `menu_home` est faux
+ * (sinon boucle infinie avec `<Navigate>`).
+ */
+export function getBackofficeFallbackPath(access: NavAccessMap): string {
+  for (const item of HEADER_NAV_ITEMS) {
+    if (access[item.key]) return item.to;
+  }
+  return "/settings";
+}
+
 /** Entrées de menu principal (header) — utilisé pour détecter une matrice « tout à faux » par erreur. */
 const HEADER_MENU_MATRIX_KEYS: NavMatrixCible[] = [
   "menu_home",
@@ -102,13 +114,29 @@ export function defaultNavAccessForRole(roleId: number | null | undefined): NavA
   return allFalse();
 }
 
+/**
+ * Rôles métier agence/expo (4–6) : sans lignes dans `matrice_securite`, tous les menus header sont ouverts.
+ * Sinon le défaut `allFalse()` laisse le header vide (cassant admin_agency tant que la matrice n’est pas peuplée).
+ */
+function navAccessWhenMatriceSecuriteEmptyForAgencyRole(roleId: number): NavAccessMap | null {
+  if (roleId >= 4 && roleId <= 6) {
+    return {
+      ...allTrue(),
+      page_œuvre: false,
+    };
+  }
+  return null;
+}
+
 /** Fusionne les lignes `matrice_securite` (menus/pages) avec les défauts pour un rôle. */
 export function mergeNavAccessFromMatriceSecurite(
   roleId: number,
   rows: { ressource: string; lecture: boolean }[] | null | undefined,
 ): NavAccessMap {
   const base = defaultNavAccessForRole(roleId);
-  if (!rows?.length) return base;
+  if (!rows?.length) {
+    return navAccessWhenMatriceSecuriteEmptyForAgencyRole(roleId) ?? base;
+  }
   const out = { ...base };
   for (const r of rows) {
     const k = r.ressource as NavMatrixCible;

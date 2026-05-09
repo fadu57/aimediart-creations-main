@@ -40,6 +40,16 @@
   "qr_confirm_action": "Regenerate anyway",
   "qr_confirm_cancel": "Cancel",
 
+  "qr_bulk_regenerate_btn": "Regenerate all QR codes",
+  "qr_bulk_regenerate_title": "Regenerate all QR codes in the catalogue",
+  "qr_bulk_confirm_title": "Regenerate all QR codes?",
+  "qr_bulk_confirm_warning": "Warning: all existing QR codes will be replaced.",
+  "qr_bulk_confirm_description": "This action will regenerate {{count}} QR codes in the catalogue. Any already-printed QR code will need to be replaced. Use this only if QR codes point to outdated URLs (e.g. /oeuvre/ → /artwork/).",
+  "qr_bulk_confirm_action": "Regenerate all",
+  "qr_bulk_progress": "{{done}} / {{total}}",
+  "qr_bulk_success": "{{count}} QR codes successfully regenerated.",
+  "qr_bulk_partial": "{{success}} QR codes regenerated, {{error}} error(s).",
+
   "pdf_error_no_id": "Artwork identifier unavailable.",
   "pdf_error_no_qr_url": "Unable to build QR URL for this artwork.",
   "pdf_error_generate": "Unable to generate the label PDF.",

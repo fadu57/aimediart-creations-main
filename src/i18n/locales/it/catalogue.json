@@ -40,6 +40,16 @@
   "qr_confirm_action": "Rigenera comunque",
   "qr_confirm_cancel": "Annulla",
 
+  "qr_bulk_regenerate_btn": "Rigenera tutti i QR",
+  "qr_bulk_regenerate_title": "Rigenera tutti i codici QR del catalogo",
+  "qr_bulk_confirm_title": "Rigenerare tutti i codici QR?",
+  "qr_bulk_confirm_warning": "Attenzione: tutti i codici QR esistenti verranno sostituiti.",
+  "qr_bulk_confirm_description": "Questa azione rigenererà {{count}} codici QR del catalogo. Qualsiasi QR già stampato dovrà essere sostituito. Usare solo se i QR puntano a URL obsoleti (es. /oeuvre/ → /artwork/).",
+  "qr_bulk_confirm_action": "Rigenera tutto",
+  "qr_bulk_progress": "{{done}} / {{total}}",
+  "qr_bulk_success": "{{count}} codici QR rigenerati con successo.",
+  "qr_bulk_partial": "{{success}} QR rigenerati, {{error}} errore/i.",
+
   "pdf_error_no_id": "Identificatore dell'opera non disponibile.",
   "pdf_error_no_qr_url": "Impossibile costruire l'URL QR per questa opera.",
   "pdf_error_generate": "Impossibile generare il cartel PDF.",

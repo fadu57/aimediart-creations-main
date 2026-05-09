@@ -2,7 +2,41 @@
   "page": {
     "title": "Statistiken",
     "subtitle": "Detaillierte Analyse der Besuchs- und Emotionsfeedback-Daten",
-    "print": "Ausgewählte Statistiken drucken"
+    "print": "Ausgewählte Statistiken drucken",
+    "preview": "Vor dem Drucken anzeigen"
+  },
+  "preview": {
+    "title": "Druckvorschau",
+    "hint": "Ein PDF, das der Bildschirmvorschau entspricht (Diagramme und Layout), öffnet sich in einem einzigen neuen Tab. Für Papier: im PDF-Viewer Datei → Drucken oder Strg+P.",
+    "generatedAt": "Erstellt am {{date}}",
+    "filtersTitle": "Bereich",
+    "close": "Schließen",
+    "colDay": "Tag",
+    "colHour": "Stunde",
+    "colHearts": "Herzen",
+    "totalFeedbacks": "Rückmeldungen gesamt: {{count}}",
+    "printPreparing": "Wird vorbereitet…",
+    "pdfTabLoading": "PDF wird erstellt…",
+    "printTabLoading": "Druckseite wird vorbereitet…",
+    "pdfGenerationTimeout": "Zeitüberschreitung bei der PDF-Erstellung (3 Min.).",
+    "pdfGenerationTimeoutHint": "Die Erfassung hat zu lange gedauert. Schließen Sie andere Registerkarten und versuchen Sie es erneut.",
+    "pdfError": "PDF konnte nicht erstellt werden. Externe Bilder prüfen oder erneut versuchen.",
+    "pdfExportNeedLogin": "Melden Sie sich an, um das PDF zu exportieren.",
+    "pdfExportServerError": "PDF-Export nicht verfügbar. Lokal: „npm run dev:all“ oder parallel „npm run pdf-server“ und „npm run dev“. Terminal pdf prüfen.",
+    "popupBlocked": "Pop-ups für diese Website zulassen, um das PDF zu öffnen.",
+    "printPopupBlocked": "Pop-ups zulassen, um das PDF in einem neuen Tab zu öffnen.",
+    "paperFormatTitle": "Papierformat",
+    "paperFormatHint": "Der Inhalt wird an die nutzbare Breite des Formats angepasst; der Rest läuft auf weiteren Seiten weiter.",
+    "paperFormatLabel": "Format",
+    "paperFormatConfirm": "PDF erzeugen",
+    "paperFormats": {
+      "a4": "A4 (210 × 297 mm)",
+      "a3": "A3 (297 × 420 mm)",
+      "a5": "A5 (148 × 210 mm)",
+      "letter": "US Letter (215,9 × 279,4 mm)",
+      "legal": "US Legal (215,9 × 355,6 mm)",
+      "tabloid": "Tabloid (279,4 × 431,8 mm)"
+    }
   },
   "filter": {
     "organisation": "Organisation",
@@ -12,17 +46,26 @@
   "emotions": {
     "title": "Emotionsverteilung",
     "subtitle": "Aufschlüsselung der Besucherempfindungen",
-    "empty": "Kein Feedback für diesen Bereich."
+    "empty": "Kein Feedback für diesen Bereich.",
+    "names": {
+      "eblouie": "Begeistert",
+      "touchee": "Bewegt",
+      "intriguee": "Neugierig",
+      "apaisee": "Beruhigt",
+      "troublee": "Verstört",
+      "amusee": "Amüsiert"
+    }
   },
   "timeline": {
     "title": "Zeitlicher Verlauf",
     "subtitle": "Besucher im Tagesverlauf",
+    "subtitlePdf": "Vom ersten bis zum letzten Tag mit Rückmeldungen (Vorschau und PDF — volle Spanne)",
     "prevWeek": "Vorherige Woche",
     "nextWeek": "Nächste Woche"
   },
   "hourly": {
     "title": "Stündliche Besucherzahlen",
-    "subtitle": "Besucher im Stundenverlauf (auf das blaue Diagramm klicken)"
+    "subtitle": "Summe der Besuche pro Stunde (0–23 Uhr) über den gesamten gefilterten Zeitraum"
   },
   "cross": {
     "title": "Emotionen / Kunstwerke Kreuztabelle",

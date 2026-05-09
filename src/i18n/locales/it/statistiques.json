@@ -2,7 +2,41 @@
   "page": {
     "title": "Statistiche",
     "subtitle": "Analisi dettagliata dei dati di visita e del feedback emotivo",
-    "print": "Stampa le statistiche selezionate"
+    "print": "Stampa le statistiche selezionate",
+    "preview": "Anteprima prima di stampare"
+  },
+  "preview": {
+    "title": "Anteprima di stampa",
+    "hint": "Si apre un PDF fedele all’anteprima (grafici e impaginazione) in un’unica nuova scheda. Per stampare su carta: nel lettore PDF, File → Stampa o Ctrl+P.",
+    "generatedAt": "Generato il {{date}}",
+    "filtersTitle": "Ambito",
+    "close": "Chiudi",
+    "colDay": "Giorno",
+    "colHour": "Ora",
+    "colHearts": "Cuori",
+    "totalFeedbacks": "Totale feedback: {{count}}",
+    "printPreparing": "Preparazione…",
+    "pdfTabLoading": "Generazione PDF…",
+    "printTabLoading": "Preparazione della pagina di stampa…",
+    "pdfGenerationTimeout": "Timeout nella generazione del PDF (3 min).",
+    "pdfGenerationTimeoutHint": "L’acquisizione ha richiesto troppo tempo. Chiudi altre schede e riprova.",
+    "pdfError": "Impossibile generare il PDF. Controllare le immagini esterne o riprovare.",
+    "pdfExportNeedLogin": "Accedi per esportare il PDF.",
+    "pdfExportServerError": "Esportazione PDF non disponibile. In locale: «npm run dev:all» oppure in parallelo «npm run pdf-server» e «npm run dev». Controlla il terminale pdf.",
+    "popupBlocked": "Consentire le finestre pop-up per aprire il PDF.",
+    "printPopupBlocked": "Consentire le finestre pop-up per aprire il PDF in una nuova scheda.",
+    "paperFormatTitle": "Formato carta",
+    "paperFormatHint": "Il contenuto è scalato sulla larghezza utile del formato scelto; il resto va sulle pagine successive.",
+    "paperFormatLabel": "Formato",
+    "paperFormatConfirm": "Genera PDF",
+    "paperFormats": {
+      "a4": "A4 (210 × 297 mm)",
+      "a3": "A3 (297 × 420 mm)",
+      "a5": "A5 (148 × 210 mm)",
+      "letter": "Letter US (215,9 × 279,4 mm)",
+      "legal": "Legal US (215,9 × 355,6 mm)",
+      "tabloid": "Tabloid (279,4 × 431,8 mm)"
+    }
   },
   "filter": {
     "organisation": "Organizzazione",
@@ -12,17 +46,26 @@
   "emotions": {
     "title": "Distribuzione delle emozioni",
     "subtitle": "Ripartizione delle sensazioni dei visitatori",
-    "empty": "Nessun feedback per questo ambito."
+    "empty": "Nessun feedback per questo ambito.",
+    "names": {
+      "eblouie": "Abbagliato/a",
+      "touchee": "Commosso/a",
+      "intriguee": "Incuriosito/a",
+      "apaisee": "Rasserenato/a",
+      "troublee": "Turbato/a",
+      "amusee": "Divertito/a"
+    }
   },
   "timeline": {
     "title": "Evoluzione temporale",
     "subtitle": "Visitatori nel corso dei giorni",
+    "subtitlePdf": "Dal primo all'ultimo giorno con feedback (anteprima e PDF — intervallo completo)",
     "prevWeek": "Settimana precedente",
     "nextWeek": "Settimana successiva"
   },
   "hourly": {
     "title": "Frequenza oraria",
-    "subtitle": "Visitatori nel corso delle ore (clicca sul grafico blu)"
+    "subtitle": "Somma delle visite per ora (0–23) sull'intero periodo filtrato"
   },
   "cross": {
     "title": "Tabella incrociata emozioni / opere",

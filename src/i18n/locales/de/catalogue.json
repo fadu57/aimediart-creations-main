@@ -40,6 +40,16 @@
   "qr_confirm_action": "Trotzdem neu generieren",
   "qr_confirm_cancel": "Abbrechen",
 
+  "qr_bulk_regenerate_btn": "Alle QR-Codes neu generieren",
+  "qr_bulk_regenerate_title": "Alle QR-Codes des Katalogs neu generieren",
+  "qr_bulk_confirm_title": "Alle QR-Codes neu generieren?",
+  "qr_bulk_confirm_warning": "Achtung: Alle vorhandenen QR-Codes werden ersetzt.",
+  "qr_bulk_confirm_description": "Diese Aktion generiert {{count}} QR-Codes im Katalog neu. Bereits gedruckte QR-Codes müssen ersetzt werden. Nur verwenden, wenn QR-Codes auf veraltete URLs verweisen (z. B. /oeuvre/ → /artwork/).",
+  "qr_bulk_confirm_action": "Alles neu generieren",
+  "qr_bulk_progress": "{{done}} / {{total}}",
+  "qr_bulk_success": "{{count}} QR-Codes erfolgreich neu generiert.",
+  "qr_bulk_partial": "{{success}} QR-Codes neu generiert, {{error}} Fehler.",
+
   "pdf_error_no_id": "Kunstwerk-ID nicht verfügbar.",
   "pdf_error_no_qr_url": "QR-URL für dieses Kunstwerk konnte nicht erstellt werden.",
   "pdf_error_generate": "Etikett-PDF konnte nicht generiert werden.",

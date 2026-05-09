@@ -1,16 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { emotions, artworks, expos } from "@/data/mockData";
 import { useDataScope } from "@/hooks/useDataScope";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { supabase } from "@/lib/supabase";
+import { PDF_FORMAT_OPTIONS, type PdfPaperFormat } from "@/lib/statisticsPrintExport";
+import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
+import { StatisticsReportView } from "@/components/statistics/StatisticsReportView";
+import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
-import { ChevronLeft, ChevronRight, Eye, Heart, Smile, Image, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Heart,
+  Image,
+  Loader2,
+  Smile,
+} from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 type EmotionCatalogRow = {
@@ -24,6 +47,8 @@ type ExpoOption = {
   id: string;
   expo_name: string;
   agency_id: string | null;
+  /** Valeur brute logo (colonnes variables selon le schéma `expos`). */
+  logoRaw: string | null;
 };
 
 type TopArtworkRow = {
@@ -42,6 +67,13 @@ function asTrimmedString(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value).trim();
   return "";
+}
+
+/** URL d’export PDF : proxy Vite `/pdf-export` → serveur Playwright, ou URL absolue si `VITE_PDF_EXPORT_URL`. */
+function getStatisticsPdfExportUrl(): string {
+  const base = import.meta.env.VITE_PDF_EXPORT_URL?.replace(/\/$/, "");
+  if (base) return `${base}/export/statistics-pdf`;
+  return "/pdf-export/export/statistics-pdf";
 }
 
 function startOfWeekMonday(d: Date): Date {
@@ -81,10 +113,13 @@ function artworkExpoId(aw: unknown): string | null {
 }
 
 const Statistics = () => {
+  const [searchParams] = useSearchParams();
+  const chromiumPdfAutoOpen = searchParams.get("chromiumPdf") === "1";
+
   const { t } = useTranslation("statistiques");
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name } = useAuthUser();
-  const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; name: string; logoUrl: string | null }>>([]);
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("all");
   const [emotionCatalogFromDb, setEmotionCatalogFromDb] = useState<EmotionCatalogRow[]>([]);
@@ -94,9 +129,13 @@ const Statistics = () => {
   const [uniqueVisitorsTotal, setUniqueVisitorsTotal] = useState(0);
   const [averageHearts, setAverageHearts] = useState<number | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [temporalSeries, setTemporalSeries] = useState<Array<{ day: string; visites: number; coeurs: number }>>([]);
+  const [temporalSeries, setTemporalSeries] = useState<
+    Array<{ day: string; date: string; weekday: string; dateLabel: string; visites: number }>
+  >([]);
+  const [temporalSeriesForPdf, setTemporalSeriesForPdf] = useState<
+    Array<{ day: string; date: string; weekday: string; dateLabel: string; visites: number }>
+  >([]);
   const [hourlySeries, setHourlySeries] = useState<Array<{ hour: string; visites: number }>>([]);
-  const [selectedTemporalDate, setSelectedTemporalDate] = useState<string | null>(null);
   const [crossRows, setCrossRows] = useState<Array<{ artworkId: string; name: string; counts: Record<string, number> }>>([]);
   const [crossError, setCrossError] = useState<string | null>(null);
   const [topArtworks, setTopArtworks] = useState<TopArtworkRow[]>([]);
@@ -106,23 +145,80 @@ const Statistics = () => {
   const [topSortDirection, setTopSortDirection] = useState<TopSortDirection>("desc");
   const [crossSortEmotionId, setCrossSortEmotionId] = useState<string | null>(null);
   const [crossSortDirection, setCrossSortDirection] = useState<TopSortDirection>("desc");
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [paperFormatDialogOpen, setPaperFormatDialogOpen] = useState(false);
+  const [selectedPdfPaper, setSelectedPdfPaper] = useState<PdfPaperFormat>("a4");
+  const [printExportBusy, setPrintExportBusy] = useState(false);
+  const statisticsPrintAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chromiumPdfAutoOpen) {
+      document.documentElement.dataset.statisticsChromiumPdf = "1";
+    } else {
+      delete document.documentElement.dataset.statisticsChromiumPdf;
+    }
+  }, [chromiumPdfAutoOpen]);
+
+  /** Marqueur lu par Playwright : rapport monté + temps pour Recharts / polices. */
+  useEffect(() => {
+    const exportUiActive = printPreviewOpen || chromiumPdfAutoOpen;
+    if (!exportUiActive) return;
+    let cancelled = false;
+    let pollId: number | undefined;
+    let readyId: number | undefined;
+
+    const armReadyTimer = () => {
+      const root = statisticsPrintAreaRef.current;
+      if (!root || cancelled) return;
+      root.removeAttribute("data-statistics-export-ready");
+      readyId = window.setTimeout(() => {
+        if (cancelled) return;
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (!cancelled) statisticsPrintAreaRef.current?.setAttribute("data-statistics-export-ready", "true");
+          });
+        });
+      }, 1100);
+    };
+
+    const pollForRoot = () => {
+      const root = statisticsPrintAreaRef.current;
+      if (!root) {
+        pollId = window.setTimeout(pollForRoot, 50);
+        return;
+      }
+      armReadyTimer();
+    };
+    pollForRoot();
+
+    return () => {
+      cancelled = true;
+      if (pollId !== undefined) window.clearTimeout(pollId);
+      if (readyId !== undefined) window.clearTimeout(readyId);
+      statisticsPrintAreaRef.current?.removeAttribute("data-statistics-export-ready");
+    };
+  }, [printPreviewOpen, chromiumPdfAutoOpen, temporalSeriesForPdf, hourlySeries]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
         .from("agencies")
-        .select("id, name_agency")
+        .select("id, name_agency, logo_agency")
         .order("name_agency", { ascending: true });
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
         setAgencyOptions([]);
         return;
       }
-      const options = (data as Array<{ id?: string | null; name_agency?: string | null }>)
+      const options = (data as Array<{ id?: string | null; name_agency?: string | null; logo_agency?: string | null }>)
         .map((row) => ({
           id: asTrimmedString(row.id),
           name: asTrimmedString(row.name_agency),
+          logoUrl: (() => {
+            const u = asTrimmedString(row.logo_agency);
+            return u.length > 0 ? u : null;
+          })(),
         }))
         .filter((row) => row.id.length > 0)
         .map((row) => ({ ...row, name: row.name || row.id }));
@@ -136,17 +232,18 @@ const Statistics = () => {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase.from("expos").select("id, expo_name, agency_id").order("expo_name", { ascending: true });
+      const { data, error } = await supabase.from("expos").select("*").order("expo_name", { ascending: true });
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
         setExpoOptions([]);
         return;
       }
-      const options = (data as Array<{ id?: unknown; expo_name?: unknown; agency_id?: unknown }>)
+      const options = (data as Record<string, unknown>[])
         .map((row) => ({
           id: asTrimmedString(row.id),
           expo_name: asTrimmedString(row.expo_name),
           agency_id: asTrimmedString(row.agency_id) || null,
+          logoRaw: expoLogoRawFromRow(row),
         }))
         .filter((row) => row.id.length > 0)
         .map((row) => ({ ...row, expo_name: row.expo_name || row.id }));
@@ -303,10 +400,6 @@ const Statistics = () => {
   }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.expoId]);
 
   useEffect(() => {
-    setSelectedTemporalDate(null);
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.expoId, weekOffset]);
-
-  useEffect(() => {
     let cancelled = false;
     void (async () => {
       const targetAgencyId =
@@ -419,7 +512,7 @@ const Statistics = () => {
 
       let query = supabase
         .from("visitor_feedback")
-        .select("submitted_at, heart_rating")
+        .select("submitted_at")
         .gte("submitted_at", weekStart.toISOString())
         .lte("submitted_at", weekEnd.toISOString());
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
@@ -435,11 +528,11 @@ const Statistics = () => {
       const init = Array.from({ length: 7 }).map((_, i) => {
         const dayDate = new Date(weekStart);
         dayDate.setDate(weekStart.getDate() + i);
-        return { date: toYmd(dayDate), day: toFrDayMonth(dayDate), visits: 0, heartsSum: 0, heartsCount: 0 };
+        return { date: toYmd(dayDate), day: toFrDayMonth(dayDate), visits: 0 };
       });
       const byDate = new Map(init.map((x) => [x.date, x]));
 
-      for (const row of data as Array<{ submitted_at?: string | null; heart_rating?: string | number | null }>) {
+      for (const row of data as Array<{ submitted_at?: string | null }>) {
         const submittedAt = asTrimmedString(row.submitted_at);
         if (!submittedAt) continue;
         const d = new Date(submittedAt);
@@ -448,16 +541,6 @@ const Statistics = () => {
         const slot = byDate.get(key);
         if (!slot) continue;
         slot.visits += 1;
-        const heartValue =
-          typeof row.heart_rating === "number"
-            ? row.heart_rating
-            : typeof row.heart_rating === "string"
-              ? Number.parseFloat(row.heart_rating)
-              : NaN;
-        if (Number.isFinite(heartValue) && heartValue > 0) {
-          slot.heartsSum += heartValue;
-          slot.heartsCount += 1;
-        }
       }
 
       const series = init.map((x, i) => {
@@ -480,6 +563,85 @@ const Statistics = () => {
     };
   }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, weekOffset]);
 
+  const loadTemporalSeriesForPdf = useCallback(async () => {
+    const targetAgencyId =
+      effectiveAgencyFilter ??
+      (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+    const targetExpoId =
+      drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
+
+    let query = supabase.from("visitor_feedback").select("submitted_at");
+    if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
+    if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+
+    const { data, error } = await query;
+    if (error || !Array.isArray(data) || data.length === 0) {
+      setTemporalSeriesForPdf([]);
+      return;
+    }
+
+    let minMs = Infinity;
+    let maxMs = -Infinity;
+    const rows = data as Array<{ submitted_at?: string | null }>;
+    for (const row of rows) {
+      const submittedAt = asTrimmedString(row.submitted_at);
+      if (!submittedAt) continue;
+      const d = new Date(submittedAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const t = d.getTime();
+      minMs = Math.min(minMs, t);
+      maxMs = Math.max(maxMs, t);
+    }
+    if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) {
+      setTemporalSeriesForPdf([]);
+      return;
+    }
+
+    const d0 = new Date(minMs);
+    d0.setHours(0, 0, 0, 0);
+    const d1 = new Date(maxMs);
+    d1.setHours(0, 0, 0, 0);
+
+    const byDate = new Map<string, number>();
+    for (let cur = new Date(d0); cur.getTime() <= d1.getTime(); cur.setDate(cur.getDate() + 1)) {
+      byDate.set(toYmd(cur), 0);
+    }
+    for (const row of rows) {
+      const submittedAt = asTrimmedString(row.submitted_at);
+      if (!submittedAt) continue;
+      const d = new Date(submittedAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const key = toYmd(d);
+      if (byDate.has(key)) byDate.set(key, (byDate.get(key) ?? 0) + 1);
+    }
+
+    const series: Array<{
+      day: string;
+      date: string;
+      weekday: string;
+      dateLabel: string;
+      visites: number;
+    }> = [];
+    for (let cur = new Date(d0); cur.getTime() <= d1.getTime(); cur.setDate(cur.getDate() + 1)) {
+      const key = toYmd(cur);
+      const weekday = toFrWeekdayShort(cur);
+      const dateLabel = toFrDayMonth(cur);
+      series.push({
+        day: `${weekday}|${dateLabel}`,
+        date: key,
+        weekday,
+        dateLabel,
+        visites: byDate.get(key) ?? 0,
+      });
+    }
+    setTemporalSeriesForPdf(series);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+
+  useEffect(() => {
+    if (!printPreviewOpen && !chromiumPdfAutoOpen) return;
+    void loadTemporalSeriesForPdf();
+  }, [printPreviewOpen, chromiumPdfAutoOpen, loadTemporalSeriesForPdf]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -489,21 +651,7 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      let dayStartIso: string | null = null;
-      let dayEndIso: string | null = null;
-      if (selectedTemporalDate) {
-        const dayStart = new Date(`${selectedTemporalDate}T00:00:00`);
-        const dayEnd = new Date(`${selectedTemporalDate}T23:59:59.999`);
-        if (!Number.isNaN(dayStart.getTime()) && !Number.isNaN(dayEnd.getTime())) {
-          dayStartIso = dayStart.toISOString();
-          dayEndIso = dayEnd.toISOString();
-        }
-      }
-
       let query = supabase.from("visitor_feedback").select("submitted_at");
-      if (dayStartIso && dayEndIso) {
-        query = query.gte("submitted_at", dayStartIso).lte("submitted_at", dayEndIso);
-      }
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
       if (targetExpoId) query = query.eq("expo_id", targetExpoId);
       const { data, error } = await query;
@@ -531,7 +679,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedTemporalDate]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -851,14 +999,16 @@ const Statistics = () => {
     setCrossSortEmotionId(emotionId);
     setCrossSortDirection("desc");
   };
-  const selectedTemporalDayLabel = useMemo(() => {
-    if (!selectedTemporalDate) return null;
-    const match = temporalSeries.find((row) => (row as { date?: string }).date === selectedTemporalDate) as
-      | { dateLabel?: string; weekday?: string }
-      | undefined;
-    if (!match) return selectedTemporalDate;
-    return `${match.weekday ?? ""} ${match.dateLabel ?? ""}`.trim();
-  }, [selectedTemporalDate, temporalSeries]);
+
+  const timelineTickIntervalPdf =
+    temporalSeriesForPdf.length > 18 ? Math.max(1, Math.floor(temporalSeriesForPdf.length / 14)) : 0;
+
+  const expectedChartSurfaces = useMemo(() => {
+    let n = 0;
+    if (temporalSeriesForPdf.length > 0) n++;
+    if (hourlySeries.length > 0) n++;
+    return n;
+  }, [temporalSeriesForPdf, hourlySeries]);
 
   const selectedAgencyLabel = useMemo(() => {
     if (selectedAgencyId === "all") return "— (vue globale)";
@@ -872,6 +1022,57 @@ const Statistics = () => {
       ? scope.expoId
       : expoOptionsForSelect[0]?.id || "";
 
+  const previewExpoLabel = useMemo(() => {
+    if (!canDrillExpo) {
+      const only = expoOptionsForSelect[0];
+      return only?.expo_name || "—";
+    }
+    if (drillExpoId === "all") return t("filter.allExpos");
+    return expoOptionsForSelect.find((e) => e.id === drillExpoId)?.expo_name ?? drillExpoId;
+  }, [canDrillExpo, drillExpoId, expoOptionsForSelect, t]);
+
+  /** Expo pour le logo du bloc « filtres » : expo choisie, ou 1ʳᵉ expo du périmètre si « toutes les expos ». */
+  const previewExpoIdForLogo = useMemo(() => {
+    if (!canDrillExpo) {
+      const only = expoOptionsForSelect[0];
+      return only?.id ?? null;
+    }
+    if (drillExpoId === "all") {
+      const first = expoOptionsForSelect[0];
+      return first?.id ?? null;
+    }
+    return drillExpoId;
+  }, [canDrillExpo, drillExpoId, expoOptionsForSelect]);
+
+  const previewExpoLogoMeta = useMemo(() => {
+    if (!previewExpoIdForLogo) return { logoUrl: null as string | null, name: null as string | null };
+    const row = expoOptions.find((e) => e.id === previewExpoIdForLogo);
+    if (!row) return { logoUrl: null, name: null };
+    const raw = row.logoRaw?.trim();
+    if (!raw) return { logoUrl: null, name: row.expo_name };
+    return {
+      logoUrl: resolveExpoLogoImgSrc(raw),
+      name: row.expo_name,
+    };
+  }, [previewExpoIdForLogo, expoOptions]);
+
+  /** Organisation dont on affiche le logo dans l'aperçu / PDF (pas de logo en vue globale « all »). */
+  const previewAgencyIdForLogo = useMemo(() => {
+    if (selectedAgencyId !== "all") return selectedAgencyId;
+    if (scope.mode === "agency" || scope.mode === "expo") return scope.agencyId ?? null;
+    return null;
+  }, [selectedAgencyId, scope.mode, scope.agencyId]);
+
+  const previewAgencyLogoMeta = useMemo(() => {
+    if (!previewAgencyIdForLogo) return { logoUrl: null as string | null, name: null as string | null };
+    const opt = agencyOptions.find((a) => a.id === previewAgencyIdForLogo);
+    const raw = opt?.logoUrl?.trim();
+    return {
+      logoUrl: raw && raw.length > 0 ? raw : null,
+      name: opt?.name ?? null,
+    };
+  }, [previewAgencyIdForLogo, agencyOptions]);
+
   const orgLabel =
     scope.mode === "all"
       ? selectedAgencyLabel
@@ -880,6 +1081,90 @@ const Statistics = () => {
         : scope.mode === "expo"
           ? selectedAgencyLabel
           : "—";
+
+  const handlePrintStatistics = async (paperFormat: PdfPaperFormat) => {
+    if (printExportBusy) return;
+    setPrintExportBusy(true);
+
+    try {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || !sessionData.session) {
+        window.alert(t("preview.pdfExportNeedLogin"));
+        setPrintExportBusy(false);
+        return;
+      }
+
+      try {
+        await Promise.race([
+          loadTemporalSeriesForPdf(),
+          new Promise<void>((_, rej) => setTimeout(() => rej(new Error("timeout")), 25_000)),
+        ]);
+      } catch {
+        /* données déjà présentes ou délai */
+      }
+      await new Promise((r) => setTimeout(r, 400));
+
+      const res = await fetch(getStatisticsPdfExportUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session: sessionData.session,
+          paperFormat,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText.slice(0, 500));
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const tab = window.open(url, "aimediart_statistics_pdf");
+      if (!tab) {
+        window.alert(t("preview.popupBlocked"));
+        URL.revokeObjectURL(url);
+        setPrintExportBusy(false);
+        return;
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 600_000);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
+    }
+
+    setPrintExportBusy(false);
+  };
+
+  if (chromiumPdfAutoOpen) {
+    return (
+      <div
+        id="statistics-print-area"
+        ref={statisticsPrintAreaRef}
+        data-expected-chart-surfaces={expectedChartSurfaces}
+        className="min-h-screen bg-white px-5 py-6 text-neutral-900"
+      >
+        <StatisticsReportView
+          orgLabel={orgLabel}
+          previewExpoLabel={previewExpoLabel}
+          previewAgencyLogoMeta={previewAgencyLogoMeta}
+          previewExpoLogoMeta={previewExpoLogoMeta}
+          miniKpis={miniKpis}
+          emotionSeries={emotionSeries}
+          feedbackTotal={feedbackTotal}
+          temporalSeriesForPdf={temporalSeriesForPdf}
+          hourlySeries={hourlySeries}
+          timelineTickIntervalPdf={timelineTickIntervalPdf}
+          crossEmotionColumns={crossEmotionColumns}
+          sortedCrossRows={sortedCrossRows}
+          crossError={crossError}
+          sortedTopArtworks={sortedTopArtworks}
+          topArtworksError={topArtworksError}
+          formatFrNumber={formatFrNumber}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8 space-y-8">
@@ -891,18 +1176,10 @@ const Statistics = () => {
             type="button"
             variant="outline"
             className="mt-3"
-            onClick={() => {
-              if (typeof window !== "undefined") window.print();
-            }}
+            onClick={() => setPrintPreviewOpen(true)}
           >
-            {t("page.print")}
+            {t("page.preview")}
           </Button>
-          {!authLoading && scope.mode === "agency" && (
-            <p className="text-xs text-muted-foreground mt-1">Agence {scope.agencyId} — toutes les expos (filtre expo optionnel).</p>
-          )}
-          {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">Exposition {scope.expoId} uniquement.</p>
-          )}
         </div>
         <div className="flex flex-col gap-2 text-sm min-w-[220px]">
           {showOrganizationFilter && (
@@ -1005,7 +1282,7 @@ const Statistics = () => {
             ) : (
               emotionSeries.map((emo) => (
                 <div key={emo.id} className="flex items-center gap-3">
-                  <span className="text-sm w-24 shrink-0">{emo.name}</span>
+                  <span className="text-sm w-24 shrink-0">{t(`emotions.names.${normalizeEmotionKey(emo.name)}`, { defaultValue: emo.name })}</span>
                   <div className="flex-1 h-3 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${emo.percentage}%`, backgroundColor: emo.color }} />
                   </div>
@@ -1070,16 +1347,7 @@ const Statistics = () => {
                   />
                   <YAxis tick={{ fontSize: 12 }} width={30} />
                   <Tooltip />
-                  <Bar
-                    dataKey="visites"
-                    name="Visites"
-                    fill="#3399CC"
-                    radius={[4, 4, 0, 0]}
-                    onClick={(payload) => {
-                      const date = asTrimmedString((payload as { payload?: { date?: unknown } })?.payload?.date);
-                      if (date) setSelectedTemporalDate(date);
-                    }}
-                  />
+                  <Bar dataKey="visites" name="Visites" fill="#3399CC" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -1090,11 +1358,7 @@ const Statistics = () => {
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="text-lg">{t("hourly.title")}</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {selectedTemporalDayLabel
-                ? `Visiteurs au fil des heures (${selectedTemporalDayLabel}) (cliquer sur le graphique bleu)`
-                : t("hourly.subtitle")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("hourly.subtitle")}</p>
           </CardHeader>
           <CardContent>
             {hourlySeries.length === 0 ? (
@@ -1140,7 +1404,7 @@ const Statistics = () => {
                         <span aria-hidden="true">
                           {emotion.name.toLowerCase().includes("troublé") ? "😵‍💫" : (emotion.icon || "")}
                         </span>
-                        <span>{emotion.name}</span>
+                        <span>{t(`emotions.names.${normalizeEmotionKey(emotion.name)}`, { defaultValue: emotion.name })}</span>
                         {crossSortEmotionId === emotion.id && crossSortDirection === "asc" ? (
                           <ArrowUp className="h-3.5 w-3.5" />
                         ) : (
@@ -1255,6 +1519,105 @@ const Statistics = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={printPreviewOpen} onOpenChange={setPrintPreviewOpen}>
+        <DialogContent
+          aria-describedby={undefined}
+          className="max-w-5xl gap-0 border-border bg-white p-0 text-neutral-900 sm:max-w-5xl max-h-[92vh] overflow-hidden print:!left-0 print:!top-0 print:!max-h-none print:!h-auto print:!w-full print:!max-w-none print:!translate-x-0 print:!translate-y-0 print:!overflow-visible print:border-0 print:!shadow-none"
+        >
+          <DialogHeader className="border-b border-neutral-200 bg-white px-6 py-4 text-left print:hidden">
+            <DialogTitle className="font-serif text-xl font-bold text-neutral-900">{t("preview.title")}</DialogTitle>
+          </DialogHeader>
+          <div
+            id="statistics-print-area"
+            ref={statisticsPrintAreaRef}
+            data-expected-chart-surfaces={expectedChartSurfaces}
+            className="bg-white px-5 py-6 text-neutral-900 max-h-[min(68vh,720px)] overflow-y-auto print:max-h-none print:!overflow-visible print:px-6 print:py-4"
+          >
+            <StatisticsReportView
+              orgLabel={orgLabel}
+              previewExpoLabel={previewExpoLabel}
+              previewAgencyLogoMeta={previewAgencyLogoMeta}
+              previewExpoLogoMeta={previewExpoLogoMeta}
+              miniKpis={miniKpis}
+              emotionSeries={emotionSeries}
+              feedbackTotal={feedbackTotal}
+              temporalSeriesForPdf={temporalSeriesForPdf}
+              hourlySeries={hourlySeries}
+              timelineTickIntervalPdf={timelineTickIntervalPdf}
+              crossEmotionColumns={crossEmotionColumns}
+              sortedCrossRows={sortedCrossRows}
+              crossError={crossError}
+              sortedTopArtworks={sortedTopArtworks}
+              topArtworksError={topArtworksError}
+              formatFrNumber={formatFrNumber}
+            />
+          </div>
+          <DialogFooter className="border-t border-neutral-200 bg-neutral-50/80 px-6 py-4 sm:justify-between print:hidden">
+            <Button type="button" variant="outline" onClick={() => setPrintPreviewOpen(false)}>
+              {t("preview.close")}
+            </Button>
+            <Button
+              type="button"
+              className="inline-flex items-center justify-center bg-[#E63946] hover:bg-[#c62f3a] disabled:opacity-70"
+              disabled={printExportBusy}
+              onClick={() => setPaperFormatDialogOpen(true)}
+            >
+              {printExportBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  {t("preview.printPreparing")}
+                </>
+              ) : (
+                t("page.print")
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paperFormatDialogOpen} onOpenChange={setPaperFormatDialogOpen}>
+        <DialogContent className="max-w-md border-border bg-white text-neutral-900 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg">{t("preview.paperFormatTitle")}</DialogTitle>
+            <DialogDescription className="text-sm text-neutral-600">{t("preview.paperFormatHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <label htmlFor="stats-pdf-paper" className="text-sm font-medium text-neutral-800">
+              {t("preview.paperFormatLabel")}
+            </label>
+            <select
+              id="stats-pdf-paper"
+              name="statistics_pdf_paper_format"
+              className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              value={selectedPdfPaper}
+              onChange={(e) => setSelectedPdfPaper(e.target.value as PdfPaperFormat)}
+            >
+              {PDF_FORMAT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(`preview.paperFormats.${opt.value}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setPaperFormatDialogOpen(false)}>
+              {t("preview.close")}
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#E63946] hover:bg-[#c62f3a]"
+              disabled={printExportBusy}
+              onClick={() => {
+                setPaperFormatDialogOpen(false);
+                void handlePrintStatistics(selectedPdfPaper);
+              }}
+            >
+              {t("preview.paperFormatConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

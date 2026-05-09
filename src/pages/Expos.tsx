@@ -22,6 +22,7 @@ import { sortExpoFieldKeys } from "@/lib/expoFormUtils";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
+import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import QRCode from "qrcode";
@@ -44,50 +45,6 @@ type ExpoRow = {
   expo_logo?: string | null;
   deleted_at?: string | null;
 };
-
-function coerceLogoString(v: unknown): string | null {
-  if (typeof v === "string" && v.trim()) return v.trim();
-  return null;
-}
-
-/**
- * Lit la meilleure valeur logo sur une ligne `expos` (colonnes variables selon les migrations).
- */
-function expoLogoRawFromRow(row: Record<string, unknown>): string | null {
-  const priority = [
-    "logo_expo",
-    "expo_logo",
-    "logo_url",
-    "expo_logo_url",
-    "image_url",
-    "cover_url",
-    "expo_image_url",
-    "photo_expo",
-  ];
-  for (const k of priority) {
-    const s = coerceLogoString(row[k]);
-    if (s) return s;
-  }
-  for (const key of Object.keys(row)) {
-    if (!/(logo|image|cover|photo|thumb|banner)/i.test(key)) continue;
-    const s = coerceLogoString(row[key]);
-    if (!s) continue;
-    if (s.startsWith("http") || s.startsWith("/") || s.startsWith("data:")) return s;
-    if (s.includes("/")) return s;
-  }
-  return null;
-}
-
-/** Transforme une valeur base (URL complète ou chemin `expos/logos/...`) en URL affichable. */
-function resolveExpoLogoImgSrc(raw: string): string {
-  const t = raw.trim();
-  if (!t) return "";
-  if (/^https?:\/\//i.test(t) || t.startsWith("data:") || t.startsWith("blob:")) return t;
-  if (t.startsWith("/")) return t;
-  const path = t.replace(/^\/+/, "");
-  const { data } = supabase.storage.from("images").getPublicUrl(path);
-  return data.publicUrl;
-}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

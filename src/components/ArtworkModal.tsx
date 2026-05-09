@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronsUpDown, Loader2, Upload } from "lucide-react";
+import QRCode from "qrcode";
 import { toast } from "sonner";
 
 import { AddArtistDialog } from "@/components/AddArtistDialog";
@@ -35,6 +36,48 @@ import { cn } from "@/lib/utils";
 import { prepareArtworkImageForAnalysis } from "@/utils/imageAnalysisPrep";
 import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+
+async function getQrBaseOriginFromSettings(): Promise<string> {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("value")
+    .eq("key", "settings_general_links_qr")
+    .maybeSingle();
+  if (error) return "";
+  const rawValue = typeof data?.value === "string" ? data.value : "";
+  if (!rawValue.trim()) return "";
+  try {
+    const parsed = JSON.parse(rawValue) as { public_site_origin?: string | null };
+    return (parsed.public_site_origin ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function generateAndSaveQrCode(artworkId: string): Promise<void> {
+  const originOverride = await getQrBaseOriginFromSettings();
+  const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
+  if (!targetUrl) return;
+
+  const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
+  const blob = await (await fetch(dataUrl)).blob();
+  const path = `qrcodes/${artworkId}.png`;
+
+  const { error: uploadError } = await supabase.storage.from("qrcode").upload(path, blob, {
+    contentType: "image/png",
+    cacheControl: "3600",
+    upsert: true,
+  });
+  if (uploadError) throw uploadError;
+
+  const { data: pub } = supabase.storage.from("qrcode").getPublicUrl(path);
+  const { error: updateError } = await supabase
+    .from("artworks")
+    .update({ artwork_qr_code_url: pub.publicUrl, artwork_qrcode_image: pub.publicUrl })
+    .eq("artwork_id", artworkId);
+  if (updateError) throw updateError;
+}
 
 type ArtworkModalProps = {
   open: boolean;
@@ -413,6 +456,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       return;
     }
     setIsSubmitting(true);
+    let newArtworkId: string | null = null;
     try {
       const payload = {
         artwork_title: title.trim(),
@@ -430,8 +474,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         if (error) throw error;
         toast.success(t("toast_artwork_updated"));
       } else {
-        const { error } = await supabase.from("artworks").insert(payload);
+        const { data: inserted, error } = await supabase
+          .from("artworks")
+          .insert(payload)
+          .select("artwork_id")
+          .single();
         if (error) throw error;
+        newArtworkId = (inserted as { artwork_id: string } | null)?.artwork_id ?? null;
         toast.success(t("toast_artwork_created"));
       }
       onOpenChange(false);
@@ -441,6 +490,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
+    }
+
+    if (newArtworkId) {
+      void generateAndSaveQrCode(newArtworkId).catch((e) => {
+        console.warn("[ArtworkModal] QR auto-génération échouée :", e);
+      });
     }
   };
 
@@ -657,7 +712,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          if (isAiBusy) return;
+          if (isAiBusy || artistDialogOpen) return;
           if (hasUnsavedChanges) {
             setShowCloseConfirm(true);
             return;
@@ -668,25 +723,25 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     >
       <DialogContent
         onEscapeKeyDown={(e) => {
-          if (isAiBusy || hasUnsavedChanges) {
+          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy) {
+            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
         }}
         onPointerDownOutside={(e) => {
-          if (isAiBusy || hasUnsavedChanges) {
+          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy) {
+            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
         }}
         onInteractOutside={(e) => {
-          if (isAiBusy || hasUnsavedChanges) {
+          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy) {
+            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
@@ -830,55 +885,56 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                     placeholder={selectedArtistDisplay}
                     disabled={isVisitorLocked || isLoading}
                   />
-                  {showArtistSuggestions && artistSearch.trim().length > 0 && (
+                  {showArtistSuggestions && (
                     <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                      {filteredArtists.length === 0 ? (
-                        <div className="space-y-2 px-3 py-2">
-                          <p className="text-sm text-muted-foreground">{t("artist_not_found")}</p>
-                          {!isVisitorLocked && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-full justify-center"
-                              onMouseDown={(ev) => ev.preventDefault()}
-                              onClick={() => {
-                                setShowArtistSuggestions(false);
-                                setArtistDialogOpen(true);
-                              }}
-                            >
-                              {t("btn_create_artist")}
-                            </Button>
+                      {artistSearch.trim().length > 0 && filteredArtists.length === 0 && (
+                        <p className="px-3 py-2 text-sm text-muted-foreground">{t("artist_not_found")}</p>
+                      )}
+                      {filteredArtists.map((artist) => {
+                        const label =
+                          [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
+                          artist.artist_nickname ||
+                          artist.artist_id;
+                        return (
+                          <button
+                            key={artist.artist_id}
+                            type="button"
+                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
+                            onMouseDown={(ev) => ev.preventDefault()}
+                            onClick={() => {
+                              setArtistId(artist.artist_id);
+                              setArtistSearch(label);
+                              setShowArtistSuggestions(false);
+                            }}
+                          >
+                            <span className="truncate">{label}</span>
+                            <Check
+                              className={cn(
+                                "ml-2 h-4 w-4 shrink-0",
+                                artistId === artist.artist_id ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                          </button>
+                        );
+                      })}
+                      {!isVisitorLocked && (
+                        <>
+                          {filteredArtists.length > 0 && (
+                            <div className="mx-2 my-1 border-t border-border/60" />
                           )}
-                        </div>
-                      ) : (
-                        filteredArtists.map((artist) => {
-                          const label =
-                            [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
-                            artist.artist_nickname ||
-                            artist.artist_id;
-                          return (
-                            <button
-                              key={artist.artist_id}
-                              type="button"
-                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
-                              onMouseDown={(ev) => ev.preventDefault()}
-                              onClick={() => {
-                                setArtistId(artist.artist_id);
-                                setArtistSearch(label);
-                                setShowArtistSuggestions(false);
-                              }}
-                            >
-                              <span className="truncate">{label}</span>
-                              <Check
-                                className={cn(
-                                  "ml-2 h-4 w-4 shrink-0",
-                                  artistId === artist.artist_id ? "opacity-100" : "opacity-0",
-                                )}
-                              />
-                            </button>
-                          );
-                        })
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                            onMouseDown={(ev) => ev.preventDefault()}
+                            onClick={() => {
+                              setShowArtistSuggestions(false);
+                              setArtistDialogOpen(true);
+                            }}
+                          >
+                            <span className="text-base leading-none">+</span>
+                            {t("btn_create_artist")}
+                          </button>
+                        </>
                       )}
                     </div>
                   )}

@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   readonly VITE_DEFAULT_EXPO_ID?: string;
   /** URL publique du site (ex. https://app.example.com) pour les redirections e-mail Auth ; sinon `window.location.origin`. */
   readonly VITE_PUBLIC_SITE_URL?: string;
+  /** Serveur Express Playwright pour l’export PDF statistiques (ex. http://127.0.0.1:3847). */
+  readonly VITE_PDF_EXPORT_URL?: string;
 }
 
 interface ImportMeta {

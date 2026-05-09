@@ -1,5 +1,6 @@
 {
   "greeting": "Bonjour",
+  "greeting_agency_suffix": " / {{agency}}",
   "language_label": "Langue de l'interface",
   "nav_home": "Accueil",
   "nav_organisation": "Organisation",

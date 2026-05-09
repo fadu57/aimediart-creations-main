@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Plus, Search, Loader2, QrCode, X } from "lucide-react";
+import { Plus, Search, Loader2, QrCode, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
@@ -182,7 +182,8 @@ const Catalogue = () => {
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
   const [generatingQrForArtworkId, setGeneratingQrForArtworkId] = useState<string | null>(null);
-  const [qrConfirmArtworkId, setQrConfirmArtworkId] = useState<string | null>(null);
+  const [bulkQrConfirmOpen, setBulkQrConfirmOpen] = useState(false);
+  const [bulkQrProgress, setBulkQrProgress] = useState<{ done: number; total: number } | null>(null);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
   const navigate = useNavigate();
@@ -639,6 +640,67 @@ const Catalogue = () => {
     [role_id, generatingQrForArtworkId],
   );
 
+  const handleRegenerateAllQrCodes = useCallback(async () => {
+    if (role_id === 7) return;
+    const ids = artworks.map((a) => a.artwork_id?.trim()).filter(Boolean) as string[];
+    if (ids.length === 0) return;
+
+    const originOverride = await getQrBaseOriginFromSettings();
+    setBulkQrProgress({ done: 0, total: ids.length });
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < ids.length; i++) {
+      const artworkId = ids[i];
+      try {
+        const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
+        if (!targetUrl) { errorCount++; continue; }
+
+        const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
+        const blob = await (await fetch(dataUrl)).blob();
+        const path = `qrcodes/${artworkId}.png`;
+
+        const { error: uploadError } = await supabase.storage.from("qrcode").upload(path, blob, {
+          contentType: "image/png",
+          cacheControl: "3600",
+          upsert: true,
+        });
+        if (uploadError) throw uploadError;
+
+        const { data: pub } = supabase.storage.from("qrcode").getPublicUrl(path);
+        const publicQrUrl = pub.publicUrl;
+
+        const { error: updateError } = await supabase
+          .from("artworks")
+          .update({ artwork_qr_code_url: publicQrUrl, artwork_qrcode_image: publicQrUrl })
+          .eq("artwork_id", artworkId);
+        if (updateError) throw updateError;
+
+        setArtworks((prev) =>
+          prev.map((row) =>
+            row.artwork_id === artworkId
+              ? { ...row, artwork_qr_code_url: publicQrUrl, artwork_qrcode_image: publicQrUrl }
+              : row,
+          ),
+        );
+        successCount++;
+      } catch {
+        errorCount++;
+      }
+      setBulkQrProgress({ done: i + 1, total: ids.length });
+      // Throttle pour ne pas saturer Supabase Storage
+      await new Promise((r) => setTimeout(r, 120));
+    }
+
+    setBulkQrProgress(null);
+    if (errorCount === 0) {
+      toast.success(t("qr_bulk_success", { count: successCount }));
+    } else {
+      toast.warning(t("qr_bulk_partial", { success: successCount, error: errorCount }));
+    }
+  }, [role_id, artworks]);
+
   const handleGeneratePDF = async (aw: ArtworkRow) => {
     const artworkId = aw.artwork_id?.trim();
     if (!artworkId) {
@@ -765,7 +827,7 @@ const Catalogue = () => {
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
-        <div className="flex w-full items-center gap-4 md:max-w-[760px]">
+        <div className="flex w-full items-center gap-4 md:max-w-[576px]">
           <div>
             <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
           </div>
@@ -835,7 +897,29 @@ const Catalogue = () => {
             <p className="text-xs text-muted-foreground mt-1">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-[576px] justify-end">
+          {isAdminFullAccess && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-amber-500/60 text-amber-700 hover:bg-amber-50 shrink-0"
+              onClick={() => setBulkQrConfirmOpen(true)}
+              disabled={Boolean(bulkQrProgress) || Boolean(generatingQrForArtworkId)}
+              title={t("qr_bulk_regenerate_title")}
+            >
+              {bulkQrProgress ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  {t("qr_bulk_progress", { done: bulkQrProgress.done, total: bulkQrProgress.total })}
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  {t("qr_bulk_regenerate_btn")}
+                </>
+              )}
+            </Button>
+          )}
           <Button
             className="gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground shrink-0"
             onClick={() => openCreateArtwork()}
@@ -924,6 +1008,19 @@ const Catalogue = () => {
                         <span className="text-[11px] text-muted-foreground px-1 text-center">{t("qr_unavailable")}</span>
                       )}
                     </div>
+                  ) : qrImage ? (
+                    <div className="flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-muted/40 p-0.5 text-center">
+                      {generatingQrForArtworkId === aw.artwork_id ? (
+                        <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
+                      ) : (
+                        <ImageWithSkeleton
+                          src={qrImage}
+                          alt={`QR code — ${aw.artwork_title ?? "œuvre"}`}
+                          wrapperClassName="h-20 w-20"
+                          className="h-20 w-20 object-contain"
+                        />
+                      )}
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -935,25 +1032,14 @@ const Catalogue = () => {
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (qrImage) {
-                          setQrConfirmArtworkId(aw.artwork_id);
-                        } else {
-                          void handleGenerateQrForArtwork(aw.artwork_id);
-                        }
+                        void handleGenerateQrForArtwork(aw.artwork_id);
                       }}
                       disabled={Boolean(generatingQrForArtworkId)}
-                      title={qrImage ? t("qr_regenerate_title") : t("qr_generate_title")}
-                      aria-label={qrImage ? t("qr_regenerate_aria") : t("qr_generate_aria")}
+                      title={t("qr_generate_title")}
+                      aria-label={t("qr_generate_aria")}
                     >
                       {generatingQrForArtworkId === aw.artwork_id ? (
                         <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
-                      ) : qrImage ? (
-                        <ImageWithSkeleton
-                          src={qrImage}
-                          alt={`QR code — ${aw.artwork_title ?? "œuvre"}`}
-                          wrapperClassName="h-20 w-20"
-                          className="h-20 w-20 object-contain"
-                        />
                       ) : (
                         <>
                           <QrCode className="h-9 w-9 text-muted-foreground/80 shrink-0" aria-hidden />
@@ -964,11 +1050,13 @@ const Catalogue = () => {
                       )}
                     </button>
                   )}
-                  <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
-                    <span className="whitespace-nowrap">{t("qr_click_hint_line1")}</span>
-                    <br />
-                    <span>{t("qr_click_hint_line2")}</span>
-                  </p>
+                  {!qrImage && (
+                    <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
+                      <span className="whitespace-nowrap">{t("qr_click_hint_line1")}</span>
+                      <br />
+                      <span>{t("qr_click_hint_line2")}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex min-h-[152px] w-[116px] shrink-0 flex-col items-center gap-2">
@@ -1113,33 +1201,29 @@ const Catalogue = () => {
         })}
       </div>
 
-      <AlertDialog
-        open={Boolean(qrConfirmArtworkId)}
-        onOpenChange={(open) => !open && setQrConfirmArtworkId(null)}
-      >
+      <AlertDialog open={bulkQrConfirmOpen} onOpenChange={(open) => !open && setBulkQrConfirmOpen(false)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("qr_confirm_title")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("qr_bulk_confirm_title")}</AlertDialogTitle>
             <AlertDialogDescription>
               <span className="block font-semibold text-destructive mb-2">
-                {t("qr_confirm_warning")}
+                {t("qr_bulk_confirm_warning")}
               </span>
-              {t("qr_confirm_description")}
+              {t("qr_bulk_confirm_description", { count: artworks.length })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setQrConfirmArtworkId(null)}>
+            <AlertDialogCancel onClick={() => setBulkQrConfirmOpen(false)}>
               {t("qr_confirm_cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-amber-600 text-white hover:bg-amber-700"
               onClick={() => {
-                const id = qrConfirmArtworkId;
-                setQrConfirmArtworkId(null);
-                if (id) void handleGenerateQrForArtwork(id);
+                setBulkQrConfirmOpen(false);
+                void handleRegenerateAllQrCodes();
               }}
             >
-              {t("qr_confirm_action")}
+              {t("qr_bulk_confirm_action")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

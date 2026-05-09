@@ -42,9 +42,9 @@ function navKey(label: string): string {
 }
 const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
   { value: "fr", label: "FR", flagClass: "fi fi-fr" },
+  { value: "de", label: "DE", flagClass: "fi fi-de" },
   { value: "en", label: "EN", flagClass: "fi fi-gb" },
   { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
   { value: "it", label: "IT", flagClass: "fi fi-it" },
 ];
 
@@ -143,16 +143,20 @@ export default function Header() {
     pathname.startsWith("/summary/") ||
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
-  const { session, first_name, user, role_name, role_id, loading: authLoading } = useAuthUser();
+  const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/home";
   const { can } = useNavigationMatrix();
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("header");
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [agencyDisplayName, setAgencyDisplayName] = useState<string | null>(null);
   const [isDesktopHeader, setIsDesktopHeader] = useState(
     typeof window !== "undefined" ? window.innerWidth > 1173 : true,
   );
+  /** Rôles métier agence/expo/visiteur : pas d’entrée « Organisation » (/agencies) dans le header. */
+  const hideOrganisationNav = typeof role_id === "number" && role_id > 3;
+  const showGreetingAgency = typeof role_id === "number" && role_id > 3;
   const hasFullHeader = role_id === 4 || role_id === 1 || (typeof role_id === "number" && role_id >= 1 && role_id <= 6);
   const canSeeHomeMenu = can("menu_home");
   const canSeeSettings = role_id === 1 || role_id === 2 || role_id === 3;
@@ -162,6 +166,31 @@ export default function Header() {
     (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "") ||
     (typeof userMeta.first_name === "string" ? userMeta.first_name.trim() : "");
   const displayUserPrenom = first_name?.trim() || jwtDisplayName || "Visiteur";
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!session?.user || !agency_id?.trim() || !showGreetingAgency) {
+      setAgencyDisplayName(null);
+      return;
+    }
+    void (async () => {
+      const { data, error } = await supabase
+        .from("agencies")
+        .select("name_agency")
+        .eq("id", agency_id.trim())
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        setAgencyDisplayName(null);
+        return;
+      }
+      const n = (data as { name_agency?: string | null }).name_agency?.trim();
+      setAgencyDisplayName(n || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user, agency_id, showGreetingAgency]);
 
   const handleLogout = async () => {
     // Déconnexion tolérante hors-ligne: évite l'appel réseau `logout?scope=global`
@@ -233,7 +262,102 @@ export default function Header() {
                 ))}
               </select>
             </div>
-            <span className="whitespace-nowrap text-[11px] text-gray-700">
+            {!isDesktopHeader && (
+              <span className="whitespace-nowrap text-[11px] text-gray-700">
+                {t("greeting")}
+                {session ? (
+                  <>
+                    {" "}
+                    {authLoading ? (
+                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
+                    ) : (
+                      <span id="display_user_prenom_mobile" className="font-semibold">
+                        {displayUserPrenom}
+                        {showGreetingAgency && agencyDisplayName
+                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                          : null}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  ""
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+        {isDesktopHeader && (
+          <div className="ml-4 hidden shrink-0 flex-col items-end gap-1 xl:flex">
+            <nav className="flex items-center gap-1">
+              {canSeeHomeMenu && (
+                <NavLink
+                  to={homePath}
+                  className={({ isActive }) =>
+                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {t("nav_home")}
+                </NavLink>
+              )}
+              {hasFullHeader &&
+                HEADER_NAV_ITEMS.map((item) => {
+                  if (item.key === "menu_home") return null;
+                  if (hideOrganisationNav && item.key === "menu_agence") return null;
+                  if (!can(item.key)) return null;
+                  return (
+                    <NavLink
+                      key={`desktop-nav-${item.key}`}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                          isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                        }`
+                      }
+                    >
+                      {t(navKey(item.label))}
+                    </NavLink>
+                  );
+                })}
+              {hasFullHeader && canSeeSettings && (
+                <NavLink
+                  to="/settings"
+                  className={({ isActive }) =>
+                    `inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                    }`
+                  }
+                  aria-label={t("settings")}
+                  title={t("settings")}
+                >
+                  <Settings className="h-5 w-5" aria-hidden />
+                </NavLink>
+              )}
+              {session && !isAuthFormPage ? (
+                <button
+                  type="button"
+                  className="rounded-md px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                >
+                  {t("logout")}
+                </button>
+              ) : (
+                <NavLink
+                  to="/login"
+                  className={({ isActive }) =>
+                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {t("login")}
+                </NavLink>
+              )}
+            </nav>
+            <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
               {t("greeting")}
               {session ? (
                 <>
@@ -243,6 +367,9 @@ export default function Header() {
                   ) : (
                     <span id="display_user_prenom" className="font-semibold">
                       {displayUserPrenom}
+                      {showGreetingAgency && agencyDisplayName
+                        ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                        : null}
                     </span>
                   )}
                 </>
@@ -251,76 +378,6 @@ export default function Header() {
               )}
             </span>
           </div>
-        </div>
-        {isDesktopHeader && (
-          <nav className="ml-4 hidden items-center gap-1 xl:flex">
-            {canSeeHomeMenu && (
-              <NavLink
-                to={homePath}
-                className={({ isActive }) =>
-                  `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {t("nav_home")}
-              </NavLink>
-            )}
-            {hasFullHeader &&
-              HEADER_NAV_ITEMS.map((item) => {
-                if (item.key === "menu_home") return null;
-                if (!can(item.key)) return null;
-                return (
-                  <NavLink
-                    key={`desktop-nav-${item.key}`}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-                        isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                      }`
-                    }
-                  >
-                    {t(navKey(item.label))}
-                  </NavLink>
-                );
-              })}
-            {hasFullHeader && canSeeSettings && (
-              <NavLink
-                to="/settings"
-                className={({ isActive }) =>
-                  `inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                  }`
-                }
-                aria-label={t("settings")}
-                title={t("settings")}
-              >
-                <Settings className="h-5 w-5" aria-hidden />
-              </NavLink>
-            )}
-            {session && !isAuthFormPage ? (
-              <button
-                type="button"
-                className="rounded-md px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                onClick={() => {
-                  void handleLogout();
-                }}
-              >
-                {t("logout")}
-              </button>
-            ) : (
-              <NavLink
-                to="/login"
-                className={({ isActive }) =>
-                  `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
-                    isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {t("login")}
-              </NavLink>
-            )}
-          </nav>
         )}
       </div>
       {!isDesktopHeader && (
@@ -341,6 +398,7 @@ export default function Header() {
             {hasFullHeader &&
               HEADER_NAV_ITEMS.map((item) => {
                 if (item.key === "menu_home") return null;
+                if (hideOrganisationNav && item.key === "menu_agence") return null;
                 if (!can(item.key)) return null;
                 const icon =
                   item.key === "menu_home" ? (

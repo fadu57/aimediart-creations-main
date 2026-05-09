@@ -2,7 +2,41 @@
   "page": {
     "title": "Estadísticas",
     "subtitle": "Análisis detallado de los datos de visita y retroalimentación emocional",
-    "print": "Imprimir estadísticas seleccionadas"
+    "print": "Imprimir estadísticas seleccionadas",
+    "preview": "Vista previa antes de imprimir"
+  },
+  "preview": {
+    "title": "Vista previa de impresión",
+    "hint": "Se abre un PDF fiel a la vista previa (gráficos y maquetación) en una sola pestaña nueva. Para imprimir en papel: en el visor PDF, Archivo → Imprimir o Ctrl+P.",
+    "generatedAt": "Generado el {{date}}",
+    "filtersTitle": "Ámbito",
+    "close": "Cerrar",
+    "colDay": "Día",
+    "colHour": "Hora",
+    "colHearts": "Corazones",
+    "totalFeedbacks": "Total de respuestas: {{count}}",
+    "printPreparing": "Preparando…",
+    "pdfTabLoading": "Generando PDF…",
+    "printTabLoading": "Preparando la página de impresión…",
+    "pdfGenerationTimeout": "Tiempo agotado al generar el PDF (3 min).",
+    "pdfGenerationTimeoutHint": "La captura tardó demasiado. Cierre otras pestañas e inténtelo de nuevo.",
+    "pdfError": "No se pudo generar el PDF. Revise imágenes externas o reintente.",
+    "pdfExportNeedLogin": "Inicie sesión para exportar el PDF.",
+    "pdfExportServerError": "Exportación PDF no disponible. En local: «npm run dev:all» o en paralelo «npm run pdf-server» y «npm run dev». Revise la consola del servidor pdf.",
+    "popupBlocked": "Permita ventanas emergentes para abrir el PDF.",
+    "printPopupBlocked": "Permita ventanas emergentes para abrir el PDF en una pestaña nueva.",
+    "paperFormatTitle": "Tamaño del papel",
+    "paperFormatHint": "El contenido se escala al ancho útil del formato elegido; el resto continúa en páginas siguientes.",
+    "paperFormatLabel": "Formato",
+    "paperFormatConfirm": "Generar PDF",
+    "paperFormats": {
+      "a4": "A4 (210 × 297 mm)",
+      "a3": "A3 (297 × 420 mm)",
+      "a5": "A5 (148 × 210 mm)",
+      "letter": "Carta US (215,9 × 279,4 mm)",
+      "legal": "Legal US (215,9 × 355,6 mm)",
+      "tabloid": "Tabloid (279,4 × 431,8 mm)"
+    }
   },
   "filter": {
     "organisation": "Organización",
@@ -12,17 +46,26 @@
   "emotions": {
     "title": "Distribución de emociones",
     "subtitle": "Desglose de los sentimientos de los visitantes",
-    "empty": "Sin comentarios para este ámbito."
+    "empty": "Sin comentarios para este ámbito.",
+    "names": {
+      "eblouie": "Deslumbrado/a",
+      "touchee": "Conmovido/a",
+      "intriguee": "Intrigado/a",
+      "apaisee": "Calmado/a",
+      "troublee": "Perturbado/a",
+      "amusee": "Divertido/a"
+    }
   },
   "timeline": {
     "title": "Evolución temporal",
     "subtitle": "Visitantes a lo largo de los días",
+    "subtitlePdf": "Desde el primer hasta el último día con respuestas (vista previa y PDF — rango completo)",
     "prevWeek": "Semana anterior",
     "nextWeek": "Semana siguiente"
   },
   "hourly": {
     "title": "Asistencia por horas",
-    "subtitle": "Visitantes a lo largo de las horas (clic en el gráfico azul)"
+    "subtitle": "Suma de visitas por hora (0h–23h) en todo el período filtrado"
   },
   "cross": {
     "title": "Tabla cruzada emociones / obras",

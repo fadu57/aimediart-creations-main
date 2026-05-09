@@ -2,7 +2,41 @@
   "page": {
     "title": "Statistiques",
     "subtitle": "Analyse détaillée des données de visite et feedback émotionnel",
-    "print": "Imprimer les statistiques sélectionnées"
+    "print": "Imprimer les statistiques sélectionnées",
+    "preview": "Prévisualiser avant impression"
+  },
+  "preview": {
+    "title": "Aperçu avant impression",
+    "hint": "Le PDF est généré côté serveur avec Chromium (Playwright). En local : lancez « npm run dev:all » (Vite + serveur PDF) ou deux terminaux : « npm run dev » et « npm run pdf-server ». Optionnel : VITE_PDF_EXPORT_URL si le serveur PDF est ailleurs (voir server/README-pdf-export.md). Impression papier : dans le lecteur PDF, Fichier → Imprimer ou Ctrl+P.",
+    "generatedAt": "Généré le {{date}}",
+    "filtersTitle": "Périmètre",
+    "close": "Fermer",
+    "colDay": "Jour",
+    "colHour": "Heure",
+    "colHearts": "Cœurs",
+    "totalFeedbacks": "Total des retours : {{count}}",
+    "printPreparing": "Préparation…",
+    "pdfTabLoading": "Génération du PDF…",
+    "printTabLoading": "Préparation de la page d’impression…",
+    "pdfGenerationTimeout": "Délai dépassé pour la génération du PDF (3 min).",
+    "pdfGenerationTimeoutHint": "La capture a pris trop de temps. Fermez d’autres onglets lourds et réessayez, ou réduisez la quantité de données affichée.",
+    "pdfError": "Impossible de générer le PDF. Vérifiez les images externes ou réessayez.",
+    "pdfExportNeedLogin": "Connectez-vous pour exporter le PDF.",
+    "pdfExportServerError": "Export PDF indisponible. En local, lancez « npm run dev:all » ou « npm run pdf-server » en parallèle de « npm run dev ». Vérifiez la console du terminal pdf.",
+    "popupBlocked": "Autorisez les fenêtres pop-up pour ce site afin d’ouvrir le PDF.",
+    "printPopupBlocked": "Autorisez les fenêtres pop-up pour ouvrir le PDF dans un nouvel onglet.",
+    "paperFormatTitle": "Format du papier",
+    "paperFormatHint": "Le contenu est mis à l’échelle sur la largeur utile du format choisi ; la suite défile sur les pages suivantes.",
+    "paperFormatLabel": "Format",
+    "paperFormatConfirm": "Générer le PDF",
+    "paperFormats": {
+      "a4": "A4 (210 × 297 mm)",
+      "a3": "A3 (297 × 420 mm)",
+      "a5": "A5 (148 × 210 mm)",
+      "letter": "Letter US (215,9 × 279,4 mm)",
+      "legal": "Legal US (215,9 × 355,6 mm)",
+      "tabloid": "Tabloid (279,4 × 431,8 mm)"
+    }
   },
   "filter": {
     "organisation": "Organisation",
@@ -12,17 +46,26 @@
   "emotions": {
     "title": "Distribution des émotions",
     "subtitle": "Répartition des ressentis des visiteurs",
-    "empty": "Aucun feedback pour ce périmètre."
+    "empty": "Aucun feedback pour ce périmètre.",
+    "names": {
+      "eblouie": "Ébloui·e",
+      "touchee": "Touché·e",
+      "intriguee": "Intrigué·e",
+      "apaisee": "Apaisé·e",
+      "troublee": "Troublé·e",
+      "amusee": "Amusé·e"
+    }
   },
   "timeline": {
     "title": "Évolution temporelle",
     "subtitle": "Visiteurs au fil des jours",
+    "subtitlePdf": "Du premier au dernier jour avec retours (aperçu et PDF — plage complète)",
     "prevWeek": "Semaine précédente",
     "nextWeek": "Semaine suivante"
   },
   "hourly": {
     "title": "Fréquentation horaire",
-    "subtitle": "Visiteurs au fil des heures (cliquer sur le graphique bleu)"
+    "subtitle": "Cumul des visites par tranche horaire (0h–23h) sur toute la période filtrée"
   },
   "cross": {
     "title": "Tableau croisé émotions / œuvres",

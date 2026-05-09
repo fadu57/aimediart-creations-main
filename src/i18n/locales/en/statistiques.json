@@ -2,7 +2,41 @@
   "page": {
     "title": "Statistics",
     "subtitle": "Detailed analysis of visit data and emotional feedback",
-    "print": "Print selected statistics"
+    "print": "Print selected statistics",
+    "preview": "Preview before printing"
+  },
+  "preview": {
+    "title": "Print preview",
+    "hint": "The PDF is generated server-side with Chromium (Playwright). Locally: run “npm run dev:all” (Vite + PDF server) or two terminals: “npm run dev” and “npm run pdf-server”. Optional: VITE_PDF_EXPORT_URL if the PDF server runs elsewhere (see server/README-pdf-export.md). Printing: use File → Print or Ctrl+P in the PDF viewer.",
+    "generatedAt": "Generated on {{date}}",
+    "filtersTitle": "Scope",
+    "close": "Close",
+    "colDay": "Day",
+    "colHour": "Hour",
+    "colHearts": "Hearts",
+    "totalFeedbacks": "Total feedback: {{count}}",
+    "printPreparing": "Preparing…",
+    "pdfTabLoading": "Generating PDF…",
+    "printTabLoading": "Preparing print page…",
+    "pdfGenerationTimeout": "PDF generation timed out (3 min).",
+    "pdfGenerationTimeoutHint": "Capture took too long. Close other heavy tabs and try again, or reduce the amount of data shown.",
+    "pdfError": "Could not generate the PDF. Check external images or try again.",
+    "pdfExportNeedLogin": "Sign in to export the PDF.",
+    "pdfExportServerError": "PDF export unavailable. Locally, run “npm run dev:all” or run “npm run pdf-server” alongside “npm run dev”. Check the pdf terminal for errors.",
+    "popupBlocked": "Allow pop-ups for this site to open the PDF.",
+    "printPopupBlocked": "Allow pop-ups for this site to open the PDF in a new tab.",
+    "paperFormatTitle": "Paper size",
+    "paperFormatHint": "Content is scaled to the printable width for the chosen size; overflow continues on the following pages.",
+    "paperFormatLabel": "Format",
+    "paperFormatConfirm": "Generate PDF",
+    "paperFormats": {
+      "a4": "A4 (210 × 297 mm)",
+      "a3": "A3 (297 × 420 mm)",
+      "a5": "A5 (148 × 210 mm)",
+      "letter": "US Letter (8.5 × 11 in)",
+      "legal": "US Legal (8.5 × 14 in)",
+      "tabloid": "Tabloid / Ledger (11 × 17 in)"
+    }
   },
   "filter": {
     "organisation": "Organisation",
@@ -12,17 +46,26 @@
   "emotions": {
     "title": "Emotion distribution",
     "subtitle": "Breakdown of visitor feelings",
-    "empty": "No feedback for this scope."
+    "empty": "No feedback for this scope.",
+    "names": {
+      "eblouie": "Dazzled",
+      "touchee": "Moved",
+      "intriguee": "Intrigued",
+      "apaisee": "Soothed",
+      "troublee": "Unsettled",
+      "amusee": "Amused"
+    }
   },
   "timeline": {
     "title": "Timeline",
-    "subtitle": "Visitors over the days",
+    "subtitle": "Visitors day by day",
+    "subtitlePdf": "From the first to the last day with feedback (preview and PDF — full range)",
     "prevWeek": "Previous week",
     "nextWeek": "Next week"
   },
   "hourly": {
     "title": "Hourly attendance",
-    "subtitle": "Visitors over the hours (click on the blue chart)"
+    "subtitle": "Total visits per hour (0–23) across the entire filtered period"
   },
   "cross": {
     "title": "Emotions / artworks cross table",

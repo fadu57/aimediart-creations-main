@@ -1,14 +1,18 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
+import { getBackofficeFallbackPath } from "@/lib/navigationMatrix";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 
 /**
- * Redirige vers `/dashboard` si la route back-office courante est interdite par les lignes menu/page dans `matrice_securite`.
+ * Redirige vers la première route de menu autorisée (ou `/settings`) si la route courante est interdite
+ * par `matrice_securite`. Ne cible pas systématiquement `/dashboard` : si « Accueil » est décoché,
+ * une redirection vers `/dashboard` provoquerait une boucle infinie avec `<Navigate>`.
  */
 export function BackofficeNavGuard() {
   const location = useLocation();
-  const { canAccessPath, loading } = useNavigationMatrix();
+  const { canAccessPath, loading, access } = useNavigationMatrix();
+  const fallback = getBackofficeFallbackPath(access);
 
   if (loading) {
     return (
@@ -19,7 +23,10 @@ export function BackofficeNavGuard() {
   }
 
   if (!canAccessPath(location.pathname)) {
-    return <Navigate to="/dashboard" replace state={{ from: location.pathname, blocked: true }} />;
+    if (location.pathname === fallback) {
+      return <Outlet />;
+    }
+    return <Navigate to={fallback} replace state={{ from: location.pathname, blocked: true }} />;
   }
 
   return <Outlet />;
