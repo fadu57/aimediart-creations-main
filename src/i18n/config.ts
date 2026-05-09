@@ -60,6 +60,18 @@ import deHome from "./locales/de/home.json";
 import esHome from "./locales/es/home.json";
 import itHome from "./locales/it/home.json";
 
+import frArtworkModal from "./locales/fr/artwork_modal.json";
+import enArtworkModal from "./locales/en/artwork_modal.json";
+import deArtworkModal from "./locales/de/artwork_modal.json";
+import esArtworkModal from "./locales/es/artwork_modal.json";
+import itArtworkModal from "./locales/it/artwork_modal.json";
+
+import frVisitor from "./locales/fr/visitor.json";
+import enVisitor from "./locales/en/visitor.json";
+import deVisitor from "./locales/de/visitor.json";
+import esVisitor from "./locales/es/visitor.json";
+import itVisitor from "./locales/it/visitor.json";
+
 const SUPPORTED_LANGS = ["fr", "en", "de", "es", "it"] as const;
 type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 
@@ -73,15 +85,15 @@ function getInitialLanguage(): SupportedLang {
 
 i18n.use(initReactI18next).init({
   resources: {
-    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome },
-    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome },
-    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome },
-    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome },
-    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome },
+    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome, artwork_modal: frArtworkModal, visitor: frVisitor },
+    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome, artwork_modal: enArtworkModal, visitor: enVisitor },
+    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome, artwork_modal: deArtworkModal, visitor: deVisitor },
+    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome, artwork_modal: esArtworkModal, visitor: esVisitor },
+    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome, artwork_modal: itArtworkModal, visitor: itVisitor },
   },
   lng: getInitialLanguage(),
   fallbackLng: "fr",
-  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home"],
+  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home", "artwork_modal", "visitor"],
   defaultNS: "header",
   interpolation: {
     escapeValue: false,

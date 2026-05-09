@@ -42,12 +42,12 @@ const CubeSlider = ({ artworks, currentArtworkIndex, rotationStep }: CubeSliderP
       {/* Préchargement discret des fiches voisines pour fluidifier la navigation. */}
       <iframe
         className="cube__preload-frame"
-        src={`/œuvre/${encodeURIComponent(nextArtwork.id)}?embed=1&preload=1`}
+        src={`/artwork/${encodeURIComponent(nextArtwork.id)}?embed=1&preload=1`}
         title="preload-next-artwork"
       />
       <iframe
         className="cube__preload-frame"
-        src={`/œuvre/${encodeURIComponent(prevArtwork.id)}?embed=1&preload=1`}
+        src={`/artwork/${encodeURIComponent(prevArtwork.id)}?embed=1&preload=1`}
         title="preload-prev-artwork"
       />
       <div className="cube-shell">

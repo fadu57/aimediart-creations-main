@@ -1,3 +1,5 @@
+import i18n from "@/i18n/config";
+
 /**
  * Génère une courte biographie via l'Edge Function `generate-artist-bio`.
  * La fonction lit le prompt dynamique dans `app_settings` côté serveur.
@@ -6,6 +8,8 @@ export async function generateBiographyWithGrok(params: {
   prenom: string;
   name: string;
   artTypes: string[];
+  /** Langue cible de la bio générée. Si omis, utilise la langue active de l'interface. */
+  lang?: string;
 }): Promise<string> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -25,6 +29,7 @@ export async function generateBiographyWithGrok(params: {
       prenom: params.prenom,
       nom: params.name,
       art_types: params.artTypes,
+      lang: params.lang ?? i18n.language ?? "fr",
     }),
   });
 

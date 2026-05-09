@@ -5,7 +5,25 @@ type RequestBody = {
   prenom?: string;
   nom?: string;
   art_types?: string[];
+  /** Code de langue BCP-47 court (fr, en, de, es, it). Optionnel — sans valeur, le comportement par défaut (français) est conservé. */
+  lang?: string;
 };
+
+const LANG_NAMES: Record<string, string> = {
+  fr: "français",
+  en: "English",
+  de: "Deutsch",
+  es: "español",
+  it: "italiano",
+};
+
+/** Retourne une instruction de langue à appendre au prompt, ou null si langue inconnue/non fournie. */
+function buildLangInstruction(lang: string | undefined): string | null {
+  if (!lang) return null;
+  const name = LANG_NAMES[lang.toLowerCase().slice(0, 2)];
+  if (!name) return null;
+  return `IMPORTANT: Tu dois rédiger la biographie UNIQUEMENT en ${name}. N'utilise aucune autre langue.`;
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -90,11 +108,23 @@ serve(async (req: Request) => {
   }
 
   const promptTemplate = await loadPromptTemplate();
-  const prompt = renderTemplate(promptTemplate, {
+  const renderedPrompt = renderTemplate(promptTemplate, {
     prenom,
     nom,
     art_types: artTypes.join(", "),
   });
+
+  const langName = body.lang ? (LANG_NAMES[body.lang.toLowerCase().slice(0, 2)] ?? null) : null;
+  const langInstruction = buildLangInstruction(body.lang);
+
+  // Remplacer toute mention "en français" dans le template rendu pour éviter un conflit explicite avec la consigne de langue.
+  // Cela couvre à la fois le DEFAULT_PROMPT_TEMPLATE et les templates éditables stockés en DB.
+  const adjustedPrompt = langName
+    ? renderedPrompt.replace(/\ben\s+fran[çc]ais\b/gi, `en ${langName}`)
+    : renderedPrompt;
+
+  // Ajouter l'instruction de langue en fin de prompt (renforcement explicite dans le user message).
+  const prompt = langInstruction ? `${adjustedPrompt}\n${langInstruction}` : adjustedPrompt;
 
   const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

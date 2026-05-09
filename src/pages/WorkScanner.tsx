@@ -74,8 +74,8 @@ const WorkScanner = () => {
           navigator.vibrate(35);
         }
         const target = expoId
-          ? `/œuvre/${encodeURIComponent(artworkId)}?expo_id=${encodeURIComponent(expoId)}`
-          : `/œuvre/${encodeURIComponent(artworkId)}`;
+          ? `/artwork/${encodeURIComponent(artworkId)}?expo_id=${encodeURIComponent(expoId)}`
+          : `/artwork/${encodeURIComponent(artworkId)}`;
         navigate(target);
       };
 

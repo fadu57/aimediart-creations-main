@@ -20,7 +20,7 @@ type ArtistRow = {
 };
 
 const modulo = (value: number, base: number) => ((value % base) + base) % base;
-const NEXT_ARTWORK_MESSAGE = "œuvres-artiste-next";
+const NEXT_ARTWORK_MESSAGE = "artworks-artist-next";
 
 const normalizeDescription = (value: unknown): string => {
   if (typeof value === "string") return value;

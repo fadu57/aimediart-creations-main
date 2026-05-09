@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,7 @@ import {
   type NavAccessMap,
   type NavMatrixCible,
 } from "@/lib/navigationMatrix";
+import { useTranslation } from "react-i18next";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -320,6 +321,7 @@ function PermissionCell({
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation("artwork_modal");
   const [search, setSearch] = useState("");
   const [roleLabelsById, setRoleLabelsById] = useState<Record<number, string>>({});
   const [appSettingsRows, setAppSettingsRows] = useState<AppSettingRow[]>([]);
@@ -560,10 +562,10 @@ export default function SettingsPage() {
         { onConflict: "key" },
       );
       if (error) throw error;
-      toast.success("Enregistré.");
+      toast.success(t("settings_toast_saved"));
       await refreshPromptsData();
     } catch (e) {
-      toast.error(getErrorMessage(e, "Enregistrement impossible."));
+      toast.error(getErrorMessage(e, t("settings_toast_error_save")));
     } finally {
       setSavingSettingsKey(null);
     }
@@ -573,7 +575,7 @@ export default function SettingsPage() {
     if (!editingAppRow) return;
     const keyValue = String(editingAppRow.key ?? "").trim();
     if (!keyValue) {
-      setEditError("Impossible de modifier cette ligne : colonne `key` absente.");
+      setEditError(t("settings_error_key_missing"));
       return;
     }
     const payload: Record<string, unknown> = {
@@ -587,7 +589,7 @@ export default function SettingsPage() {
       } else {
         const n = Number(rawMc);
         if (!Number.isFinite(n) || n < 0) {
-          setEditError("« Maximum de caractères du résultat » doit être un nombre positif ou vide.");
+          setEditError(t("settings_error_max_caract_invalid"));
           return;
         }
         payload.max_caract = n;
@@ -599,7 +601,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from("app_settings").update(payload).eq("key", keyValue);
     setSavingEdit(false);
     if (error) {
-      setEditError(error.message || "Modification impossible.");
+      setEditError(error.message || t("settings_error_modification"));
       return;
     }
     setEditAppOpen(false);
@@ -614,7 +616,7 @@ export default function SettingsPage() {
     const parsedTokens =
       trimmedTokens === "" ? null : Number.isFinite(Number(trimmedTokens)) ? Number(trimmedTokens) : NaN;
     if (Number.isNaN(parsedTokens)) {
-      setEditError("`max_tokens` doit être un nombre.");
+      setEditError(t("settings_error_max_tokens_invalid"));
       return;
     }
     const payload = {
@@ -630,7 +632,7 @@ export default function SettingsPage() {
     const { error } = await supabase.from("prompt_style").update(payload).eq("id", id);
     setSavingEdit(false);
     if (error) {
-      setEditError(error.message || "Modification impossible.");
+      setEditError(error.message || t("settings_error_modification"));
       return;
     }
     setEditPromptOpen(false);
@@ -640,7 +642,7 @@ export default function SettingsPage() {
 
   const renderPromptIaContent = () => {
     if (loadingPromptsData) {
-      return <p className="text-sm text-muted-foreground">Chargement des données...</p>;
+      return <p className="text-sm text-muted-foreground">{t("settings_loading")}</p>;
     }
     if (promptsDataError) {
       return <p className="text-sm text-destructive">{promptsDataError}</p>;
@@ -650,10 +652,10 @@ export default function SettingsPage() {
       <div className="space-y-4">
         <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none">
           {loadingFullAppSettings && (
-            <p className="mb-2 text-[11px] text-muted-foreground">Chargement de la liste complète des clés…</p>
+            <p className="mb-2 text-[11px] text-muted-foreground">{t("settings_loading_full")}</p>
           )}
           {appSettingsRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune ligne trouvée.</p>
+            <p className="text-sm text-muted-foreground">{t("settings_no_rows")}</p>
           ) : (
             <div className="overflow-x-auto rounded border border-border/50 bg-background">
               <table className="min-w-full text-xs">
@@ -667,7 +669,7 @@ export default function SettingsPage() {
                       ))}
                       <td className="border-b border-border/40 px-2 py-1.5">
                         <Button type="button" size="sm" variant="outline" onClick={() => openAppSettingsEditor(row)}>
-                          Modifier
+                          {t("settings_btn_modify")}
                         </Button>
                       </td>
                     </tr>
@@ -680,7 +682,7 @@ export default function SettingsPage() {
 
         <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none">
           {promptStyleRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune ligne trouvée.</p>
+            <p className="text-sm text-muted-foreground">{t("settings_no_rows")}</p>
           ) : (
             <div className="overflow-x-auto rounded border border-border/50 bg-background">
               <table className="min-w-full text-xs">
@@ -695,7 +697,7 @@ export default function SettingsPage() {
                       <td className="border-b border-border/40 px-2 py-1.5">{row.max_tokens ?? "—"}</td>
                       <td className="border-b border-border/40 px-2 py-1.5">
                         <Button type="button" size="sm" variant="outline" onClick={() => openPromptStyleEditor(row)}>
-                          Modifier
+                          {t("settings_btn_modify")}
                         </Button>
                       </td>
                     </tr>
@@ -1570,14 +1572,14 @@ export default function SettingsPage() {
         <DialogContent className="max-w-2xl shadow-none" aria-describedby={undefined} hideCloseButton>
           <DialogHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <DialogTitle className="text-left font-serif text-lg leading-snug sm:pr-4">
-              Modifier le texte de {editingAppRow ? String(editingAppRow.key ?? "") : ""}
+              {t("settings_dialog_app_title", { key: editingAppRow ? String(editingAppRow.key ?? "") : "" })}
             </DialogTitle>
             <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setEditAppOpen(false)}>
-                Annuler
+                {t("settings_btn_cancel")}
               </Button>
               <Button type="button" onClick={() => void saveAppSettingsEdit()} disabled={savingEdit}>
-                {savingEdit ? "Enregistrement..." : "Valider"}
+                {savingEdit ? t("settings_btn_saving") : t("settings_btn_validate")}
               </Button>
             </div>
           </DialogHeader>
@@ -1585,7 +1587,7 @@ export default function SettingsPage() {
             APP_SETTINGS_MAX_LENGTH_KEYS.has(String((editingAppRow as Record<string, unknown>).key ?? "").trim()) && (
               <div className="space-y-1.5">
                 <label htmlFor="edit-app-settings-max-caract" className="text-sm font-medium">
-                  Maximum de caractères du résultat
+                  {t("settings_max_caract_label")}
                 </label>
                 <Input
                   id="edit-app-settings-max-caract"
@@ -1605,8 +1607,7 @@ export default function SettingsPage() {
                   className="shadow-none"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  La valeur en tokens (colonne <code className="text-xs">max_tokens</code>) est calculée automatiquement
-                  (~3,5 caractères par token) pour l’appel à Gemini.
+                  {t("settings_max_caract_help")}
                 </p>
               </div>
             )}
@@ -1623,7 +1624,9 @@ export default function SettingsPage() {
               }
               className="min-h-[250px] w-full resize-y shadow-none"
               aria-label={
-                editingAppRow ? `Texte pour le paramètre ${String(editingAppRow.key ?? "")}` : "Texte du paramètre"
+                editingAppRow
+                  ? t("settings_aria_value", { key: String(editingAppRow.key ?? "") })
+                  : t("settings_aria_value", { key: "" })
               }
             />
             {editError && <p className="text-sm text-destructive">{editError}</p>}
@@ -1634,12 +1637,12 @@ export default function SettingsPage() {
       <Dialog open={editPromptOpen} onOpenChange={setEditPromptOpen}>
         <DialogContent className="max-w-2xl shadow-none">
           <DialogHeader>
-            <DialogTitle>Modifier une ligne prompt_style</DialogTitle>
+            <DialogTitle>{t("settings_dialog_prompt_title")}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-name" className="text-xs font-semibold text-muted-foreground">
-                name
+                {t("settings_field_name")}
               </label>
               <Input
                 id="edit-prompt-style-name"
@@ -1650,7 +1653,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-icon" className="text-xs font-semibold text-muted-foreground">
-                icon
+                {t("settings_field_icon")}
               </label>
               <Input
                 id="edit-prompt-style-icon"
@@ -1661,7 +1664,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-persona_identity" className="text-xs font-semibold text-muted-foreground">
-                persona_identity
+                {t("settings_field_persona")}
               </label>
               <Textarea
                 id="edit-prompt-style-persona_identity"
@@ -1673,7 +1676,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-style_rules" className="text-xs font-semibold text-muted-foreground">
-                style_rules
+                {t("settings_field_style_rules")}
               </label>
               <Textarea
                 id="edit-prompt-style-style_rules"
@@ -1685,7 +1688,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-system_instruction" className="text-xs font-semibold text-muted-foreground">
-                system_instruction
+                {t("settings_field_system_instruction")}
               </label>
               <Textarea
                 id="edit-prompt-style-system_instruction"
@@ -1697,7 +1700,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1">
               <label htmlFor="edit-prompt-style-max_tokens" className="text-xs font-semibold text-muted-foreground">
-                max_tokens
+                {t("settings_field_max_tokens")}
               </label>
               <Input
                 id="edit-prompt-style-max_tokens"
@@ -1710,10 +1713,10 @@ export default function SettingsPage() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setEditPromptOpen(false)}>
-              Annuler
+              {t("settings_btn_cancel")}
             </Button>
             <Button type="button" onClick={() => void savePromptStyleEdit()} disabled={savingEdit}>
-              {savingEdit ? "Enregistrement..." : "Valider"}
+              {savingEdit ? t("settings_btn_saving") : t("settings_btn_validate")}
             </Button>
           </DialogFooter>
         </DialogContent>

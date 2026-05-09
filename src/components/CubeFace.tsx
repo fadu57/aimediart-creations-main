@@ -16,7 +16,7 @@ const CubeFace = ({ artwork, faceClass }: CubeFaceProps) => {
       <div className="cube__card">
         <iframe
           className="cube__iframe"
-          src={`/œuvre/${encodeURIComponent(artwork.id)}?embed=1&nav_mode=same_artist_all_works`}
+          src={`/artwork/${encodeURIComponent(artwork.id)}?embed=1&nav_mode=same_artist_all_works`}
           title={`Page œuvre ${artwork.title}`}
           loading="lazy"
         />

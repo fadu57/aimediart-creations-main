@@ -1020,7 +1020,7 @@ const Catalogue = () => {
                     className="mt-auto w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground border border-primary/40"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(`/œuvre/${encodeURIComponent(aw.artwork_id)}`);
+                      navigate(`/artwork/${encodeURIComponent(aw.artwork_id)}`);
                     }}
                   >
                     {t("btn_open")}

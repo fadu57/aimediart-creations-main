@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import i18n from "@/i18n/config";
 
 export type MediationStyleRequest = {
   id: string;
@@ -10,6 +11,8 @@ export type MediationStyleRequest = {
 export type GenerateMediationParams = {
   sourceText: string;
   styles: MediationStyleRequest[];
+  /** Langue cible des textes générés. Si omis, utilise la langue active de l'interface. */
+  lang?: string;
 };
 
 export type GenerateMediationResponse = Record<string, string>;
@@ -87,6 +90,7 @@ export async function generateMediation(params: GenerateMediationParams): Promis
   const payload = {
     source_text: params.sourceText,
     styles: params.styles,
+    lang: params.lang ?? i18n.language ?? "fr",
   };
 
   const { data, error } = await supabase.functions.invoke("generate-mediation", {

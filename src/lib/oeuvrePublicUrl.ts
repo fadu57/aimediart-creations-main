@@ -47,7 +47,7 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
       if (fromQuery && UUID_RE.test(fromQuery)) return fromQuery;
 
       const parts = u.pathname.split("/").filter(Boolean);
-      const œuvreIdx = parts.findIndex((p) => p.toLowerCase() === "œuvre");
+      const œuvreIdx = parts.findIndex((p) => ["artwork", "œuvre", "oeuvre"].includes(p.toLowerCase()));
       if (œuvreIdx >= 0 && parts[œuvreIdx + 1]) {
         const seg = decodeURIComponent(parts[œuvreIdx + 1]);
         if (UUID_RE.test(seg)) return seg;
@@ -63,10 +63,10 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
   return m ? m[0] : "";
 }
 
-/** URL absolue a encoder dans un QR : une seule fois `/œuvre/<uuid>`. */
+/** URL absolue a encoder dans un QR : une seule fois `/artwork/<uuid>`. */
 export function buildOeuvreQrUrl(artworkId: string | null | undefined, originOverride?: string | null): string {
   const id = parseArtworkIdFromInput(artworkId);
   const origin = (originOverride ?? getPublicSiteOrigin()).trim().replace(/\/+$/, "");
   if (!origin || !id) return "";
-  return `${origin}/œuvre/${encodeURIComponent(id)}`;
+  return `${origin}/artwork/${encodeURIComponent(id)}`;
 }

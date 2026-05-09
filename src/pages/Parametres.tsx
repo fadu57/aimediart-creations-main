@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess, normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 
 export default function Parametres() {
+  const { t } = useTranslation("artwork_modal");
   const { role_id, role_name } = useAuthUser();
   // Admins autorisés à éditer les settings applicatifs.
   // 1=admin_general, 2=super_admin, 4=admin_agency
@@ -57,9 +59,9 @@ export default function Parametres() {
         { onConflict: "key" },
       );
       if (error) throw error;
-      toast.success("Prompt enregistré.");
+      toast.success(t("params_toast_saved"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Enregistrement impossible.";
+      const msg = e instanceof Error ? e.message : t("params_toast_error");
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -70,26 +72,26 @@ export default function Parametres() {
     <div className="container py-8 space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Paramètres</h2>
-          <p className="text-muted-foreground">Prompt d’analyse d’image (Gemini) utilisé par l’Edge Function.</p>
+          <h2 className="text-3xl font-serif font-bold">{t("params_title")}</h2>
+          <p className="text-muted-foreground">{t("params_subtitle")}</p>
         </div>
         <Button
           className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
           disabled={!canEdit || saving || loading}
           onClick={() => void handleSave()}
         >
-          {saving ? "Enregistrement..." : "Enregistrer"}
+          {saving ? t("params_btn_saving") : t("params_btn_save")}
         </Button>
       </div>
 
       {!canEdit && (
         <p className="text-sm text-destructive">
-          Accès réservé aux administrateurs (role_id 1/2/4).
+          {t("params_access_denied")}
         </p>
       )}
 
       <p className="text-xs text-muted-foreground">
-        Rôle détecté : <code className="rounded bg-muted px-1 py-0.5">{String(role_name ?? "null")}</code>{" "}
+        {t("params_role_label")} <code className="rounded bg-muted px-1 py-0.5">{String(role_name ?? "null")}</code>{" "}
         / role_id : <code className="rounded bg-muted px-1 py-0.5">{String(role_id ?? "null")}</code>
       </p>
 
@@ -98,11 +100,11 @@ export default function Parametres() {
         onChange={(e) => setPrompt(e.target.value)}
         disabled={!canEdit || loading}
         className="min-h-[280px] text-sm leading-relaxed"
-        placeholder="Saisissez le prompt d'analyse..."
+        placeholder={t("params_prompt_placeholder")}
       />
 
       <p className="text-xs text-muted-foreground">
-        Variable disponible : <code className="rounded bg-muted px-1 py-0.5">{`{{artist_name}}`}</code>
+        {t("params_variable_label")} <code className="rounded bg-muted px-1 py-0.5">{`{{artist_name}}`}</code>
       </p>
     </div>
   );

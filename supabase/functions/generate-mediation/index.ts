@@ -9,7 +9,25 @@ type MediationStyleInput = {
 type RequestBody = {
   source_text?: string;
   styles?: MediationStyleInput[];
+  /** Code de langue BCP-47 court (fr, en, de, es, it). Optionnel — sans valeur, pas d'instruction de langue injectée. */
+  lang?: string;
 };
+
+const LANG_NAMES: Record<string, string> = {
+  fr: "français",
+  en: "English",
+  de: "Deutsch",
+  es: "español",
+  it: "italiano",
+};
+
+/** Retourne une instruction de langue à injecter dans le prompt, ou null si langue inconnue/non fournie. */
+function buildLangInstruction(lang: string | undefined): string | null {
+  if (!lang) return null;
+  const name = LANG_NAMES[lang.toLowerCase().slice(0, 2)];
+  if (!name) return null;
+  return `IMPORTANT: Tu dois générer TOUS les textes de médiation UNIQUEMENT en ${name}. N'utilise aucune autre langue.`;
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +81,7 @@ serve(async (req: Request) => {
 
   const sourceText = body.source_text?.trim() ?? "";
   const styles = body.styles ?? [];
+  const langInstruction = buildLangInstruction(body.lang);
 
   if (!sourceText) {
     return jsonResponse(400, { error: "source_text est requis." });
@@ -97,13 +116,14 @@ serve(async (req: Request) => {
     "Respecte le ton de chaque label de style.",
     "Chaque texte doit rester concis, clair, fidèle aux informations fournies.",
     "IMPORTANT: les clés JSON de sortie doivent être exactement les IDs fournis.",
+    langInstruction,
     "",
     "Contraintes styles:",
     stylesSpec,
     "",
     "Texte source:",
     sourceText,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",

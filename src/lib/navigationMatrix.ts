@@ -132,6 +132,6 @@ export function pathnameToNavCible(pathname: string): NavMatrixCible | null {
   if (p.startsWith("/artistes")) return "menu_artiste";
   if (p.startsWith("/catalogue")) return "menu_catalogue";
   if (p.startsWith("/statistiques")) return "menu_stats";
-  if (p === "/œuvre" || p.startsWith("/œuvre/") || p === "/visitor" || p.startsWith("/visitor/")) return "page_œuvre";
+  if (p === "/artwork" || p.startsWith("/artwork/") || p === "/œuvre" || p.startsWith("/œuvre/") || p === "/visitor" || p.startsWith("/visitor/")) return "page_œuvre";
   return null;
 }

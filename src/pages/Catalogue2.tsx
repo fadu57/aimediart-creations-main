@@ -222,7 +222,7 @@ export default function Catalogue2() {
                   <tr
                     key={r.artwork_id}
                     className="border-b hover:bg-muted/30 cursor-pointer"
-                    onClick={() => navigate(`/œuvre/${encodeURIComponent(r.artwork_id)}`)}
+                    onClick={() => navigate(`/artwork/${encodeURIComponent(r.artwork_id)}`)}
                   >
                     <td className="px-2 py-1 truncate" title={text(r.artwork_title) || "—"}>{text(r.artwork_title) || "—"}</td>
                     <td className="px-2 py-1 truncate" title={artistById.get(r.artwork_artist_id || "") || "—"}>{artistById.get(r.artwork_artist_id || "") || "—"}</td>

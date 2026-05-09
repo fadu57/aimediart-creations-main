@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Building2, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
@@ -17,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 
 type ArtworkRow = {
@@ -59,12 +60,29 @@ type ArtistRow = {
 type EmotionRow = {
   id: string | number;
   icone_emotion?: string | null;
+  /** Libellé FR canonique (source de vérité et fallback toutes langues). */
   name_emotion?: string | null;
+  /** Forme masculine FR (ex. "Ému") — préférée pour l'affichage FR. */
+  Emotion_M?: string | null;
+  /** Forme féminine FR (ex. "Émue") — réservé usage futur. */
+  Emotion_F?: string | null;
+  name_emotion_en?: string | null;
+  name_emotion_de?: string | null;
+  name_emotion_es?: string | null;
+  name_emotion_it?: string | null;
 };
 
 type PromptStyleRow = {
   id: string | number;
+  /** Ancien champ (fallback ultime si name_fr absent). */
   name?: string | null;
+  /** Code stable du style (poete, pote, conteur, expert, senior, hiphop, simple, enfant_5). */
+  code?: string | null;
+  name_fr?: string | null;
+  name_en?: string | null;
+  name_de?: string | null;
+  name_es?: string | null;
+  name_it?: string | null;
   icon?: string | null;
 };
 
@@ -110,6 +128,12 @@ function mediationTextForStyle(
 
   const obj = raw as Record<string, string | null | undefined>;
 
+  // code = clé canonique stable (ex. "poete", "hiphop", "enfant_5")
+  if (style.code?.trim()) {
+    const byCode = stringFromObj(obj, style.code.trim());
+    if (byCode) return byCode;
+  }
+
   const nameKey = style.name;
   if (nameKey != null && nameKey !== "") {
     const direct = stringFromObj(obj, nameKey);
@@ -118,8 +142,8 @@ function mediationTextForStyle(
 
   const inferred = inferJsonKeyFromDisplayName(style.name);
   if (inferred) {
-    const t = stringFromObj(obj, inferred);
-    if (t) return t;
+    const byInferred = stringFromObj(obj, inferred);
+    if (byInferred) return byInferred;
   }
 
   const byId = stringFromObj(obj, String(style.id));
@@ -129,6 +153,57 @@ function mediationTextForStyle(
   if (simple) return simple;
 
   return firstNonEmptyMediationText(obj);
+}
+
+/**
+ * Résout le label d'affichage d'un style depuis les colonnes multilingues de `prompt_style`.
+ *
+ * Ordre de priorité :
+ *   1. `name_<lang>` (ex. `name_en` pour lang="en")
+ *   2. `name_fr` (fallback FR si la colonne de la langue est vide)
+ *   3. `name` (ancien champ — fallback ultime)
+ *   4. id converti en string
+ */
+function getStyleLabelFromDb(style: PromptStyleRow, currentLang: string): string {
+  const lang = currentLang.split("-")[0].toLowerCase() as "fr" | "en" | "de" | "es" | "it" | string;
+  const col = `name_${lang}` as keyof PromptStyleRow;
+  const localized = style[col] as string | null | undefined;
+  if (localized?.trim()) return localized.trim();
+
+  if (style.name_fr?.trim()) return style.name_fr.trim();
+  if (style.name?.trim()) return style.name.trim();
+  return String(style.id);
+}
+
+/**
+ * Résout le label d'affichage d'une émotion depuis les colonnes multilingues de la table `emotions`.
+ *
+ * Ordre de priorité :
+ *   FR  → Emotion_M (forme masculine propre) → name_emotion
+ *   EN  → name_emotion_en → name_emotion
+ *   DE  → name_emotion_de → name_emotion
+ *   ES  → name_emotion_es → name_emotion
+ *   IT  → name_emotion_it → name_emotion
+ *   Autre/inconnu → name_emotion (fallback universel)
+ */
+function getEmotionLabel(emo: EmotionRow, currentLang: string): string {
+  const lang = currentLang.split("-")[0].toLowerCase();
+  const fallback = (emo.name_emotion ?? "").trim();
+
+  switch (lang) {
+    case "fr":
+      return (emo.Emotion_M ?? emo.name_emotion ?? "").trim() || fallback;
+    case "en":
+      return (emo.name_emotion_en ?? emo.name_emotion ?? "").trim() || fallback;
+    case "de":
+      return (emo.name_emotion_de ?? emo.name_emotion ?? "").trim() || fallback;
+    case "es":
+      return (emo.name_emotion_es ?? emo.name_emotion ?? "").trim() || fallback;
+    case "it":
+      return (emo.name_emotion_it ?? emo.name_emotion ?? "").trim() || fallback;
+    default:
+      return fallback;
+  }
 }
 
 function isUuidLike(value: string): boolean {
@@ -151,13 +226,14 @@ function triggerHeartConfetti(): void {
 
 const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
   { value: "fr", label: "FR", flagClass: "fi fi-fr" },
+  { value: "de", label: "DE", flagClass: "fi fi-de" },
   { value: "en", label: "EN", flagClass: "fi fi-gb" },
   { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
   { value: "it", label: "IT", flagClass: "fi fi-it" },
 ];
 
 const VisitorView = () => {
+  const { t } = useTranslation("visitor");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isEmbedded = searchParams.get("embed") === "1";
@@ -456,7 +532,7 @@ const VisitorView = () => {
       if (cancelled) return;
       if (error) {
         setEmotionsDb([]);
-        setEmotionsError(error.message || "Impossible de lire les émotions depuis la base.");
+        setEmotionsError(error.message || t("emotions_db_error"));
         return;
       }
       const rows = (data as EmotionRow[] | null) ?? [];
@@ -467,7 +543,7 @@ const VisitorView = () => {
       });
       setEmotionsDb(validRows);
       if (rows.length > 0 && validRows.length === 0) {
-        setEmotionsError("Les colonnes icone_emotion / name_emotion sont vides dans la base.");
+        setEmotionsError(t("emotions_columns_empty"));
       }
     };
 
@@ -483,11 +559,11 @@ const VisitorView = () => {
       setPromptStylesLoading(true);
       setStylesQueryError(null);
       try {
-        // Colonnes explicites (id, name, icon, ordonnancement) — alignées sur le schéma réel.
-        // Si une colonne manque, le 2e essai en select('*') + tri par id peut quand même récupérer des lignes.
+        // Colonnes incluant les labels multilingues (name_fr/en/de/es/it) et le code stable.
+        // Si une colonne manque (ex. schéma plus ancien), le 2e essai en select('*') récupère quand même les lignes.
         let res = await supabase
           .from("prompt_style")
-          .select("id, name, icon, ordonnancement")
+          .select("id, name, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement")
           .order("ordonnancement", { ascending: true });
 
         if (res.error) {
@@ -530,12 +606,12 @@ const VisitorView = () => {
         const sid = String(style.id);
         return {
           sid,
-          label: style.name ?? sid,
+          label: getStyleLabelFromDb(style, language) || sid,
           icon: style.icon ?? "",
           text: mediationTextForStyle(artwork?.artwork_description, style).trim() || "—",
         };
       }),
-    [promptStylesDb, artwork?.artwork_description],
+    [promptStylesDb, artwork?.artwork_description, language],
   );
 
   useEffect(() => {
@@ -569,11 +645,11 @@ const VisitorView = () => {
     };
   }, [quickFeedbackMessage]);
 
-  const artworkTitle = artwork?.artwork_title?.trim() || "Œuvre sans titre";
+  const artworkTitle = artwork?.artwork_title?.trim() || t("artwork_no_title");
   const artistDisplayName =
     `${artist?.artist_firstname ?? artist?.artist_prenom ?? artwork?.artwork_artist_firstname ?? artwork?.artwork_artist_prenom ?? ""} ${
       artist?.artist_lastname ?? artist?.artist_name ?? artwork?.artwork_artist_lastname ?? artwork?.artwork_artist_name ?? ""
-    }`.trim() || "Artiste inconnu";
+    }`.trim() || t("artist_unknown");
   const artistPhotoUrl =
     artist?.artist_photo_url?.trim() ||
     artist?.artist_image?.trim() ||
@@ -618,7 +694,9 @@ const VisitorView = () => {
     (typeof userMeta.nom === "string" ? userMeta.nom.trim() : "") ||
     (typeof userMeta.last_name === "string" ? userMeta.last_name.trim() : "");
   const headerDisplayName = `${headerFirstName} ${headerLastName}`.trim();
-  const headerIdentityLabel = isAnonymousVisitor ? "Hey anonymous, on s'inscrit ?" : `Bonjour ${headerDisplayName || "Visiteur"}`;
+  const headerIdentityLabel = isAnonymousVisitor
+    ? t("header_anon")
+    : t("header_greeting", { name: headerDisplayName || t("header_visitor") });
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {
@@ -665,7 +743,7 @@ const VisitorView = () => {
 
     if (!resolvedArtworkId || !emotionId || !heartRating || !visitorId) {
       // Donnée critique absente : on n'envoie rien.
-      alert("Erreur technique : données manquantes pour l'enregistrement (visitor_id/artwork_id/emotion/note).");
+      alert(t("error_missing_data"));
       return;
     }
 
@@ -712,7 +790,7 @@ const VisitorView = () => {
 
     if (error) {
       console.error("ERREUR SUPABASE RÉELLE :", error.message, error.details, error.hint);
-      alert("Erreur technique : " + error.message);
+      alert(t("error_insert", { message: error.message }));
       return;
     }
     console.log("SUCCÈS INSERT (sans erreur). Vérification de persistance...");
@@ -728,21 +806,21 @@ const VisitorView = () => {
 
     if (persistedError) {
       console.error("ERREUR VÉRIFICATION INSERT :", persistedError.message, persistedError.details, persistedError.hint);
-      alert("Insertion incertaine : impossible de vérifier la persistance en base.");
+      alert(t("error_verify_insert"));
       return;
     }
 
     const persisted = Array.isArray(persistedRows) && persistedRows.length > 0;
     console.log("Résultat vérification persistance :", persistedRows);
     if (!persisted) {
-      alert("Aucune ligne retrouvée après insertion. Vérifiez que vous consultez le bon projet Supabase et la bonne table.");
+      alert(t("error_no_row"));
       return;
     }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
     triggerHeartConfetti();
     if (isSameArtistNavigation) {
-      window.parent?.postMessage({ type: "œuvres-artiste-next" }, window.location.origin);
+      window.parent?.postMessage({ type: "artworks-artist-next" }, window.location.origin);
       return;
     }
     setIsValidationPopupOpen(true);
@@ -780,7 +858,7 @@ const VisitorView = () => {
     if (!nextArtworkId) return;
 
     const query = expoId ? `?expo_id=${encodeURIComponent(expoId)}` : "";
-    navigate(`/œuvre/${encodeURIComponent(nextArtworkId)}${query}`);
+    navigate(`/artwork/${encodeURIComponent(nextArtworkId)}${query}`);
   };
 
   const showQuickFeedbackMessage = (message: string) => {
@@ -797,7 +875,7 @@ const VisitorView = () => {
   const handleSameArtistNavigationClick = (direction: -1 | 1) => {
     const hasNoEmotionAndNoHeart = !selectedEmotion && heartRating === 0;
     if (hasNoEmotionAndNoHeart) {
-      showQuickFeedbackMessage("Vous n'avez pas saisi d'émotion et de cœur.");
+      showQuickFeedbackMessage(t("quick_feedback_missing"));
       window.setTimeout(() => {
         emotionSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);
@@ -835,7 +913,7 @@ const VisitorView = () => {
   };
 
   if (loadingArtwork) {
-    return <div className="mx-auto w-full max-w-[320px] px-4 py-6 text-sm text-muted-foreground">Chargement...</div>;
+    return <div className="mx-auto w-full max-w-[320px] px-4 py-6 text-sm text-muted-foreground">{t("loading")}</div>;
   }
 
   if (!artwork) {
@@ -843,17 +921,17 @@ const VisitorView = () => {
       <div className="mx-auto w-full max-w-[375px] px-4 py-8">
         <div className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-6 text-center shadow-sm">
           <p className="text-5xl">🎨</p>
-          <h2 className="mt-3 text-2xl font-bold text-[#F0F0F0]">Œuvre indisponible</h2>
+          <h2 className="mt-3 text-2xl font-bold text-[#F0F0F0]">{t("artwork_unavailable_title")}</h2>
           <p className="mt-2 text-sm leading-relaxed text-[#F0F0F0]/85">
-            Cette œuvre n&apos;est pas accessible pour le moment dans votre session.
+            {t("artwork_unavailable_desc")}
           </p>
           <div className="mt-6 flex flex-col gap-2">
             <Button
               type="button"
-              onClick={() => navigate("/œuvre", { replace: true })}
+              onClick={() => navigate("/artwork", { replace: true })}
               className="w-full rounded-full"
             >
-              Voir une autre œuvre
+              {t("btn_see_another")}
             </Button>
             <Button
               type="button"
@@ -861,7 +939,7 @@ const VisitorView = () => {
               onClick={() => navigate("/scan", { replace: true })}
               className="w-full rounded-full"
             >
-              Retour à l&apos;accueil
+              {t("btn_back_home")}
             </Button>
           </div>
         </div>
@@ -882,7 +960,7 @@ const VisitorView = () => {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold text-[#E63946]">AIMEDIArt.com</p>
-              <p className="text-[10px] font-semibold italic text-[#E63946]">Art-mediation with AI</p>
+              <p className="text-[10px] font-semibold italic text-[#E63946]">{t("tagline")}</p>
             </div>
           </div>
           <div className="flex min-w-0 grow basis-auto flex-col items-center gap-1 px-2">
@@ -892,15 +970,13 @@ const VisitorView = () => {
                 onClick={handleSignupClick}
                 className="rounded-full bg-[#E63946] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_4px_10px_rgba(0,0,0,0.25)] transition hover:bg-red-700"
               >
-                S&apos;inscrire
+                {t("btn_register")}
               </button>
             )}
             <p className="max-w-[170px] whitespace-normal break-words text-center text-[10px] font-semibold italic text-[#F0F0F0]">
               {isAnonymousVisitor ? (
                 <>
-                  Hey &quot;Anonymous&quot;
-                  <br />
-                  on s&apos;inscrit ?
+                  {t("anon_cta_header")}
                 </>
               ) : (
                 <>
@@ -918,7 +994,7 @@ const VisitorView = () => {
             <button
               type="button"
               className="fab-main shrink-0"
-              aria-label={isFabOpen ? "Fermer le menu flottant" : "Ouvrir le menu flottant"}
+              aria-label={isFabOpen ? t("aria_close_menu") : t("aria_open_menu")}
               onClick={() => {
                 setIsFabOpen((prev) => !prev);
                 if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
@@ -964,7 +1040,7 @@ const VisitorView = () => {
                     </NavLink>
                   );
                 })}
-              <div className="fab-item fab-language-item px-2" aria-label="Choix de langue">
+              <div className="fab-item fab-language-item px-2" aria-label={t("aria_language")}>
                 <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
                   <span className={activeLanguage.flagClass} aria-hidden />
                   <select
@@ -972,8 +1048,8 @@ const VisitorView = () => {
                     value={language}
                     onChange={(e) => setLanguage(e.target.value as UiLanguage)}
                     className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
-                    aria-label="Langue de l'interface"
-                    title="Langue de l'interface"
+                    aria-label={t("aria_language")}
+                    title={t("aria_language")}
                   >
                     {UI_LANGUAGE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -986,7 +1062,7 @@ const VisitorView = () => {
               <button
                 type="button"
                 className="fab-item fab-auth-item"
-                aria-label={isAuthenticated ? "Déconnexion" : "Connexion"}
+                aria-label={isAuthenticated ? t("btn_logout") : t("btn_login")}
                 onClick={() => {
                   setIsFabOpen(false);
                   void handleAuthAffordanceClick();
@@ -995,12 +1071,12 @@ const VisitorView = () => {
                 {isAuthenticated ? (
                   <>
                     <LogOut className="h-5 w-5 text-[#121212]" aria-hidden />
-                    <span className="fab-item-label">Déconnexion</span>
+                    <span className="fab-item-label">{t("btn_logout")}</span>
                   </>
                 ) : (
                   <>
                     <LogIn className="h-5 w-5 text-[#121212]" aria-hidden />
-                    <span className="fab-item-label">Connexion</span>
+                    <span className="fab-item-label">{t("btn_login")}</span>
                   </>
                 )}
               </button>
@@ -1008,14 +1084,14 @@ const VisitorView = () => {
                 <button
                   type="button"
                   className="fab-item fab-signup-item"
-                  aria-label="S'inscrire"
+                  aria-label={t("btn_register")}
                   onClick={() => {
                     setIsFabOpen(false);
                     handleSignupClick();
                   }}
                 >
                   <UserPlus className="h-5 w-5 text-[#121212]" aria-hidden />
-                  <span className="fab-item-label">S&apos;inscrire</span>
+                  <span className="fab-item-label">{t("btn_register")}</span>
                 </button>
               )}
             </div>
@@ -1033,8 +1109,8 @@ const VisitorView = () => {
             <div ref={sameArtistNavRef} className="grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2">
               <button
                 type="button"
-                aria-label="Oeuvre precedente"
-                title="Oeuvre précédente du même artiste"
+                aria-label={t("aria_prev_artwork")}
+                title={t("title_prev_artwork")}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
                 onClick={() => handleSameArtistNavigationClick(-1)}
               >
@@ -1043,8 +1119,8 @@ const VisitorView = () => {
               <span aria-hidden />
               <button
                 type="button"
-                aria-label="Oeuvre suivante"
-                title="Oeuvre suivante du même artiste"
+                aria-label={t("aria_next_artwork")}
+                title={t("title_next_artwork")}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
                 onClick={() => handleSameArtistNavigationClick(1)}
               >
@@ -1057,7 +1133,7 @@ const VisitorView = () => {
         <div className="œuvre-full-width-box px-5 text-right -mt-1 mb-[10px]">
           <h2 className="m-0 text-xl font-bold leading-tight text-[#F0F0F0]">{artworkTitle}</h2>
           <div className="mt-1 flex items-center justify-end gap-2">
-            <span className="text-[11px] italic text-[#E63946]">Voir la photo et la bio de l&apos;artiste</span>
+            <span className="text-[11px] italic text-[#E63946]">{t("see_artist_bio")}</span>
             <button
               type="button"
               className="m-0 border-0 bg-transparent p-0 italic leading-none text-[#F0F0F0] underline decoration-[#E63946] underline-offset-2 shadow-none"
@@ -1121,20 +1197,20 @@ const VisitorView = () => {
         <div className="œuvre-full-width-box mb-[16px] rounded-2xl bg-[rgba(18,18,18,0.65)] px-0 pb-3 pt-2">
           <div className="mb-2 flex items-center gap-2 px-5">
             <span className="text-xl">📖</span>
-            <h3 className="font-bold text-[14px] text-[#F0F0F0]">Sélectionnez comment l&apos;IA doit vous parler</h3>
+            <h3 className="font-bold text-[14px] text-[#F0F0F0]">{t("ai_select_style")}</h3>
           </div>
           {stylesQueryError ? (
             <p className="mb-2 text-center text-xs text-red-600">{stylesQueryError}</p>
           ) : null}
           {promptStylesLoading ? (
-            <div className="flex min-h-[120px] items-center justify-center" aria-busy="true" aria-label="Chargement des styles">
+            <div className="flex min-h-[120px] items-center justify-center" aria-busy="true" aria-label={t("aria_loading_styles")}>
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
             </div>
           ) : !aiSlides.length ? (
             <div className="space-y-1 px-5 text-center text-xs text-red-600">
-              <p className="font-semibold">ALERTE : aucune ligne dans prompt_style (ou accès refusé).</p>
+              <p className="font-semibold">{t("ai_styles_error")}</p>
               <p className="font-normal text-muted-foreground">
-                Vérifiez les politiques RLS Supabase pour la table <code className="rounded bg-muted px-1">prompt_style</code>.
+                {t("ai_styles_error_rls")}
               </p>
             </div>
           ) : (
@@ -1187,7 +1263,7 @@ const VisitorView = () => {
                       <SwiperSlide key={`thumb-ai-${slide.sid}`} className="thumbs-slide">
                         <button
                           type="button"
-                          className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0]"
+                          className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0] h-[88px]"
                           onClick={() => setSelectedPromptStyleId(slide.sid)}
                         >
                           <span className={`text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`} aria-hidden>
@@ -1215,12 +1291,15 @@ const VisitorView = () => {
             <span className="inline-flex h-6 w-6 items-center justify-center">
               <Heart className="h-3.5 w-3.5 text-[#E63946]" fill="none" strokeWidth={2} />
             </span>
-            <h3 className="font-bold text-[13px] whitespace-nowrap text-[#F0F0F0]">L'émotion ressentie devant cette oeuvre</h3>
+            <h3 className="font-bold text-[13px] whitespace-nowrap text-[#F0F0F0]">{t("emotion_section_title")}</h3>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {emotionsDb.map((emo) => {
-              const emotionName = (emo.name_emotion ?? "").trim();
-              const displayedEmotionIcon = emotionName.toLowerCase() === "troublé" ? "😵‍💫" : (emo.icone_emotion ?? "");
+              // name_emotion = référence canonique pour la comparaison d'icône (valeur brute DB)
+              const emotionNameRaw = (emo.name_emotion ?? "").trim();
+              // Label affiché : colonne multilingue DB selon langue active, fallback name_emotion
+              const emotionDisplayLabel = getEmotionLabel(emo, language);
+              const displayedEmotionIcon = emotionNameRaw.toLowerCase() === "troublé" ? "😵‍💫" : (emo.icone_emotion ?? "");
               return (
                 <button
                   key={String(emo.id)}
@@ -1237,7 +1316,7 @@ const VisitorView = () => {
                     <span className="text-xl leading-none" aria-hidden>
                       {displayedEmotionIcon}
                     </span>
-                    <span>{emotionName}</span>
+                    <span>{emotionDisplayLabel}</span>
                   </span>
                 </button>
               );
@@ -1246,7 +1325,7 @@ const VisitorView = () => {
           {emotionsError && <p className="text-[11px] text-red-600">{emotionsError}</p>}
           {!emotionsError && emotionsDb.length === 0 && (
             <p className="text-[11px] text-red-600">
-              Aucun bouton affiché: la table emotions ne renvoie pas de lignes avec icone_emotion et name_emotion.
+              {t("emotions_empty_error")}
             </p>
           )}
         </div>
@@ -1257,11 +1336,9 @@ const VisitorView = () => {
             quickFeedbackMessage ? "border-2 border-[#E63946] bg-[#E63946]/5" : "border-2 border-transparent"
           }`}
         >
-          <p className="font-bold text-[14px] text-[#F0F0F0]">Attribuez VOTRE note en CŒURS</p>
-          <p className="text-xs italic text-[#F0F0F0]/85">
-            Ce n&apos;est pas la qualité de l&apos;œuvre qui est notée,
-            <br />
-            juste VOTRE ressenti
+          <p className="font-bold text-[14px] text-[#F0F0F0]">{t("heart_rating_title")}</p>
+          <p className="text-xs italic text-[#F0F0F0]/85" style={{ whiteSpace: "pre-line" }}>
+            {t("heart_rating_subtitle")}
           </p>
           <div className="flex justify-center gap-2 py-2">
             {[1, 2, 3, 4, 5].map((n) => (
@@ -1305,14 +1382,14 @@ const VisitorView = () => {
                 onClick={handleResetFeedbackSelection}
                 className="w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
               >
-                Corriger
+                {t("btn_correct")}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 className="w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
               >
-                Commenter
+                {t("btn_comment")}
               </Button>
               <Button
                 type="button"
@@ -1320,7 +1397,7 @@ const VisitorView = () => {
                 disabled={submittingFeedback || !canSubmitFeedback}
                 className="w-[100px] h-12 text-base leading-tight shadow-none transition-all duration-200 gradient-gold gradient-gold-hover-bg text-primary-foreground hover:brightness-105 hover:saturate-125"
               >
-                {submittingFeedback ? "Enregistrement..." : "Valider"}
+                {submittingFeedback ? t("btn_saving") : t("btn_validate")}
               </Button>
             </div>
           </div>
@@ -1336,7 +1413,7 @@ const VisitorView = () => {
             className="rounded-xl border border-black/10 bg-white px-4 py-3 text-center shadow-xl"
             role="status"
             aria-live="polite"
-            aria-label="Message de sélection manquante"
+            aria-label={t("aria_missing_selection")}
           >
             <p className="text-sm font-semibold text-[#9D2525]">{quickFeedbackMessage}</p>
             <p
@@ -1366,7 +1443,7 @@ const VisitorView = () => {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Photo et bio de l'artiste"
+            aria-label={t("aria_artist_dialog")}
           >
             {canShowArtistPhoto ? (
               <div className="relative w-full overflow-hidden rounded shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
@@ -1382,12 +1459,12 @@ const VisitorView = () => {
               </div>
             ) : (
               <div className="flex h-[180px] items-center justify-center rounded bg-gray-100 text-center text-sm text-gray-500">
-                Photo artiste indisponible
+                {t("artist_photo_unavailable")}
               </div>
             )}
             <div className="mt-3 max-h-[220px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-[15px]">
               <p className="text-xs leading-relaxed text-gray-700 break-words [word-wrap:break-word]">
-                {artistBioText || "Biographie de l'artiste non disponible."}
+                {artistBioText || t("artist_bio_unavailable")}
               </p>
             </div>
             <button
@@ -1399,7 +1476,7 @@ const VisitorView = () => {
                 closeArtistPhotoModal();
               }}
             >
-              Fermer
+              {t("btn_close")}
             </button>
           </div>
         </div>
@@ -1416,12 +1493,10 @@ const VisitorView = () => {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Confirmation de ressenti"
+            aria-label={t("aria_validation_dialog")}
           >
-            <p className="text-sm font-semibold leading-relaxed text-gray-900">
-              Merci {isAnonymousVisitor ? "Anonymous" : (headerFirstName || "Visiteur")}, c&apos;est enregistré.
-              <br />
-              On scanne le qrcode d&apos;une autre œuvre ?
+            <p className="text-sm font-semibold leading-relaxed text-gray-900" style={{ whiteSpace: "pre-line" }}>
+              {t("validation_thanks", { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) })}
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Button
@@ -1429,7 +1504,7 @@ const VisitorView = () => {
                 className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
                 onClick={handleScanAnotherArtwork}
               >
-                Scanner une autre œuvre
+                {t("btn_scan_another")}
               </Button>
               <Button
                 type="button"
@@ -1437,7 +1512,7 @@ const VisitorView = () => {
                 className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
                 onClick={handleExitExpo}
               >
-                Non je quitte l'expo
+                {t("btn_exit_expo")}
               </Button>
             </div>
           </div>
@@ -1455,33 +1530,14 @@ const VisitorView = () => {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Message de fin de visite"
+            aria-label={t("aria_exit_dialog")}
           >
             <p className="text-sm font-semibold leading-relaxed text-black">
-              {hasAgencyThanksName ? (
-                <>
-                  <span className="text-[#E63946]">AIMEDIArt.com</span> et{" "}
-                  <span className="text-[hsl(0_65%_48%)]">{agencyThanksName}</span>{" "}
-                  <span className="whitespace-nowrap">
-                    vous remercient
-                    <br />
-                    pour votre visite.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-[#E63946]">AIMEDIArt.com</span>{" "}
-                  <span className="whitespace-nowrap">
-                    vous remercie
-                    <br />
-                    pour votre visite.
-                  </span>
-                </>
-              )}
+              {hasAgencyThanksName
+                ? t("exit_thanks_with_agency", { agency: agencyThanksName })
+                : t("exit_thanks_solo")}
               <br />
-              Nous avons été ravi de vous présenter cette exposition.
-              <br />
-              Nous espérons vous revoir très bientôt ! Au plaisir !
+              {t("exit_message")}
             </p>
             <Button
               type="button"
@@ -1492,7 +1548,7 @@ const VisitorView = () => {
                 window.location.assign("https://www.aimediart.com");
               }}
             >
-              Fermer
+              {t("btn_close")}
             </Button>
           </div>
         </div>

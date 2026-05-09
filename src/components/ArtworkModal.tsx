@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, ChevronsUpDown, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -127,6 +128,7 @@ function serializeDraftSnapshot(snapshot: DraftSnapshot): string {
 }
 
 export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: ArtworkModalProps) {
+  const { t } = useTranslation("artwork_modal");
   const { role_id, agency_id, expo_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
 
@@ -287,7 +289,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         .single();
       if (cancelled) return;
       if (error || !data) {
-        toast.error(error?.message ?? "Œuvre introuvable.");
+        toast.error(error?.message ?? t("toast_error_artwork_load"));
         onOpenChange(false);
         return;
       }
@@ -403,11 +405,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const handleSave = async () => {
     if (isVisitorLocked) return;
     if (!title.trim()) {
-      toast.error("Le titre est obligatoire.");
+      toast.error(t("toast_error_title_required"));
       return;
     }
     if (!artistId) {
-      toast.error("Sélectionnez un artiste.");
+      toast.error(t("toast_error_artist_required"));
       return;
     }
     setIsSubmitting(true);
@@ -426,16 +428,16 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       if (editingArtworkId) {
         const { error } = await supabase.from("artworks").update(payload).eq("artwork_id", editingArtworkId);
         if (error) throw error;
-        toast.success("Œuvre mise à jour.");
+        toast.success(t("toast_artwork_updated"));
       } else {
         const { error } = await supabase.from("artworks").insert(payload);
         if (error) throw error;
-        toast.success("Œuvre créée.");
+        toast.success(t("toast_artwork_created"));
       }
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Enregistrement impossible.";
+      const msg = err instanceof Error ? err.message : t("toast_error_save");
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -450,7 +452,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     () =>
       [selectedArtist?.artist_firstname, selectedArtist?.artist_lastname].filter(Boolean).join(" ").trim() ||
       selectedArtist?.artist_nickname ||
-      "Choisir un artiste",
+      t("artist_placeholder"),
     [selectedArtist?.artist_firstname, selectedArtist?.artist_lastname, selectedArtist?.artist_nickname],
   );
   const filteredArtists = useMemo(() => {
@@ -530,14 +532,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     return Math.max(0, Math.floor((Date.now() - analyzeStartedAt) / 1000));
   }, [analyzingImage, analyzeStartedAt, analyzeTick]);
   const analyzeProgressMessage = useMemo(() => {
-    if (!analyzingImage) {
-      return "Analyse approfondie en cours ... Nos modèles d'Intelligence Artificielle scrutent les détails de l'œuvre (cela peut prendre jusqu'à 45 secondes)";
-    }
-    if (analyzeElapsedSec < 10) return "Analyse de la composition et des couleurs...";
-    if (analyzeElapsedSec < 20) return "Interprétation de la symbolique...";
-    if (analyzeElapsedSec < 30) return "Finalisation du rapport détaillé...";
-    return "Analyse approfondie en cours... Nos modèles Gemini 2.5 scrutent les détails de l'œuvre (cela peut prendre jusqu'à 45 secondes).";
-  }, [analyzingImage, analyzeElapsedSec]);
+    if (!analyzingImage) return t("analyze_init_msg");
+    if (analyzeElapsedSec < 10) return t("analyze_step_1");
+    if (analyzeElapsedSec < 20) return t("analyze_step_2");
+    if (analyzeElapsedSec < 30) return t("analyze_step_3");
+    return t("analyze_step_4");
+  }, [analyzingImage, analyzeElapsedSec, t]);
 
   useEffect(() => {
     if (!analyzingImage) return;
@@ -549,7 +549,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     if (!imageUrl) return;
     if (isVisitorLocked) return;
     if (!artistId) {
-      toast.error("Sélectionnez un artiste avant l'analyse.");
+      toast.error(t("toast_error_artist_analyze"));
       return;
     }
     setAnalyzeImageError(null);
@@ -578,7 +578,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setNotesFlash(true);
       window.setTimeout(() => setNotesFlash(false), 1200);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Analyse image impossible.";
+      const msg = e instanceof Error ? e.message : t("toast_error_analyze");
       setAnalyzeImageError(msg);
     } finally {
       setAnalyzingImage(false);
@@ -599,9 +599,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       if (error) throw error;
       const { data } = supabase.storage.from("artwork-images").getPublicUrl(path);
       setImageUrl(data.publicUrl);
-      toast.success("Image envoyee.");
+      toast.success(t("toast_image_uploaded"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Upload image impossible.";
+      const msg = e instanceof Error ? e.message : t("toast_error_upload");
       toast.error(msg);
     } finally {
       setUploadingImage(false);
@@ -611,11 +611,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const handleGenerateMediations = async () => {
     if (isVisitorLocked) return;
     if (!artistId) {
-      toast.error("Sélectionnez un artiste avant la génération.");
+      toast.error(t("toast_error_artist_generate"));
       return;
     }
     if (!sourceMaterial.trim()) {
-      toast.error("Renseignez la matière brute avant la génération.");
+      toast.error(t("toast_error_source_required"));
       return;
     }
     setGeneratingMediation(true);
@@ -642,9 +642,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       }
       setDescriptions(next);
       setActiveTab(styleTabs[0].key);
-      toast.success("Les 8 médiations ont été générées.");
+      toast.success(t("toast_mediation_generated"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Génération IA impossible.";
+      const msg = e instanceof Error ? e.message : t("toast_error_generate");
       toast.error(msg);
     } finally {
       setGeneratingMediation(false);
@@ -696,11 +696,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]",
         )}
       >
-        <DialogTitle className="sr-only">{editingArtworkId ? "Fiche de l'œuvre" : "Nouvelle œuvre"}</DialogTitle>
+        <DialogTitle className="sr-only">{editingArtworkId ? t("title_edit") : t("title_new")}</DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
-              {editingArtworkId ? "Fiche de l'œuvre" : "Nouvelle œuvre"}
+              {editingArtworkId ? t("title_edit") : t("title_new")}
             </h2>
             <div className="flex items-center gap-2">
               <Button
@@ -715,34 +715,28 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 disabled={isVisitorLocked || isSubmitting || isLoading || isAiBusy}
                 onClick={() => void handleSave()}
               >
-                {isSubmitting ? (
-                  "Enregistrement…"
-                ) : editingArtworkId ? (
-                  "Enregistrer"
-                ) : (
-                  "Enregistrer"
-                )}
+                {isSubmitting ? t("btn_saving") : t("btn_save")}
               </Button>
             </div>
           </div>
         </div>
         <DialogDescription className="sr-only">
-          {editingArtworkId
-            ? "Modifier les informations et les textes de médiation de l’œuvre."
-            : "Créer une nouvelle fiche œuvre avec textes de médiation et image."}
+          {editingArtworkId ? t("dialog_edit_desc") : t("dialog_new_desc")}
         </DialogDescription>
+
+
         <div className="px-4 sm:px-5 pt-3 pb-4 space-y-4">
         {isVisitorLocked && (
           <Alert variant="destructive" className="border-destructive/60">
-            <AlertTitle>Accès restreint</AlertTitle>
-            <AlertDescription>Le rôle visiteur (niveau 7) ne peut pas créer ou modifier une œuvre.</AlertDescription>
+            <AlertTitle>{t("alert_visitor_title")}</AlertTitle>
+            <AlertDescription>{t("alert_visitor_desc")}</AlertDescription>
           </Alert>
         )}
 
         {duplicateArtwork && !editingArtworkId && (
           <Alert variant="destructive" className="border-destructive/60">
-            <AlertTitle>Doublon détecté</AlertTitle>
-            <AlertDescription>Une œuvre avec ce titre existe déjà pour cet artiste.</AlertDescription>
+            <AlertTitle>{t("alert_duplicate_title")}</AlertTitle>
+            <AlertDescription>{t("alert_duplicate_desc")}</AlertDescription>
           </Alert>
         )}
 
@@ -755,7 +749,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
             {imageUrl ? (
               <img
                 src={imageUrl}
-                alt="Photo de l'œuvre"
+                alt={t("img_alt")}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -774,7 +768,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 onClick={() => photoInputRef.current?.click()}
                 disabled={isVisitorLocked || isLoading || uploadingImage}
               >
-                {uploadingImage ? "Envoi..." : "Changer la photo"}
+                {uploadingImage ? t("btn_uploading") : t("btn_change_photo")}
               </Button>
             </div>
 
@@ -793,7 +787,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
           <div className="flex-1 min-w-0 space-y-3">
             <div className="space-y-1.5">
-              <Label>Titre de l'œuvre</Label>
+              <Label>{t("label_title")}</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -813,15 +807,15 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   {analyzingImage ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Analyse en cours…
+                      {t("btn_analyzing")}
                     </>
                   ) : (
-                    "✨ Analyser l'image avec l'IA"
+                    t("btn_analyze")
                   )}
                 </Button>
               )}
               <div className="min-w-0 flex-1 space-y-1.5">
-                <Label>Artiste</Label>
+                <Label>{t("label_artist")}</Label>
                 <div className="relative">
                   <Input
                     value={artistSearch}
@@ -840,7 +834,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                     <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
                       {filteredArtists.length === 0 ? (
                         <div className="space-y-2 px-3 py-2">
-                          <p className="text-sm text-muted-foreground">Aucun artiste trouvé.</p>
+                          <p className="text-sm text-muted-foreground">{t("artist_not_found")}</p>
                           {!isVisitorLocked && (
                             <Button
                               type="button"
@@ -853,7 +847,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                                 setArtistDialogOpen(true);
                               }}
                             >
-                              Créer un nouvel artiste
+                              {t("btn_create_artist")}
                             </Button>
                           )}
                         </div>
@@ -895,15 +889,14 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
                 <p className="inline-flex items-center gap-2 text-sm font-medium">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Analyse approfondie en cours ... Nos modèles d'Intelligence Artificielle scrutent les détails de l'œuvre (cela peut
-                  prendre jusqu'à 45 secondes)
+                  {t("analyze_init_msg")}
                 </p>
                 <p className="mt-1 text-xs">{analyzeProgressMessage}</p>
               </div>
             )}
             {!analyzingImage && analyzeImageError && (
               <Alert variant="destructive">
-                <AlertTitle>Analyse interrompue</AlertTitle>
+                <AlertTitle>{t("analyze_error_title")}</AlertTitle>
                 <AlertDescription className="space-y-3">
                   <p className="text-xs break-words">{analyzeImageError}</p>
                   <Button
@@ -914,7 +907,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                     onClick={() => void handleAnalyzeImage()}
                     disabled={!imageUrl || isVisitorLocked}
                   >
-                    Réessayer
+                    {t("btn_retry")}
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -924,13 +917,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         {checkingDuplicate && (
           <p className="text-xs text-muted-foreground inline-flex items-center gap-2">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Vérification d’unicité en cours…
+            {t("checking_duplicate")}
           </p>
         )}
 
         <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
           <div className="space-y-2">
-            <Label>Notes sur l'œuvre / Intentions de l'artiste</Label>
+            <Label>{t("label_source_material")}</Label>
             <Textarea
               value={sourceMaterial}
               onChange={(e) => setSourceMaterial(e.target.value)}
@@ -939,10 +932,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 "w-full min-h-[170px] text-sm transition-colors",
                 notesFlash ? "border-amber-400 ring-2 ring-amber-300" : "",
               )}
-              placeholder="Texte source brut (notes curatoriales, intentions artistiques, etc.)"
+              placeholder={t("source_material_placeholder")}
             />
             <p className="text-xs text-muted-foreground">
-              Collez ici vos notes ou la description catalogue, l'IA s'en servira pour générer les médiations.
+              {t("source_material_help")}
             </p>
             <Button
               type="button"
@@ -954,12 +947,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               {generatingMediation ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Génération des médiations AI…
+                  {t("btn_generating")}
                 </>
               ) : sourceMaterial.trim().length === 0 ? (
-                "En attente de notes..."
+                t("btn_waiting_notes")
               ) : (
-                "🚀 Générer les médiations IA"
+                t("btn_generate")
               )}
             </Button>
           </div>
@@ -967,13 +960,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmer la fermeture</AlertDialogTitle>
+              <AlertDialogTitle>{t("dialog_close_title")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Voulez-vous fermer sans avoir enregistré les modifications ?
+                {t("dialog_close_desc")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Non</AlertDialogCancel>
+              <AlertDialogCancel>{t("btn_no")}</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-red-600 text-white hover:bg-red-700"
                 onClick={() => {
@@ -981,14 +974,14 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   onOpenChange(false);
                 }}
               >
-                Oui
+                {t("btn_yes")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         <div className="space-y-2">
-          <Label>Textes de médiation</Label>
+          <Label>{t("label_mediations")}</Label>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
             <TabsList className="grid w-full grid-cols-4 gap-2 bg-muted p-2 [grid-auto-rows:minmax(0,auto)]">
               {styleTabs.map((tab) => (
@@ -1018,7 +1011,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   }
                   disabled={isVisitorLocked || isLoading}
                   className="min-h-[140px] text-sm"
-                  placeholder={`Version "${tab.label}"`}
+                  placeholder={t("tab_version_placeholder", { label: tab.label })}
                 />
               </TabsContent>
             ))}

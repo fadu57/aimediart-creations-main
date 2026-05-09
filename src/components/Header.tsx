@@ -118,8 +118,8 @@ export default function Header() {
     pathname === "/register-visitor" ||
     pathname.startsWith("/register-visitor/");
   const isArtworkViewerPage =
-    /(^|\/)oeuvre(\/|$)/.test(normalizedPathname) ||
-    /(^|\/)oeuvres_artiste(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvre|artwork)(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname === "/visitor" ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/scan-work2" ||

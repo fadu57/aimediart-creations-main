@@ -50,6 +50,17 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
+
+/** Redirige les anciens QR codes /oeuvre/:artworkId -> /artwork/:artworkId (retrocompat). */
+function OeuvreToArtworkRedirect() {
+  const { artworkId } = useParams<{ artworkId: string }>();
+  const [searchParams] = useSearchParams();
+  const qs = searchParams.toString();
+  const to = artworkId
+    ? `/artwork/${encodeURIComponent(artworkId)}${qs ? `?${qs}` : ""}`
+    : "/artwork";
+  return <Navigate to={to} replace />;
+}
 /**
  * Shell commun : header (état connecté / invité) + zone de contenu.
  * Permet d’afficher « Aucun user connecté » sur `/login` tout en gardant la même barre.
@@ -63,8 +74,8 @@ function AppShell() {
     .replace(/œ/g, "oe")
     .replace(/Œ/g, "oe");
   const hideGlobalHeader =
-    /(^|\/)oeuvre(\/|$)/.test(normalizedPathname) ||
-    /(^|\/)oeuvres_artiste(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvre|artwork)(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
     normalizedPathname === "/scan-work1" ||
@@ -120,7 +131,7 @@ function RootEntryRoute() {
 /**
  * - `/login` : public (formulaire), avec header
  * - `/scan-work1` : page scanner visiteur / public
- * - `/œuvre` : page contenu œuvre après scan
+ * - `/artwork` : page contenu œuvre après scan
  * - `/visitor/*` : public, sans header applicatif
  * - autres routes : `RequireBackoffice` (session + rôle gestion)
  */
@@ -135,9 +146,12 @@ const AppRoutes = () => (
       <Route path="login" element={<Login />} />
       <Route path="signup" element={<RegisterSaaS />} />
       <Route path="reset-password" element={<ResetPassword />} />
-      <Route path="Oeuvre" element={<Navigate to="/œuvre" replace />} />
-      <Route path="Œuvre" element={<Navigate to="/œuvre" replace />} />
-      <Route path="œuvre" element={<Navigate to="/œuvre" replace />} />
+      {/* Redirects rétrocompatibilité anciens QR codes */}
+      <Route path="Oeuvre" element={<Navigate to="/artwork" replace />} />
+      <Route path="Œuvre" element={<Navigate to="/artwork" replace />} />
+      <Route path="oeuvre" element={<Navigate to="/artwork" replace />} />
+      <Route path="œuvre" element={<Navigate to="/artwork" replace />} />
+      <Route path="œuvre/:artworkId" element={<OeuvreToArtworkRedirect />} />
       <Route element={<VisitorShell />}>
         <Route path="scan" element={<Intro />} />
         <Route path="scan-work1" element={<WorkScanner />} />
@@ -148,10 +162,10 @@ const AppRoutes = () => (
         <Route path="register" element={<VisitorRegister />} />
         <Route path="register_visitor" element={<RegisterVisitor />} />
         <Route element={<OeuvrePageAccessGuard />}>
-          <Route path="œuvre" element={<ArtworkDetail />} />
-          <Route path="œuvre/:artworkId" element={<ArtworkDetail />} />
-          <Route path="œuvres_artiste" element={<OeuvresArtiste />} />
-          <Route path="œuvres_artiste/:artistId" element={<OeuvresArtiste />} />
+          <Route path="artwork" element={<ArtworkDetail />} />
+          <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
+          <Route path="artworks_artist" element={<OeuvresArtiste />} />
+          <Route path="artworks_artist/:artistId" element={<OeuvresArtiste />} />
           <Route path="visitor/:artworkId?" element={<ArtworkDetail />} />
         </Route>
       </Route>
