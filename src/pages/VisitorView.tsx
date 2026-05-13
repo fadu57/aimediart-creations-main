@@ -16,6 +16,7 @@ import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
+import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
@@ -72,17 +73,8 @@ type EmotionRow = {
   name_emotion_it?: string | null;
 };
 
-type PromptStyleRow = {
+type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
-  /** Ancien champ (fallback ultime si name_fr absent). */
-  name?: string | null;
-  /** Code stable du style (poete, pote, conteur, expert, senior, hiphop, simple, enfant_5). */
-  code?: string | null;
-  name_fr?: string | null;
-  name_en?: string | null;
-  name_de?: string | null;
-  name_es?: string | null;
-  name_it?: string | null;
   icon?: string | null;
 };
 
@@ -153,26 +145,6 @@ function mediationTextForStyle(
   if (simple) return simple;
 
   return firstNonEmptyMediationText(obj);
-}
-
-/**
- * Résout le label d'affichage d'un style depuis les colonnes multilingues de `prompt_style`.
- *
- * Ordre de priorité :
- *   1. `name_<lang>` (ex. `name_en` pour lang="en")
- *   2. `name_fr` (fallback FR si la colonne de la langue est vide)
- *   3. `name` (ancien champ — fallback ultime)
- *   4. id converti en string
- */
-function getStyleLabelFromDb(style: PromptStyleRow, currentLang: string): string {
-  const lang = currentLang.split("-")[0].toLowerCase() as "fr" | "en" | "de" | "es" | "it" | string;
-  const col = `name_${lang}` as keyof PromptStyleRow;
-  const localized = style[col] as string | null | undefined;
-  if (localized?.trim()) return localized.trim();
-
-  if (style.name_fr?.trim()) return style.name_fr.trim();
-  if (style.name?.trim()) return style.name.trim();
-  return String(style.id);
 }
 
 /**

@@ -28,6 +28,7 @@ export function inferJsonKeyFromDisplayName(name: string | null | undefined): st
   if (n.includes("expert")) return "expert";
   if (n.includes("enfant")) return "enfant";
   if (n.includes("ado")) return "ado";
+  if (n.includes("hip-hopeur")) return "rap";
   if (n.includes("rap")) return "rap";
   if (n.includes("simple")) return "simple";
   if (n.includes("neutre")) return "neutre";

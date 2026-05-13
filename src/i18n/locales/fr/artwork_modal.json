@@ -10,6 +10,8 @@
   "alert_duplicate_title": "Doublon détecté",
   "alert_duplicate_desc": "Une œuvre avec ce titre existe déjà pour cet artiste.",
   "img_alt": "Photo de l'œuvre",
+  "qr_alt": "QR code de l'œuvre",
+  "qr_empty": "Pas encore de QR code pour cette œuvre.",
   "btn_change_photo": "Changer la photo",
   "btn_uploading": "Envoi…",
   "label_title": "Titre de l'œuvre",

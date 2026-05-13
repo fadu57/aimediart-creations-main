@@ -10,6 +10,8 @@
   "alert_duplicate_title": "Duplicado detectado",
   "alert_duplicate_desc": "Ya existe una obra con este título para este artista.",
   "img_alt": "Foto de la obra",
+  "qr_alt": "Código QR de la obra",
+  "qr_empty": "Aún no hay código QR para esta obra.",
   "btn_change_photo": "Cambiar foto",
   "btn_uploading": "Subiendo…",
   "label_title": "Título de la obra",

@@ -1,0 +1,195 @@
+/**
+ * Styles réservés au rapport PDF (aperçu impression / StatisticsPdfReport).
+ * Styles de l’aperçu impression / rapport imprimable (dialog statistiques).
+ */
+
+.statistics-pdf-document {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  color: #111827;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+.statistics-pdf-document * {
+  box-sizing: border-box;
+}
+
+.statistics-pdf-document .statistics-pdf-sans {
+  font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif;
+}
+
+/* Pages logiques du rapport (structure demandée) */
+.statistics-pdf-page {
+  display: block;
+  width: 100%;
+}
+
+.statistics-pdf-page--after {
+  break-after: page;
+  page-break-after: always;
+}
+
+.statistics-pdf-page--before {
+  break-before: page;
+  page-break-before: always;
+}
+
+.statistics-pdf-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #fafafa, #fff);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.statistics-pdf-h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.35rem;
+}
+
+.statistics-pdf-h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.statistics-pdf-muted {
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.statistics-pdf-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .statistics-pdf-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.statistics-pdf-kpi-cell {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.5rem 0.35rem;
+  text-align: center;
+}
+
+.statistics-pdf-kpi-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.statistics-pdf-kpi-value {
+  font-family: ui-serif, Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 0.25rem;
+}
+
+.statistics-pdf-emotion-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.statistics-pdf-emotion-bar {
+  flex: 1;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.statistics-pdf-chart-host {
+  height: 210px;
+  width: 100%;
+  max-width: 100%;
+}
+
+.statistics-pdf-chart-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .statistics-pdf-chart-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Tableaux imprimables — thead répété par le moteur PDF */
+.statistics-pdf-table-wrap {
+  overflow: visible;
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+table.statistics-pdf-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.7rem;
+}
+
+@media (min-width: 480px) {
+  table.statistics-pdf-table {
+    font-size: 0.8rem;
+  }
+}
+
+.statistics-pdf-table thead {
+  display: table-header-group;
+}
+
+.statistics-pdf-table tbody tr {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.statistics-pdf-table th,
+.statistics-pdf-table td {
+  border-bottom: 1px solid #f3f4f6;
+  padding: 0.35rem 0.5rem;
+  vertical-align: middle;
+}
+
+.statistics-pdf-table thead th {
+  background: #f3f4f6;
+  font-weight: 600;
+  text-align: left;
+}
+
+.statistics-pdf-table th.text-center,
+.statistics-pdf-table td.text-center {
+  text-align: center;
+}
+
+.statistics-pdf-table th.text-right,
+.statistics-pdf-table td.text-right {
+  text-align: right;
+}
+
+/* Sonde logos hors écran (métadonnées / debug) */
+.statistics-pdf-logo-probes {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

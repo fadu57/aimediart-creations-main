@@ -19,7 +19,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Plus, Search, Loader2, QrCode, X, RefreshCw } from "lucide-react";
+import { Plus, Search, Loader2, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
@@ -28,8 +28,6 @@ import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
-import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
-
 type ArtworkRow = {
   artwork_id: string;
   artwork_title: string | null;
@@ -181,7 +179,6 @@ const Catalogue = () => {
   const [œuvresNavigationType, setOeuvresNavigationType] = useState("single_scan_sequence");
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
-  const [generatingQrForArtworkId, setGeneratingQrForArtworkId] = useState<string | null>(null);
   const [bulkQrConfirmOpen, setBulkQrConfirmOpen] = useState(false);
   const [bulkQrProgress, setBulkQrProgress] = useState<{ done: number; total: number } | null>(null);
   const { scope, loading: authLoading } = useDataScope();
@@ -586,60 +583,6 @@ const Catalogue = () => {
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
-  const handleGenerateQrForArtwork = useCallback(
-    async (artworkId: string) => {
-      console.log("handleGenerateQrForArtwork appelée pour artworkId:", artworkId);
-      if (role_id === 7) return;
-      if (generatingQrForArtworkId) return;
-      const originOverride = await getQrBaseOriginFromSettings();
-      console.log("originOverride:", originOverride);
-      const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
-      console.log("URL générée pour le QR code (from Catalogue.tsx):", targetUrl);
-      if (!targetUrl) {
-        toast.error(t("qr_error_no_url"));
-        return;
-      }
-      setGeneratingQrForArtworkId(artworkId);
-      try {
-        const dataUrl = await QRCode.toDataURL(targetUrl, {
-          width: 1024,
-          margin: 1,
-        });
-        const blob = await (await fetch(dataUrl)).blob();
-        const path = `qrcodes/${artworkId}.png`;
-        const { error: uploadError } = await supabase.storage.from("qrcode").upload(path, blob, {
-          contentType: "image/png",
-          cacheControl: "3600",
-          upsert: true,
-        });
-        if (uploadError) throw uploadError;
-        const { data: pub } = supabase.storage.from("qrcode").getPublicUrl(path);
-        const publicQrUrl = pub.publicUrl;
-        const { error: updateError } = await supabase
-          .from("artworks")
-          .update({
-            artwork_qr_code_url: publicQrUrl,
-            artwork_qrcode_image: publicQrUrl,
-          })
-          .eq("artwork_id", artworkId);
-        if (updateError) throw updateError;
-        setArtworks((prev) =>
-          prev.map((row) =>
-            row.artwork_id === artworkId
-              ? { ...row, artwork_qr_code_url: publicQrUrl, artwork_qrcode_image: publicQrUrl }
-              : row,
-          ),
-        );
-        toast.success(t("qr_success"));
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : t("qr_error_generate"));
-      } finally {
-        setGeneratingQrForArtworkId(null);
-      }
-    },
-    [role_id, generatingQrForArtworkId],
-  );
-
   const handleRegenerateAllQrCodes = useCallback(async () => {
     if (role_id === 7) return;
     const ids = artworks.map((a) => a.artwork_id?.trim()).filter(Boolean) as string[];
@@ -904,7 +847,7 @@ const Catalogue = () => {
               variant="outline"
               className="gap-2 border-amber-500/60 text-amber-700 hover:bg-amber-50 shrink-0"
               onClick={() => setBulkQrConfirmOpen(true)}
-              disabled={Boolean(bulkQrProgress) || Boolean(generatingQrForArtworkId)}
+              disabled={Boolean(bulkQrProgress)}
               title={t("qr_bulk_regenerate_title")}
             >
               {bulkQrProgress ? (
@@ -972,7 +915,6 @@ const Catalogue = () => {
               .join(" ")
               .trim() || t("artist_unknown");
           const artworkImage = aw.artwork_image_url || aw.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
-          const qrImage = aw.artwork_qrcode_image || aw.artwork_qr_code_url || null;
           const currentStatusRaw = (aw.artwork_status ?? "").trim();
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
           const statusLabel = currentStatusRaw || t("status_empty");
@@ -994,79 +936,16 @@ const Catalogue = () => {
                   }
                 }}
               >
-                <div className="flex w-[108px] shrink-0 flex-col items-center gap-1.5">
-                  {role_id === 7 ? (
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-muted/40">
-                      {qrImage ? (
-                        <ImageWithSkeleton
-                          src={qrImage}
-                          alt={`QR ${aw.artwork_title ?? ""}`}
-                          wrapperClassName="h-20 w-20"
-                          className="h-20 w-20 object-contain"
-                        />
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground px-1 text-center">{t("qr_unavailable")}</span>
-                      )}
-                    </div>
-                  ) : qrImage ? (
-                    <div className="flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-muted/40 p-0.5 text-center">
-                      {generatingQrForArtworkId === aw.artwork_id ? (
-                        <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
-                      ) : (
-                        <ImageWithSkeleton
-                          src={qrImage}
-                          alt={`QR code — ${aw.artwork_title ?? "œuvre"}`}
-                          wrapperClassName="h-20 w-20"
-                          className="h-20 w-20 object-contain"
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-muted/40 p-0.5 text-center transition-colors",
-                        "hover:border-amber-400/70 hover:bg-amber-50/40",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                        generatingQrForArtworkId === aw.artwork_id && "pointer-events-none opacity-90",
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleGenerateQrForArtwork(aw.artwork_id);
-                      }}
-                      disabled={Boolean(generatingQrForArtworkId)}
-                      title={t("qr_generate_title")}
-                      aria-label={t("qr_generate_aria")}
-                    >
-                      {generatingQrForArtworkId === aw.artwork_id ? (
-                        <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
-                      ) : (
-                        <>
-                          <QrCode className="h-9 w-9 text-muted-foreground/80 shrink-0" aria-hidden />
-                          <span className="mt-0.5 text-[10px] leading-tight text-muted-foreground px-0.5">
-                            {t("qr_generate_label")}
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                  {!qrImage && (
-                    <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
-                      <span className="whitespace-nowrap">{t("qr_click_hint_line1")}</span>
-                      <br />
-                      <span>{t("qr_click_hint_line2")}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex min-h-[152px] w-[116px] shrink-0 flex-col items-center gap-2">
-                  <img
-                    src={artworkImage}
-                    alt={aw.artwork_title ?? "œuvre"}
-                    className="h-24 w-24 rounded-xl object-cover shrink-0"
-                  />
+                <div className="flex w-[150px] min-w-[150px] shrink-0 flex-col items-center gap-2">
+                  <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
+                    <img
+                      src={artworkImage}
+                      alt={aw.artwork_title ?? "œuvre"}
+                      className="h-[150px] w-[150px] rounded-xl object-cover shrink-0"
+                    />
+                  </div>
                   <div
-                    className="w-full max-w-[112px]"
+                    className="w-full max-w-[150px]"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -1079,7 +958,7 @@ const Catalogue = () => {
                       disabled={isAssigningExpo}
                     >
                       <SelectTrigger
-                        className="h-7 w-full max-w-[112px] px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate"
+                        className="h-7 w-full max-w-[150px] px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate"
                       >
                         <SelectValue placeholder={t("expo_selector_placeholder")} />
                       </SelectTrigger>
@@ -1101,26 +980,16 @@ const Catalogue = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="mt-auto w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground border border-primary/40"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/artwork/${encodeURIComponent(aw.artwork_id)}`);
-                    }}
-                  >
-                    {t("btn_open")}
-                  </Button>
                 </div>
 
-                <div className="flex min-w-0 flex-1 self-stretch items-start gap-4">
-                  <div className="flex min-h-full flex-1 min-w-0 flex-col">
-                    <h3 className="line-clamp-2 w-[200px] font-serif font-bold text-lg">{aw.artwork_title ?? t("artwork_untitled")}</h3>
-                    <p className="text-sm text-primary italic">{artistLabel}</p>
+                <div className="relative flex min-h-[156px] min-w-0 flex-1 flex-col justify-end self-stretch">
+                  <div className="pointer-events-none absolute left-0 top-0 z-10 flex w-[150px] max-w-[150px] flex-col">
+                    <h3 className="line-clamp-1 w-[150px] max-w-full font-serif font-bold text-lg">
+                      {aw.artwork_title ?? t("artwork_untitled")}
+                    </h3>
+                    <p className="line-clamp-1 text-sm text-primary italic">{artistLabel}</p>
                     <div
-                      className="mt-2 inline-flex items-center gap-2"
+                      className="pointer-events-auto mt-2 inline-flex min-w-0 max-w-full items-center gap-2"
                       onClick={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
                     >
@@ -1135,35 +1004,12 @@ const Catalogue = () => {
                           }}
                         />
                       </label>
-                      <span className="text-xs font-semibold text-foreground">{statusLabel}</span>
-                    </div>
-                    <div className="mt-auto flex flex-col items-start gap-2 pt-3">
-                      <span
-                        className={cn(
-                          "inline-flex w-[260px] items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
-                          hasImageAnalysis
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                            : "border-[#E63946] bg-[#E63946] text-white",
-                        )}
-                      >
-                        {t(hasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
-                      </span>
-                      <span
-                        className={cn(
-                          "inline-flex w-[260px] items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
-                          hasGeneratedMediation
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                            : "border-[#E63946] bg-[#E63946] text-white",
-                        )}
-                      >
-                        {t("badge_ia_mediation", { count: generatedTextsCount })}
-                      </span>
+                      <span className="min-w-0 truncate text-xs font-semibold text-foreground">{statusLabel}</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="self-stretch flex min-h-[140px] w-[180px] shrink-0 flex-col justify-between border-l border-border/60 pl-3 pt-9">
-                  <div className="flex flex-col gap-2">
+                  <div className="relative z-0 ml-auto flex h-[156px] w-[300px] min-w-[300px] shrink-0 flex-col justify-between gap-3 border-l border-border/60 p-0">
+                    <div className="ml-auto flex w-[180px] flex-col gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -1193,6 +1039,29 @@ const Catalogue = () => {
                     >
                       {t("btn_print_cartel")}
                     </Button>
+                    </div>
+                    <div className="flex w-full shrink-0 flex-col items-end gap-2 pt-3 mt-auto">
+                    <span
+                      className={cn(
+                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        hasImageAnalysis
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-[#E63946] bg-[#E63946] text-white",
+                      )}
+                    >
+                      {t(hasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        hasGeneratedMediation
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-[#E63946] bg-[#E63946] text-white",
+                      )}
+                    >
+                      {t("badge_ia_mediation", { count: generatedTextsCount })}
+                    </span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
