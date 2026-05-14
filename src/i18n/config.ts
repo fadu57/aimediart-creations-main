@@ -1,8 +1,8 @@
 /**
  * Configuration i18next — migration progressive depuis UiLanguageProvider.
  *
- * Namespaces actifs : "header", "catalogue", "artists".
- * Les autres écrans utilisent encore FALLBACK_TRANSLATIONS dans UiLanguageProvider.tsx.
+ * Traductions : imports JSON depuis `./locales/{{lng}}/{{ns}}.json` (chemins sous `src/i18n/locales/`).
+ * Pas de HttpBackend ni de `loadPath` : tout est bundlé au build (équivalent logique à « src/i18n/locales », pas `/locales/` public).
  *
  * Sync langue : la langue est lue depuis localStorage (clé "ui_language") au démarrage,
  * puis mise à jour via i18n.changeLanguage() appelé par Header.tsx lors du changement
@@ -72,6 +72,24 @@ import deVisitor from "./locales/de/visitor.json";
 import esVisitor from "./locales/es/visitor.json";
 import itVisitor from "./locales/it/visitor.json";
 
+import frAuth from "./locales/fr/auth.json";
+import enAuth from "./locales/en/auth.json";
+import deAuth from "./locales/de/auth.json";
+import esAuth from "./locales/es/auth.json";
+import itAuth from "./locales/it/auth.json";
+
+import frTrash from "./locales/fr/trash.json";
+import enTrash from "./locales/en/trash.json";
+import deTrash from "./locales/de/trash.json";
+import esTrash from "./locales/es/trash.json";
+import itTrash from "./locales/it/trash.json";
+
+import frSettings from "./locales/fr/settings.json";
+import enSettings from "./locales/en/settings.json";
+import deSettings from "./locales/de/settings.json";
+import esSettings from "./locales/es/settings.json";
+import itSettings from "./locales/it/settings.json";
+
 const SUPPORTED_LANGS = ["fr", "en", "de", "es", "it"] as const;
 type SupportedLang = (typeof SUPPORTED_LANGS)[number];
 
@@ -85,15 +103,15 @@ function getInitialLanguage(): SupportedLang {
 
 i18n.use(initReactI18next).init({
   resources: {
-    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome, artwork_modal: frArtworkModal, visitor: frVisitor },
-    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome, artwork_modal: enArtworkModal, visitor: enVisitor },
-    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome, artwork_modal: deArtworkModal, visitor: deVisitor },
-    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome, artwork_modal: esArtworkModal, visitor: esVisitor },
-    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome, artwork_modal: itArtworkModal, visitor: itVisitor },
+    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome, artwork_modal: frArtworkModal, visitor: frVisitor, auth: frAuth, trash: frTrash, settings: frSettings },
+    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome, artwork_modal: enArtworkModal, visitor: enVisitor, auth: enAuth, trash: enTrash, settings: enSettings },
+    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome, artwork_modal: deArtworkModal, visitor: deVisitor, auth: deAuth, trash: deTrash, settings: deSettings },
+    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome, artwork_modal: esArtworkModal, visitor: esVisitor, auth: esAuth, trash: esTrash, settings: esSettings },
+    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome, artwork_modal: itArtworkModal, visitor: itVisitor, auth: itAuth, trash: itTrash, settings: itSettings },
   },
   lng: getInitialLanguage(),
   fallbackLng: "fr",
-  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home", "artwork_modal", "visitor"],
+  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home", "artwork_modal", "visitor", "auth", "trash", "settings"],
   defaultNS: "header",
   interpolation: {
     escapeValue: false,

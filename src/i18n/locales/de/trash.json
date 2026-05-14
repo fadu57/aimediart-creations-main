@@ -1,0 +1,11 @@
+{
+  "empty_state": "Keine archivierten Einträge.",
+  "restore_button": "Wiederherstellen",
+  "delete_permanently": "Endgültig löschen",
+  "confirm_restore": "Dieses Element aus dem Papierkorb wiederherstellen?",
+  "confirm_delete": "Dieses Element endgültig löschen? Dies kann nicht rückgängig gemacht werden.",
+  "success_restore": "Element wiederhergestellt.",
+  "success_delete": "Element endgültig gelöscht.",
+  "error_restore": "Element konnte nicht wiederhergestellt werden.",
+  "error_delete": "Element konnte nicht endgültig gelöscht werden."
+}

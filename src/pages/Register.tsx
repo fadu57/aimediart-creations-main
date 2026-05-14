@@ -1,5 +1,6 @@
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -11,7 +12,6 @@ import { isVisitorRole } from "@/lib/authUser";
 import { getStoredVisitorUuid } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import { USER_AGE_OPTIONS } from "@/lib/userAgeOptions";
-import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -31,7 +31,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const PASSWORD_MIN_LENGTH = 6;
 const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
 
-/** Erreur d’inscription = compte déjà existant pour cet e-mail (Auth). */
 function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
   const c = (code ?? "").toLowerCase();
   if (c === "email_exists" || c === "user_already_exists") return true;
@@ -42,21 +41,6 @@ function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
     m.includes("user already registered") ||
     m.includes("email address is already registered")
   );
-}
-
-/** Met en forme les erreurs Supabase Auth pour l’utilisateur. */
-function formatSignUpError(message: string): string {
-  const m = message.toLowerCase();
-  if (isDuplicateEmailSignUpError(message)) {
-    return "Cette adresse e-mail est déjà utilisée.";
-  }
-  if (m.includes("password") && (m.includes("short") || m.includes("least") || m.includes("6"))) {
-    return `Mot de passe trop court : au moins ${PASSWORD_MIN_LENGTH} caractères.`;
-  }
-  if (m.includes("invalid email") || m.includes("email")) {
-    return "Adresse e-mail invalide.";
-  }
-  return message;
 }
 
 function isBypassEmail(email: string): boolean {
@@ -84,22 +68,37 @@ type RegisterVisitorInstantResponse = {
 };
 
 const Register = () => {
+  const { t } = useTranslation("auth");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { t } = useUiLanguage();
   const { session, loading: authLoading, role_name, role_id } = useAuthUser();
   const expoIdFromUrl = searchParams.get("expo_id")?.trim() || "";
   const agencyIdFromUrl = searchParams.get("agency_id")?.trim() || "";
 
+  const formatSignUpError = useCallback(
+    (message: string): string => {
+      const m = message.toLowerCase();
+      if (isDuplicateEmailSignUpError(message)) {
+        return t("register_visitor.error_duplicate_email_signup");
+      }
+      if (m.includes("password") && (m.includes("short") || m.includes("least") || m.includes(String(PASSWORD_MIN_LENGTH)))) {
+        return t("register_visitor.error_password_short_signup", { min: PASSWORD_MIN_LENGTH });
+      }
+      if (m.includes("invalid email") || (m.includes("email") && m.includes("invalid"))) {
+        return t("register_visitor.error_invalid_email_signup");
+      }
+      return message;
+    },
+    [t],
+  );
+
   const [step, setStep] = useState<1 | 2>(1);
 
-  /* Étape 1 — conservé en state React pour l’étape 2 */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  /* Étape 2 — aligné sur public.users (cf. authUser / userScope) */
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [userAge, setUserAge] = useState("");
@@ -116,13 +115,10 @@ const Register = () => {
   const passwordHasMinLength = password.length >= PASSWORD_MIN_LENGTH;
   const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
   const canGoToStep2 = emailLooksValid && passwordHasMinLength && passwordsMatch;
-  const finalActionLabel = t("Entrer dans l'exposition");
+  const finalActionLabel = t("register_visitor.enter_expo");
   const creatingProfile = submitting || uploadingPhoto;
   const canSubmitFinal =
-    !creatingProfile &&
-    Boolean(prenom.trim()) &&
-    Boolean(nom.trim()) &&
-    userPhoneValid;
+    !creatingProfile && Boolean(prenom.trim()) && Boolean(nom.trim()) && userPhoneValid;
 
   useEffect(() => {
     if (expoIdFromUrl) setCurrentExpoId(expoIdFromUrl);
@@ -142,21 +138,21 @@ const Register = () => {
   }
 
   const goToStep2 = () => {
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      toast.error("Saisissez votre adresse e-mail.");
+    const emailTrimmed = email.trim();
+    if (!emailTrimmed) {
+      toast.error(t("register_visitor.toast_enter_email"));
       return;
     }
     if (!password) {
-      toast.error("Saisissez un mot de passe.");
+      toast.error(t("register_visitor.toast_enter_password"));
       return;
     }
     if (password.length < PASSWORD_MIN_LENGTH) {
-      toast.error(`Le mot de passe doit contenir au moins ${PASSWORD_MIN_LENGTH} caractères.`);
+      toast.error(t("register_visitor.toast_password_min", { min: PASSWORD_MIN_LENGTH }));
       return;
     }
     if (password !== confirmPassword) {
-      toast.error("Les mots de passe ne correspondent pas.");
+      toast.error(t("register.error_password_mismatch"));
       return;
     }
     setStep(2);
@@ -191,18 +187,23 @@ const Register = () => {
       const first = await tryUpload(preferredBucket);
       if (first.ok) {
         setUserPhotoUrl(first.publicUrl);
-        toast.success("Photo de profil capturée.");
+        toast.success(t("register_visitor.toast_photo_saved"));
         return;
       }
       const second = await tryUpload(fallbackBucket);
       if (second.ok) {
         setUserPhotoUrl(second.publicUrl);
-        toast.success("Photo de profil capturée.");
+        toast.success(t("register_visitor.toast_photo_saved"));
         return;
       }
-      throw new Error(`Envoi photo impossible : ${first.error.message} / ${second.error.message}`);
+      toast.error(
+        t("register_visitor.toast_photo_upload_failed", {
+          first: first.error.message,
+          second: second.error.message,
+        }),
+      );
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Capture photo impossible.";
+      const msg = err instanceof Error ? err.message : t("register_visitor.toast_photo_failed");
       toast.error(msg);
     } finally {
       setUploadingPhoto(false);
@@ -219,39 +220,36 @@ const Register = () => {
     const trimmedPhone = userPhone.trim();
 
     if (!trimmed || !password) {
-      toast.error("Données d’accès incomplètes. Revenez à l’étape 1.");
+      toast.error(t("register_visitor.toast_complete_email_password"));
       return;
     }
     if (!trimmedPrenom) {
-      toast.error("Indiquez votre prénom.");
+      toast.error(t("register_visitor.toast_enter_firstname"));
       return;
     }
     if (!trimmedNom) {
-      toast.error("Indiquez votre nom.");
+      toast.error(t("register_visitor.toast_enter_lastname"));
       return;
     }
     if (!userPhoneValid) {
-      toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+      toast.error(t("register_visitor.toast_phone_invalid"));
       return;
     }
     setSubmitting(true);
     try {
-      // Dérogation permanente: pour cet e-mail, on n'appelle jamais l'Edge Function.
-      // Le flux est limité à une connexion directe au compte existant.
       if (isBypassEmail(trimmed)) {
         const { error: bypassSignInError } = await supabase.auth.signInWithPassword({
           email: trimmed,
           password,
         });
         if (bypassSignInError) {
-          toast.message("Mode test actif: entrée directe sans authentification.");
+          toast.message(t("register_visitor.toast_test_bypass"));
         }
         const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
         navigate(target, { replace: true });
         return;
       }
 
-      // Flux visiteur uniquement (role_id=7) : création confirmée immédiatement côté serveur.
       const body: RegisterVisitorInstantPayload = {
         email: trimmed,
         password,
@@ -271,7 +269,7 @@ const Register = () => {
       );
 
       if (createError) {
-        const msg = createError.message || "Inscription visiteur impossible.";
+        const msg = createError.message || t("register_visitor.toast_visitor_signup_failed");
         if (isDuplicateEmailSignUpError(msg, createData?.code)) {
           setEmailDuplicateOpen(true);
           return;
@@ -281,7 +279,7 @@ const Register = () => {
       }
 
       if (!createData?.ok || !createData?.user_id) {
-        const msg = createData?.error || "Inscription incomplète : identifiant utilisateur manquant.";
+        const msg = createData?.error || t("register_visitor.toast_incomplete_profile");
         toast.error(msg);
         return;
       }
@@ -291,7 +289,7 @@ const Register = () => {
         password,
       });
       if (signInError) {
-        toast.error(signInError.message || "Compte créé mais connexion automatique impossible.");
+        toast.error(signInError.message || t("register_visitor.toast_auto_sign_in_failed"));
         return;
       }
 
@@ -304,8 +302,8 @@ const Register = () => {
         navigate("/scan-work1", { replace: true });
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Inscription visiteur impossible.";
-      toast.error(msg);
+      const msg = err instanceof Error ? err.message : t("register_visitor.toast_visitor_signup_failed");
+      toast.error(formatSignUpError(msg));
     } finally {
       setSubmitting(false);
     }
@@ -314,7 +312,7 @@ const Register = () => {
   const handleDuplicateYesReset = async () => {
     const trimmed = email.trim();
     if (!trimmed) {
-      toast.error("Adresse e-mail manquante.");
+      toast.error(t("register_visitor.toast_email_missing"));
       setEmailDuplicateOpen(false);
       return;
     }
@@ -325,27 +323,28 @@ const Register = () => {
     setSendingResetEmail(false);
     setEmailDuplicateOpen(false);
     if (error) {
-      toast.error(error.message || "Envoi du lien impossible.");
+      toast.error(error.message || t("login.toast_reset_send_failed"));
       return;
     }
-    toast.success(
-      "Si un compte existe pour cet e-mail, vous recevrez un lien pour choisir un nouveau mot de passe.",
-    );
+    toast.success(t("reset_password.success"));
   };
+
+  const markOk = t("register_visitor.rule_ok");
+  const markPending = t("register_visitor.rule_pending");
 
   return (
     <div className="flex w-full flex-1 flex-col items-center px-4 pb-8 pt-1">
       <AlertDialog open={emailDuplicateOpen} onOpenChange={setEmailDuplicateOpen}>
         <AlertDialogContent className="max-w-[min(320px,calc(100vw-2rem))]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base">E-mail déjà utilisé</AlertDialogTitle>
+            <AlertDialogTitle className="text-base">{t("register_visitor.dialog_duplicate_title")}</AlertDialogTitle>
             <AlertDialogDescription className="text-left text-sm leading-snug">
-              Cet e-mail est déjà utilisé. Avez-vous perdu votre mot de passe ? Voulez-vous le réinitialiser ?
+              {t("register_visitor.dialog_duplicate_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel type="button" className="mt-0" disabled={sendingResetEmail}>
-              Non
+              {t("register_visitor.btn_no")}
             </AlertDialogCancel>
             <Button
               type="button"
@@ -356,10 +355,10 @@ const Register = () => {
               {sendingResetEmail ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Envoi…
+                  {t("register_visitor.btn_sending")}
                 </>
               ) : (
-                "Oui"
+                t("register_visitor.btn_yes")
               )}
             </Button>
           </AlertDialogFooter>
@@ -370,7 +369,7 @@ const Register = () => {
         <CardHeader className="space-y-1 px-3 pb-1 pt-3">
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-left font-serif text-xl leading-tight">
-              {step === 1 ? "Accès" : "Créer un compte"}
+              {step === 1 ? t("register_visitor.title_step_access") : t("register_visitor.title_step_profile")}
             </CardTitle>
             <span
               className="shrink-0 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground tabular-nums"
@@ -385,7 +384,7 @@ const Register = () => {
             <div className="space-y-2.5">
               <div className="space-y-1">
                 <Label htmlFor="register-email" className="text-xs">
-                  E-mail
+                  {t("register.email")}
                 </Label>
                 <Input
                   id="register-email"
@@ -394,19 +393,17 @@ const Register = () => {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
+                  placeholder={t("register_visitor.placeholder_email")}
                   className="h-9 text-sm"
                   required
                 />
                 {email.includes("@") && (
-                  <p className="text-[10px] leading-tight text-muted-foreground">
-                    Nous vérifions si l’e-mail existe déjà
-                  </p>
+                  <p className="text-[10px] leading-tight text-muted-foreground">{t("register_visitor.hint_email_check")}</p>
                 )}
               </div>
               <div className="space-y-1">
                 <Label htmlFor="register-password" className="text-xs">
-                  Mot de passe
+                  {t("register.password")}
                 </Label>
                 <div className="relative">
                   <Input
@@ -424,18 +421,20 @@ const Register = () => {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus:ring-0"
-                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-label={
+                      showPassword ? t("register_visitor.aria_hide_password") : t("register_visitor.aria_show_password")
+                    }
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <p className="text-[10px] leading-tight text-muted-foreground">
-                  Au moins {PASSWORD_MIN_LENGTH} caractères.
+                  {t("register_visitor.password_hint_min", { min: PASSWORD_MIN_LENGTH })}
                 </p>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="register-password-confirm" className="text-xs">
-                  Confirmation du mot de passe
+                  {t("register.password_confirm")}
                 </Label>
                 <div className="relative">
                   <Input
@@ -452,21 +451,26 @@ const Register = () => {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus:ring-0"
-                    aria-label={showPassword ? "Masquer la confirmation" : "Afficher la confirmation"}
+                    aria-label={
+                      showPassword ? t("register_visitor.aria_hide_confirm") : t("register_visitor.aria_show_confirm")
+                    }
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <div className="rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-[10px] leading-tight">
-                  <p className="mb-1 font-semibold text-foreground">Validation (règles Supabase Auth)</p>
+                  <p className="mb-1 font-semibold text-foreground">{t("register_visitor.validation_box_title")}</p>
                   <p className={passwordHasMinLength ? "text-emerald-600" : "text-muted-foreground"}>
-                    {passwordHasMinLength ? "✓" : "•"} Mot de passe : au moins {PASSWORD_MIN_LENGTH} caractères
+                    {t("register_visitor.rule_password_length", {
+                      mark: passwordHasMinLength ? markOk : markPending,
+                      min: PASSWORD_MIN_LENGTH,
+                    })}
                   </p>
                   <p className={passwordsMatch ? "text-emerald-600" : "text-muted-foreground"}>
-                    {passwordsMatch ? "✓" : "•"} Confirmation : les deux mots de passe doivent être identiques
+                    {t("register_visitor.rule_password_match", { mark: passwordsMatch ? markOk : markPending })}
                   </p>
                   <p className={emailLooksValid ? "text-emerald-600" : "text-muted-foreground"}>
-                    {emailLooksValid ? "✓" : "•"} E-mail : format valide requis
+                    {t("register_visitor.rule_email_format", { mark: emailLooksValid ? markOk : markPending })}
                   </p>
                 </div>
               </div>
@@ -476,14 +480,14 @@ const Register = () => {
                 onClick={goToStep2}
                 disabled={!canGoToStep2}
               >
-                OK
+                {t("register_visitor.btn_continue")}
               </Button>
               <p className="pt-1 text-center text-[11px] text-muted-foreground">
                 <Link
                   to={expoIdFromUrl ? `/login?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/login"}
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
-                  Déjà un compte ? Se connecter
+                  {t("register_visitor.link_login_combined")}
                 </Link>
               </p>
             </div>
@@ -491,7 +495,7 @@ const Register = () => {
             <form onSubmit={(e) => void handleFinalize(e)} className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-prenom" className="w-20 shrink-0 text-xs">
-                  Prénom
+                  {t("register_visitor.label_firstname")}
                 </Label>
                 <Input
                   id="register-prenom"
@@ -507,7 +511,7 @@ const Register = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-nom" className="w-20 shrink-0 text-xs">
-                  Nom
+                  {t("register_visitor.label_lastname")}
                 </Label>
                 <Input
                   id="register-nom"
@@ -523,11 +527,11 @@ const Register = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-age" className="w-20 shrink-0 text-xs">
-                  Âge
+                  {t("register_visitor.label_age")}
                 </Label>
                 <Select value={userAge} onValueChange={setUserAge} disabled={submitting || uploadingPhoto}>
                   <SelectTrigger id="register-age" className="h-9 flex-1 text-sm">
-                    <SelectValue placeholder="Choisir une tranche d’âge" />
+                    <SelectValue placeholder={t("register_visitor.age_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {USER_AGE_OPTIONS.map((age) => (
@@ -540,7 +544,7 @@ const Register = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-phone" className="w-20 shrink-0 text-xs">
-                  Tél.
+                  {t("register_visitor.label_tel")}
                 </Label>
                 <SmartPhoneInput
                   id="register-phone"
@@ -557,7 +561,7 @@ const Register = () => {
                     htmlFor="register-selfie"
                     className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
                   >
-                    {uploadingPhoto ? "Capture en cours..." : "Prendre un selfie"}
+                    {uploadingPhoto ? t("register_visitor.btn_photo_uploading") : t("register_visitor.btn_take_selfie")}
                   </label>
                   <input
                     id="register-selfie"
@@ -569,7 +573,7 @@ const Register = () => {
                     className="hidden"
                   />
                   {userPhotoUrl ? (
-                    <img src={userPhotoUrl} alt="Aperçu selfie" className="h-[100px] w-[100px] rounded-full object-cover" />
+                    <img src={userPhotoUrl} alt={t("register_visitor.selfie_alt")} className="h-[100px] w-[100px] rounded-full object-cover" />
                   ) : (
                     <div className="h-[100px] w-[100px] rounded-full border border-dashed border-border/80 bg-muted/40" />
                   )}
@@ -583,7 +587,7 @@ const Register = () => {
                   disabled={creatingProfile}
                   onClick={() => setStep(1)}
                 >
-                  Retour
+                  {t("register_visitor.btn_back")}
                 </Button>
                 <Button
                   type="submit"
@@ -593,7 +597,7 @@ const Register = () => {
                   {creatingProfile ? (
                     <>
                       <Loader2 className="mr-1 h-3.5 w-3.5 shrink-0 animate-spin" />
-                      Création du profil...
+                      {t("register_visitor.btn_creating_profile")}
                     </>
                   ) : (
                     finalActionLabel
@@ -605,7 +609,7 @@ const Register = () => {
                   to={expoIdFromUrl ? `/login?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/login"}
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
-                  Déjà un compte ? Se connecter
+                  {t("register_visitor.link_login_combined")}
                 </Link>
               </p>
             </form>

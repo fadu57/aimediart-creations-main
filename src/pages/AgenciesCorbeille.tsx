@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
@@ -18,6 +19,7 @@ type AgencyTrashRow = {
 };
 
 export default function AgenciesCorbeille() {
+  const { t } = useTranslation("trash");
   const { loading: authLoading, role_id, role_name } = useAuthUser();
   const canAccess = useMemo(
     () => role_id === 1 || role_id === 2 || role_id === 3 || role_id === 4 || hasFullDataAccess(role_name),
@@ -58,10 +60,10 @@ export default function AgenciesCorbeille() {
       .update({ deleted_at: null })
       .eq("id", agencyId);
     if (error) {
-      toast.error(error.message);
+      toast.error(error.message || t("error_restore"));
       return;
     }
-    toast.success("Organisation restaurée.");
+    toast.success(t("success_restore"));
     await loadTrash();
   };
 
@@ -96,7 +98,7 @@ export default function AgenciesCorbeille() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune fiche archivée.</p>
+        <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {rows.map((row) => (
@@ -114,7 +116,7 @@ export default function AgenciesCorbeille() {
                   />
                 </div>
                 <Button type="button" className="gap-2 shrink-0" onClick={() => void handleRestore(row.id)}>
-                  <ArchiveRestore className="h-4 w-4" /> Restaurer
+                  <ArchiveRestore className="h-4 w-4" /> {t("restore_button")}
                 </Button>
               </CardContent>
             </Card>

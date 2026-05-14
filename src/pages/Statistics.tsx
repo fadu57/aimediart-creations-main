@@ -20,6 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { PDF_FORMAT_OPTIONS, type PdfPaperFormat } from "@/lib/statisticsPrintExport";
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
 import { StatisticsReportView } from "@/components/statistics/StatisticsReportView";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
@@ -1168,8 +1169,8 @@ const Statistics = () => {
 
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start">
-        <div>
+      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 max-w-full md:max-w-md shrink-0">
           <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           <p className="text-muted-foreground">{t("page.subtitle")}</p>
           <Button
@@ -1181,7 +1182,8 @@ const Statistics = () => {
             {t("page.preview")}
           </Button>
         </div>
-        <div className="flex flex-col gap-2 text-sm min-w-[220px]">
+        <BackofficeStickyAgencyLogoSlot />
+        <div className="flex flex-col gap-2 text-sm min-w-[220px] shrink-0 md:ml-auto">
           {showOrganizationFilter && (
             <div>
               <label htmlFor="statistics-scope-org" className="text-xs text-muted-foreground font-medium">

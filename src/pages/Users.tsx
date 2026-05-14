@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1478,10 +1479,11 @@ const Users = ({
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-3xl font-serif font-bold text-white">Utilisateurs</h2>
-        </div>
-        <div className="relative w-[210px] min-w-[210px] max-w-[210px] md:mr-auto">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-4 md:max-w-[min(100%,680px)]">
+          <div>
+            <h2 className="text-3xl font-serif font-bold text-white">Utilisateurs</h2>
+          </div>
+        <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
           <Input
             type="text"
             autoComplete="off"
@@ -1508,16 +1510,20 @@ const Users = ({
             ))}
           </datalist>
         </div>
-        <Button
-          type="button"
-          className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
-          onClick={openCreate}
-        >
-          + Nouvel utilisateur
-        </Button>
-        <Button asChild type="button" variant="outline" className="border-border bg-background/80">
-          <Link to="/user/utilisateurs" className="text-center leading-tight">Tableau</Link>
-        </Button>
+        </div>
+        <BackofficeStickyAgencyLogoSlot />
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+            onClick={openCreate}
+          >
+            + Nouvel utilisateur
+          </Button>
+          <Button asChild type="button" variant="outline" className="border-border bg-background/80">
+            <Link to="/user/utilisateurs" className="text-center leading-tight">Tableau</Link>
+          </Button>
+        </div>
       </div>
 
       {error && (

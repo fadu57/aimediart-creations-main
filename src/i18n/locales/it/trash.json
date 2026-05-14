@@ -1,0 +1,11 @@
+{
+  "empty_state": "Nessuna scheda archiviata.",
+  "restore_button": "Ripristina",
+  "delete_permanently": "Elimina definitivamente",
+  "confirm_restore": "Ripristinare questo elemento dal cestino?",
+  "confirm_delete": "Eliminare definitivamente questo elemento? Azione irreversibile.",
+  "success_restore": "Elemento ripristinato.",
+  "success_delete": "Elemento eliminato definitivamente.",
+  "error_restore": "Impossibile ripristinare l’elemento.",
+  "error_delete": "Impossibile eliminare definitivamente l’elemento."
+}

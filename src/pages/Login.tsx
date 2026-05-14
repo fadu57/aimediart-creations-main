@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -8,14 +9,12 @@ import { buildSignupTrackingPayload } from "@/lib/signupTrackingFromLogin";
 import { clearLoginTrackerSession } from "@/lib/visitorTracking";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { isVisitorRole } from "@/lib/authUser";
-import { getCurrentExpoId, setCurrentExpoId } from "@/lib/expoContext";
+import { setCurrentExpoId } from "@/lib/expoContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const EMAIL_VALIDATION_MESSAGE = "Veuillez inclure un « @ » dans l’adresse e-mail.";
+import type { TFunction } from "i18next";
 
 const getRedirectAfterLoginPath = (): string | null => {
   if (typeof window === "undefined") return null;
@@ -33,8 +32,9 @@ const getRedirectAfterLoginPath = (): string | null => {
 };
 
 const Login = () => {
+  const { t } = useTranslation("auth");
   const [searchParams] = useSearchParams();
-  const { session, loading: authLoading, role_name, agency_id, role_id } = useAuthUser();
+  const { session, loading: authLoading, agency_id } = useAuthUser();
   const expoIdFromUrl = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {
@@ -69,7 +69,7 @@ const Login = () => {
     e.preventDefault();
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
-      toast.error("Saisissez l’e-mail et le mot de passe.");
+      toast.error(t("login.toast_enter_email_password"));
       return;
     }
 
@@ -81,11 +81,11 @@ const Login = () => {
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message || "Connexion impossible.");
+      toast.error(error.message || t("login.toast_sign_in_failed"));
       return;
     }
 
-    toast.success("Connexion réussie.");
+    toast.success(t("login.toast_success"));
     clearLoginTrackerSession();
     /* Redirection : `session` + rôle via `useAuthUser` (bloc Navigate ci-dessus). */
   };
@@ -93,7 +93,7 @@ const Login = () => {
   const handleForgotPassword = async () => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
-      toast.error("Saisissez d’abord votre adresse e-mail.");
+      toast.error(t("login.toast_enter_email_before_reset"));
       return;
     }
     setSendingReset(true);
@@ -102,18 +102,18 @@ const Login = () => {
     });
     setSendingReset(false);
     if (error) {
-      toast.error(error.message || "Envoi du lien impossible.");
+      toast.error(error.message || t("login.toast_reset_send_failed"));
       return;
     }
-    toast.success("Si un compte existe pour cet e-mail, vous recevrez un lien pour choisir un nouveau mot de passe.");
+    toast.success(t("reset_password.success"));
   };
 
   const upsertProfileForLevel4 = async (
     authUserId: string,
     targetAgencyId: string,
     tracking: Record<string, unknown> | null,
+    logT: TFunction<"auth">,
   ) => {
-    // Les donnees de profil vont dans public.profiles (le trigger signUp peut avoir deja cree la ligne)
     const profilePayload: {
       id: string;
       first_name?: string | null;
@@ -139,28 +139,27 @@ const Login = () => {
       .from("profiles")
       .upsert(profilePayload, { onConflict: "id" });
     if (profileErr) {
-      throw new Error(`Mise a jour profil impossible : ${profileErr.message}`);
+      throw new Error(logT("login.error_profile_update", { message: profileErr.message }));
     }
 
-    // Le rattachement agence + role va dans agency_users (PK composite user_id, agency_id)
     const { error: linkErr } = await supabase
       .from("agency_users")
       .upsert({ user_id: authUserId, agency_id: targetAgencyId, role_id: 4 }, { onConflict: "user_id,agency_id" });
     if (linkErr) {
-      throw new Error(`Rattachement agence impossible : ${linkErr.message}`);
+      throw new Error(logT("login.error_agency_link", { message: linkErr.message }));
     }
   };
 
   const handleCreateAccount = async () => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
-      toast.error("Saisissez l’e-mail et le mot de passe pour créer le compte.");
+      toast.error(t("login.toast_enter_email_password_create"));
       return;
     }
 
     const targetAgencyId = (agency_id ?? import.meta.env.VITE_DEFAULT_AGENCY_ID?.trim()) || null;
     if (!targetAgencyId) {
-      toast.error("agency_id introuvable. Définissez VITE_DEFAULT_AGENCY_ID pour la création de compte niveau 4.");
+      toast.error(t("login.toast_agency_missing"));
       return;
     }
 
@@ -175,15 +174,15 @@ const Login = () => {
 
       const authUserId = data.user?.id ?? null;
       if (!authUserId) {
-        throw new Error("ID utilisateur non retourné par Supabase après signUp.");
+        throw new Error(t("login.error_user_id_missing"));
       }
 
       const tracking = buildSignupTrackingPayload(searchParams);
-      await upsertProfileForLevel4(authUserId, targetAgencyId, tracking);
+      await upsertProfileForLevel4(authUserId, targetAgencyId, tracking, t);
       clearLoginTrackerSession();
-      toast.success("Compte créé. Vérifiez l’e-mail si la confirmation est activée.");
+      toast.success(t("login.toast_account_created"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Création du compte impossible.";
+      const msg = e instanceof Error ? e.message : t("login.toast_create_failed");
       toast.error(msg);
     } finally {
       setCreatingAccount(false);
@@ -194,12 +193,12 @@ const Login = () => {
     <div className="flex w-full flex-1 flex-col items-center px-4 pb-8 pt-0">
       <Card className="mt-5 w-full max-w-[320px] border-border shadow-lg">
         <CardHeader className="space-y-1 px-3 pt-4 pb-2">
-          <CardTitle className="font-serif text-2xl text-center">Connexion</CardTitle>
+          <CardTitle className="font-serif text-2xl text-center">{t("login.title")}</CardTitle>
         </CardHeader>
         <CardContent className="px-3 pb-4 pt-0">
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div className="space-y-[5px]">
-              <Label htmlFor="login-email">E-mail</Label>
+              <Label htmlFor="login-email">{t("login.email")}</Label>
               <Input
                 id="login-email"
                 type="email"
@@ -209,11 +208,11 @@ const Login = () => {
                 onInvalid={(e) => {
                   const input = e.currentTarget;
                   if (input.validity.typeMismatch || input.validity.patternMismatch) {
-                    input.setCustomValidity(EMAIL_VALIDATION_MESSAGE);
+                    input.setCustomValidity(t("login.validation_email_pattern"));
                     return;
                   }
                   if (input.validity.valueMissing) {
-                    input.setCustomValidity("L’adresse e-mail est obligatoire.");
+                    input.setCustomValidity(t("login.validation_email_required"));
                     return;
                   }
                   input.setCustomValidity("");
@@ -221,13 +220,13 @@ const Login = () => {
                 onInput={(e) => {
                   e.currentTarget.setCustomValidity("");
                 }}
-                placeholder="vous@exemple.com"
+                placeholder={t("login.placeholder_email")}
                 disabled={submitting}
                 required
               />
             </div>
             <div className="space-y-[5px]">
-              <Label htmlFor="login-password">Mot de passe</Label>
+              <Label htmlFor="login-password">{t("login.password")}</Label>
               <div className="relative">
                 <Input
                   id="login-password"
@@ -243,7 +242,7 @@ const Login = () => {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none drop-shadow-none focus:outline-none focus:ring-0 active:opacity-100"
-                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={showPassword ? t("login.aria_hide_password") : t("login.aria_show_password")}
                   disabled={submitting}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -256,7 +255,7 @@ const Login = () => {
                   onClick={() => void handleForgotPassword()}
                   disabled={submitting || sendingReset}
                 >
-                  {sendingReset ? "Envoi…" : "Mot de passe oublié ?"}
+                  {sendingReset ? t("login.forgot_sending") : t("login.forgot_password")}
                 </button>
               </div>
             </div>
@@ -267,16 +266,16 @@ const Login = () => {
                 onClick={() => void handleCreateAccount()}
                 disabled={submitting || creatingAccount}
               >
-                {creatingAccount ? "Création..." : "Créer un compte"}
+                {creatingAccount ? t("login.btn_creating_account") : t("login.btn_create_account")}
               </Button>
               <Button type="submit" className="flex-1 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground" disabled={submitting}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connexion…
+                    {t("login.submit_loading")}
                   </>
                 ) : (
-                  "Se connecter"
+                  t("login.submit")
                 )}
               </Button>
             </div>
@@ -285,7 +284,7 @@ const Login = () => {
                 to={expoIdFromUrl ? `/register?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/register"}
                 className="underline underline-offset-2 transition-colors hover:text-foreground"
               >
-                Pas encore de compte ? S&apos;inscrire
+                {t("login.register_cta_inline")}
               </Link>
             </p>
           </form>

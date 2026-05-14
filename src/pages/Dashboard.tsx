@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Eye, Heart, Smile, ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import { emotions, artworks, expos, getArtistById } from "@/data/mockData";
 import { useDataScope } from "@/hooks/useDataScope";
@@ -102,9 +103,10 @@ const Dashboard = () => {
   return (
     <div className="container py-8 space-y-8">
       <div className="flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
-        <div>
+        <div className="min-w-0 shrink-0 md:flex-1">
           <h2 className="text-3xl font-serif font-bold text-white">Accueil</h2>
         </div>
+        <BackofficeStickyAgencyLogoSlot />
       </div>
       <div>
         <p className="text-sm text-muted-foreground mb-1">Données en temps réel de votre exposition</p>

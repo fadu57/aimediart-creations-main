@@ -1,0 +1,11 @@
+{
+  "empty_state": "No archived records.",
+  "restore_button": "Restore",
+  "delete_permanently": "Delete permanently",
+  "confirm_restore": "Restore this item from trash?",
+  "confirm_delete": "Permanently delete this item? This cannot be undone.",
+  "success_restore": "Item restored.",
+  "success_delete": "Item permanently deleted.",
+  "error_restore": "Could not restore this item.",
+  "error_delete": "Could not permanently delete this item."
+}

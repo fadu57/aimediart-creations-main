@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
@@ -12,6 +13,7 @@ import { Label } from "@/components/ui/label";
 const MIN_LEN = 8;
 
 const ResetPassword = () => {
+  const { t } = useTranslation("auth");
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -27,7 +29,9 @@ const ResetPassword = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       if (event === "PASSWORD_RECOVERY" || session) {
         setReady(true);
@@ -49,16 +53,16 @@ const ResetPassword = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < MIN_LEN) {
-      toast.error(`Le mot de passe doit contenir au moins ${MIN_LEN} caractères.`);
+      toast.error(t("recovery.toast_min_length", { min: MIN_LEN }));
       return;
     }
     if (password !== confirm) {
-      toast.error("Les deux saisies du nouveau mot de passe ne correspondent pas.");
+      toast.error(t("recovery.toast_confirm_mismatch"));
       return;
     }
     const prev = previousPassword.trim();
     if (prev.length > 0 && prev === password) {
-      toast.error("Le nouveau mot de passe doit être différent de l’ancien.");
+      toast.error(t("recovery.toast_same_as_previous"));
       return;
     }
 
@@ -67,11 +71,11 @@ const ResetPassword = () => {
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message || "Impossible de mettre à jour le mot de passe.");
+      toast.error(error.message || t("recovery.toast_update_failed"));
       return;
     }
 
-    toast.success("Mot de passe mis à jour. Vous pouvez vous connecter.");
+    toast.success(t("recovery.toast_updated"));
     await supabase.auth.signOut();
     navigate("/login", { replace: true });
   };
@@ -87,11 +91,9 @@ const ResetPassword = () => {
   if (!ready) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-12 text-center">
-        <p className="text-sm text-muted-foreground max-w-md">
-          Lien invalide ou expiré. Demandez un nouveau lien depuis la page de connexion (« Mot de passe oublié »).
-        </p>
+        <p className="text-sm text-muted-foreground max-w-md">{t("recovery.invalid_link")}</p>
         <Button variant="outline" asChild>
-          <Link to="/login">Retour à la connexion</Link>
+          <Link to="/login">{t("recovery.link_back_login")}</Link>
         </Button>
       </div>
     );
@@ -101,16 +103,13 @@ const ResetPassword = () => {
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="font-serif text-2xl text-center">Nouveau mot de passe</CardTitle>
-          <CardDescription className="text-center">
-            Choisissez un mot de passe différent de l’ancien. Si vous vous souvenez encore de l’ancien, saisissez-le
-            ci-dessous : il ne doit pas être identique au nouveau.
-          </CardDescription>
+          <CardTitle className="font-serif text-2xl text-center">{t("recovery.card_title")}</CardTitle>
+          <CardDescription className="text-center">{t("recovery.card_description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             <div className="space-y-[5px]">
-              <Label htmlFor="reset-previous">Ancien mot de passe (optionnel)</Label>
+              <Label htmlFor="reset-previous">{t("recovery.previous_password_label")}</Label>
               <div className="relative">
                 <Input
                   id="reset-previous"
@@ -120,20 +119,20 @@ const ResetPassword = () => {
                   onChange={(e) => setPreviousPassword(e.target.value)}
                   disabled={submitting}
                   className="pr-10"
-                  placeholder="Pour vérifier qu’il est différent du nouveau"
+                  placeholder={t("recovery.previous_placeholder")}
                 />
                 <button
                   type="button"
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={() => setShowPrev((v) => !v)}
-                  aria-label={showPrev ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={showPrev ? t("recovery.aria_hide_password") : t("recovery.aria_show_password")}
                 >
                   {showPrev ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
             <div className="space-y-[5px]">
-              <Label htmlFor="reset-new">Nouveau mot de passe</Label>
+              <Label htmlFor="reset-new">{t("recovery.new_password_label")}</Label>
               <div className="relative">
                 <Input
                   id="reset-new"
@@ -150,14 +149,14 @@ const ResetPassword = () => {
                   type="button"
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={showPw ? t("recovery.aria_hide_password") : t("recovery.aria_show_password")}
                 >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
             <div className="space-y-[5px]">
-              <Label htmlFor="reset-confirm">Confirmer le nouveau mot de passe</Label>
+              <Label htmlFor="reset-confirm">{t("recovery.confirm_password_label")}</Label>
               <div className="relative">
                 <Input
                   id="reset-confirm"
@@ -174,7 +173,7 @@ const ResetPassword = () => {
                   type="button"
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={() => setShowCf((v) => !v)}
-                  aria-label={showCf ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={showCf ? t("recovery.aria_hide_password") : t("recovery.aria_show_password")}
                 >
                   {showCf ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -184,15 +183,15 @@ const ResetPassword = () => {
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enregistrement…
+                  {t("recovery.submit_loading")}
                 </>
               ) : (
-                "Enregistrer le mot de passe"
+                t("recovery.submit")
               )}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
               <Link to="/login" className="text-primary underline-offset-4 hover:underline">
-                Retour à la connexion
+                {t("recovery.link_back_login")}
               </Link>
             </p>
           </form>

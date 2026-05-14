@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AddArtistDialog } from "@/components/AddArtistDialog";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { canCreateArtist } from "@/lib/authUser";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
@@ -125,9 +126,9 @@ const Artists = () => {
   return artists ? (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full items-center gap-4 md:max-w-[680px]">
+        <div className="flex w-full shrink-0 items-center gap-4 md:max-w-[680px]">
           <div>
-          <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
+            <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
           </div>
           <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
             <Input
@@ -156,7 +157,8 @@ const Artists = () => {
             </datalist>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <BackofficeStickyAgencyLogoSlot />
+        <div className="flex shrink-0 items-center gap-2">
           {canAddArtist && (
             <Button
               type="button"

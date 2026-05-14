@@ -77,50 +77,25 @@ type PromptStyleForm = {
   max_tokens: string;
 };
 
-const SECTIONS: SettingSection[] = [
-  {
-    id: "general",
-    title: "Paramètres généraux",
-    description: "Préférences globales de l'application et comportements par défaut.",
-    icon: SlidersHorizontal,
-  },
-  {
-    id: "security",
-    title: "Sécurité et accès",
-    description: "Gestion des droits, des rôles et des règles d'accès.",
-    icon: Shield,
-  },
-  {
-    id: "retention",
-    title: "Corbeille & rétention",
-    description: "Durées de conservation et purge automatique des corbeilles.",
-    icon: Trash2,
-  },
-  {
-    id: "prompts-ia",
-    title: "Prompts IA",
-    description: "Configuration des prompts, personas et instructions système.",
-    icon: BrainCircuit,
-  },
-  {
-    id: "visitors",
-    title: "Visiteurs",
-    description: "Paramètres de parcours et d'interaction pour les visiteurs.",
-    icon: Users,
-  },
-  {
-    id: "notifications",
-    title: "Notifications",
-    description: "Canaux, fréquence et contenus des notifications envoyées.",
-    icon: Bell,
-  },
-  {
-    id: "œuvres-navigation",
-    title: "Type de navigation dans les œuvres",
-    description: "Choix du mode de navigation pour la consultation des fiches œuvre.",
-    icon: SlidersHorizontal,
-  },
-];
+const NAV_MATRIX_I18N_KEYS: Record<NavMatrixCible, string> = {
+  menu_home: "nav_entry_menu_home",
+  menu_agence: "nav_entry_menu_agence",
+  menu_user: "nav_entry_menu_user",
+  menu_expos: "nav_entry_menu_expos",
+  menu_artiste: "nav_entry_menu_artiste",
+  menu_catalogue: "nav_entry_menu_catalogue",
+  menu_stats: "nav_entry_menu_stats",
+  page_œuvre: "nav_entry_page_oeuvre",
+};
+
+const ROLE_FB_I18N: Partial<Record<number, string>> = {
+  2: "role_fallback_2",
+  3: "role_fallback_3",
+  4: "role_fallback_4",
+  5: "role_fallback_5",
+  6: "role_fallback_6",
+  7: "role_fallback_7",
+};
 
 const SECURITY_ACCESS_MATRIX = [
   {
@@ -263,15 +238,7 @@ function securityMatrixFromMatriceRows(rows: MatriceSecuriteRow[] | null | undef
   return out;
 }
 
-/** Libellés de secours si `roles_user.label` est indisponible. */
-const ROLE_LABEL_FALLBACK: Record<number, string> = {
-  2: "Super administrateur",
-  3: "Développeur",
-  4: "Administrateur agence",
-  5: "Curateur d'exposition",
-  6: "Équipe exposition",
-  7: "Visiteur",
-};
+
 
 const checkboxNoShadow =
   "shadow-none ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=checked]:shadow-none";
@@ -302,6 +269,7 @@ function PermissionCell({
   /** Libellé pour l’accessibilité (ex. « Configuration — lecture : oui »). */
   ariaLabel: string;
 }) {
+  const { t } = useTranslation("settings");
   return (
     <td className="border-b border-border/40 px-1 py-2 text-center align-middle">
       <div className="flex justify-center">
@@ -313,7 +281,7 @@ function PermissionCell({
           disabled={disabled}
           className={`shrink-0 ${checkboxNoShadow}`}
           aria-label={ariaLabel}
-          title={allowed ? "Oui" : "Non"}
+          title={allowed ? t("perm_yes") : t("perm_no")}
         />
       </div>
     </td>
@@ -321,7 +289,52 @@ function PermissionCell({
 }
 
 export default function SettingsPage() {
-  const { t } = useTranslation("artwork_modal");
+  const { t } = useTranslation("settings");
+
+  const sectionsCatalog = useMemo((): SettingSection[] => [
+    {
+      id: "general",
+      title: t("section_general_title"),
+      description: t("section_general_desc"),
+      icon: SlidersHorizontal,
+    },
+    {
+      id: "security",
+      title: t("section_security_title"),
+      description: t("section_security_desc"),
+      icon: Shield,
+    },
+    {
+      id: "retention",
+      title: t("section_retention_title"),
+      description: t("section_retention_desc"),
+      icon: Trash2,
+    },
+    {
+      id: "prompts-ia",
+      title: t("section_prompts_title"),
+      description: t("section_prompts_desc"),
+      icon: BrainCircuit,
+    },
+    {
+      id: "visitors",
+      title: t("section_visitors_title"),
+      description: t("section_visitors_desc"),
+      icon: Users,
+    },
+    {
+      id: "notifications",
+      title: t("section_notifications_title"),
+      description: t("section_notifications_desc"),
+      icon: Bell,
+    },
+    {
+      id: "œuvres-navigation",
+      title: t("section_artworks_nav_title"),
+      description: t("section_artworks_nav_desc"),
+      icon: SlidersHorizontal,
+    },
+  ], [t]);
   const [search, setSearch] = useState("");
   const [roleLabelsById, setRoleLabelsById] = useState<Record<number, string>>({});
   const [appSettingsRows, setAppSettingsRows] = useState<AppSettingRow[]>([]);
@@ -410,8 +423,8 @@ export default function SettingsPage() {
 
   const filteredSections = useMemo(() => {
     let base = canAccessGeneralSettings
-      ? SECTIONS
-      : SECTIONS.filter((s) => s.id !== "general");
+      ? sectionsCatalog
+      : sectionsCatalog.filter((s) => s.id !== "general");
     // La section "retention" est réservée aux rôles 1-3 uniquement
     if (!canAccessGeneralSettings) {
       base = base.filter((s) => s.id !== "retention");
@@ -421,7 +434,7 @@ export default function SettingsPage() {
     return base.filter((section) => {
       return section.title.toLowerCase().includes(q) || section.description.toLowerCase().includes(q);
     });
-  }, [search, canAccessGeneralSettings]);
+  }, [search, canAccessGeneralSettings, sectionsCatalog]);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,7 +487,7 @@ export default function SettingsPage() {
           setNavAccessMatrix(navMatrixFromMatriceSecuriteRows(allMatrice));
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Impossible de charger les données de prompts.";
+        const msg = e instanceof Error ? e.message : t("prompts_load_error");
         if (!cancelled) setPromptsDataError(msg);
       } finally {
         if (!cancelled) setLoadingPromptsData(false);
@@ -664,7 +677,7 @@ export default function SettingsPage() {
                     <tr key={`app-setting-${index}`} className="align-top">
                       {appSettingsColumns.map((col) => (
                         <td key={`app-setting-${index}-${col}`} className="border-b border-border/40 px-2 py-1.5">
-                          {row[col] == null ? "—" : String(row[col])}
+                          {row[col] == null ? t("dash_emdash") : String(row[col])}
                         </td>
                       ))}
                       <td className="border-b border-border/40 px-2 py-1.5">
@@ -689,12 +702,12 @@ export default function SettingsPage() {
                 <tbody>
                   {promptStyleRows.map((row) => (
                     <tr key={`prompt-style-${row.id}`} className="align-top">
-                      <td className="border-b border-border/40 px-2 py-1.5">{row.name || "—"}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5">{row.icon || "—"}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.persona_identity || "—"}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.style_rules || "—"}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.system_instruction || "—"}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5">{row.max_tokens ?? "—"}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5">{row.name || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5">{row.icon || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.persona_identity || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.style_rules || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.system_instruction || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5">{row.max_tokens ?? t("dash_emdash")}</td>
                       <td className="border-b border-border/40 px-2 py-1.5">
                         <Button type="button" size="sm" variant="outline" onClick={() => openPromptStyleEditor(row)}>
                           {t("settings_btn_modify")}
@@ -741,13 +754,13 @@ export default function SettingsPage() {
         { onConflict: "role_id,ressource" },
       );
       if (error) throw error;
-      toast.success("Matrice mise à jour.");
+      toast.success(t("toast_sec_matrix"));
     } catch (e) {
       setSecurityMatrix(matrixBefore);
       toast.error(
         getErrorMessage(
           e,
-          "Enregistrement impossible. Vérifiez les droits sur la table matrice_securite (RLS / politiques).",
+          t("error_sec_save"),
         ),
       );
     } finally {
@@ -774,14 +787,14 @@ export default function SettingsPage() {
         { onConflict: "role_id,ressource" },
       );
       if (error) throw error;
-      toast.success("Matrice menus et pages mise à jour.");
+      toast.success(t("toast_sec_nav"));
       void refreshNavigationMatrix();
     } catch (e) {
       setNavAccessMatrix(matrixBefore);
       toast.error(
         getErrorMessage(
           e,
-          "Enregistrement impossible. Vérifiez les droits sur la table matrice_securite (RLS / politiques).",
+          t("error_sec_save"),
         ),
       );
     } finally {
@@ -801,7 +814,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-8">
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Matrice des droits</p>
+        <p className="text-sm text-muted-foreground">{t("sec_matrix_title")}</p>
         <div className="overflow-x-auto rounded border border-border/50 bg-background shadow-none">
           <table className="min-w-full border-collapse text-xs">
             <thead className="bg-muted/40">
@@ -811,10 +824,12 @@ export default function SettingsPage() {
                   scope="colgroup"
                   className="border-b border-border/60 px-2 py-2 text-left align-bottom font-semibold"
                 >
-                  Ressource sensible / droit
+                  {t("sec_col_resource_rights")}
                 </th>
                 {rows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   return (
                     <th
                       key={`security-head-role-${row.roleId}`}
@@ -834,13 +849,15 @@ export default function SettingsPage() {
                   scope="rowgroup"
                   className="border-b border-border/40 bg-muted/20 px-2 py-2 text-left align-middle text-[11px] font-semibold leading-tight"
                 >
-                  Configuration — <code className="font-normal">app_settings</code>
+                  {t("sec_group_app")} <code className="font-normal">app_settings</code>
                 </th>
                 <th scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">
-                  Lecture
+                  {t("sec_rw_read")}
                 </th>
                 {rows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   const perms = securityMatrix[row.roleId];
                   if (!perms) return null;
                   return (
@@ -850,7 +867,7 @@ export default function SettingsPage() {
                       checkboxName={`security_${row.roleId}_app_settings_read`}
                       allowed={perms.appSettingsRead}
                       disabled={busy}
-                      ariaLabel={`${label}, configuration app_settings, lecture`}
+                      ariaLabel={t("sec_aria_app_read", { label })}
                       onCheckedChange={(c) => void applySecurityPatch(row.roleId, { appSettingsRead: c })}
                     />
                   );
@@ -858,10 +875,12 @@ export default function SettingsPage() {
               </tr>
               <tr className="align-middle">
                 <th scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">
-                  Écriture
+                  {t("sec_rw_write")}
                 </th>
                 {rows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   const perms = securityMatrix[row.roleId];
                   if (!perms) return null;
                   return (
@@ -871,7 +890,7 @@ export default function SettingsPage() {
                       checkboxName={`security_${row.roleId}_app_settings_write`}
                       allowed={perms.appSettingsWrite}
                       disabled={busy}
-                      ariaLabel={`${label}, configuration app_settings, écriture`}
+                      ariaLabel={t("sec_aria_app_write", { label })}
                       onCheckedChange={(c) => void applySecurityPatch(row.roleId, { appSettingsWrite: c })}
                     />
                   );
@@ -883,13 +902,15 @@ export default function SettingsPage() {
                   scope="rowgroup"
                   className="border-b border-border/40 bg-muted/20 px-2 py-2 text-left align-middle text-[11px] font-semibold leading-tight"
                 >
-                  Prompt IA — <code className="font-normal">prompt_style</code>
+                  {t("sec_group_prompt")} <code className="font-normal">prompt_style</code>
                 </th>
                 <th scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">
-                  Lecture
+                  {t("sec_rw_read")}
                 </th>
                 {rows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   const perms = securityMatrix[row.roleId];
                   if (!perms) return null;
                   return (
@@ -899,7 +920,7 @@ export default function SettingsPage() {
                       checkboxName={`security_${row.roleId}_prompt_style_read`}
                       allowed={perms.promptStyleRead}
                       disabled={busy}
-                      ariaLabel={`${label}, prompt_style, lecture`}
+                      ariaLabel={t("sec_aria_prompt_read", { label })}
                       onCheckedChange={(c) => void applySecurityPatch(row.roleId, { promptStyleRead: c })}
                     />
                   );
@@ -907,10 +928,12 @@ export default function SettingsPage() {
               </tr>
               <tr className="align-middle">
                 <th scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">
-                  Écriture
+                  {t("sec_rw_write")}
                 </th>
                 {rows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   const perms = securityMatrix[row.roleId];
                   if (!perms) return null;
                   return (
@@ -920,7 +943,7 @@ export default function SettingsPage() {
                       checkboxName={`security_${row.roleId}_prompt_style_write`}
                       allowed={perms.promptStyleWrite}
                       disabled={busy}
-                      ariaLabel={`${label}, prompt_style, écriture`}
+                      ariaLabel={t("sec_aria_prompt_write", { label })}
                       onCheckedChange={(c) => void applySecurityPatch(row.roleId, { promptStyleWrite: c })}
                     />
                   );
@@ -932,7 +955,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">Accès aux Menus et aux Pages</p>
+        <p className="text-sm text-muted-foreground">{t("sec_menus_pages_title")}</p>
         <div className="overflow-x-auto rounded border border-border/50 bg-background shadow-none">
           <table className="min-w-full border-collapse text-xs">
             <thead className="bg-muted/40">
@@ -942,10 +965,12 @@ export default function SettingsPage() {
                   scope="colgroup"
                   className="border-b border-border/60 px-2 py-2 text-left align-bottom font-semibold"
                 >
-                  Accès aux menus et aux pages
+                  {t("sec_menus_pages_column")}
                 </th>
                 {navRows.map((row) => {
-                  const label = roleLabelsById[row.roleId] ?? ROLE_LABEL_FALLBACK[row.roleId] ?? row.roleName;
+                  const label =
+                    roleLabelsById[row.roleId] ??
+                    (ROLE_FB_I18N[row.roleId] !== undefined ? t(ROLE_FB_I18N[row.roleId]!) : row.roleName);
                   return (
                     <th
                       key={`nav-head-role-${row.roleId}`}
@@ -964,20 +989,26 @@ export default function SettingsPage() {
                   colSpan={2 + navRows.length}
                   className="border-b border-border/40 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  Menus
+                  {t("sec_group_menus")}
                 </td>
               </tr>
-              {NAV_MATRIX_MENU_ROWS.map((item) => (
+              {NAV_MATRIX_MENU_ROWS.map((item) => {
+                const menuTitle = t(NAV_MATRIX_I18N_KEYS[item.key]);
+                return (
                 <tr key={`nav-menu-${item.key}`} className="align-middle">
                   <th
                     colSpan={2}
                     scope="row"
                     className="border-b border-border/40 px-2 py-2 text-left font-medium"
                   >
-                    {item.label}
+                    {menuTitle}
                   </th>
                   {navRows.map((roleRow) => {
-                    const label = roleLabelsById[roleRow.roleId] ?? ROLE_LABEL_FALLBACK[roleRow.roleId] ?? roleRow.roleName;
+                    const label =
+                      roleLabelsById[roleRow.roleId] ??
+                      (ROLE_FB_I18N[roleRow.roleId] !== undefined
+                        ? t(ROLE_FB_I18N[roleRow.roleId]!)
+                        : roleRow.roleName);
                     const perms = navAccessMatrix[roleRow.roleId];
                     if (!perms) return null;
                     return (
@@ -987,28 +1018,35 @@ export default function SettingsPage() {
                         checkboxName={`nav_${roleRow.roleId}_${item.key}`}
                         allowed={perms[item.key]}
                         disabled={busyNav}
-                        ariaLabel={`${label}, ${item.label}, accès menu`}
+                        ariaLabel={t("sec_aria_nav_menu", { label, menu: menuTitle })}
                         onCheckedChange={(c) => void applyNavMatrixPatch(roleRow.roleId, item.key, c)}
                       />
                     );
                   })}
                 </tr>
-              ))}
+              );
+              })}
               <tr className="bg-muted/25">
                 <td
                   colSpan={2 + navRows.length}
                   className="border-b border-border/40 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
-                  Pages
+                  {t("sec_group_pages")}
                 </td>
               </tr>
-              {NAV_MATRIX_PAGE_ROWS.map((item) => (
+              {NAV_MATRIX_PAGE_ROWS.map((item) => {
+                const pageTitle = t(NAV_MATRIX_I18N_KEYS[item.key]);
+                return (
                 <tr key={`nav-page-${item.key}`} className="align-middle">
                   <th colSpan={2} scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">
-                    {item.label}
+                    {pageTitle}
                   </th>
                   {navRows.map((roleRow) => {
-                    const label = roleLabelsById[roleRow.roleId] ?? ROLE_LABEL_FALLBACK[roleRow.roleId] ?? roleRow.roleName;
+                    const label =
+                      roleLabelsById[roleRow.roleId] ??
+                      (ROLE_FB_I18N[roleRow.roleId] !== undefined
+                        ? t(ROLE_FB_I18N[roleRow.roleId]!)
+                        : roleRow.roleName);
                     const perms = navAccessMatrix[roleRow.roleId];
                     if (!perms) return null;
                     return (
@@ -1018,13 +1056,14 @@ export default function SettingsPage() {
                         checkboxName={`nav_page_${roleRow.roleId}_${item.key}`}
                         allowed={perms[item.key]}
                         disabled={busyNav}
-                        ariaLabel={`${label}, page ${item.label}, accès`}
+                        ariaLabel={t("sec_aria_nav_page", { label, page: pageTitle })}
                         onCheckedChange={(c) => void applyNavMatrixPatch(roleRow.roleId, item.key, c)}
                       />
                     );
                   })}
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -1036,14 +1075,16 @@ export default function SettingsPage() {
   const renderGeneralContent = () => (
     <div className="space-y-4">
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Identité &amp; marque</p>
+        <p className="text-sm font-semibold">{t("gen_brand_heading")}</p>
         <p className="text-xs text-muted-foreground">
-          Stocké dans <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalIdentity}</code> (JSON).
+          {t("gen_stored_in_prefix")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalIdentity}</code>{" "}
+          {t("gen_stored_json_suffix")}
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <label htmlFor="settings-identity-organization_name" className="text-xs font-medium">
-              Nom d&apos;organisation
+              {t("gen_org_name_label")}
             </label>
             <Input
               id="settings-identity-organization_name"
@@ -1055,7 +1096,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-identity-logo_url" className="text-xs font-medium">
-              URL du logo
+              {t("gen_logo_url_label")}
             </label>
             <Input
               id="settings-identity-logo_url"
@@ -1067,7 +1108,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-identity-favicon_url" className="text-xs font-medium">
-              URL favicon
+              {t("gen_favicon_url_label")}
             </label>
             <Input
               id="settings-identity-favicon_url"
@@ -1079,7 +1120,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-identity-accent_color" className="text-xs font-medium">
-              Couleur d&apos;accent (hex)
+              {t("gen_accent_color_label")}
             </label>
             <Input
               id="settings-identity-accent_color"
@@ -1097,19 +1138,21 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalIdentity}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalIdentity, identity)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalIdentity ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalIdentity ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Langue &amp; contenus</p>
+        <p className="text-sm font-semibold">{t("gen_language_heading")}</p>
         <p className="text-xs text-muted-foreground">
-          Clé <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLanguage}</code>.
+          {t("gen_key_word")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLanguage}</code>
+          .
         </p>
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="space-y-1">
             <label htmlFor="settings-language-default_locale" className="text-xs font-medium">
-              Locale
+              {t("gen_locale_label")}
             </label>
             <Input
               id="settings-language-default_locale"
@@ -1121,7 +1164,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-language-date_format" className="text-xs font-medium">
-              Format date
+              {t("gen_date_format_label")}
             </label>
             <Input
               id="settings-language-date_format"
@@ -1133,7 +1176,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-language-time_format" className="text-xs font-medium">
-              Format heure
+              {t("gen_time_format_label")}
             </label>
             <Input
               id="settings-language-time_format"
@@ -1150,18 +1193,16 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalLanguage}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalLanguage, language)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalLanguage ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalLanguage ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Site</p>
-        <p className="text-xs text-muted-foreground">
-          Préfixe d&apos;URL utilisé pour générer les QR codes (localhost, tunnel smartphone, etc.).
-        </p>
+        <p className="text-sm font-semibold">{t("gen_site_heading")}</p>
+        <p className="text-xs text-muted-foreground">{t("gen_site_intro")}</p>
         <div className="space-y-1">
           <label htmlFor="settings-site-qr_origin" className="text-xs font-medium">
-            Préfixe URL QR
+            {t("gen_qr_prefix_label")}
           </label>
           <Input
             id="settings-site-qr_origin"
@@ -1169,9 +1210,9 @@ export default function SettingsPage() {
             className={fieldClass}
             value={linksQr.public_site_origin}
             onChange={(e) => setLinksQr((p) => ({ ...p, public_site_origin: e.target.value }))}
-            placeholder="https://localhost:8080"
+            placeholder={t("gen_qr_origin_placeholder")}
           />
-          <p className="text-[11px] text-muted-foreground">Exemple tunnel : https://xxxx-8080.euw.devtunnels.ms</p>
+          <p className="text-[11px] text-muted-foreground">{t("gen_qr_tunnel_hint")}</p>
         </div>
         <Button
           type="button"
@@ -1179,19 +1220,21 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalLinksQr}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalLinksQr, linksQr)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalLinksQr ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalLinksQr ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Liens &amp; QR</p>
+        <p className="text-sm font-semibold">{t("gen_links_qr_heading")}</p>
         <p className="text-xs text-muted-foreground">
-          Clé <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLinksQr}</code>.
+          {t("gen_key_word")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLinksQr}</code>
+          .
         </p>
         <div className="space-y-2">
 
           <div className="space-y-1">
             <label htmlFor="settings-links-qr_notes" className="text-xs font-medium">
-              Notes / règles
+              {t("prompts.notes_label")}
             </label>
             <Textarea
               id="settings-links-qr_notes"
@@ -1208,19 +1251,21 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalLinksQr}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalLinksQr, linksQr)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalLinksQr ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalLinksQr ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Limites &amp; performance</p>
+        <p className="text-sm font-semibold">{t("gen_limits_heading")}</p>
         <p className="text-xs text-muted-foreground">
-          Clé <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLimits}</code>.
+          {t("gen_key_word")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalLimits}</code>
+          .
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <label htmlFor="settings-limits-max_upload_mb" className="text-xs font-medium">
-              Taille max upload (Mo)
+              {t("gen_upload_max_label")}
             </label>
             <Input
               id="settings-limits-max_upload_mb"
@@ -1236,7 +1281,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <label htmlFor="settings-limits-image_compression_quality" className="text-xs font-medium">
-              Qualité compression image (0–100)
+              {t("gen_img_quality_label")}
             </label>
             <Input
               id="settings-limits-image_compression_quality"
@@ -1261,14 +1306,16 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalLimits}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalLimits, limits)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalLimits ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalLimits ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Maintenance</p>
+        <p className="text-sm font-semibold">{t("gen_maintenance_heading")}</p>
         <p className="text-xs text-muted-foreground">
-          Clé <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalMaintenance}</code>.
+          {t("gen_key_word")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.generalMaintenance}</code>
+          .
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm">
@@ -1279,12 +1326,12 @@ export default function SettingsPage() {
               onCheckedChange={(v) => setMaintenance((p) => ({ ...p, enabled: v === true }))}
               className={checkboxNoShadow}
             />
-            <span>Mode maintenance activé</span>
+            <span>{t("gen_maintenance_checkbox")}</span>
           </label>
         </div>
         <div className="space-y-1">
           <label htmlFor="settings-maintenance-message" className="text-xs font-medium">
-            Message affiché
+            {t("prompts.message_label")}
           </label>
           <Textarea
             id="settings-maintenance-message"
@@ -1296,7 +1343,7 @@ export default function SettingsPage() {
         </div>
         <div className="space-y-1">
           <label htmlFor="settings-maintenance-allowed_role_ids" className="text-xs font-medium">
-            Rôles autorisés (ids séparés par des virgules, ex. 1,2,3)
+            {t("gen_roles_allowed_label")}
           </label>
           <Input
             id="settings-maintenance-allowed_role_ids"
@@ -1316,7 +1363,7 @@ export default function SettingsPage() {
           disabled={savingSettingsKey === SETTINGS_KEYS.generalMaintenance}
           onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.generalMaintenance, maintenance)}
         >
-          {savingSettingsKey === SETTINGS_KEYS.generalMaintenance ? "Enregistrement..." : "Enregistrer"}
+          {savingSettingsKey === SETTINGS_KEYS.generalMaintenance ? t("form_btn_saving") : t("form_btn_save")}
         </Button>
       </div>
     </div>
@@ -1324,9 +1371,11 @@ export default function SettingsPage() {
 
   const renderVisitorsContent = () => (
     <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-      <p className="text-sm font-semibold">Comportement visiteur</p>
+      <p className="text-sm font-semibold">{t("vis_heading")}</p>
       <p className="text-xs text-muted-foreground">
-        Clé <code className="rounded bg-muted px-1">{SETTINGS_KEYS.visitorsBehavior}</code>.
+        {t("gen_key_word")}{" "}
+        <code className="rounded bg-muted px-1">{SETTINGS_KEYS.visitorsBehavior}</code>
+        .
       </p>
       <label className="flex items-center gap-2 text-sm">
         <Checkbox
@@ -1336,7 +1385,7 @@ export default function SettingsPage() {
           onCheckedChange={(v) => setVisitors((p) => ({ ...p, ressenti_mandatory: v === true }))}
           className={checkboxNoShadow}
         />
-        <span>Ressenti obligatoire avant validation</span>
+        <span>{t("vis_ressenti_mandatory")}</span>
       </label>
       <label className="flex items-center gap-2 text-sm">
         <Checkbox
@@ -1346,7 +1395,7 @@ export default function SettingsPage() {
           onCheckedChange={(v) => setVisitors((p) => ({ ...p, show_exit_dialog: v === true }))}
           className={checkboxNoShadow}
         />
-        <span>Afficher le dialogue de fin de visite</span>
+        <span>{t("vis_exit_dialog")}</span>
       </label>
       <Button
         type="button"
@@ -1354,7 +1403,7 @@ export default function SettingsPage() {
         disabled={savingSettingsKey === SETTINGS_KEYS.visitorsBehavior}
         onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.visitorsBehavior, visitors)}
       >
-        {savingSettingsKey === SETTINGS_KEYS.visitorsBehavior ? "Enregistrement..." : "Enregistrer"}
+        {savingSettingsKey === SETTINGS_KEYS.visitorsBehavior ? t("form_btn_saving") : t("form_btn_save")}
       </Button>
     </div>
   );
@@ -1362,13 +1411,15 @@ export default function SettingsPage() {
   const renderNotificationsContent = () => (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Clé unique <code className="rounded bg-muted px-1">{SETTINGS_KEYS.notifications}</code> (JSON : canaux, fréquence, contenus).
+        {t("notif_intro_before")}{" "}
+        <code className="rounded bg-muted px-1">{SETTINGS_KEYS.notifications}</code>{" "}
+        {t("notif_intro_after")}
       </p>
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Canaux</p>
+        <p className="text-sm font-semibold">{t("notif_channels_heading")}</p>
         <div className="space-y-1">
           <label htmlFor="settings-notifications-email_from" className="text-xs font-medium">
-            Email expéditeur
+            {t("notif_email_from")}
           </label>
           <Input
             id="settings-notifications-email_from"
@@ -1377,13 +1428,13 @@ export default function SettingsPage() {
             className={fieldClass}
             value={notifications.email_from}
             onChange={(e) => setNotifications((p) => ({ ...p, email_from: e.target.value }))}
-            placeholder="noreply@exemple.com"
+            placeholder={t("notif_placeholder_email_from")}
             autoComplete="email"
           />
         </div>
         <div className="space-y-1">
           <label htmlFor="settings-notifications-webhook_url" className="text-xs font-medium">
-            URL webhook
+            {t("notif_webhook_url")}
           </label>
           <Input
             id="settings-notifications-webhook_url"
@@ -1392,15 +1443,15 @@ export default function SettingsPage() {
             className={fieldClass}
             value={notifications.webhook_url}
             onChange={(e) => setNotifications((p) => ({ ...p, webhook_url: e.target.value }))}
-            placeholder="https://..."
+            placeholder={t("notif_placeholder_webhook")}
           />
         </div>
       </div>
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Fréquence</p>
+        <p className="text-sm font-semibold">{t("notif_frequency_heading")}</p>
         <div className="space-y-1">
           <label htmlFor="settings-notifications-frequency_batch_seconds" className="text-xs font-medium">
-            Regroupement (secondes)
+            {t("notif_batch_seconds")}
           </label>
           <Input
             id="settings-notifications-frequency_batch_seconds"
@@ -1419,10 +1470,10 @@ export default function SettingsPage() {
         </div>
       </div>
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-        <p className="text-sm font-semibold">Contenus</p>
+        <p className="text-sm font-semibold">{t("notif_content_heading")}</p>
         <div className="space-y-1">
           <label htmlFor="settings-notifications-content_detail" className="text-xs font-medium">
-            Niveau de détail
+            {t("notif_detail_level")}
           </label>
           <Input
             id="settings-notifications-content_detail"
@@ -1430,7 +1481,7 @@ export default function SettingsPage() {
             className={fieldClass}
             value={notifications.content_detail}
             onChange={(e) => setNotifications((p) => ({ ...p, content_detail: e.target.value }))}
-            placeholder="standard | minimal | verbose"
+            placeholder={t("notif_detail_placeholder")}
           />
         </div>
       </div>
@@ -1440,14 +1491,14 @@ export default function SettingsPage() {
         disabled={savingSettingsKey === SETTINGS_KEYS.notifications}
         onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.notifications, notifications)}
       >
-        {savingSettingsKey === SETTINGS_KEYS.notifications ? "Enregistrement..." : "Enregistrer"}
+        {savingSettingsKey === SETTINGS_KEYS.notifications ? t("form_btn_saving") : t("form_btn_save")}
       </Button>
     </div>
   );
 
   const renderOeuvresNavigationContent = () => (
     <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
-      <p className="text-sm font-semibold">Type de navigation dans les œuvres</p>
+      <p className="text-sm font-semibold">{t("nav_type_heading")}</p>
       <div className="space-y-2">
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -1457,7 +1508,7 @@ export default function SettingsPage() {
             checked={œuvresNavigationType === "single_scan_sequence"}
             onChange={(e) => setOeuvresNavigationType(e.target.value)}
           />
-          <span>Oeuvres scannées l&apos;une après l&apos;autre</span>
+          <span>{t("nav_type_scan_sequence")}</span>
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -1467,7 +1518,7 @@ export default function SettingsPage() {
             checked={œuvresNavigationType === "same_artist_all_works"}
             onChange={(e) => setOeuvresNavigationType(e.target.value)}
           />
-          <span>Une œuvre scannée donne toutes les œuvres du même artiste</span>
+          <span>{t("nav_type_same_artist")}</span>
         </label>
       </div>
       <Button
@@ -1476,7 +1527,7 @@ export default function SettingsPage() {
         disabled={savingSettingsKey === OEUVRES_NAVIGATION_TYPE_KEY}
         onClick={() => void upsertAppSettingJson(OEUVRES_NAVIGATION_TYPE_KEY, { mode: œuvresNavigationType })}
       >
-        {savingSettingsKey === OEUVRES_NAVIGATION_TYPE_KEY ? "Enregistrement..." : "Enregistrer"}
+        {savingSettingsKey === OEUVRES_NAVIGATION_TYPE_KEY ? t("form_btn_saving") : t("form_btn_save")}
       </Button>
     </div>
   );
@@ -1485,12 +1536,12 @@ export default function SettingsPage() {
     <div className="container py-8 space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Configurations générales de l&apos;application</h2>
+          <h2 className="text-3xl font-serif font-bold">{t("page_main_title")}</h2>
         </div>
         <Button className="gradient-gold gradient-gold-hover-bg text-primary-foreground gap-2 shrink-0" asChild>
           <Link to="/catalogue">
             <SettingsGearIcon className="h-4 w-4" />
-            Retour au catalogue
+            {t("btn_back_catalogue")}
           </Link>
         </Button>
       </div>
@@ -1500,7 +1551,7 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <label htmlFor="settings-search" className="sr-only">
-                Rechercher un paramètre
+                {t("search_aria")}
               </label>
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <Input
@@ -1508,7 +1559,7 @@ export default function SettingsPage() {
                 name="settings_search_query"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un paramètre..."
+                placeholder={t("search_placeholder")}
                 className="pl-9 h-10 shadow-none"
                 autoComplete="off"
               />
@@ -1520,7 +1571,7 @@ export default function SettingsPage() {
       {filteredSections.length === 0 ? (
         <Card className="border border-dashed border-border/60 bg-muted/20 shadow-none">
           <CardContent className="p-6 text-sm text-muted-foreground text-center">
-            Aucun paramètre ne correspond à votre recherche.
+            {t("empty_search")}
           </CardContent>
         </Card>
       ) : (
@@ -1557,7 +1608,7 @@ export default function SettingsPage() {
                       <RetentionSettings roleId={role_id} />
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Section en cours de configuration.
+                        {t("section_wip")}
                       </p>
                     )}
                   </AccordionContent>
@@ -1596,7 +1647,7 @@ export default function SettingsPage() {
                   min={0}
                   step={1}
                   inputMode="numeric"
-                  placeholder="ex. 6000"
+                  placeholder={t("edit_max_caract_placeholder")}
                   value={editingAppForm.max_caract ?? ""}
                   onChange={(e) =>
                     setEditingAppForm((prev) => ({

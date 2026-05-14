@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtworkModal } from "@/components/ArtworkModal";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
@@ -769,8 +770,9 @@ const Catalogue = () => {
 
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
-        <div className="flex w-full items-center gap-4 md:max-w-[576px]">
+      <div className="sticky top-16 z-30 flex flex-col gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
+          <div className="flex flex-wrap items-center gap-4">
           <div>
             <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
           </div>
@@ -831,16 +833,13 @@ const Catalogue = () => {
               ))}
             </datalist>
           </div>
-        </div>
-        <div>
-          {!authLoading && scope.mode === "agency" && (
-            <p className="text-xs text-muted-foreground mt-1">{t("scope_agency_hint", { agencyId: scope.agencyId })}</p>
-          )}
+          </div>
           {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
+            <p className="text-xs text-muted-foreground">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap w-[576px] justify-end">
+        <BackofficeStickyAgencyLogoSlot />
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 md:w-auto md:max-w-[576px] md:justify-end">
           {isAdminFullAccess && (
             <Button
               type="button"
@@ -1008,7 +1007,7 @@ const Catalogue = () => {
                     </div>
                   </div>
 
-                  <div className="relative z-0 ml-auto flex h-[156px] w-[300px] min-w-[300px] shrink-0 flex-col justify-between gap-3 border-l border-border/60 p-0">
+                  <div className="relative z-0 ml-auto flex h-[156px] w-[300px] min-w-[300px] shrink-0 flex-col justify-between gap-3 p-0">
                     <div className="ml-auto flex w-[180px] flex-col gap-2">
                     <Button
                       type="button"

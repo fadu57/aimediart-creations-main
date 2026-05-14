@@ -1,0 +1,11 @@
+{
+  "empty_state": "No hay registros archivados.",
+  "restore_button": "Restaurar",
+  "delete_permanently": "Eliminar definitivamente",
+  "confirm_restore": "¿Restaurar este elemento desde la papelera?",
+  "confirm_delete": "¿Eliminar definitivamente este elemento? Esta acción no se puede deshacer.",
+  "success_restore": "Elemento restaurado.",
+  "success_delete": "Elemento eliminado definitivamente.",
+  "error_restore": "No se pudo restaurar el elemento.",
+  "error_delete": "No se pudo eliminar definitivamente el elemento."
+}

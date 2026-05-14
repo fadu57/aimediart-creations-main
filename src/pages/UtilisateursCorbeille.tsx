@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
@@ -19,6 +20,7 @@ type UserTrashRow = {
 };
 
 export default function UtilisateursCorbeille() {
+  const { t } = useTranslation("trash");
   const { loading: authLoading, role_id } = useAuthUser();
   const { can, loading: navLoading } = useNavigationMatrix();
   const canAccess = can("menu_user");
@@ -58,10 +60,10 @@ export default function UtilisateursCorbeille() {
       .update({ deleted_at: null })
       .eq("id", userId);
     if (error) {
-      toast.error(error.message);
+      toast.error(error.message || t("error_restore"));
       return;
     }
-    toast.success("Fiche utilisateur restaurée.");
+    toast.success(t("success_restore"));
     await loadTrash();
   };
 
@@ -99,7 +101,7 @@ export default function UtilisateursCorbeille() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucune fiche archivée.</p>
+        <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
           {rows.map((u) => {
@@ -120,7 +122,7 @@ export default function UtilisateursCorbeille() {
                   </div>
                   {canRestore ? (
                     <Button type="button" className="gap-2 shrink-0" onClick={() => void handleRestore(u.id)}>
-                      <ArchiveRestore className="h-4 w-4" /> Restaurer
+                      <ArchiveRestore className="h-4 w-4" /> {t("restore_button")}
                     </Button>
                   ) : (
                     <div className="h-9 w-24" />

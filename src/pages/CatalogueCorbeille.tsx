@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
@@ -18,6 +19,7 @@ type ArtworkRow = {
 };
 
 export default function CatalogueCorbeille() {
+  const { t } = useTranslation("trash");
   const { loading: authLoading, role_id, role_name } = useAuthUser();
   const canAccess = useMemo(() => {
     if (authLoading) return false;
@@ -59,10 +61,10 @@ export default function CatalogueCorbeille() {
         .update({ deleted_at: null })
         .eq("artwork_id", artworkId);
       if (error) throw error;
-      toast.success("Œuvre restaurée.");
+      toast.success(t("success_restore"));
       await loadTrash();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Restauration impossible.";
+      const msg = e instanceof Error ? e.message : t("error_restore");
       toast.error(msg);
     }
   };
@@ -124,7 +126,7 @@ export default function CatalogueCorbeille() {
                     />
                   </div>
                   <Button type="button" className="gap-2 shrink-0" onClick={() => void handleRestore(a.artwork_id)}>
-                    <ArchiveRestore className="h-4 w-4" /> Restaurer
+                    <ArchiveRestore className="h-4 w-4" /> {t("restore_button")}
                   </Button>
                 </CardContent>
               </Card>

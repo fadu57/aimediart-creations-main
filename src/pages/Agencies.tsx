@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AgencyFormDialog } from "@/components/AgencyFormDialog";
+import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { sortAgencyFieldKeys } from "@/lib/agencyFormUtils";
@@ -170,7 +171,8 @@ const Agencies = () => {
 
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
+      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 md:max-w-[min(100%,42rem)] shrink-0">
         <div>
           <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           {!authLoading && scope.mode === "agency" && (
@@ -180,7 +182,7 @@ const Agencies = () => {
             <p className="text-xs text-muted-foreground mt-1">{t("page.scopeExpo", { expoId: scope.expoId })}</p>
           )}
         </div>
-        <div className="relative w-[210px] min-w-[210px] max-w-[210px] md:mr-auto">
+        <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
           <Input
             type="text"
             list="agencies-search-suggestions"
@@ -206,6 +208,8 @@ const Agencies = () => {
             ))}
           </datalist>
         </div>
+        </div>
+        <BackofficeStickyAgencyLogoSlot />
         {(canCreateAgency || canOpenAgencyTrash) && (
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <Button

@@ -1,0 +1,11 @@
+{
+  "empty_state": "Aucune fiche archivée.",
+  "restore_button": "Restaurer",
+  "delete_permanently": "Supprimer définitivement",
+  "confirm_restore": "Restaurer cet élément depuis la corbeille ?",
+  "confirm_delete": "Supprimer définitivement cet élément ? Cette action est irréversible.",
+  "success_restore": "Élément restauré.",
+  "success_delete": "Élément supprimé définitivement.",
+  "error_restore": "Impossible de restaurer cet élément.",
+  "error_delete": "Impossible de supprimer définitivement cet élément."
+}

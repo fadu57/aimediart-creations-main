@@ -9,7 +9,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess, normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 
 export default function Parametres() {
-  const { t } = useTranslation("artwork_modal");
+  const { t } = useTranslation("settings");
   const { role_id, role_name } = useAuthUser();
   // Admins autorisés à éditer les settings applicatifs.
   // 1=admin_general, 2=super_admin, 4=admin_agency
@@ -91,8 +91,10 @@ export default function Parametres() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        {t("params_role_label")} <code className="rounded bg-muted px-1 py-0.5">{String(role_name ?? "null")}</code>{" "}
-        / role_id : <code className="rounded bg-muted px-1 py-0.5">{String(role_id ?? "null")}</code>
+        {t("params_role_label")}{" "}
+        <code className="rounded bg-muted px-1 py-0.5">{String(role_name ?? t("common.null_placeholder"))}</code>{" "}
+        / {t("params_role_id_label")}{" "}
+        <code className="rounded bg-muted px-1 py-0.5">{String(role_id ?? t("common.null_placeholder"))}</code>
       </p>
 
       <Textarea

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
   Camera,
@@ -45,8 +46,8 @@ const BIRTH_YEARS = Array.from({ length: 2010 - 1920 + 1 }, (_, i) => 2010 - i);
 
 type StrengthScore = 0 | 1 | 2 | 3 | 4;
 
-function getPasswordStrength(pw: string): { score: StrengthScore; label: string; colorClass: string } {
-  if (!pw) return { score: 0, label: "", colorClass: "bg-border" };
+function getPasswordStrength(pw: string): { score: StrengthScore; colorClass: string } {
+  if (!pw) return { score: 0, colorClass: "bg-border" };
   let n = 0;
   if (pw.length >= 8) n++;
   if (pw.length >= 12) n++;
@@ -54,12 +55,12 @@ function getPasswordStrength(pw: string): { score: StrengthScore; label: string;
   if (/[0-9]/.test(pw)) n++;
   if (/[^A-Za-z0-9]/.test(pw)) n++;
   const score = Math.min(n, 4) as StrengthScore;
-  const map: Record<StrengthScore, { label: string; colorClass: string }> = {
-    0: { label: "Tres faible", colorClass: "bg-red-600" },
-    1: { label: "Faible", colorClass: "bg-red-400" },
-    2: { label: "Moyen", colorClass: "bg-yellow-400" },
-    3: { label: "Bon", colorClass: "bg-emerald-400" },
-    4: { label: "Fort", colorClass: "bg-emerald-600" },
+  const map: Record<StrengthScore, { colorClass: string }> = {
+    0: { colorClass: "bg-red-600" },
+    1: { colorClass: "bg-red-400" },
+    2: { colorClass: "bg-yellow-400" },
+    3: { colorClass: "bg-emerald-400" },
+    4: { colorClass: "bg-emerald-600" },
   };
   return { score, ...map[score] };
 }
@@ -76,14 +77,6 @@ function isDuplicateEmail(msg: string): boolean {
     m.includes("email_exists") ||
     m.includes("already been registered")
   );
-}
-
-function formatAuthError(msg: string): string {
-  if (isDuplicateEmail(msg)) return "Cette adresse e-mail est deja utilisee.";
-  if (msg.toLowerCase().includes("password")) {
-    return `Mot de passe trop court (minimum ${PASSWORD_MIN_LENGTH} caracteres).`;
-  }
-  return msg;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +110,7 @@ type WebcamMode = "idle" | "requesting" | "active" | "captured" | "denied";
 // ---------------------------------------------------------------------------
 
 const RegisterSaaS = () => {
+  const { t } = useTranslation("auth");
   const navigate = useNavigate();
   const { session, loading: authLoading } = useAuthUser();
 
@@ -164,6 +158,19 @@ const RegisterSaaS = () => {
   const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
   const passwordStrength = getPasswordStrength(password);
   const usernameBlocked = usernameAvailable === false && username.trim().length >= 3;
+
+  const formatAuthErrorMsg = useCallback(
+    (msg: string) => {
+      if (isDuplicateEmail(msg)) return t("register_saas.error_duplicate_email");
+      if (msg.toLowerCase().includes("password")) {
+        return t("register_saas.error_password_policy", { min: PASSWORD_MIN_LENGTH });
+      }
+      return msg;
+    },
+    [t],
+  );
+
+  const strengthLabel = password.length > 0 ? t(`register_saas.strength_level_${passwordStrength.score}`) : "";
 
   // Redirect already-authenticated users
   if (!authLoading && session) {
@@ -228,12 +235,12 @@ const RegisterSaaS = () => {
       stopStream();
       const msg =
         err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Acces camera refuse. Autorisez la camera dans les parametres du navigateur."
-          : "Camera non disponible sur cet appareil.";
+          ? t("register_saas.camera_denied")
+          : t("register_saas.camera_unavailable");
       setWebcamError(msg);
       setWebcamMode("denied");
     }
-  }, [stopStream]);
+  }, [stopStream, t]);
 
   const captureSnapshot = useCallback(() => {
     const video = videoRef.current;
@@ -296,12 +303,12 @@ const RegisterSaaS = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!(ALLOWED_MIME as readonly string[]).includes(file.type)) {
-      toast.error("Format non accepte. Utilisez JPEG, PNG ou WebP.");
+      toast.error(t("register_saas.toast_format_invalid"));
       e.target.value = "";
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      toast.error("Fichier trop lourd (max 2 Mo avant compression).");
+      toast.error(t("register_saas.toast_file_too_large"));
       e.target.value = "";
       return;
     }
@@ -318,7 +325,7 @@ const RegisterSaaS = () => {
       setAvatarBlob(compressed);
       setWebcamMode("captured");
     } catch {
-      toast.error("Compression impossible. Essayez une autre image.");
+      toast.error(t("register_saas.toast_compression_failed"));
     }
     e.target.value = "";
   };
@@ -335,11 +342,26 @@ const RegisterSaaS = () => {
     setFirstNameError(null);
     setLastNameError(null);
 
-    if (!emailValid) { setEmailError("Adresse e-mail invalide."); ok = false; }
-    if (!passwordValid) { setPasswordError(`Minimum ${PASSWORD_MIN_LENGTH} caracteres.`); ok = false; }
-    if (!passwordsMatch) { setConfirmError("Les mots de passe ne correspondent pas."); ok = false; }
-    if (!firstName.trim()) { setFirstNameError("Le prenom est obligatoire."); ok = false; }
-    if (!lastName.trim()) { setLastNameError("Le nom est obligatoire."); ok = false; }
+    if (!emailValid) {
+      setEmailError(t("register_saas.validation_email_invalid"));
+      ok = false;
+    }
+    if (!passwordValid) {
+      setPasswordError(t("register_saas.validation_password_short", { min: PASSWORD_MIN_LENGTH }));
+      ok = false;
+    }
+    if (!passwordsMatch) {
+      setConfirmError(t("register.error_password_mismatch"));
+      ok = false;
+    }
+    if (!firstName.trim()) {
+      setFirstNameError(t("register_saas.validation_firstname_required"));
+      ok = false;
+    }
+    if (!lastName.trim()) {
+      setLastNameError(t("register_saas.validation_lastname_required"));
+      ok = false;
+    }
     return ok;
   };
 
@@ -372,9 +394,9 @@ const RegisterSaaS = () => {
 
       if (error) {
         if (isDuplicateEmail(error.message)) {
-          setEmailError("Cette adresse e-mail est deja utilisee.");
+          setEmailError(t("register_saas.error_duplicate_email"));
         } else {
-          toast.error(formatAuthError(error.message));
+          toast.error(formatAuthErrorMsg(error.message));
         }
         return;
       }
@@ -394,7 +416,7 @@ const RegisterSaaS = () => {
             await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
           } else {
             console.warn("[RegisterSaaS] avatar upload:", uploadErr.message);
-            toast.error("Photo non enregistree, vous pourrez la modifier plus tard.");
+            toast.error(t("register_saas.toast_avatar_later"));
           }
         } catch {
           // Non-blocking — account is already created
@@ -402,14 +424,14 @@ const RegisterSaaS = () => {
       }
 
       if (!data.session) {
-        toast.success("Compte cree ! Verifiez vos e-mails pour activer votre compte.");
+        toast.success(t("register_saas.toast_confirm_email"));
         navigate("/login", { replace: true });
       } else {
-        toast.success("Bienvenue !");
+        toast.success(t("register_saas.toast_welcome"));
         navigate("/dashboard", { replace: true });
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Inscription impossible.");
+      toast.error(err instanceof Error ? err.message : t("register_saas.toast_signup_failed"));
     } finally {
       setSubmitting(false);
     }
@@ -439,15 +461,15 @@ const RegisterSaaS = () => {
       {/* Page header */}
       <div className="mb-8 text-center">
         <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
-          Creer votre compte
+          {t("register_saas.page_title")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Deja inscrit ?{" "}
+          {t("register_saas.already_registered_prompt")}{" "}
           <Link
             to="/login"
             className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
           >
-            Se connecter
+            {t("register.login_link")}
           </Link>
         </p>
       </div>
@@ -456,7 +478,7 @@ const RegisterSaaS = () => {
         onSubmit={(e) => void handleSubmit(e)}
         noValidate
         className="w-full max-w-3xl"
-        aria-label="Formulaire d'inscription"
+        aria-label={t("register_saas.form_aria_label")}
       >
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           {/* ================================================================ */}
@@ -473,14 +495,17 @@ const RegisterSaaS = () => {
                 id="section-connexion"
                 className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
               >
-                Connexion
+                {t("register_saas.section_credentials")}
               </h2>
               <div className="space-y-4">
 
                 {/* Email */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-email">
-                    E-mail <span className="text-destructive" aria-hidden>*</span>
+                    {t("register.email")}{" "}
+                    <span className="text-destructive" aria-hidden>
+                      *
+                    </span>
                   </Label>
                   <Input
                     id="reg-email"
@@ -488,7 +513,7 @@ const RegisterSaaS = () => {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
-                    placeholder="vous@exemple.com"
+                    placeholder={t("login.placeholder_email")}
                     aria-required="true"
                     aria-invalid={emailError ? "true" : "false"}
                     aria-describedby={emailError ? "reg-email-err" : undefined}
@@ -505,7 +530,10 @@ const RegisterSaaS = () => {
                 {/* Password */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-password">
-                    Mot de passe <span className="text-destructive" aria-hidden>*</span>
+                    {t("register.password")}{" "}
+                    <span className="text-destructive" aria-hidden>
+                      *
+                    </span>
                   </Label>
                   <div className="relative">
                     <Input
@@ -514,7 +542,7 @@ const RegisterSaaS = () => {
                       autoComplete="new-password"
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
-                      placeholder={`Minimum ${PASSWORD_MIN_LENGTH} caracteres`}
+                      placeholder={t("register_saas.placeholder_password_min", { min: PASSWORD_MIN_LENGTH })}
                       className={`pr-10 ${passwordError ? "border-destructive" : ""}`}
                       aria-required="true"
                       aria-invalid={passwordError ? "true" : "false"}
@@ -525,7 +553,7 @@ const RegisterSaaS = () => {
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus:ring-0"
-                      aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                      aria-label={showPassword ? t("login.aria_hide_password") : t("login.aria_show_password")}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -551,7 +579,7 @@ const RegisterSaaS = () => {
                           passwordStrength.score >= 3 ? "text-emerald-500" : "text-muted-foreground"
                         }`}
                       >
-                        {passwordStrength.label}
+                        {strengthLabel}
                       </p>
                     </div>
                   )}
@@ -563,7 +591,10 @@ const RegisterSaaS = () => {
                 {/* Confirm password */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-confirm">
-                    Confirmation <span className="text-destructive" aria-hidden>*</span>
+                    {t("register_saas.label_confirm")}{" "}
+                    <span className="text-destructive" aria-hidden>
+                      *
+                    </span>
                   </Label>
                   <div className="relative">
                     <Input
@@ -572,7 +603,7 @@ const RegisterSaaS = () => {
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => { setConfirmPassword(e.target.value); setConfirmError(null); }}
-                      placeholder="Repetez le mot de passe"
+                      placeholder={t("register_saas.placeholder_repeat_password")}
                       className={`pr-16 ${confirmError ? "border-destructive" : ""}`}
                       aria-required="true"
                       aria-invalid={confirmError ? "true" : "false"}
@@ -583,12 +614,12 @@ const RegisterSaaS = () => {
                         {passwordsMatch ? (
                           <Check
                             className="h-4 w-4 text-emerald-500"
-                            aria-label="Mots de passe identiques"
+                            aria-label={t("register_saas.password_identical_aria")}
                           />
                         ) : (
                           <X
                             className="h-4 w-4 text-destructive"
-                            aria-label="Mots de passe differents"
+                            aria-label={t("register_saas.password_different_aria")}
                           />
                         )}
                       </span>
@@ -597,7 +628,7 @@ const RegisterSaaS = () => {
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus:ring-0"
-                      aria-label={showPassword ? "Masquer" : "Afficher"}
+                      aria-label={showPassword ? t("register_saas.username_toggle_hide") : t("register_saas.username_toggle_show")}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -618,7 +649,7 @@ const RegisterSaaS = () => {
                 id="section-identite"
                 className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
               >
-                Identite
+                {t("register_saas.section_identity")}
               </h2>
               <div className="space-y-4">
 
@@ -626,7 +657,10 @@ const RegisterSaaS = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="reg-firstname">
-                      Prenom <span className="text-destructive" aria-hidden>*</span>
+                      {t("register_saas.label_firstname")}{" "}
+                      <span className="text-destructive" aria-hidden>
+                        *
+                      </span>
                     </Label>
                     <Input
                       id="reg-firstname"
@@ -634,7 +668,7 @@ const RegisterSaaS = () => {
                       autoComplete="given-name"
                       value={firstName}
                       onChange={(e) => { setFirstName(e.target.value); setFirstNameError(null); }}
-                      placeholder="Jean"
+                      placeholder={t("register_saas.placeholder_firstname")}
                       aria-required="true"
                       aria-invalid={firstNameError ? "true" : "false"}
                       disabled={submitting}
@@ -646,7 +680,10 @@ const RegisterSaaS = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="reg-lastname">
-                      Nom <span className="text-destructive" aria-hidden>*</span>
+                      {t("register_saas.label_lastname")}{" "}
+                      <span className="text-destructive" aria-hidden>
+                        *
+                      </span>
                     </Label>
                     <Input
                       id="reg-lastname"
@@ -654,7 +691,7 @@ const RegisterSaaS = () => {
                       autoComplete="family-name"
                       value={lastName}
                       onChange={(e) => { setLastName(e.target.value); setLastNameError(null); }}
-                      placeholder="Dupont"
+                      placeholder={t("register_saas.placeholder_lastname")}
                       aria-required="true"
                       aria-invalid={lastNameError ? "true" : "false"}
                       disabled={submitting}
@@ -669,8 +706,10 @@ const RegisterSaaS = () => {
                 {/* Username */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-username">
-                    Pseudo{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">(optionnel)</span>
+                    {t("register_saas.label_username")}{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      {t("register_saas.optional_short")}
+                    </span>
                   </Label>
                   <div className="relative">
                     <span
@@ -687,7 +726,7 @@ const RegisterSaaS = () => {
                       onChange={(e) =>
                         setUsername(e.target.value.replace(/\s/g, "").toLowerCase())
                       }
-                      placeholder="monpseudo"
+                      placeholder={t("register_saas.placeholder_username")}
                       className="pl-7 pr-8"
                       disabled={submitting}
                     />
@@ -696,24 +735,24 @@ const RegisterSaaS = () => {
                         {usernameChecking ? (
                           <Loader2
                             className="h-3.5 w-3.5 animate-spin text-muted-foreground"
-                            aria-label="Verification en cours"
+                            aria-label={t("register_saas.username_checking_aria")}
                           />
                         ) : usernameAvailable === true ? (
-                          <Check className="h-4 w-4 text-emerald-500" aria-label="Pseudo disponible" />
+                          <Check className="h-4 w-4 text-emerald-500" aria-label={t("register_saas.username_available_aria")} />
                         ) : usernameAvailable === false ? (
-                          <X className="h-4 w-4 text-destructive" aria-label="Pseudo deja pris" />
+                          <X className="h-4 w-4 text-destructive" aria-label={t("register_saas.username_taken_aria")} />
                         ) : null}
                       </span>
                     )}
                   </div>
                   {usernameBlocked && (
                     <p className="text-xs text-destructive" role="alert">
-                      Ce pseudo est deja utilise.
+                      {t("register_saas.username_taken_message")}
                     </p>
                   )}
                   {usernameAvailable === true && username.trim().length >= 3 && (
                     <p className="text-xs text-emerald-500" aria-live="polite">
-                      Pseudo disponible !
+                      {t("register_saas.username_available_message")}
                     </p>
                   )}
                 </div>
@@ -721,8 +760,10 @@ const RegisterSaaS = () => {
                 {/* Phone */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-phone">
-                    Telephone{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">(optionnel)</span>
+                    {t("register_saas.label_phone")}{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      {t("register_saas.optional_short")}
+                    </span>
                   </Label>
                   <Input
                     id="reg-phone"
@@ -730,7 +771,7 @@ const RegisterSaaS = () => {
                     autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+33 6 12 34 56 78"
+                    placeholder={t("register_saas.placeholder_phone")}
                     disabled={submitting}
                   />
                 </div>
@@ -738,12 +779,14 @@ const RegisterSaaS = () => {
                 {/* Birth year */}
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-birthyear">
-                    Annee de naissance{" "}
-                    <span className="text-[11px] font-normal text-muted-foreground">(optionnel)</span>
+                    {t("register_saas.label_birth_year")}{" "}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      {t("register_saas.optional_short")}
+                    </span>
                   </Label>
                   <Select value={birthYear} onValueChange={setBirthYear} disabled={submitting}>
                     <SelectTrigger id="reg-birthyear">
-                      <SelectValue placeholder="Selectionnez une annee" />
+                      <SelectValue placeholder={t("register_saas.select_year_placeholder")} />
                     </SelectTrigger>
                     <SelectContent className="max-h-52">
                       {BIRTH_YEARS.map((y) => (
@@ -770,8 +813,10 @@ const RegisterSaaS = () => {
                 id="section-avatar"
                 className="mb-4 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"
               >
-                Photo de profil{" "}
-                <span className="text-muted-foreground/60 normal-case tracking-normal">(optionnel)</span>
+                {t("register_saas.section_avatar")}{" "}
+                <span className="text-muted-foreground/60 normal-case tracking-normal">
+                  {t("register_saas.optional_short")}
+                </span>
               </h2>
 
               {/* Circular avatar preview */}
@@ -779,13 +824,13 @@ const RegisterSaaS = () => {
                 {avatarPreview ? (
                   <img
                     src={avatarPreview}
-                    alt="Apercu de votre photo de profil"
+                    alt={t("register_saas.avatar_preview_alt")}
                     className="h-28 w-28 rounded-full object-cover ring-2 ring-primary/40 ring-offset-2 ring-offset-background transition-all"
                   />
                 ) : (
                   <div
                     className="flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-border/50 bg-muted/20"
-                    aria-label="Aucune photo selectionnee"
+                    aria-label={t("register_saas.no_photo_aria")}
                   >
                     <UserCircle2 className="h-14 w-14 text-muted-foreground/30" aria-hidden />
                   </div>
@@ -801,12 +846,12 @@ const RegisterSaaS = () => {
                     playsInline
                     muted
                     className="h-full w-full object-cover"
-                    aria-label="Flux webcam en direct"
+                    aria-label={t("register_saas.webcam_stream_aria")}
                   />
                   {webcamMode === "requesting" && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70">
                       <Loader2 className="h-8 w-8 animate-spin text-white" aria-hidden />
-                      <p className="text-xs text-white/70">Acces a la camera...</p>
+                      <p className="text-xs text-white/70">{t("register_saas.webcam_waiting")}</p>
                     </div>
                   )}
                 </div>
@@ -838,7 +883,7 @@ const RegisterSaaS = () => {
                       disabled={submitting}
                     >
                       <Camera className="h-4 w-4" aria-hidden />
-                      Prendre un selfie
+                      {t("register_saas.btn_take_selfie")}
                     </Button>
 
                     {/* File / native camera */}
@@ -849,8 +894,8 @@ const RegisterSaaS = () => {
                       }`}
                     >
                       <Upload className="h-4 w-4" aria-hidden />
-                      <span className="hidden sm:inline">Choisir une photo</span>
-                      <span className="sm:hidden">Prendre ou choisir une photo</span>
+                      <span className="hidden sm:inline">{t("register_saas.btn_choose_photo")}</span>
+                      <span className="sm:hidden">{t("register_saas.btn_photo_mobile")}</span>
                     </label>
                     <input
                       id="reg-avatar-file"
@@ -860,13 +905,13 @@ const RegisterSaaS = () => {
                       className="sr-only"
                       onChange={(e) => void handleFileSelect(e)}
                       disabled={submitting}
-                      aria-label="Choisir une photo de profil"
+                      aria-label={t("register_saas.file_input_avatar_aria")}
                     />
 
                     <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-                      JPEG, PNG ou WebP · max 2 Mo
+                      {t("register_saas.hint_formats")}
                       <br />
-                      Compresse automatiquement a ~500 Ko
+                      {t("register_saas.hint_compression")}
                     </p>
                   </>
                 )}
@@ -881,7 +926,7 @@ const RegisterSaaS = () => {
                       disabled={submitting}
                     >
                       <Camera className="h-4 w-4" aria-hidden />
-                      Capturer
+                      {t("register_saas.btn_capture")}
                     </Button>
                     <Button
                       type="button"
@@ -889,7 +934,7 @@ const RegisterSaaS = () => {
                       className="aspect-square px-2"
                       onClick={cancelWebcam}
                       disabled={submitting}
-                      aria-label="Annuler la webcam"
+                      aria-label={t("register_saas.btn_cancel_webcam_aria")}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -907,7 +952,7 @@ const RegisterSaaS = () => {
                       disabled={submitting}
                     >
                       <RefreshCw className="h-4 w-4" aria-hidden />
-                      Reprendre
+                      {t("register_saas.btn_retake")}
                     </Button>
                     <Button
                       type="button"
@@ -917,7 +962,7 @@ const RegisterSaaS = () => {
                       disabled={submitting}
                     >
                       <Check className="h-4 w-4" aria-hidden />
-                      Valide
+                      {t("register_saas.btn_validate_photo")}
                     </Button>
                   </div>
                 )}
@@ -939,24 +984,24 @@ const RegisterSaaS = () => {
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                Creation en cours...
+                {t("register_saas.btn_submitting")}
               </>
             ) : (
-              "Creer mon compte"
+              t("register_saas.btn_submit")
             )}
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            Les champs marques <span className="text-destructive">*</span> sont obligatoires.
+            {t("register_saas.required_fields_note")}
           </p>
 
           <p className="text-sm text-muted-foreground">
-            Deja inscrit ?{" "}
+            {t("register_saas.already_registered_prompt")}{" "}
             <Link
               to="/login"
               className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
             >
-              Se connecter
+              {t("register.login_link")}
             </Link>
           </p>
         </div>
