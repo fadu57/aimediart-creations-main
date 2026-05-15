@@ -83,25 +83,49 @@ export function useArtistBios(artistId: string | null, agencyId: string | null) 
   return { bios, loading };
 }
 
-/** Insert / mise à jour d’une ligne bio (adapter `onConflict` au schéma réel si besoin). */
+/** Insert ou mise à jour d’une ligne (pas d’upsert : index uniques partiels côté DB). */
 export async function upsertArtistBioRow(
   artistId: string,
-  agencyId: string,
-  lang: Language,
+  agencyId: string | null,
+  language: Language,
   bioText: string,
 ): Promise<void> {
-  const row = {
+  const text = bioText.trim();
+  const scopedAgency = agencyId?.trim() || null;
+
+  let query = supabase.from("artist_bios").select("id").eq("artist_id", artistId).eq("language", language);
+
+  if (scopedAgency) {
+    query = query.eq("agency_id", scopedAgency);
+  } else {
+    query = query.is("agency_id", null);
+  }
+
+  const { data: existing, error: selectError } = await query.maybeSingle();
+  if (selectError) {
+    throw new Error(typeof selectError.message === "string" ? selectError.message : "Bio multilingue : lecture impossible.");
+  }
+
+  const existingId = (existing as { id?: string } | null)?.id;
+
+  if (existingId) {
+    const { error: updateError } = await supabase
+      .from("artist_bios")
+      .update({ bio_text: text, updated_at: new Date().toISOString() })
+      .eq("id", existingId);
+    if (updateError) {
+      throw new Error(typeof updateError.message === "string" ? updateError.message : "Bio multilingue : mise à jour impossible.");
+    }
+    return;
+  }
+
+  const { error: insertError } = await supabase.from("artist_bios").insert({
     artist_id: artistId,
-    agency_id: agencyId,
-    language: lang,
-    bio_text: bioText.trim(),
-  };
-
-  const { error } = await supabase.from("artist_bios").upsert(row, {
-    onConflict: "artist_id,agency_id,language",
+    agency_id: scopedAgency,
+    language,
+    bio_text: text,
   });
-
-  if (error) {
-    throw new Error(typeof error.message === "string" ? error.message : "Bio multilingue : erreur Upsert.");
+  if (insertError) {
+    throw new Error(typeof insertError.message === "string" ? insertError.message : "Bio multilingue : insertion impossible.");
   }
 }
