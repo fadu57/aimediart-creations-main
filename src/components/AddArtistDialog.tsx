@@ -8,7 +8,8 @@ import { CalendarIcon, ChevronDown, ImageIcon, Loader2 } from "lucide-react";
 import { z } from "zod";
 
 import { supabase } from "@/lib/supabase";
-import { computeArtistControl, computeInitialeArtist } from "@/lib/artistControl";
+import type { Database } from "@/types/supabase";
+import { computeArtistControl } from "@/lib/artistControl";
 import {
   ARTIST_TYPE_OPTIONS,
   SOCIAL_LINK_TYPES,
@@ -21,9 +22,17 @@ import {
 } from "@/lib/countries";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
+import {
+  ARTIST_BIO_LANGUAGES,
+  EMPTY_BIOS,
+  hasAnyBioText,
+  upsertArtistBioRow,
+  useArtistBios,
+  type Language,
+} from "@/hooks/useArtistBios";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess, normalizeRoleName } from "@/lib/authUser";
-import { normalizeArtistBioForStorage, resolveSpellcheckLang } from "@/lib/artistBio";
+import { normalizeArtistBioForStorage } from "@/lib/artistBio";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -52,6 +61,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -73,7 +83,7 @@ const artistFormSchema = z.object({
   // Les seules valeurs "requises" pour que l'enregistrement passe.
   // Tout le reste doit être optionnel et ne doit pas bloquer `handleSubmit`.
   artist_typ: z.array(z.string()).min(1, "Sélectionnez au moins un type d’art."),
-  artist_bio: z.string().min(1, "La biographie est requise.").trim(),
+  artist_bio: z.string().trim().default(""),
 
   // Le formulaire UI peut contenir d'autres champs, mais ils ne doivent pas bloquer.
   artist_address: z.string().optional(),
@@ -90,7 +100,9 @@ const artistFormSchema = z.object({
 
 export type ArtistFormInput = z.infer<typeof artistFormSchema>;
 
-/** Ligne telle que renvoyée par Supabase (colonnes réelles de la table `artists`). */
+type ArtistsTableUpdate = Database["public"]["Tables"]["artists"]["Update"];
+type ArtistsTableInsert = Database["public"]["Tables"]["artists"]["Insert"];
+
 type DbArtistRow = {
   artist_id: string;
   artist_firstname?: string | null;
@@ -157,7 +169,6 @@ export type AddArtistDialogProps = {
 export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artistIdProp }: AddArtistDialogProps) {
   const { t } = useTranslation("artists");
   const { user, role_name, role_id, agency_id } = useAuthUser();
-  const bioSpellLang = useMemo(() => resolveSpellcheckLang(user), [user]);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const bypassCloseConfirmRef = useRef(false);
 
@@ -176,6 +187,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
   const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
   const [loadingAgencies, setLoadingAgencies] = useState(false);
   const [phoneValid, setPhoneValid] = useState(true);
+  const [activeLanguage, setActiveLanguage] = useState<Language>("fr");
+  const [biosDraft, setBiosDraft] = useState<Record<Language, string>>(() => ({ ...EMPTY_BIOS }));
 
   const form = useForm<ArtistFormInput>({
     resolver: zodResolver(artistFormSchema),
@@ -187,7 +200,13 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
   const artistTyp = useWatch({ control: form.control, name: "artist_typ" });
   const pays = useWatch({ control: form.control, name: "pays" });
   const photoUrl = useWatch({ control: form.control, name: "artist_photo_url" });
-  const bio = useWatch({ control: form.control, name: "artist_bio" });
+
+  const agencyForBiosHook = useMemo(
+    () => (agency_id ?? "").trim() || selectedAgencyId.trim() || null,
+    [agency_id, selectedAgencyId],
+  );
+
+  const { bios, loading: biosLoading } = useArtistBios(open ? editingArtistId : null, agencyForBiosHook);
 
   const previewSrc = useMemo(() => {
     if (pendingPhotoFile) {
@@ -208,6 +227,19 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    if (!editingArtistId) {
+      setBiosDraft({ ...EMPTY_BIOS });
+      setActiveLanguage("fr");
+      return;
+    }
+    if (biosLoading) return;
+    if (hasAnyBioText(bios)) {
+      setBiosDraft({ ...EMPTY_BIOS, ...bios });
+    }
+  }, [open, editingArtistId, biosLoading, bios]);
+
   const resetAll = useCallback(() => {
     form.reset(getDefaultValues());
     setEditingArtistId(null);
@@ -217,6 +249,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
     setProcessingPhoto(false);
     setCheckingDuplicate(false);
     setGeneratingBio(false);
+    setActiveLanguage("fr");
+    setBiosDraft({ ...EMPTY_BIOS });
     setSelectedAgencyId("");
     setAgencyOptions([]);
     setPhoneValid(true);
@@ -271,7 +305,13 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
     Boolean(firstname?.trim()) && Boolean(lastname?.trim()) && (artistTyp?.length ?? 0) >= 1;
 
   const canShowGenerateBio = !ficheReadOnly;
-  const hasArtistChanges = !editingArtistId ? true : Boolean(form.formState.isDirty || pendingPhotoFile);
+
+  const biosEdited = useMemo(() => {
+    if (!editingArtistId || biosLoading) return false;
+    return ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "") !== (bios[lang] ?? ""));
+  }, [bios, biosDraft, biosLoading, editingArtistId]);
+
+  const hasArtistChanges = !editingArtistId ? true : Boolean(form.formState.isDirty || pendingPhotoFile || biosEdited);
 
   const needsAgencyPicker = useMemo(() => {
     if ((agency_id ?? "").trim()) return false;
@@ -282,13 +322,16 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
 
   const agencySelectionOk = !needsAgencyPicker || selectedAgencyId.trim().length > 0;
 
+  const hasAnyBioDraft = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim().length > 0);
+
   const canShowSave =
     !ficheReadOnly &&
     hasTripleRequired &&
-    Boolean((bio ?? "").trim()) &&
+    hasAnyBioDraft &&
     !duplicateRow &&
     !checkingDuplicate &&
     !generatingBio &&
+    (!editingArtistId || !biosLoading) &&
     agencySelectionOk;
 
   const resolveCurrentAgencyId = useCallback(async (): Promise<string | null> => {
@@ -369,6 +412,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
             .trim();
       }
 
+      const legacyBio = (agencySpecificBio || (row.artist_bio ?? "")).trim();
+
       form.reset({
         artist_firstname: row.artist_firstname ?? "",
         artist_lastname: row.artist_lastname ?? "",
@@ -377,7 +422,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
         artist_city: row.artist_city ?? "",
         pays: paysValue,
         artist_nickname: row.artist_nickname ?? "",
-        artist_bio: agencySpecificBio || (row.artist_bio ?? ""),
+        artist_bio: "",
         artist_photo_url: row.artist_photo_url ?? "",
         email: row.artist_email ?? "",
         phone: row.artist_phone ?? "",
@@ -390,6 +435,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
         artist_typ: parseArtistTypFromDb(row.artist_typ),
         social,
       });
+      setBiosDraft({ ...EMPTY_BIOS, fr: legacyBio });
       setEditingArtistId(row.artist_id);
       setDuplicateRow(null);
       setPendingPhotoFile(null);
@@ -490,8 +536,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
     setGeneratingBio(true);
     try {
       const text = await generateBiographyWithGrok({ prenom: p, name: n, artTypes: types });
-      form.setValue("artist_bio", text, { shouldValidate: true, shouldDirty: true });
-      toast.success("Biographie générée. Vous pouvez la modifier.");
+      setBiosDraft((prev) => ({ ...prev, fr: text }));
+      toast.success(t("messages.bio_generated"));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erreur lors de la génération.";
       toast.error(msg);
@@ -575,7 +621,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
       toast.error("Un doublon est détecté : utilisez « Oui » pour modifier la fiche, ou « Non » pour fermer.");
       return;
     }
-    if (!values.artist_bio.trim()) {
+    if (!ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim())) {
       toast.error("La biographie est requise avant l’enregistrement.");
       return;
     }
@@ -584,7 +630,15 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
       return;
     }
 
-    const bioStored = normalizeArtistBioForStorage(values.artist_bio);
+    let legacyBioSource = "";
+    for (const lang of ARTIST_BIO_LANGUAGES) {
+      const chunk = (biosDraft[lang] ?? "").trim();
+      if (chunk) {
+        legacyBioSource = chunk;
+        break;
+      }
+    }
+    const bioStored = normalizeArtistBioForStorage(legacyBioSource);
     if (!bioStored) {
       toast.error("La biographie est requise avant l’enregistrement.");
       return;
@@ -609,7 +663,6 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
       if (pendingPhotoFile) {
         photoPublicUrl = await uploadPendingPhotoFile();
       }
-      console.log("URL de la photo à enregistrer:", photoPublicUrl);
 
       // Mapping rigoureux: colonnes `artists` préfixées par `artist_`.
       // - E-mail -> artist_email
@@ -634,25 +687,35 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
 
       let savedArtistId = editingArtistId ?? null;
       if (editingArtistId) {
-        // On tente d'abord `artist_image`, puis fallback `artist_photo_url` (schémas existants).
-        const payloadCandidates: Array<Record<string, unknown>> = [
-          { ...payloadBase, artist_image: photoPublicUrl },
-          { ...payloadBase, artist_photo_url: photoPublicUrl },
-        ];
-        let lastError: Error | null = null;
-        for (const p of payloadCandidates) {
-          const { error } = await supabase.from("artists").update(p).eq("artist_id", editingArtistId);
-          if (!error) {
-            lastError = null;
-            savedArtistId = editingArtistId;
-            break;
+        if (photoPublicUrl) {
+          const payloadCandidates: ArtistsTableUpdate[] = [
+            { ...payloadBase, artist_image: photoPublicUrl },
+            { ...payloadBase, artist_photo_url: photoPublicUrl },
+          ];
+          let lastError: Error | null = null;
+          for (const p of payloadCandidates) {
+            const { error } = await supabase.from("artists").update(p).eq("artist_id", editingArtistId);
+            if (!error) {
+              lastError = null;
+              savedArtistId = editingArtistId;
+              break;
+            }
+            lastError =
+              error instanceof Error ? error : new Error(String((error as { message?: string }).message ?? ""));
           }
-          lastError = error instanceof Error ? error : new Error(error.message);
+          if (lastError) throw lastError;
+        } else {
+          const { error } = await supabase.from("artists").update(payloadBase).eq("artist_id", editingArtistId);
+          if (error) {
+            throw error instanceof Error
+              ? error
+              : new Error(String((error as { message?: string }).message ?? ""));
+          }
+          savedArtistId = editingArtistId;
         }
-        if (lastError) throw lastError;
         toast.success("Artiste mis à jour.");
       } else {
-        const payloadCandidates: Array<Record<string, unknown>> = [
+        const payloadCandidates: ArtistsTableInsert[] = [
           { ...payloadBase, artist_image: photoPublicUrl },
           { ...payloadBase, artist_photo_url: photoPublicUrl },
         ];
@@ -661,7 +724,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
         for (const p of payloadCandidates) {
           const { data, error } = await supabase
             .from("artists")
-            .insert(p as never)
+            .insert(p)
             .select("artist_id")
             .single();
           if (!error) {
@@ -672,7 +735,8 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
               } | null)?.artist_id ?? null) ?? null;
             break;
           }
-          lastError = error instanceof Error ? error : new Error(error.message);
+          lastError =
+            error instanceof Error ? error : new Error(String((error as { message?: string }).message ?? ""));
         }
         if (lastError) throw lastError;
         savedArtistId = createdArtistId;
@@ -690,12 +754,18 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
       };
       const { error: agencyBioError } = await supabase
         .from("artist_agency_details")
-        .upsert(agencyBioPayload as never, {
+        .upsert(agencyBioPayload, {
           onConflict: "artist_id,agency_id",
         });
       if (agencyBioError) {
         throw new Error(`Bio agence : ${agencyBioError.message}`);
       }
+
+      for (const lang of ARTIST_BIO_LANGUAGES) {
+        await upsertArtistBioRow(savedArtistId, currentAgencyId, lang, biosDraft[lang]);
+      }
+
+      await persistSocialLinks(savedArtistId);
 
       bypassCloseConfirmRef.current = true;
       onOpenChange(false);
@@ -802,7 +872,7 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
                   {!ficheReadOnly && (
                     <Button
                       type="submit"
-                      disabled={!canShowSave || isSubmitting || processingPhoto}
+                      disabled={!canShowSave || isSubmitting || processingPhoto || (Boolean(editingArtistId) && biosLoading)}
                       className={
                         editingArtistId
                           ? `h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] ${
@@ -824,28 +894,54 @@ export function AddArtistDialog({ open, onOpenChange, onSuccess, artistId: artis
 
             <div className="space-y-4 w-full">
 
-            <FormField
-              control={form.control}
-              name="artist_bio"
-              render={({ field }) => (
-                <FormItem className="flex min-h-0 min-w-0 flex-col space-y-0">
-                  <FormLabel className="sr-only">{t("bio_label")}</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder={t("bio_placeholder")}
-                      className={cn(
-                        "w-full min-h-[250px] min-w-0 resize-y overflow-y-auto p-2 text-xs leading-snug shadow-none",
-                      )}
-                      {...field}
-                      disabled={ficheReadOnly}
-                      spellCheck
-                      lang={bioSpellLang}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            <div className="flex min-h-0 min-w-0 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-1">
+                <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
+                {!ficheReadOnly && <RequiredAsterisk />}
+              </div>
+
+              {biosLoading && editingArtistId ? (
+                <div className="flex min-h-[200px] items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/20 text-sm text-muted-foreground">
+                  <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                  <span>{t("loading_bio_tabs", "Chargement des biographies…")}</span>
+                </div>
+              ) : (
+                <Tabs value={activeLanguage} onValueChange={(v) => setActiveLanguage(v as Language)}>
+                  <TabsList className="flex h-auto min-h-9 w-full flex-wrap justify-start gap-1">
+                    {ARTIST_BIO_LANGUAGES.map((lang) => (
+                      <TabsTrigger
+                        key={lang}
+                        value={lang}
+                        type="button"
+                        className="shrink-0 gap-1.5 px-2.5 text-xs sm:text-sm"
+                      >
+                        {lang.toUpperCase()}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {ARTIST_BIO_LANGUAGES.map((lang) => (
+                    <TabsContent key={lang} value={lang}>
+                      <Textarea
+                        value={biosDraft[lang]}
+                        onChange={(e) =>
+                          setBiosDraft((prev) => ({
+                            ...prev,
+                            [lang]: e.target.value,
+                          }))
+                        }
+                        placeholder={`Bio en ${lang.toUpperCase()}...`}
+                        rows={14}
+                        disabled={ficheReadOnly}
+                        spellCheck
+                        lang={lang}
+                        className="w-full min-h-[240px] min-w-0 resize-y overflow-y-auto p-2 text-xs leading-snug shadow-none"
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
               )}
-            />
+            </div>
 
             {!ficheReadOnly && (
               <p className="text-xs text-destructive -mt-0.5">

@@ -150,6 +150,114 @@ export interface Database {
           { foreignKeyName: "agency_users_role_id_fkey"; columns: ["role_id"]; referencedRelation: "roles_user"; referencedColumns: ["role_id"] }
         ];
       };
+      artists: {
+        Row: {
+          artist_id: string;
+          artist_firstname?: string | null;
+          artist_lastname?: string | null;
+          artist_typ?: string | null;
+          artist_bio?: string | null;
+          artist_control?: string | null;
+          artist_email?: string | null;
+          artist_phone?: string | null;
+          artist_birth_date?: string | null;
+          artist_photo_url?: string | null;
+          artist_image?: string | null;
+        };
+        Insert: {
+          artist_id?: string;
+          artist_firstname?: string | null;
+          artist_lastname?: string | null;
+          artist_typ?: string | null;
+          artist_bio?: string | null;
+          artist_control?: string | null;
+          artist_email?: string | null;
+          artist_phone?: string | null;
+          artist_birth_date?: string | null;
+          artist_photo_url?: string | null;
+          artist_image?: string | null;
+        };
+        Update: {
+          artist_firstname?: string | null;
+          artist_lastname?: string | null;
+          artist_typ?: string | null;
+          artist_bio?: string | null;
+          artist_control?: string | null;
+          artist_email?: string | null;
+          artist_phone?: string | null;
+          artist_birth_date?: string | null;
+          artist_photo_url?: string | null;
+          artist_image?: string | null;
+        };
+        Relationships: [];
+      };
+      artist_agency_details: {
+        Row: {
+          artist_id: string;
+          agency_id: string;
+          agency_specific_bio?: string | null;
+        };
+        Insert: {
+          artist_id: string;
+          agency_id: string;
+          agency_specific_bio?: string | null;
+        };
+        Update: {
+          agency_specific_bio?: string | null;
+        };
+        Relationships: [];
+      };
+      social_links: {
+        Row: {
+          id?: string;
+          artist_id: string;
+          type_link: string;
+          url: string;
+          created_at?: string | null;
+        };
+        Insert: {
+          id?: string;
+          artist_id: string;
+          type_link: string;
+          url: string;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          artist_id?: string;
+          type_link?: string;
+          url?: string;
+          created_at?: string | null;
+        };
+        Relationships: [];
+      };
+      artist_bios: {
+        Row: {
+          id?: string;
+          artist_id: string;
+          agency_id?: string | null;
+          language: string;
+          bio_text?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Insert: {
+          id?: string;
+          artist_id: string;
+          agency_id?: string | null;
+          language: string;
+          bio_text?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          agency_id?: string | null;
+          language?: string;
+          bio_text?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       expo_user_role: {
         Row: {
           id: string;
