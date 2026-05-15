@@ -1,54 +1,38 @@
-import i18n from "@/i18n/config";
+import { supabase } from "@/lib/supabase";
+import type { Language } from "@/hooks/useArtistBios";
 
-/**
- * Génère une courte biographie via l'Edge Function `generate-artist-bio`.
- * La fonction lit le prompt dynamique dans `app_settings` côté serveur.
- */
-export async function generateBiographyWithGrok(params: {
+type GenerateBiographyArgs = {
   prenom: string;
   name: string;
   artTypes: string[];
-  /** Langue cible de la bio générée. Si omis, utilise la langue active de l'interface. */
-  lang?: string;
-}): Promise<string> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!supabaseUrl || !anonKey) {
-    throw new Error("Configuration Supabase manquante (URL ou ANON KEY).");
-  }
+};
 
-  const endpoint = `${supabaseUrl}/functions/v1/generate-artist-bio`;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
-    },
-    body: JSON.stringify({
-      prenom: params.prenom,
-      nom: params.name,
-      art_types: params.artTypes,
-      lang: params.lang ?? i18n.language ?? "fr",
-    }),
+export async function generateMultilingualBiographyWithGrok(
+  args: GenerateBiographyArgs,
+): Promise<Record<Language, string>> {
+  const { data, error } = await supabase.functions.invoke("generate-artist-bio", {
+    body: args,
   });
 
-  const raw = await response.text();
-  let parsed: { bio?: string; error?: string; details?: string } | null = null;
-  try {
-    parsed = raw ? (JSON.parse(raw) as { bio?: string; error?: string; details?: string }) : null;
-  } catch {
-    parsed = null;
+  if (error) {
+    const maybeMessage =
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error &&
+      typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : "Appel à generate-artist-bio impossible.";
+
+    throw new Error(maybeMessage);
   }
 
-  if (!response.ok) {
-    const detail = [parsed?.error, parsed?.details, raw].filter(Boolean).join(" - ");
-    throw new Error(detail || `Erreur Edge Function (${response.status}).`);
-  }
+  const bios = data as Partial<Record<Language, string>> | null;
 
-  const bio = parsed?.bio?.trim() ?? "";
-  if (!bio) {
-    throw new Error("Réponse vide de la fonction generate-artist-bio.");
-  }
-  return bio;
+  return {
+    fr: bios?.fr?.trim() || "",
+    en: bios?.en?.trim() || "",
+    es: bios?.es?.trim() || "",
+    de: bios?.de?.trim() || "",
+    it: bios?.it?.trim() || "",
+  };
 }
