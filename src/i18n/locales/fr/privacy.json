@@ -1,0 +1,241 @@
+{
+  "meta": {
+    "title": "Politique de confidentialité – Aimediart.com",
+    "version": "Version : 16 mai 2026",
+    "scope": "Champ d’application : site vitrine Aimediart.com, plateforme SaaS AIMEDIArt et services associés (support, facturation, médiation numérique, fonctionnalités d’IA, analytics de base).",
+    "languageRef": "Les traductions sont fournies à titre informatif. La langue de référence et la version juridiquement prévalente est le français, sous réserve des dispositions impératives applicables."
+  },
+  "sections": {
+    "controller": {
+      "title": "1. Qui est responsable de vos données ?",
+      "p1": "Le responsable du traitement des données personnelles collectées via Aimediart.com est l’éditeur du site et de la plateforme AIMEDIArt (ci-après « nous » ou « l’Éditeur »), dont l’identité et les coordonnées complètes sont indiquées dans les mentions légales.",
+      "p2": "Vous pouvez nous contacter pour toute question liée à la protection des données à l’adresse suivante : contact@aimediart.com (à adapter) ou via le formulaire de contact du site.",
+      "p3": "Selon les traitements, nous pouvons agir en tant que :",
+      "list": {
+        "i1": "responsable de traitement, lorsque nous définissons les finalités et moyens (ex. gestion des comptes clients, facturation, suivi commercial, sécurité de la plateforme) ;",
+        "i2": "sous-traitant, lorsque nous traitons des données pour le compte de clients professionnels qui restent responsables (ex. données de visiteurs d’exposition collectées pour une galerie, institution, musée ou agence utilisant AIMEDIArt)."
+      },
+      "p4": "Dans ce dernier cas, une convention de traitement des données (DPA) vient compléter les présentes dispositions."
+    },
+    "dataCollected": {
+      "title": "2. Quelles données collectons-nous ?",
+      "p1": "Nous collectons uniquement les données pertinentes pour fournir et améliorer nos services. Les catégories principales sont :",
+      "accountId": {
+        "title": "2.1 Données de compte et d’identification",
+        "list": {
+          "i1": "Nom, prénom, éventuellement fonction ou rôle (ex. curateur, galeriste, chargé de médiation) ;",
+          "i2": "Coordonnées professionnelles (adresse email, téléphone, structure) ;",
+          "i3": "Identifiants de connexion (login, hash du mot de passe, logs de connexion) ;",
+          "i4": "Préférences de langue et paramètres de profil."
+        }
+      },
+      "contractBilling": {
+        "title": "2.2 Données de contrat et de facturation",
+        "list": {
+          "i1": "Informations de facturation (structure, adresse postale, numéro de TVA le cas échéant) ;",
+          "i2": "Données relatives aux commandes, abonnements, renouvellements, résiliations ;",
+          "i3": "Historique des paiements (via un prestataire de paiement tiers) ;",
+          "i4": "Échanges liés à la négociation ou au suivi de la relation commerciale."
+        }
+      },
+      "contentProject": {
+        "title": "2.3 Données de contenu et de projet",
+        "list": {
+          "i1": "Contenus chargés sur la plateforme : textes, biographies, descriptions d’œuvres, visuels, métadonnées, scripts de médiation, prompts fournis à l’IA, etc. ;",
+          "i2": "Structuration des expositions, parcours de visite, QR codes, paramétrages de médiation numérique ;",
+          "i3": "Commentaires ou retours des équipes projet."
+        },
+        "p1": "Ces contenus peuvent contenir des données personnelles (par exemple nom d’un artiste, biographie, contact référent) sous la responsabilité principale du client professionnel."
+      },
+      "logsSecurity": {
+        "title": "2.4 Données de journalisation et de sécurité",
+        "list": {
+          "i1": "Logs techniques des serveurs (adresses IP, identifiants techniques, timestamps, codes d’erreur, événements de sécurité) ;",
+          "i2": "Journaux d’actions dans l’interface (création, modification, suppression d’éléments, connexions / déconnexions) ;",
+          "i3": "Informations liées à l’usage des API et des fonctionnalités d’IA."
+        }
+      },
+      "navigation": {
+        "title": "2.5 Données de navigation et mesures d’audience",
+        "p1": "Sur le site vitrine et, le cas échéant, sur certaines interfaces de la plateforme, nous collectons des données de navigation via des cookies et traceurs, conformément à notre politique cookies :",
+        "list": {
+          "i1": "pages consultées, temps passé, clics sur certaines zones ;",
+          "i2": "provenance approximative (pays / région), type de terminal et de navigateur ;",
+          "i3": "acceptation ou refus des cookies."
+        },
+        "p2": "Ces données sont en principe agrégées et pseudonymisées et ne servent pas à établir des profils marketing individualisés."
+      },
+      "support": {
+        "title": "2.6 Données échangées avec le support",
+        "list": {
+          "i1": "Contenu des demandes d’assistance (emails, formulaires, captures d’écran) ;",
+          "i2": "Informations nécessaires au diagnostic (configuration technique, journaux d’erreur, extraits de contenu anonymisés si possible) ;",
+          "i3": "Historique des tickets et échanges."
+        }
+      }
+    },
+    "purposes": {
+      "title": "3. À quelles fins utilisons-nous vos données et sur quelles bases légales ?",
+      "p1": "Nous traitons les données pour des finalités déterminées, explicites et légitimes. Selon les cas, la base légale peut être : l’exécution du contrat, le respect d’une obligation légale, notre intérêt légitime, ou votre consentement.",
+      "accountServices": {
+        "title": "3.1 Gestion du compte et fourniture des services",
+        "list": {
+          "i1": "Création et administration des comptes utilisateurs ;",
+          "i2": "Fourniture des fonctionnalités de la plateforme (médiation, IA, tableaux de bord, QR codes, etc.) ;",
+          "i3": "Support utilisateur et assistance technique."
+        },
+        "legalBasis": "Base légale : exécution du contrat ou des mesures précontractuelles (article 6.1.b RGPD)."
+      },
+      "b2bClient": {
+        "title": "3.2 Gestion de la relation client B2B",
+        "list": {
+          "i1": "Suivi commercial (prospection B2B raisonnable, relances de démonstration, échanges précontractuels) ;",
+          "i2": "Gestion des contrats, abonnements, renouvellements et résiliations ;",
+          "i3": "Facturation, comptabilité, gestion des impayés et contentieux."
+        },
+        "legalBasis": "Base légale : exécution du contrat (6.1.b) et respect d’obligations légales (comptabilité, 6.1.c), intérêts légitimes pour la gestion et le développement des activités B2B (6.1.f), sous réserve des droits des personnes."
+      },
+      "platformSecurity": {
+        "title": "3.3 Amélioration de la plateforme et sécurité",
+        "list": {
+          "i1": "Analyse agrégée de l’usage pour améliorer l’ergonomie, la performance et la fiabilité du service ;",
+          "i2": "Détection d’anomalies, prévention des abus et fraudes, sécurisation de l’infrastructure ;",
+          "i3": "Tests, audits et améliorations techniques."
+        },
+        "legalBasis": "Base légale : intérêts légitimes (6.1.f) à assurer la sécurité, la qualité de service et l’amélioration continue de la plateforme, sans porter atteinte de manière excessive aux droits et libertés des personnes."
+      },
+      "audience": {
+        "title": "3.4 Mesure d’audience",
+        "list": {
+          "i1": "Mesure d’audience du site vitrine et de certaines sections de la plateforme ;",
+          "i2": "Statistiques agrégées sur les consultations, parcours, interactions."
+        },
+        "legalBasisIntro": "Base légale : selon la configuration retenue :",
+        "legalList": {
+          "i1": "consentement (6.1.a) pour les traceurs non strictement nécessaires ;",
+          "i2": "ou, dans les cas limités prévus par la CNIL pour certaines mesures d’audience exemptées, intérêt légitime à condition de respecter strictement les critères applicables."
+        }
+      },
+      "communication": {
+        "title": "3.5 Communication et information",
+        "list": {
+          "i1": "Envoi d’informations relatives aux services souscrits (mises à jour, changements de conditions, incidents, sécurité) ;",
+          "i2": "Envoi d’actualités ou de contenu éditorial lié à AIMEDIArt lorsque la personne l’a accepté ou lorsque cela est permis par la réglementation (prospection B2B raisonnable)."
+        },
+        "legalBasis": "Base légale : exécution du contrat (informations strictement nécessaires au service) ou intérêts légitimes / consentement selon le type de communication et le statut (client, prospect, professionnel, consommateur)."
+      },
+      "legalObligations": {
+        "title": "3.6 Respect de nos obligations légales",
+        "list": {
+          "i1": "Gestion des droits d’accès, de rectification, d’effacement, de limitation, de portabilité et d’opposition ;",
+          "i2": "Gestion des demandes des autorités (fiscales, administratives, judiciaires) ;",
+          "i3": "Lutte contre la fraude, le blanchiment, le financement du terrorisme le cas échéant."
+        },
+        "legalBasis": "Base légale : respect d’obligations légales auxquelles nous sommes soumis (6.1.c) et, le cas échéant, exécution de missions d’intérêt public lorsque la loi l’impose."
+      }
+    },
+    "retention": {
+      "title": "4. Combien de temps conservons-nous vos données ?",
+      "p1": "Nous conservons les données personnelles uniquement pendant la durée nécessaire aux finalités pour lesquelles elles sont traitées, augmentée des délais légaux de prescription ou d’archivage.",
+      "p2": "À titre indicatif :",
+      "list": {
+        "i1": "Données de compte : pendant la durée d’utilisation du service, puis pendant une période limitée après clôture pour la gestion des preuves et des litiges (par exemple 3 à 5 ans) ;",
+        "i2": "Données de facturation : pendant la durée légale de conservation comptable (en général 10 ans à compter de la clôture de l’exercice) ;",
+        "i3": "Logs de connexion et de sécurité : quelques mois à un an, selon la sensibilité et les contraintes de sécurité ;",
+        "i4": "Données de support : pendant le temps nécessaire au traitement de la demande, puis archivage limité ;",
+        "i5": "Cookies et mesures d’audience : durées conformes à la politique cookies (généralement 6 à 13 mois pour les traceurs, sous réserve de la configuration exacte)."
+      },
+      "p3": "Les durées exactes peuvent varier selon les pays et la nature des traitements. Elles sont précisées ou affinées dans notre registre interne des traitements et, le cas échéant, dans les contrats conclus avec les clients professionnels."
+    },
+    "recipients": {
+      "title": "5. Qui peut avoir accès à vos données ?",
+      "p1": "Les données personnelles sont accessibles, dans la limite de leurs attributions respectives et pour les seules finalités poursuivies, aux catégories suivantes :",
+      "list": {
+        "i1": "Membres de l’équipe AIMEDIArt en charge de la relation client, du support et de la maintenance ;",
+        "i2": "Prestataires techniques (hébergeurs, fournisseurs d’infrastructure cloud, outils de supervision, services d’IA, prestataires de paiement, solution d’emailing, etc.) agissant en qualité de sous-traitants ;",
+        "i3": "Conseils externes (avocats, experts-comptables, auditeurs) lorsque cela est nécessaire et encadré ;",
+        "i4": "Autorités compétentes (administratives, judiciaires, fiscales, régulatrices) lorsque la loi l’exige."
+      },
+      "p2": "Lorsque nous faisons appel à des sous-traitants, nous nous assurons qu’ils présentent des garanties suffisantes en matière de sécurité et de confidentialité et qu’un contrat de sous-traitance conforme à l’article 28 du RGPD encadre le traitement."
+    },
+    "transfers": {
+      "title": "6. Où sont stockées vos données et y a-t-il des transferts hors UE ?",
+      "p1": "Par principe, nous cherchons à héberger les données dans l’Union européenne ou dans des pays bénéficiant d’une décision d’adéquation de la Commission européenne.",
+      "p2": "Certains prestataires ou sous-traitants techniques peuvent toutefois être situés en dehors de l’UE ou recourir à des sous-traitants eux-mêmes basés hors UE (par exemple pour certaines fonctionnalités d’IA, d’analytics ou d’emailing).",
+      "p3": "Dans ce cas, nous veillons à ce que les transferts soient encadrés par l’un des mécanismes prévus par le RGPD :",
+      "list": {
+        "i1": "décision d’adéquation de la Commission européenne ;",
+        "i2": "clauses contractuelles types (CCT) approuvées par la Commission ;",
+        "i3": "règles d’entreprise contraignantes (BCR) ;",
+        "i4": "ou, à défaut, dérogations spécifiques prévues par le RGPD dans des cas exceptionnels."
+      },
+      "p4": "Les informations relatives aux principaux sous-traitants et transferts significatifs peuvent être communiquées aux clients professionnels sur demande raisonnable ou via un DPA."
+    },
+    "rights": {
+      "title": "7. Quels sont vos droits ?",
+      "p1": "Conformément au RGPD et aux lois applicables, vous disposez des droits suivants sur vos données personnelles, dans les limites prévues par les textes :",
+      "list": {
+        "i1": "Droit d’accès : obtenir la confirmation que des données vous concernant sont traitées et, le cas échéant, y accéder ;",
+        "i2": "Droit de rectification : demander la correction de données inexactes ou incomplètes ;",
+        "i3": "Droit d’effacement : obtenir l’effacement de vos données dans certains cas (par exemple lorsqu’elles ne sont plus nécessaires, ou en cas de retrait du consentement, sous réserve d’obligations légales de conservation) ;",
+        "i4": "Droit à la limitation : obtenir la limitation temporaire du traitement dans certaines hypothèses ;",
+        "i5": "Droit d’opposition : vous opposer à certains traitements fondés sur nos intérêts légitimes, pour des raisons tenant à votre situation particulière ;",
+        "i6": "Droit à la portabilité : recevoir les données que vous nous avez fournies dans un format structuré, couramment utilisé et lisible par machine, lorsque le traitement est fondé sur le consentement ou le contrat et effectué à l’aide de procédés automatisés ;",
+        "i7": "Droit de définir des directives post-mortem (lorsque le droit local le prévoit) sur le sort de vos données après votre décès."
+      },
+      "p2": "Vous pouvez exercer ces droits en nous contactant à l’adresse figurant au début de la présente politique, en joignant tout élément permettant de vérifier votre identité. Nous répondrons dans les meilleurs délais et en principe dans un délai d’un mois, prolongeable en cas de demandes complexes ou multiples.",
+      "p3": "En cas de doute raisonnable sur votre identité, nous pourrons vous demander des informations supplémentaires."
+    },
+    "complaints": {
+      "title": "8. Droit d’introduire une réclamation",
+      "p1": "Si vous estimez, après nous avoir contactés, que vos droits ne sont pas respectés ou que le traitement de vos données n’est pas conforme au RGPD, vous pouvez introduire une réclamation auprès de l’autorité de contrôle compétente.",
+      "p2": "Pour les utilisateurs situés en France, il s’agit de la CNIL (Commission nationale de l’informatique et des libertés) : www.cnil.fr.",
+      "p3": "Si vous êtes situé dans un autre pays de l’Espace économique européen, vous pouvez également contacter l’autorité de protection des données de votre pays de résidence habituelle."
+    },
+    "security": {
+      "title": "9. Sécurité des données",
+      "p1": "Nous mettons en œuvre des mesures techniques et organisationnelles raisonnables pour protéger les données personnelles contre la destruction accidentelle ou illicite, la perte, l’altération, la divulgation non autorisée ou l’accès non autorisé.",
+      "p2": "Ces mesures peuvent inclure par exemple :",
+      "list": {
+        "i1": "chiffrement des données en transit, segmentation des environnements ;",
+        "i2": "contrôle d’accès, gestion des habilitations, authentification forte lorsque cela est approprié ;",
+        "i3": "journalisation des accès et des événements de sécurité ;",
+        "i4": "sauvegardes régulières et procédures de reprise ;",
+        "i5": "politique interne de gestion des vulnérabilités et mises à jour."
+      },
+      "p3": "Aucun système n’étant parfaitement sécurisé, nous ne pouvons toutefois pas garantir une sécurité absolue. En cas d’incident de sécurité affectant vos données personnelles et susceptible d’engendrer un risque élevé pour vos droits et libertés, nous vous informerons dans les conditions prévues par la réglementation applicable."
+    },
+    "processorRole": {
+      "title": "10. Traitements réalisés en tant que sous-traitant (clients professionnels)",
+      "p1": "Lorsque nous fournissons la plateforme AIMEDIArt à des clients professionnels (par exemple une galerie, un musée, une institution culturelle, une agence) et que ceux-ci utilisent la plateforme pour traiter des données personnelles de leurs propres utilisateurs, visiteurs ou contacts, ils demeurent en principe responsables de traitement et nous agissons comme sous-traitant.",
+      "p2": "Dans ce cadre :",
+      "list": {
+        "i1": "le client professionnel choisit les finalités et moyens des traitements (ex. collecte de retours visiteurs, gestion de listes de contacts, création de contenus de médiation) ;",
+        "i2": "nous traitons les données uniquement sur instruction documentée du client et dans les limites du contrat ;",
+        "i3": "un accord de sous-traitance (DPA) peut préciser les rôles, responsabilités, mesures de sécurité, modalités de coopération pour l’exercice des droits, gestion des violations de données et transferts éventuels."
+      },
+      "p3": "Les personnes concernées (visiteurs, contacts, etc.) doivent se référer en priorité à la politique de confidentialité du client responsable de traitement, qui reste le point de contact principal pour leurs demandes, sous réserve de toute obligation spécifique nous incombant directement."
+    },
+    "ai": {
+      "title": "11. Spécificités liées aux fonctionnalités d’IA",
+      "p1": "Certaines fonctionnalités de la plateforme AIMEDIArt peuvent s’appuyer sur des services d’intelligence artificielle (IA) fournis par nous-mêmes ou par des prestataires tiers (par exemple : reformulation de textes, simplification, traduction, aide à la rédaction, génération de propositions de contenus).",
+      "p2": "Dans ce cadre :",
+      "list": {
+        "i1": "les données envoyées à l’IA peuvent inclure des extraits de contenus que vous fournissez (textes de médiation, descriptions d’œuvres, prompts, etc.) ;",
+        "i2": "nous nous efforçons de limiter les données personnelles transmises aux moteurs d’IA aux seules informations nécessaires à la fourniture de la fonctionnalité ;",
+        "i3": "lorsque des prestataires d’IA tiers sont utilisés, nous nous assurons contractuellement qu’ils n’utilisent pas ces données pour entraîner publiquement leurs modèles de manière non encadrée, dans la mesure des fonctionnalités offertes et de la configuration choisie."
+      },
+      "p3": "Les résultats générés par IA peuvent être inexacts, incomplets ou inadaptés et ne doivent pas être considérés comme des avis juridiques, scientifiques, médicaux ou professionnels. Une relecture humaine reste nécessaire avant toute diffusion publique."
+    },
+    "thirdPartyLinks": {
+      "title": "12. Liens vers des sites ou services tiers",
+      "p1": "Le site et la plateforme peuvent contenir des liens vers d’autres sites, contenus ou services exploités par des tiers (par exemple outils collaboratifs, plateformes vidéo, réseaux sociaux, services d’emailing ou d’analytics externes).",
+      "p2": "Ces tiers ont leurs propres politiques de confidentialité, sur lesquelles nous n’avons aucun contrôle. Nous vous recommandons de les consulter directement. Nous ne pouvons être tenus responsables de la manière dont ces tiers traitent vos données personnelles, sous réserve des obligations qui nous incombent spécifiquement en tant que responsable ou sous-traitant."
+    },
+    "updates": {
+      "title": "13. Mise à jour de la présente politique",
+      "p1": "Nous pouvons mettre à jour la présente politique de confidentialité pour tenir compte de l’évolution de nos traitements, de nos services, de la réglementation ou de la jurisprudence.",
+      "p2": "La version applicable est celle publiée sur cette page à la date de votre visite. En cas de modification importante affectant vos droits ou la manière dont nous traitons vos données, nous vous en informerons par les moyens appropriés (notification dans la plateforme, email, bannière d’information, etc.)."
+    }
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "meta": {
+    "title": "Allgemeine Verkaufsbedingungen — Aimediart.com",
+    "version": "Fassung vom 15. Mai 2026 — Referenzsprache: Französisch — vorrangiger Anwendungsbereich: SaaS-Leistungen, digitale Dienste und Künstliche-Intelligenz-Funktionen, die in erster Linie für Fachleute im Kunstsektor bestimmt sind.",
+    "languageNotice": "Diese Allgemeinen Verkaufsbedingungen können in mehreren Sprachen bereitgestellt werden. Im Falle abweichender Auslegung ist die französische Fassung maßgeblich, vorbehaltlich zwingender Vorschriften des anwendbaren Rechts."
+  },
+  "nav": {
+    "back_home": "← Zurück zur öffentlichen Startseite",
+    "language_aria": "Anzeigesprache wählen"
+  },
+  "sections": {
+    "intro": {
+      "p1": "Diese Allgemeinen Verkaufsbedingungen regeln die Bedingungen, unter denen Aimediart.com gegen Entgelt digitale Dienste, SaaS-Software, Künstliche-Intelligenz-Funktionen, Tools der kulturellen Vermittlung, Dashboards, Anwendungs-Hosting-Leistungen sowie zugehörige Leistungen für Kunden bereitstellt, die die Plattform nutzen.",
+      "p2": "Aimediart.com ist Teil eines SaaS-Plattformprojekts für die Kunstwelt, insbesondere im Bereich digitale Vermittlung von Ausstellungen, QR-Codes, Gesprächs-Tools, assistiertes Umschreiben und Dashboards, mit überwiegend B2B-Ausrichtung für Galerien, Agenturen, Einrichtungen und Akteure der Kultur.",
+      "p3": "Diese AGB sollen internationale Vertragsbeziehungen rahmen, vorbehaltlich der im Land des Kunden geltenden zwingenden Vorschriften, insbesondere im Verbraucherrecht, beim Datenschutz und bei digitalen Diensten."
+    },
+    "sellerIdentity": {
+      "title": "2. Identität des Verkäufers",
+      "p1": "Verkäufer ist die Aimediart.com betreibende Rechtsperson, deren rechtliche Angaben, Registrierungsdaten, Kontakt-, Rechnungs- und gegebenenfalls USt-IdNr. im Impressum und/oder auf jedem Angebot, Bestellformular, jeder Rechnung oder vertraglichen Abonnementseite anzugeben sind.",
+      "p2": "Der Kunde erkennt an, dass diese AGB zusammen mit dem Impressum, der Datenschutzerklärung, der Cookie-Richtlinie und gegebenenfalls den Nutzungsbedingungen der Plattform zu lesen sind."
+    },
+    "definitions": {
+      "title": "3. Begriffsbestimmungen",
+      "intro": "Im Sinne dieser AGB:",
+      "list": {
+        "platform": "„Plattform“: Website, Anwendung, Verwaltungsoberflächen, APIs, Dashboards und über Aimediart.com zugängliche Dienste;",
+        "client": "„Kunde“: jede juristische oder natürliche Person, die mit Aimediart.com einen Vertrag abschließt;",
+        "user": "„Autorisierter Nutzer“: jede vom Kunden zur Nutzung der Plattform berechtigte Person;",
+        "services": "„Leistungen“: sämtliche SaaS-Leistungen, KI-Module, Hosting, Wartung, Support, Konfiguration und zugehörige Dienste;",
+        "clientContent": "„Kundeninhalte“: Daten, Texte, Bilder, Dateien, Biografien, Werke, Metadaten, Prompts, Ausstellungselemente und alle vom Kunden oder seinen Nutzern übermittelten oder auf deren Veranlassung erzeugten Inhalte;",
+        "subscription": "„Abonnement“: wiederkehrender Zugangsplan, monatlich oder jährlich, zu allen oder Teilen der Leistungen;",
+        "order": "„Bestellung“: Online-Abonnement, angenommenes Angebot, unterzeichnete Bestellung oder jede andere Handlung, die die Zustimmung des Kunden zu Angebot und Preis belegt."
+      }
+    },
+    "documents": {
+      "title": "4. Vertragliche Dokumente und Rangfolge",
+      "p1": "Sofern nicht ausdrücklich etwas anderes vereinbart ist, richtet sich das Vertragsverhältnis — in absteigender Priorität — nach: (i) besonderen Bedingungen oder angenommenem Angebot, (ii) diesen AGB, (iii) technischen oder kommerziellen Anlagen, (iv) der Datenschutzerklärung und (v) den Nutzungsbedingungen der Plattform.",
+      "p2": "Bei Widerspruch gilt das höherrangige Dokument. Die allgemeinen Einkaufsbedingungen des Kunden sind nur verbindlich, wenn sie von Aimediart.com ausdrücklich schriftlich akzeptiert wurden."
+    },
+    "clientsScope": {
+      "title": "5. Art der Kunden und geschäftlicher Anwendungsbereich",
+      "p1": "Aimediart.com richtet sich in erster Linie an Geschäftskunden, insbesondere Galerien, Agenturen, Ausstellungskuratoren, Kollektive, kulturelle Einrichtungen, Veranstalter, berufstätige Künstler oder vergleichbare Einheiten.",
+      "p2": "Schließen Verbraucher bestimmte Leistungen ab, gelten ergänzend die in ihrem gewöhnlichen Aufenthaltsstaat geltenden zwingenden Verbrauchervorschriften, ohne Aimediart.com die übrigen wirksamen Bestimmungen dieser AGB zu entziehen. Der Kunde erklärt, die Leistungen nicht in Verletzung geltender Rechtsvorschriften zu Exportkontrollen, internationalen Sanktionen, Embargos, Bekämpfung von Geldwäsche, Korruption und Terrorismusfinanzierung zu nutzen. Aimediart.com kann eine Geschäftsbeziehung ablehnen oder aussetzen, wenn sie berechtigterweise annimmt, dass die Plattform oder ihre Partner einem erheblichen Risiko der Verletzung solcher Vorschriften ausgesetzt wären."
+    },
+    "servicesDescription": {
+      "title": "6. Beschreibung der Leistungen",
+      "p1": "Je nach abgeschlossenem Angebot können die Leistungen umfassen: Erstellung und Verwaltung von Künstler- oder Werksdatensätzen, digitale Vermittlung per QR-Code, mehrsprachige Inhalte, Vereinfachungs- oder KI-gestützte Umschreibung, Chatbots oder Gesprächsassistenten, Erfassung von Besucherfeedback, Dashboards, Hosting, Wartung, Support sowie Integrations- oder Konfigurationsleistungen.",
+      "p2": "Aimediart.com kann die Leistungen weiterentwickeln, um Sicherheit, Leistung, regulatorische Konformität und Benutzerfreundlichkeit zu verbessern oder nicht wesentliche Funktionen hinzuzufügen/zu entfernen, sofern während einer bereits bezahlten Abonnementlaufzeit die vereinbarte Leistung nicht wesentlich verändert wird, außer bei erheblicher gesetzlicher, sicherheitstechnischer oder technischer Notwendigkeit.",
+      "p3": "Demonstrationen, Screenshots, Prototypen, Mock-ups, Präsentationen oder Marketingseiten dienen nur zur Veranschaulichung und sind nicht vertraglich bindend, sofern in einer Bestellung oder einem Angebot nicht ausdrücklich etwas anderes festgelegt ist."
+    },
+    "contractFormation": {
+      "title": "7. Zustandekommen des Vertrags",
+      "p1": "Der Vertrag kommt an dem Tag zustande, an dem die Bestellung online bestätigt wird, das Angebot unterzeichnet wird, eine Bestellung angenommen wird oder eine vom Kunden akzeptierte Leistungserbringung beginnt.",
+      "p2": "Der Kunde erklärt, vor Vertragsschluss die wesentlichen Informationen zur Leistung, zum Preis, zur Laufzeit, zu Verlängerungsmodalitäten, zum Support, zu etwaigen Einschränkungen und gegebenenfalls zum Vorhandensein oder Fehlen eines Widerrufsrechts erhalten zu haben.",
+      "p3": "Für B2C- oder gemischte Nutzungswege in der Europäischen Union muss die Abonnementoberfläche klare und verständliche vorvertragliche Informationen enthalten, einschließlich Gesamtpreis, Laufzeit, Verlängerung, Kündigungsmöglichkeiten und Modalitäten zur Ausübung des Widerrufsrechts, sofern dieses besteht."
+    },
+    "prices": {
+      "title": "9. Preise",
+      "p1": "Maßgeblich sind die zum Zeitpunkt der Bestellung auf der Website, in der Abonnementoberfläche, im Angebot oder in besonderen Bedingungen angegebenen Preise. Sofern nicht anders angegeben, verstehen sich die Preise für Geschäftskunden zuzüglich Steuern und bei Verbrauchern als alle Steuern einschließend, sofern das anwendbare Recht dies vorschreibt.",
+      "p2": "Der Preis kann insbesondere vom gewählten Tarif, der Nutzerzahl, dem Werksvolumen, der Nutzungsstufe, Optionen, Support, besonderen Aufwendungen oder Zusatzleistungen abhängen, was dem für Aimediart.com aufgebauten SaaS-Wirtschaftsmodell entspricht.",
+      "p3": "Etwaige Einrichtungs-, Integrations-, Schulungs-, Konfigurations-, Betreuungs-, Migrations- oder Maßanforderungsgebühren werden gesondert in Rechnung gestellt, sofern im kommerziellen Angebot nichts anderes vorgesehen ist."
+    },
+    "payment": {
+      "title": "11. Zahlungsbedingungen",
+      "p1": "Rechnungen sind bei Bestellung oder gemäß dem im Vertrag vorgesehenen Zahlungsplan zahlbar. Zahlungen können per Karte, Lastschrift, Überweisung oder jedem bei Abonnement angebotenen anderen Verfahren erfolgen.",
+      "p2": "Jede Zahlungsverzögerung oder jeder Zahlungsvorbehalt berechtigt Aimediart.com nach Mahnung oder angemessener Benachrichtigung je nach Umständen, alle oder Teile der Leistungen bis zur Zahlungsausgleich auszusetzen, unbeschadet fälliger Beträge. Bei Geschäftskunden können Verzugszinsen zum gesetzlichen oder auf der Rechnung genannten Satz sowie eine Pauschale für Inkassokosten anfallen, soweit das anwendbare Recht dies zulässt."
+    },
+    "accessDelivery": {
+      "title": "8. Kundenkonto und Zugang zur Plattform",
+      "p1": "Der Zugang zu den Leistungen kann die Einrichtung eines Administratorkontos und/oder von Nutzerkonten erfordern. Der Kunde verpflichtet sich, genaue, vollständige und aktuelle Angaben zu machen und die Vertraulichkeit der Zugangsdaten zu wahren.",
+      "p2": "Der Kunde ist für Handlungen über seine Konten verantwortlich und hat Aimediart.com unverzüglich von jeder Kompromittierung, unbefugter Nutzung oder Sicherheitslücke zu benachrichtigen, von der er Kenntnis erlangt. Aimediart.com kann den Zugang bei Sicherheitsrisiko, Nichtzahlung, Vertragsverletzung, rechtswidriger Nutzung, Bedrohung der Plattformintegrität oder gesetzlicher Verpflichtung aussetzen oder einschränken."
+    },
+    "duration": {
+      "title": "10. Abonnements, Laufzeit und Verlängerung",
+      "p1": "Sofern nicht anders vereinbart, werden Abonnements für die bei Bestellung genannte Dauer — üblicherweise monatlich oder jährlich — geschlossen und verlängern sich automatisch um gleiche aufeinanderfolgende Perioden, sofern nicht wie nachstehend gekündigt wird.",
+      "p2": "Der Kunde muss vor Abonnement über Bindungsdauer, Verlängerungsbedingungen, Kündigungsfristen und -verfahren sowie etwaige Kündigungsfristen informiert werden.",
+      "p3": "Bei Verträgen mit Verbrauchern in der Europäischen Union muss die Abonnement- und Verwaltungsoberfläche gegebenenfalls Widerrufs- oder vereinfachte Rücktrittsmechanismen gemäß den geltenden Regeln einbinden, einschließlich neuer Anforderungen an elektronische Widerrufsoberflächen ab dem 19. Juni 2026 in den betroffenen Fällen."
+    },
+    "rightOfWithdrawal": {
+      "title": "12. Widerrufsrecht und Stornierung",
+      "p1": "Sofern zwingendes Recht nichts anderes vorsieht, steht Geschäftskunden kein Widerrufsrecht zu. Jede Bestellung ist nach Vertragsschluss bindend, vorbehaltlich ausdrücklich gesetzlich oder in besonderen Bedingungen vorgesehener Fälle.",
+      "p2": "Handelt der Kunde als Verbraucher und gewährt ihm das anwendbare Recht ein Widerrufsrecht, kann dieses grundsätzlich innerhalb von 14 Tagen bei Fernabsatzverträgen ausgeübt werden, insbesondere für digitale Dienste und digitale Inhalte, vorbehaltlich gesetzlicher Ausnahmen. Beginnt die Erbringung eines digitalen Dienstes oder die Bereitstellung eines nicht auf einem Datenträger gelieferten digitalen Inhalts vor Ablauf der Widerrufsfrist auf ausdrücklichen Wunsch des Verbrauchers, muss Aimediart.com die nach anwendbarem Recht erforderlichen Einwilligungen und Bestätigungen einholen, um gegebenenfalls das Widerrufsrecht gemäß den geltenden Regeln einzuschränken oder erlöschen zu lassen. Für betroffene B2C-Oberflächen in der EU ist ein klarer Online-Mechanismus zur Widerrufsausübung vorzusehen, sofern die Regulierung dies verlangt."
+    },
+    "clientObligations": {
+      "title": "13. Pflichten des Kunden",
+      "intro": "Der Kunde verpflichtet sich insbesondere:",
+      "list": {
+        "item1": "die Leistungen in Übereinstimmung mit geltendem Recht, diesen AGB, Rechten Dritter und der öffentlichen Ordnung zu nutzen. Er unterlässt es insbesondere, die Plattform zur Verbreitung rechtswidriger, rechtsverletzender, diffamierender, irreführender, hasserfüllter oder gewalttätiger Inhalte oder von Inhalten zu nutzen, die Urheber-, Persönlichkeitsrechte oder geltende Vorschriften verletzen;",
+        "item2": "zu gewährleisten, dass er über alle Kundeninhalten, Bilder, Biografien, Werke, personenbezogenen Daten, Anweisungen und übermittelten Elemente erforderlichen Rechte, Genehmigungen, Lizenzen, Rechtsgrundlagen und Einwilligungen verfügt;",
+        "item3": "allein für Richtigkeit, Qualität, Rechtmäßigkeit und Relevanz der über die Plattform importierten, veröffentlichten, verarbeiteten oder verarbeitungswürdig gemachten Inhalte und Daten zu haften;",
+        "item4": "zu erkennen, dass die Leistungen Künstliche-Intelligenz-Funktionen umfassen können, die Entwurf, Übersetzung, Vereinfachung, Vermittlung, Anreicherung oder Analyse von Inhalten unterstützen. Diese Funktionen liefern probabilistische Ergebnisse, die unrichtig, unvollständig, verzerrt, veraltet oder für einen bestimmten Zweck ungeeignet sein können. Der Kunde bleibt allein verantwortlich für menschliche Prüfung und redaktionelle, rechtliche, wissenschaftliche, denkmalpflegerische, sprachliche und kommerzielle Validierung von KI-generierten oder KI-unterstützten Inhalten vor Veröffentlichung, Verbreitung, öffentlicher Mitteilung oder Entscheidungsfindung. Aimediart.com übernimmt keine Garantie für absolute Originalität, Fehlerfreiheit oder Nichtverletzung Rechte Dritter durch aus Kundenanweisungen oder -daten erzeugte Inhalte, außer bei nachgewiesenem eigenem Verschulden;",
+        "item5": "die KI-Leistungen nicht zu nutzen, um rechtswidrige, irreführende, diffamierende oder diskriminierende Inhalte, Inhalte mit Verletzung Dritter oder Inhalte zur Umgehung gesetzlicher oder vertraglicher Pflichten zu erzeugen."
+      }
+    },
+    "providerObligations": {
+      "title": "Verpflichtungen von Aimediart.com",
+      "intro": "Aimediart.com verpflichtet sich insbesondere:",
+      "list": {
+        "item1": "die Leistungen mit der Sorgfalt eines professionellen SaaS-Anbieters zu erbringen. Sofern zwingendes Recht nichts anderes vorsieht, wird keine Garantie auf Geschäftserfolg, universelle Kompatibilität, vollständige Fehlerfreiheit, ununterbrochene Verfügbarkeit oder Eignung für ein bestimmtes Kundenbedürfnis gewährt;",
+        "item2": "angemessene technische und organisatorische Maßnahmen zur Sicherheit, Integrität, Vertraulichkeit und Verfügbarkeit der Leistungen umzusetzen, ohne dass dies eine absolute Erfolgspflicht begründet;",
+        "item3": "soweit die Leistungen nach anwendbarem Recht als Vermittlungs- oder Online-Plattformdienst gelten, insbesondere unter dem Digital Services Act der EU, Melde-, Moderations-, Entfernungs-, Aussetzungs- oder Dereferenzierungsmechanismen für Inhalte oder Konten im Falle rechtswidriger Inhalte, begründeter Beschwerde, Vertragsverletzung oder regulatorischer Pflicht einzuführen. Der Kunde erkennt an, dass Aimediart.com technische Spuren aufbewahren, bestimmte Maßnahmen mitteilen, mit zuständigen Behörden zusammenarbeiten und Transparenz-, Beschwerde- und Risikomanagementprozesse anpassen kann;",
+        "item4": "Support gemäß der gebuchten Leistungsstufe oder besonderen Bedingungen zu erbringen. Sofern nicht anders angegeben, umfasst Support die Behebung reproduzierbarer Störungen, Standard-Nutzungshilfe und angemessene technische Fragen zur Plattform. Entwicklungen nach Maß, komplexe Drittintegrationen, Rechtsprüfungen, redaktionelle Freigaben, komplexe Datenmigrationen oder individualisierte Beratung sind von Standard-Support ausgenommen, sofern nichts anderes vereinbart;",
+        "item5": "Unterauftragnehmer, Hosts, Cloud-Infrastrukturanbieter, Analysetools, KI-Dienste, Zahlungs-, Nachrichten-, Support- oder andere technische Partner für die Erbringung der Leistungen einzusetzen. Aimediart.com bleibt gegenüber seinen Unterauftragnehmern im Rahmen des geltenden Rechts und seiner vertraglichen Verpflichtungen verantwortlich, unbeschadet der hierin genannten Haftungsbeschränkungen."
+      }
+    },
+    "warranty": {
+      "title": "22. Gewährleistung",
+      "p1": "Aimediart.com verpflichtet sich, die Leistungen mit der Sorgfalt eines professionellen SaaS-Anbieters zu erbringen. Sofern zwingendes Recht nichts anderes vorsieht, wird keine Garantie auf Geschäftserfolg, universelle Kompatibilität, vollständige Fehlerfreiheit, ununterbrochene Verfügbarkeit oder Eignung für ein bestimmtes Kundenbedürfnis gewährt.",
+      "p2": "Der Kunde erkennt an, dass jedes digitale Projekt von zahlreichen externen Faktoren abhängt, darunter Datenqualität, Konfiguration, Nutzung, Geräte, Konnektivität, Drittanbieter, lokale Regulierung und Mitwirkung des Kunden. Geltende zwingende Verbraucherrechtsnormen gehen unvereinbaren Bestimmungen dieser AGB vor."
+    },
+    "liability": {
+      "title": "23. Haftung",
+      "p1": "Jede Partei haftet für dem anderen nachgewiesenermaßen durch eigenes Verschulden verursachten unmittelbaren Schaden. Außer bei grober Fahrlässigkeit, Vorsatz, Verletzung fundamentaler Rechte, Körperverletzung oder zwingender abweichender Vorschrift übersteigt die Gesamthaftung von Aimediart.com für ein Vertragsjahr nicht den Gesamtbetrag ohne Steuern, den der Kunde in den zwölf vorangegangenen Monaten für die betroffene Leistung gezahlt hat oder zu zahlen hat.",
+      "p2": "Aimediart.com haftet nicht für mittelbaren Schaden, entgangenen Gewinn, entgangene Chancen, nicht auf sein Verschulden zurückzuführenden Datenverlust, Reputationsschaden, kommerziellen Nachteil, Folgen von Entscheidungen auf Basis KI-generierter Inhalte oder Schaden aus unsachgemäßer Nutzung durch den Kunden oder einen von ihm ermächtigten Dritten, sofern zwingendes Recht nichts anderes vorsieht.",
+      "p3": "Der Kunde ist allein verantwortlich für seine Nutzung von über die Plattform erzeugten Inhalten, Analysen, Empfehlungen, Umformulierungen, Übersetzungen oder Ausgaben."
+    },
+    "intellectualProperty": {
+      "title": "16. Geistiges Eigentum",
+      "p1": "Aimediart.com bleibt Inhaber sämtlicher Rechte des geistigen Eigentums an der Plattform, ihrer Architektur, Software, Datenbanken, Oberflächen, grafischen Elementen, Marken, Logos, Dokumentation, Entwicklungen, proprietären Inhalten, Know-how und Verbesserungen, vorbehaltlich der Rechte Dritter oder des Kunden an eigenen Inhalten. Vorbehaltlich vollständiger Zahlung gewährt Aimediart.com dem Kunden ein persönliches, nicht ausschließliches, nicht übertragbares und nicht abtretbares Recht auf Zugang und Nutzung der Leistungen für interne oder vertraglich vereinbarte Zwecke während der Vertragslaufzeit und im Rahmen des gebuchten Angebots.",
+      "p2": "Der Kunde behält Rechte an seinen vorbestehenden Inhalten. Er räumt Aimediart.com die für Hosting, Verarbeitung, Sicherung, Anzeige, Ausführung, Wartung, Moderation, technische Verbesserung und Vertragserfüllung unbedingt erforderlichen Rechte ein. Sofern nicht ausdrücklich vereinbart, erfolgt keine Übertragung von Schutzrechten zugunsten des Kunden an Plattformelementen oder generischen Entwicklungen von Aimediart.com."
+    },
+    "personalData": {
+      "title": "17. Personenbezogene Daten",
+      "p1": "Die Verarbeitung personenbezogener Daten im Zusammenhang mit den Leistungen richtet sich nach der Datenschutzerklärung und gegebenenfalls nach einer Auftragsverarbeitungsvereinbarung (DPA), wenn Aimediart.com im Auftrag des Kunden als Auftragsverarbeiter handelt. Gilt die DSGVO oder gleichwertige Regulierung, verpflichtet sich jede Partei, ihre jeweiligen Pflichten einzuhalten, insbesondere zu Rechtsgrundlage, Information, Sicherheit, Unterauftragsverarbeiter, internationale Übermittlungen, Betroffenenrechte und gegebenenfalls Meldung von Verletzungen.",
+      "p2": "Der Kunde gewährleistet die erforderliche Rechtsgrundlage für den Import oder die Verarbeitung personenbezogener Daten seiner Nutzer, Künstler, Besucher, Mitarbeiter, Interessenten oder anderer Betroffener über die Plattform."
+    },
+    "serviceModification": {
+      "title": "30. Änderung der AGB",
+      "p1": "Aimediart.com kann diese AGB anpassen, um gesetzliche, regulatorische, rechtsprechungsbedingte, technische, wirtschaftliche oder funktionale Entwicklungen widerzuspiegeln. Die neuen AGB gelten für neue Bestellungen mit Online-Veröffentlichung und für laufende Verträge ab ihrem Wirksamkeitsdatum vorbehaltlich angemessener vorheriger Information und zwingender Kundenrechte.",
+      "p2": "Bei wesentlicher nachteiliger Änderung eines laufenden Abonnements kann der Geschäftskunde die Kündigung zur nächsten Verlängerung vornehmen, sofern keine gesetzliche oder sicherheitsbedingte Notwendigkeit entgegensteht, gemäß den von Aimediart.com mitgeteilten Verfahren."
+    },
+    "termination": {
+      "title": "25. Kündigung",
+      "p1": "Sofern keine feste Bindung läuft, kann jede Partei den Vertrag zum Ende der laufenden Periode gemäß den bei Abonnement oder in besonderen Bedingungen genannten Kündigungsverfahren kündigen.",
+      "p2": "Bei schwerem oder wiederholtem Verstoß einer Partei gegen vertragliche Pflichten, der nach schriftlicher Mahnung innerhalb angemessener Frist nicht behoben wird, kann die andere Partei den Vertrag außerordentlich kündigen, unbeschadet etwaiger Schadensersatzansprüche.",
+      "p3": "Mit der Kündigung endet der Zugang zu den Leistungen zu ihrem Wirksamkeitsdatum, vorbehaltlich Vorschriften zur Datenrückgabe, gesetzlicher Aufbewahrung, fortgeltender Bestimmungen und Zahlung fälliger Beträge. Nach Vertragsende kann der Kunde innerhalb angemessener Frist und gemäß von Aimediart.com genannten Verfahren die Herausgabe exportierbarer Daten in einem nutzbaren Format verlangen, vorbehaltlich vollständiger Zahlung und technischer Beschränkungen. Aimediart.com kann Daten gemäß Aufbewahrungsrichtlinie, gesetzlichen Pflichten, Sicherheitsanforderungen und Regulierung löschen oder anonymisieren. Jede Partei verpflichtet sich, vertrauliche Informationen, Dokumente, Daten, Verfahren, Geschäftsgeheimnisse, Zugangsdaten, Konfigurationen, ausgehandelte Preise und allgemein nicht öffentliche im Rahmen der Geschäftsbeziehung erhaltene Informationen geheim zu halten, außer bei Vereinbarung, gesetzlicher Pflicht oder öffentlicher Verfügbarkeit ohne Verschulden. Diese Verpflichtung gilt für eine angemessene Zeit nach Vertragsende fort."
+    },
+    "forceMajeure": {
+      "title": "24. Höhere Gewalt",
+      "p1": "Keine Partei haftet für ein Versagen, das aus einem Ereignis resultiert, das außerhalb ihrer angemessenen Kontrolle liegt und die Merkmale höherer Gewalt oder eines nach anwendbarem Recht gleichwertigen Falls aufweist, einschließlich Naturkatastrophe, Krieg, Pandemie, flächendeckender Cyberangriff, massiver Netzausfall, Stromausfall, Verwaltungsentscheidung oder schwerer Ausfall eines wesentlichen Anbieters. Dauert das Hindernis über einen angemessenen Zeitraum hinaus an, kann jede Partei den Vertrag für die Zukunft ohne Schadensersatz kündigen, vorbehaltlich der Zahlung für bereits erbrachte Leistungen."
+    },
+    "disputes": {
+      "title": "31. Anwendbares Recht und Streitbeilegung",
+      "p1": "Sofern zwingendes Recht nichts anderes vorsieht, unterliegen diese AGB französischem Recht. Streitigkeiten über Gültigkeit, Auslegung, Erfüllung oder Beendigung fallen in die ausschließliche Zuständigkeit der sachlich zuständigen Gerichte am Sitz des Verkäufers, auch bei Mehrkläger- oder Drittverfahren.",
+      "p2": "Für Verbraucher bleiben die zwingenden Verbraucherschutzvorschriften des Rechts ihres gewöhnlichen Aufenthaltsorts anwendbar, soweit sie nicht vertraglich ausgeschlossen werden können. Der Verbraucher kann gegebenenfalls von Mediations- oder außergerichtlichen Streitbeilegungsverfahren in seinem Land oder auf EU-Ebene profitieren."
+    },
+    "applicableLaw": {
+      "title": "29. Teilnichtigkeit und Salvatorische Klausel",
+      "p1": "Wird eine Bestimmung dieser AGB für nichtig, undurchsetzbar oder unwirksam erklärt, bleiben die übrigen Bestimmungen in Kraft; die betreffende Bestimmung ist im größtmöglichen zulässigen Umfang auszulegen oder zu ersetzen, um der ursprünglichen wirtschaftlichen Absicht der Parteien möglichst nahezukommen."
+    },
+    "finalRecommendations": {
+      "title": "32. Fassung, Sprache und Beweis — 27. Geschäftsreferenzen",
+      "p1": "EDV-gestützte Aufzeichnungen, Verbindungsprotokolle, elektronische Bestätigungen, Support-Tickets, technische Protokolle, E-Mails, Online-Freigaben, Zeitstempel und Rechnungen von Aimediart.com können als Beweismittel vorgelegt werden, vorbehaltlich ihrer Beweiskraft nach anwendbarem Recht.",
+      "p2": "Sofern der Kunde nicht schriftlich widerspricht, kann Aimediart.com Name, Handelsname und Logo des Kunden als Geschäftsreferenz nennen, ohne vertrauliche Informationen offenzulegen, insbesondere auf seiner Website, in Geschäftsunterlagen oder Präsentationen.",
+      "p3": "Detaillierte Fallstudien, namentliche Zitate, Veröffentlichung von Ergebnissen oder vertiefte Kommunikation bedürfen der vorherigen ausdrücklichen Zustimmung des Kunden."
+    }
+  }
+}

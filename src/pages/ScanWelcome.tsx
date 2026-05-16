@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { getOrCreateVisitorUuid, getVisitorLocaleMetadata } from "@/lib/visitorIdentity";
+import { getStoredFingerprintJsId } from "@/lib/fingerprintConsent";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import { supabase } from "@/lib/supabase";
 
@@ -63,6 +64,7 @@ const ScanWelcome = () => {
         body: { visitor_uuid: visitorUuid },
       });
       const rawIp = typeof ipData?.ip_address === "string" ? ipData.ip_address.trim() : "";
+      const fp = getStoredFingerprintJsId();
       const payload = {
         visitor_uuid: visitorUuid,
         expo_id: expoId,
@@ -70,6 +72,7 @@ const ScanWelcome = () => {
         timezone,
         // Stockage propre RGPD-ready : string normalisée ou NULL.
         ip_address: rawIp || null,
+        ...(fp ? { device_fingerprint: fp } : {}),
       };
       await supabase.from("guest_visits").insert(payload);
     };

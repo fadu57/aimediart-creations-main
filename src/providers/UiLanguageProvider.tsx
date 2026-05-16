@@ -108,6 +108,13 @@ export function UiLanguageProvider({ children }: { children: React.ReactNode }) 
     }
   }, [language]);
 
+  /** Garde i18next aligné sur la langue UI (vitrine, pages légales) même si l’état a divergé. */
+  useEffect(() => {
+    if (i18n.language !== language) {
+      void i18n.changeLanguage(language);
+    }
+  }, [language]);
+
   useEffect(() => {
     let cancelled = false;
 

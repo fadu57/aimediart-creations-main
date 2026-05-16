@@ -1,0 +1,174 @@
+{
+  "dpa": {
+    "meta": {
+      "title": "TODO: translate from French",
+      "fullTitle": "TODO: translate from French"
+    },
+    "sections": {
+      "object": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French"
+      },
+      "processingDescription": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French",
+          "i4": "TODO: translate from French",
+          "i5": "TODO: translate from French"
+        }
+      },
+      "processorObligations": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French",
+          "i4": "TODO: translate from French",
+          "i5": "TODO: translate from French",
+          "i6": "TODO: translate from French",
+          "i7": "TODO: translate from French"
+        }
+      },
+      "subProcessing": {
+        "title": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French"
+        }
+      },
+      "transfers": {
+        "title": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French"
+        }
+      },
+      "breachNotification": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French"
+      }
+    }
+  },
+  "dsa": {
+    "meta": {
+      "title": "TODO: translate from French"
+    },
+    "sections": {
+      "object": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French"
+      },
+      "howToReport": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "channels": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French"
+        },
+        "contentIntro": "TODO: translate from French",
+        "contentList": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French",
+          "i4": "TODO: translate from French",
+          "i5": "TODO: translate from French"
+        }
+      },
+      "handling": {
+        "title": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French",
+          "i4": "TODO: translate from French",
+          "i5": "TODO: translate from French",
+          "i6": "TODO: translate from French",
+          "i7": "TODO: translate from French",
+          "i8": "TODO: translate from French",
+          "i9": "TODO: translate from French"
+        }
+      },
+      "abuse": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French"
+      }
+    }
+  },
+  "msa": {
+    "meta": {
+      "title": "TODO: translate from French",
+      "introNote": "TODO: translate from French"
+    },
+    "sections": {
+      "object": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French"
+      },
+      "projectScope": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French",
+          "i4": "TODO: translate from French",
+          "i5": "TODO: translate from French"
+        }
+      },
+      "sla": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French"
+        },
+        "p1": "TODO: translate from French"
+      },
+      "governance": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French"
+        }
+      },
+      "financial": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French",
+        "p2": "TODO: translate from French"
+      },
+      "ip": {
+        "title": "TODO: translate from French",
+        "intro": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French",
+          "i3": "TODO: translate from French"
+        }
+      },
+      "termReversibility": {
+        "title": "TODO: translate from French",
+        "list": {
+          "i1": "TODO: translate from French",
+          "i2": "TODO: translate from French"
+        }
+      },
+      "law": {
+        "title": "TODO: translate from French",
+        "p1": "TODO: translate from French"
+      }
+    }
+  }
+}

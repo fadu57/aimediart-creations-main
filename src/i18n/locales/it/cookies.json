@@ -1,0 +1,134 @@
+{
+  "meta": {
+    "title": "Informativa su cookie e tracker – Aimediart.com",
+    "version": "Versione: 15 maggio 2026",
+    "languageRef": "La presente informativa sui cookie e i tracker può essere resa disponibile in più lingue. In caso di difformità di interpretazione prevale la versione francese, fatti salvi i disposti inderogabili della legge applicabile."
+  },
+  "nav": {
+    "back_home": "← Torna alla home pubblica",
+    "language_aria": "Scegli la lingua di visualizzazione"
+  },
+  "sections": {
+    "object": {
+      "title": "1. Oggetto della presente informativa",
+      "p1": "La presente informativa su «Cookie e tracker» spiega come il sito Aimediart.com utilizza cookie e tecnologie simili sulle pagine di presentazione e sulla piattaforma SaaS AIMEDIArt, a quali fini e come è possibile gestire le proprie scelte tramite il banner di consenso (CMP) e le impostazioni del browser.",
+      "p2": "La presente informativa integra le Condizioni Generali di Vendita e l’Informativa sulla privacy e si applica a ogni visitatore o utente dei nostri servizi online."
+    },
+    "whatIsCookie": {
+      "title": "2. Che cos’è un cookie?",
+      "p1": "Un cookie è un piccolo file di testo depositato e/o letto sul Suo terminale (computer, smartphone, tablet) quando consulta un sito web o un’applicazione. Altre tecnologie possono svolgere una funzione analoga (ad esempio archiviazione locale, pixel, SDK, identificativi di sessione); per semplicità le indichiamo complessivamente come «cookie» o «tracker».",
+      "p2": "Alcuni cookie sono strettamente necessari al funzionamento tecnico del sito o all’erogazione di un servizio che ha esplicitamente richiesto; altri sono soggetti al Suo consenso preventivo, in particolare i cookie di misurazione del pubblico e di statistiche non esenti."
+    },
+    "whoResponsible": {
+      "title": "3. Chi è responsabile dei cookie depositati su Aimediart.com?",
+      "intro": "I cookie depositati quando visita Aimediart.com possono essere:",
+      "list": {
+        "i1": "depositati dall’editore del sito (cookie «interni» o «first-party»);",
+        "i2": "ovvero, ove applicabile, da fornitori terzi (ad esempio soluzione di misurazione del pubblico)."
+      },
+      "p1": "L’entità editrice di Aimediart.com è indicata nelle note legali del sito. Essa resta responsabile dei trattamenti effettuati mediante i cookie, nel rispetto della normativa applicabile (GDPR, direttiva ePrivacy, raccomandazioni della CNIL, ecc.)."
+    },
+    "types": {
+      "title": "4. Quali tipi di cookie utilizziamo e per quali finalità?",
+      "necessary": {
+        "title": "4.1 Cookie strettamente necessari (obbligatori)",
+        "p1": "Questi cookie sono indispensabili al funzionamento tecnico del sito o all’erogazione di un servizio che ha espressamente richiesto (ad esempio: visualizzazione del sito, gestione della sessione, sicurezza, scelta della lingua, conservazione delle Sue preferenze di consenso). Senza di essi il sito non potrebbe funzionare correttamente.",
+        "p2": "Sono depositati senza il Suo consenso preventivo, sulla base del nostro legittimo interesse a garantire il corretto funzionamento e la sicurezza del sito, nei limiti consentiti dalla normativa.",
+        "examples": {
+          "e1": "Cookie di sessione che consente l’autenticazione sull’interfaccia di amministrazione.",
+          "e2": "Cookie che memorizza le Sue scelte nel banner di consenso (accettazione/rifiuto).",
+          "e3": "Cookie di protezione contro attacchi CSRF o analoghi."
+        }
+      },
+      "analytics": {
+        "title": "4.2 Cookie di misurazione del pubblico e statistici",
+        "p1": "Utilizziamo strumenti di misurazione del pubblico per comprendere meglio l’uso del sito e migliorarne l’ergonomia (ad esempio Matomo o Google Analytics, a seconda della configurazione adottata). Questi cookie ci consentono di raccogliere informazioni aggregate e pseudonimizzate, quali:",
+        "list": {
+          "i1": "pagine consultate;",
+          "i2": "tempo trascorso sulle pagine;",
+          "i3": "percorso di navigazione;",
+          "i4": "tipo di terminale e browser."
+        },
+        "p2": "Salvo che si configuri Matomo in modalità «esente» (senza cookie, dati rigorosamente anonimi, aggregazione, assenza di ricongiungimento, ecc.), questi cookie richiedono il Suo consenso preventivo, in linea con le linee guida europee e le raccomandazioni della CNIL.",
+        "p3": "Nella configurazione standard di soluzioni come Google Analytics questi cookie non sono strettamente necessari e sono quindi soggetti a consenso. Sono depositati solo dopo il Suo accordo esplicito tramite il banner cookie / CMP e possono essere disattivati in qualsiasi momento."
+      }
+    },
+    "noAds": {
+      "title": "5. Nessuna pubblicità mirata né retargeting",
+      "p1": "Ad oggi Aimediart.com non utilizza:",
+      "list": {
+        "i1": "cookie pubblicitari destinati alla visualizzazione di banner di terzi;",
+        "i2": "tracker di retargeting pubblicitario;",
+        "i3": "condivisione automatica di identificativi con reti pubblicitarie esterne."
+      },
+      "p2": "Qualora ciò dovesse evolvere (ad esempio aggiunta di campagne Ads, pixel di terzi, ecc.), la presente informativa sarà aggiornata e Le sarà richiesto un consenso specifico in anticipo."
+    },
+    "cmp": {
+      "title": "6. Come viene raccolto il Suo consenso (CMP)?",
+      "p1": "In occasione della prima visita ad Aimediart.com (e periodicamente in seguito), viene visualizzato un banner di consenso (CMP) per consentirLe di scegliere le Sue preferenze in materia di cookie.",
+      "p2": "Tale banner Le consente almeno di:",
+      "choices": {
+        "i1": "Accettare tutti i cookie non necessari;",
+        "i2": "Rifiutare tutti i cookie non necessari con la stessa facilità con cui li accetta;",
+        "i3": "Personalizzare le Sue scelte per finalità (ad esempio: «Misurazione del pubblico»)."
+      },
+      "defaultTitle": "Per impostazione predefinita:",
+      "defaults": {
+        "i1": "Nessun cookie non strettamente necessario (come i cookie di misurazione del pubblico standard) è depositato finché non ha esplicitamente prestato consenso;",
+        "i2": "La Sua scelta è conservata per un periodo limitato (ad esempio 6 mesi), trascorso il quale potremo chiederLe nuovamente il consenso."
+      },
+      "p3": "Conserviamo una prova del Suo consenso (o del Suo rifiuto) per poter dimostrare il rispetto dei nostri obblighi in caso di controllo, in conformità alle raccomandazioni della CNIL e al GDPR."
+    },
+    "changeChoices": {
+      "title": "7. Come modificare le Sue scelte successivamente?",
+      "p1": "Può modificare in qualsiasi momento le Sue decisioni:",
+      "ways": {
+        "i1": "tramite un collegamento o un pulsante «Gestisci i miei cookie» / «Impostazioni cookie» disponibile a piè pagina o nel piede del sito;",
+        "i2": "oppure cliccando di nuovo sull’icona o sull’area dedicata del CMP, se visualizzata."
+      },
+      "p2": "Può quindi:",
+      "then": {
+        "i1": "revocare il consenso;",
+        "i2": "concedere un consenso parziale (per finalità);",
+        "i3": "oppure tornare a un rifiuto globale dei cookie non necessari."
+      },
+      "p3": "La revoca del consenso non pregiudica la liceità dei trattamenti basati sul consenso prima della revoca."
+    },
+    "browser": {
+      "title": "8. Impostazioni del browser",
+      "p1": "Oltre al CMP, può configurare il browser per:",
+      "list": {
+        "i1": "rifiutare sistematicamente tutti i cookie;",
+        "i2": "accettare o rifiutare i cookie caso per caso;",
+        "i3": "eliminare periodicamente i cookie già depositati sul Suo terminale."
+      },
+      "p2": "Le impostazioni variano a seconda dei browser (Chrome, Firefox, Safari, Edge, ecc.). Può consultare la sezione di assistenza del browser per le modalità esatte di configurazione.",
+      "p3": "Attenzione: il blocco dei cookie strettamente necessari può alterare sensibilmente il funzionamento del sito e di alcuni servizi (autenticazione, carrello, preferenze dell’interfaccia, ecc.)."
+    },
+    "retention": {
+      "title": "9. Durata di conservazione",
+      "p1": "I cookie sono conservati per una durata massima che dipende dalla loro finalità:",
+      "list": {
+        "i1": "cookie strettamente necessari: durata limitata alla sessione o a poche ore/giorni secondo la necessità tecnica;",
+        "i2": "cookie di misurazione del pubblico: durata generalmente fino a un massimo di 13 mesi (raccomandazione CNIL) per i tracker analitici e più breve per i log grezzi, salvo configurazione effettiva dello strumento."
+      },
+      "p2": "Le durate esatte sono indicate nella configurazione del CMP o possono essere precisate in una tabella dettagliata (allegato alla presente informativa)."
+    },
+    "updates": {
+      "title": "10. Aggiornamento dell’informativa sui cookie",
+      "p1": "La presente informativa può essere aggiornata, in particolare per tenere conto:",
+      "list": {
+        "i1": "di modifiche legislative o regolamentari (GDPR, ePrivacy, linee guida nazionali);",
+        "i2": "dell’aggiunta o della rimozione di partner tecnici (soluzione analitica, CMP, ecc.);",
+        "i3": "di modifiche alle finalità o alla natura dei cookie utilizzati."
+      },
+      "p2": "La versione vigente è quella pubblicata su questa pagina alla data della Sua visita. La invitiamo a consultarla regolarmente."
+    },
+    "contact": {
+      "title": "11. Contatti",
+      "p1": "Per qualsiasi domanda sulla presente informativa sui cookie può contattarci all’indirizzo:",
+      "p2": "contact@aimediart.com (da adattare),",
+      "p3": "ovvero tramite il modulo di contatto previsto su Aimediart.com."
+    }
+  }
+}

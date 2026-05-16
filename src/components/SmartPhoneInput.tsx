@@ -28,6 +28,8 @@ type SmartPhoneInputProps = {
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  /** Pays imposé par le formulaire (ex. sélecteur à côté du code postal). */
+  countrySelectorLocked?: boolean;
   countryName?: string;
   onCountryNameChange?: (countryName: string) => void;
   onValidityChange?: (valid: boolean) => void;
@@ -126,6 +128,7 @@ export function SmartPhoneInput({
   onChange,
   disabled,
   className,
+  countrySelectorLocked = false,
   countryName,
   onCountryNameChange,
   onValidityChange,
@@ -175,8 +178,8 @@ export function SmartPhoneInput({
     if (selectedKey && options.some((opt) => opt.key === selectedKey)) return;
     const first = options[0];
     setSelectedKey(first?.key ?? "");
-    if (first && onCountryNameChange) onCountryNameChange(first.name);
-  }, [options, countryName, selectedKey, onCountryNameChange]);
+    if (first && onCountryNameChange && !countrySelectorLocked) onCountryNameChange(first.name);
+  }, [options, countryName, selectedKey, onCountryNameChange, countrySelectorLocked]);
 
   const selected = useMemo(
     () => options.find((opt) => opt.key === selectedKey) ?? null,
@@ -191,30 +194,61 @@ export function SmartPhoneInput({
       return;
     }
     const digitsRaw = toDigits(raw);
-    if (!selected) {
+    if (!options.length) {
       setNationalInput(normalizeNational(digitsRaw));
       return;
     }
-    const cc = dialDigits(selected.dial);
-    if (raw.startsWith("+") && digitsRaw.startsWith(cc)) {
-      setNationalInput(normalizeNational(digitsRaw.slice(cc.length)));
+    const sorted = [...options].sort((a, b) => dialDigits(b.dial).length - dialDigits(a.dial).length);
+    const match = sorted.find((opt) => {
+      const cc = dialDigits(opt.dial);
+      return cc.length > 0 && digitsRaw.startsWith(cc);
+    });
+    if (match) {
+      setNationalInput(normalizeNational(digitsRaw.slice(dialDigits(match.dial).length)));
       return;
     }
     setNationalInput(normalizeNational(digitsRaw));
-  }, [value, selectedKey]);
+  }, [value, options]);
 
   useEffect(() => {
+    if (!selected || !options.length) return;
+    const raw = (value ?? "").trim();
+    if (!raw) return;
+    const ccSel = dialDigits(selected.dial);
+    if (!ccSel) return;
+    const digitsRaw = toDigits(raw);
+    const sorted = [...options].sort((a, b) => dialDigits(b.dial).length - dialDigits(a.dial).length);
+    const match = sorted.find((opt) => {
+      const cc = dialDigits(opt.dial);
+      return cc.length > 0 && digitsRaw.startsWith(cc);
+    });
+    const national = match
+      ? normalizeNational(digitsRaw.slice(dialDigits(match.dial).length))
+      : normalizeNational(digitsRaw);
+    const next = buildE164(selected.dial, national);
+    const a = next.replace(/\s/g, "");
+    const b = raw.replace(/\s/g, "");
+    if (next && a !== b) {
+      onChange(next);
+    }
+  }, [selectedKey, selected, options, onChange, value]);
+
+  useEffect(() => {
+    if (countrySelectorLocked) return;
     const raw = (value ?? "").trim();
     if (!raw.startsWith("+") || !options.length) return;
     const digitsRaw = toDigits(raw);
     const byDial = [...options]
       .sort((a, b) => dialDigits(b.dial).length - dialDigits(a.dial).length)
-      .find((opt) => digitsRaw.startsWith(dialDigits(opt.dial)));
+      .find((opt) => {
+        const cc = dialDigits(opt.dial);
+        return cc.length > 0 && digitsRaw.startsWith(cc);
+      });
     if (byDial && byDial.key !== selectedKey) {
       setSelectedKey(byDial.key);
       if (onCountryNameChange) onCountryNameChange(byDial.name);
     }
-  }, [value, options, selectedKey, onCountryNameChange]);
+  }, [value, options, selectedKey, onCountryNameChange, countrySelectorLocked]);
 
   const digits = toDigits(nationalInput);
   const hasBounds = Boolean(selected);
@@ -233,60 +267,96 @@ export function SmartPhoneInput({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex items-start justify-start gap-0 w-full">
-        <Select
-          value={selectedKey}
-          onValueChange={(next) => {
-            setSelectedKey(next);
-            const found = options.find((opt) => opt.key === next);
-            if (found && onCountryNameChange) onCountryNameChange(found.name);
-            if (!found) return;
-            const normalized = normalizeNational(nationalInput);
-            onChange(buildE164(found.dial, normalized));
-          }}
-          disabled={disabled || loading || options.length === 0}
-        >
-          <SelectTrigger className="h-8 w-[90px] rounded-r-none border-r-0 px-1.5 text-[11px]">
-            <SelectValue placeholder="Pays">
-              {selected ? (
-                <span className="inline-flex items-center gap-1">
-                  {selectedFlagUrl ? (
+        {countrySelectorLocked ? (
+          selected ? (
+            <div
+              className={cn(
+                "flex shrink-0 select-none items-center justify-center gap-1 rounded-md border border-input bg-muted/30 px-2",
+                "h-10 w-[100px] rounded-r-none border-r-0",
+              )}
+              title={selected.name}
+            >
+              {selectedFlagUrl ? (
+                <img
+                  src={selectedFlagUrl}
+                  alt=""
+                  className="h-[14px] w-[20px] aspect-auto rounded-sm shadow-sm object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <span className="inline-flex h-[14px] w-[20px] items-center justify-center rounded-sm bg-muted text-[9px]">
+                  —
+                </span>
+              )}
+              <span className="max-w-[5rem] truncate tabular-nums text-xs font-medium text-foreground">
+                {selected.dial?.trim() ? selected.dial : selected.name}
+              </span>
+            </div>
+          ) : (
+            <div
+              className="flex h-10 w-[100px] shrink-0 items-center justify-center rounded-md rounded-r-none border border-r-0 border-input bg-muted/20 px-2 text-xs text-muted-foreground"
+              aria-hidden
+            >
+              …
+            </div>
+          )
+        ) : (
+          <Select
+            value={selectedKey}
+            onValueChange={(next) => {
+              setSelectedKey(next);
+              const found = options.find((opt) => opt.key === next);
+              if (found && onCountryNameChange) onCountryNameChange(found.name);
+              if (!found) return;
+              const normalized = normalizeNational(nationalInput);
+              onChange(buildE164(found.dial, normalized));
+            }}
+            disabled={disabled || loading || options.length === 0}
+          >
+            <SelectTrigger className="h-8 w-[90px] rounded-r-none border-r-0 px-1.5 text-[11px]">
+              <SelectValue placeholder="Pays">
+                {selected ? (
+                  <span className="inline-flex items-center gap-1">
+                    {selectedFlagUrl ? (
+                      <img
+                        src={selectedFlagUrl}
+                        alt=""
+                        className="h-[14px] w-[20px] aspect-auto rounded-sm shadow-sm object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <span className="inline-flex h-[14px] w-[20px] items-center justify-center rounded-sm bg-muted text-[9px]">
+                        —
+                      </span>
+                    )}
+                    <span className="tabular-nums text-[11px]">{selected.dial}</span>
+                  </span>
+                ) : (
+                  "Pays"
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="max-h-80">
+              {options.map((opt) => (
+                <SelectItem key={opt.key} value={opt.key}>
+                  <span className="inline-flex items-center gap-2">
                     <img
-                      src={selectedFlagUrl}
+                      src={getFlagPublicUrl(opt.flagEmoji)}
                       alt=""
                       className="h-[14px] w-[20px] aspect-auto rounded-sm shadow-sm object-cover"
                       loading="lazy"
                       decoding="async"
                     />
-                  ) : (
-                    <span className="inline-flex h-[14px] w-[20px] items-center justify-center rounded-sm bg-muted text-[9px]">
-                      —
-                    </span>
-                  )}
-                  <span className="tabular-nums text-[11px]">{selected.dial}</span>
-                </span>
-              ) : (
-                "Pays"
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            {options.map((opt) => (
-              <SelectItem key={opt.key} value={opt.key}>
-                <span className="inline-flex items-center gap-2">
-                  <img
-                    src={getFlagPublicUrl(opt.flagEmoji)}
-                    alt=""
-                    className="h-[14px] w-[20px] aspect-auto rounded-sm shadow-sm object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <span className="tabular-nums text-xs">{opt.dial}</span>
-                  <span className="text-xs">{opt.name}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                    <span className="tabular-nums text-xs">{opt.dial}</span>
+                    <span className="text-xs">{opt.name}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Input
           id={id}
           type="tel"
@@ -303,7 +373,12 @@ export function SmartPhoneInput({
             onChange(buildE164(selected.dial, normalized));
           }}
           disabled={disabled || loading || !selected}
-          className="h-8 w-full flex-1 rounded-l-none px-2 text-xs"
+          className={cn(
+            "w-full flex-1 rounded-l-none px-2",
+            countrySelectorLocked
+              ? "h-10 min-h-10 border-l-0 text-sm"
+              : "h-8 text-xs",
+          )}
           placeholder="Numéro"
         />
       </div>

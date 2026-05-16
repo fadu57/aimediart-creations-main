@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,8 +44,19 @@ import NotFound from "./pages/NotFound";
 import WorkScanner from "./pages/WorkScanner";
 import PublicHome from "./pages/PublicHome";
 import PublicHomeCommencer from "./pages/PublicHomeCommencer";
+import CgvPage from "./pages/CgvPage";
+import CookiesPage from "./pages/CookiesPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
+import AiPolicyPage from "./pages/AiPolicyPage";
 import ExpoCastPage from "./pages/ExpoCastPage";
 import OeuvresArtiste from "./pages/OeuvresArtiste";
+import WelcomeLanding from "./pages/WelcomeLanding";
+import VisitorWelcome from "./pages/visitor/VisitorWelcome";
+import LegalStaticPage from "./pages/LegalStaticPage";
+import CookieConsentBanner from "./components/CookieConsentBanner";
+import { getAudienceChoice } from "./lib/audienceChoice";
+import { isVisitorRole } from "./lib/authUser";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -74,6 +85,7 @@ function AppShell() {
     .replace(/œ/g, "oe")
     .replace(/Œ/g, "oe");
   const hideGlobalHeader =
+    normalizedPathname === "/" ||
     /(^|\/)(oeuvre|artwork)(\/|$)/.test(normalizedPathname) ||
     /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
@@ -116,8 +128,7 @@ function RootEntryRoute() {
   if (expoId) {
     return <Navigate to={`/scan?expo_id=${encodeURIComponent(expoId)}`} replace />;
   }
-  // Landing publique par défaut, mais si session déjà active on renvoie vers l’espace backoffice.
-  const { session, loading } = useAuthUser();
+  const { session, loading, role_name, role_id } = useAuthUser();
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -125,7 +136,18 @@ function RootEntryRoute() {
       </div>
     );
   }
-  return <Navigate to={session ? "/dashboard" : "/home"} replace />;
+  if (session) {
+    const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/dashboard";
+    return <Navigate to={target} replace />;
+  }
+  const audience = getAudienceChoice();
+  if (audience === "organizer") {
+    return <Navigate to="/home" replace />;
+  }
+  if (audience === "visitor") {
+    return <Navigate to="/visitor" replace />;
+  }
+  return <WelcomeLanding />;
 }
 
 /**
@@ -140,12 +162,19 @@ const AppRoutes = () => (
     {/* Landing marketing publique (sans header) */}
     <Route path="/home" element={<PublicHome />} />
     <Route path="/home/commencer" element={<PublicHomeCommencer />} />
+    <Route path="/cgv" element={<CgvPage />} />
+    <Route path="/cookies" element={<CookiesPage />} />
+    <Route path="/privacy" element={<PrivacyPage />} />
+    <Route path="/terms" element={<TermsPage />} />
+    <Route path="/ai-policy" element={<AiPolicyPage />} />
     <Route path="/expo" element={<ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
       <Route index element={<RootEntryRoute />} />
       <Route path="login" element={<Login />} />
       <Route path="signup" element={<RegisterSaaS />} />
       <Route path="reset-password" element={<ResetPassword />} />
+      <Route path="legal/cgv" element={<LegalStaticPage variant="cgv" />} />
+      <Route path="legal/rgpd" element={<LegalStaticPage variant="rgpd" />} />
       {/* Redirects rétrocompatibilité anciens QR codes */}
       <Route path="Oeuvre" element={<Navigate to="/artwork" replace />} />
       <Route path="Œuvre" element={<Navigate to="/artwork" replace />} />
@@ -161,12 +190,13 @@ const AppRoutes = () => (
         <Route path="scan-work" element={<Navigate to="/scan-work1" replace />} />
         <Route path="register" element={<VisitorRegister />} />
         <Route path="register_visitor" element={<RegisterVisitor />} />
+        <Route path="visitor" element={<VisitorWelcome />} />
         <Route element={<OeuvrePageAccessGuard />}>
           <Route path="artwork" element={<ArtworkDetail />} />
           <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
           <Route path="artworks_artist" element={<OeuvresArtiste />} />
           <Route path="artworks_artist/:artistId" element={<OeuvresArtiste />} />
-          <Route path="visitor/:artworkId?" element={<ArtworkDetail />} />
+          <Route path="visitor/:artworkId" element={<ArtworkDetail />} />
         </Route>
       </Route>
       <Route element={<RequireBackoffice />}>
@@ -227,6 +257,7 @@ const App = () => {
           <UiLanguageProvider>
             <NavigationMatrixProvider>
               <AppRoutes />
+              <CookieConsentBanner />
             </NavigationMatrixProvider>
           </UiLanguageProvider>
         </BrowserRouter>

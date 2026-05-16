@@ -1,0 +1,134 @@
+{
+  "meta": {
+    "title": "Cookie & Tracker Policy – Aimediart.com",
+    "version": "Version: 15 May 2026",
+    "languageRef": "These cookie and tracker rules may be provided in multiple languages. In the event of any discrepancy in interpretation, the French version shall prevail, subject to any mandatory provisions of applicable law."
+  },
+  "nav": {
+    "back_home": "← Back to the public homepage",
+    "language_aria": "Choose display language"
+  },
+  "sections": {
+    "object": {
+      "title": "1. Purpose of this policy",
+      "p1": "This “Cookies & trackers” policy explains how the Aimediart.com website uses cookies and similar technologies on its marketing pages and on the AIMEDIArt SaaS platform, for what purposes, and how you can manage your choices via the consent banner (CMP) and your browser settings.",
+      "p2": "It supplements the General Terms of Sale and the Privacy Policy, and applies to every visitor or user of our online services."
+    },
+    "whatIsCookie": {
+      "title": "2. What is a cookie?",
+      "p1": "A cookie is a small text file placed and/or read on your device (computer, smartphone, tablet) when you visit a website or application. Other technologies may play a similar role (for example local storage, pixels, SDKs, session identifiers); for simplicity, we refer to them collectively as “cookies” or “trackers”.",
+      "p2": "Some cookies are strictly necessary for the technical operation of the site or for providing a service you have explicitly requested; others require your prior consent, in particular audience measurement and non-exempt analytics cookies."
+    },
+    "whoResponsible": {
+      "title": "3. Who is responsible for cookies placed on Aimediart.com?",
+      "intro": "Cookies placed when you visit Aimediart.com may be:",
+      "list": {
+        "i1": "placed by the site publisher (“first-party” or internal cookies);",
+        "i2": "or, where applicable, by third-party providers (for example an audience measurement solution)."
+      },
+      "p1": "The Aimediart.com publisher entity is identified in the site’s legal notice. It remains responsible for processing carried out using cookies, in compliance with applicable law (GDPR, ePrivacy Directive, CNIL recommendations, etc.)."
+    },
+    "types": {
+      "title": "4. What types of cookies do we use and for what purposes?",
+      "necessary": {
+        "title": "4.1 Strictly necessary cookies (mandatory)",
+        "p1": "These cookies are essential for the technical operation of the site or for providing a service you have expressly requested (for example: displaying the site, session management, security, language choice, storing your consent preferences). Without them, the site could not function properly.",
+        "p2": "They are placed without your prior consent, on the basis of our legitimate interest in ensuring the proper operation and security of the site, to the extent permitted by law.",
+        "examples": {
+          "e1": "Session cookie enabling authentication on the administration interface.",
+          "e2": "Cookie storing your choices on the consent banner (accept/reject).",
+          "e3": "Cookie protecting against CSRF or similar attacks."
+        }
+      },
+      "analytics": {
+        "title": "4.2 Audience measurement and statistical cookies",
+        "p1": "We use audience measurement tools to better understand how the site is used and to improve usability (for example Matomo or Google Analytics, depending on the configuration chosen). These cookies allow us to collect aggregated, pseudonymised information such as:",
+        "list": {
+          "i1": "pages viewed;",
+          "i2": "time spent on pages;",
+          "i3": "navigation path;",
+          "i4": "device and browser type."
+        },
+        "p2": "Unless we configure Matomo in “exempt” mode (no cookies, strictly anonymous data, aggregation, no cross-referencing, etc.), these cookies require your prior consent, in line with European guidelines and CNIL recommendations.",
+        "p3": "Under the standard configuration of solutions such as Google Analytics, these cookies are not strictly necessary and are therefore subject to consent. They are only placed after your explicit agreement via the cookie banner / CMP and can be disabled at any time."
+      }
+    },
+    "noAds": {
+      "title": "5. No targeted advertising or retargeting",
+      "p1": "To date, Aimediart.com does not use:",
+      "list": {
+        "i1": "advertising cookies intended for displaying third-party banner ads;",
+        "i2": "advertising retargeting trackers;",
+        "i3": "automatic sharing of identifiers with external ad networks."
+      },
+      "p2": "Should this change (for example addition of ad campaigns, third-party pixels, etc.), this policy will be updated and specific consent will be requested from you in advance."
+    },
+    "cmp": {
+      "title": "6. How is your consent collected (CMP)?",
+      "p1": "On your first visit to Aimediart.com (and periodically thereafter), a consent banner (CMP) is displayed so you can choose your cookie preferences.",
+      "p2": "At a minimum, this banner allows you to:",
+      "choices": {
+        "i1": "Accept all non-necessary cookies;",
+        "i2": "Reject all non-necessary cookies as easily as accepting them;",
+        "i3": "Customise your choices by purpose (for example: “Audience measurement”)."
+      },
+      "defaultTitle": "By default:",
+      "defaults": {
+        "i1": "No non-strictly-necessary cookie (such as standard audience measurement cookies) is placed until you have explicitly consented;",
+        "i2": "Your choice is stored for a limited period (for example 6 months), after which we may ask for your consent again."
+      },
+      "p3": "We retain proof of your consent (or refusal) so we can demonstrate compliance with our obligations in the event of an audit, in line with CNIL and GDPR recommendations."
+    },
+    "changeChoices": {
+      "title": "7. How can you change your choices later?",
+      "p1": "You may change your choices at any time:",
+      "ways": {
+        "i1": "either via a “Manage my cookies” / “Cookie settings” link or button at the bottom of the page or in the site footer;",
+        "i2": "or by clicking again on the CMP icon or dedicated area, if shown."
+      },
+      "p2": "You may then:",
+      "then": {
+        "i1": "withdraw your consent;",
+        "i2": "give partial consent (by purpose);",
+        "i3": "or return to a global refusal of non-necessary cookies."
+      },
+      "p3": "Withdrawal of consent does not affect the lawfulness of processing based on consent before its withdrawal."
+    },
+    "browser": {
+      "title": "8. Browser settings",
+      "p1": "In addition to the CMP, you can configure your browser to:",
+      "list": {
+        "i1": "systematically reject all cookies;",
+        "i2": "accept or reject cookies on a case-by-case basis;",
+        "i3": "regularly delete cookies already stored on your device."
+      },
+      "p2": "Settings differ by browser (Chrome, Firefox, Safari, Edge, etc.). You can read your browser’s help section for the exact configuration steps.",
+      "p3": "Warning: blocking strictly necessary cookies may seriously affect the operation of the site and certain services (authentication, cart, interface preferences, etc.)."
+    },
+    "retention": {
+      "title": "9. Retention period",
+      "p1": "Cookies are kept for a maximum duration that depends on their purpose:",
+      "list": {
+        "i1": "strictly necessary cookies: limited to the session or a few hours/days depending on technical need;",
+        "i2": "audience measurement cookies: generally up to 13 months maximum (CNIL recommendation) for analytics trackers and a shorter period for raw logs, subject to the actual tool configuration."
+      },
+      "p2": "Exact durations are shown in the CMP configuration or may be set out in a detailed table (annex to this policy)."
+    },
+    "updates": {
+      "title": "10. Updates to the cookie policy",
+      "p1": "This policy may be updated, in particular to reflect:",
+      "list": {
+        "i1": "legal or regulatory changes (GDPR, ePrivacy, national guidelines);",
+        "i2": "addition or removal of technical partners (analytics solution, CMP, etc.);",
+        "i3": "changes to purposes or to the nature of cookies used."
+      },
+      "p2": "The version in force is the one published on this page on the date of your visit. We invite you to review it regularly."
+    },
+    "contact": {
+      "title": "11. Contact",
+      "p1": "For any questions about this cookie policy, you can contact us at:",
+      "p2": "contact@aimediart.com (to be adapted),",
+      "p3": "or via the contact form provided on Aimediart.com."
+    }
+  }
+}

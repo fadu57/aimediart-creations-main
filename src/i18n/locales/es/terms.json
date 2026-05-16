@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "Condiciones de uso de la plataforma (ToU)",
+    "version": "Versión: 16 de mayo de 2026",
+    "workNotice": "Documento de trabajo que debe ser revisado / adaptado por un asesor jurídico antes de su uso contractual.",
+    "languageRef": "Las traducciones se facilitan a título informativo. El idioma de referencia y la versión jurídicamente prevalente es el francés, sin perjuicio de las disposiciones imperativas aplicables."
+  },
+  "sections": {
+    "object": {
+      "title": "1. Objeto",
+      "p1": "Las presentes Condiciones de uso de la plataforma (en adelante las «ToU») definen las reglas aplicables a todo usuario con una cuenta en la plataforma AIMEDIArt (administradores, miembros del equipo, comisarios, galeristas, responsables de mediación, etc.), actúe o no en nombre de un cliente profesional o en el marco de un acceso de demostración.",
+      "p2": "Las ToU completan las Condiciones Generales de Venta (CGV) concluidas con el cliente pagador y prevalecen sobre cualquier aviso contradictorio que pudiera mostrarse en la interfaz, salvo acuerdo escrito en contrario."
+    },
+    "accessSecurity": {
+      "title": "2. Acceso a la cuenta y seguridad",
+      "list": {
+        "i1": "El usuario debe disponer de identificadores personales (correo electrónico y contraseña, u otro mecanismo de autenticación) proporcionados o validados por el cliente profesional o por AIMEDIArt.",
+        "i2": "El usuario se compromete a mantener dichos identificadores estrictamente confidenciales, a no compartirlos y a elegir una contraseña robusta.",
+        "i3": "Toda acción realizada con los identificadores de un usuario se presume efectuada por dicho usuario, salvo prueba en contrario de un uso fraudulento debidamente notificado.",
+        "i4": "El usuario notifica sin demora a AIMEDIArt y/o a su administrador interno cualquier sospecha de compromiso (pérdida, robo, acceso no autorizado) a fin de que los accesos puedan restablecerse."
+      }
+    },
+    "acceptableUse": {
+      "title": "3. Reglas de uso aceptable",
+      "respectIntro": "El usuario se compromete a utilizar la plataforma respetando:",
+      "respectList": {
+        "i1": "las leyes y regulaciones aplicables;",
+        "i2": "los derechos de terceros (propiedad intelectual, derecho a la imagen, protección de datos personales, secreto empresarial, etc.);",
+        "i3": "las políticas internas del cliente profesional, en su caso;",
+        "i4": "las CGV y la Política de IA de AIMEDIArt."
+      },
+      "forbiddenIntro": "Está prohibido en particular:",
+      "forbiddenList": {
+        "i1": "cargar, crear o difundir contenidos manifiestamente ilícitos (incitación al odio, discriminación, apología del delito, contenidos terroristas, pornografía ilegal, etc.);",
+        "i2": "atentar contra la reputación de una persona o institución mediante contenidos difamatorios o falsos;",
+        "i3": "utilizar la plataforma para acosar, amenazar o intimidar a terceros;",
+        "i4": "eludir los mecanismos de seguridad, intentar acceder a cuentas o espacios para los que el usuario no esté autorizado, escanear o probar la resistencia del sistema sin autorización escrita;",
+        "i5": "sobrecargar deliberadamente la plataforma (ataque de denegación de servicio, scripts abusivos, etc.);",
+        "i6": "utilizar las funcionalidades de IA para generar contenidos ilícitos, engañosos, discriminatorios o contrarios a las buenas prácticas descritas en la Política de IA."
+      }
+    },
+    "contentResponsibility": {
+      "title": "4. Contenidos introducidos y responsabilidad editorial",
+      "list": {
+        "i1": "El cliente profesional sigue siendo responsable de los contenidos editoriales publicados a través de la plataforma (textos de mediación, biografías, información sobre las obras, materiales pedagógicos, etc.).",
+        "i2": "El usuario garantiza disponer de los derechos necesarios sobre los contenidos que importa (textos, imágenes, vídeos, grabaciones sonoras, etc.).",
+        "i3": "El usuario se compromete a no publicar datos personales sensibles sin base jurídica adecuada ni información previa a las personas concernidas.",
+        "i4": "AIMEDIArt no realiza un control editorial previo sistemático, pero puede moderar o retirar un contenido manifiestamente ilícito o contrario a las presentes condiciones, según el procedimiento de notificación descrito en la Parte 4."
+      }
+    },
+    "personalData": {
+      "title": "5. Datos personales",
+      "list": {
+        "i1": "Cuando el usuario introduce datos personales en la plataforma (p. ej., nombres de artistas, colaboradores, contactos, visitantes), lo hace en el marco de las finalidades definidas por el cliente responsable del tratamiento.",
+        "i2": "El usuario debe respetar la Política de privacidad de AIMEDIArt así como la de su organización, en particular en materia de información de las personas, plazos de conservación y ejercicio de derechos."
+      }
+    },
+    "suspension": {
+      "title": "6. Suspensión y cierre de cuenta",
+      "list": {
+        "i1": "En caso de incumplimiento grave o reiterado de las presentes ToU, AIMEDIArt o el cliente profesional podrán suspender o cerrar la cuenta de un usuario tras notificación, salvo urgencia manifiesta (contenidos gravemente ilícitos, incidentes de seguridad, etc.).",
+        "i2": "La suspensión puede ser temporal (mientras se realizan comprobaciones) o definitiva.",
+        "i3": "La supresión de una cuenta de usuario no afecta a los datos y contenidos creados o gestionados bajo la responsabilidad del cliente, sin perjuicio de los derechos de las personas concernidas y de las obligaciones de conservación."
+      }
+    }
+  }
+}

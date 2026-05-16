@@ -1,0 +1,158 @@
+{
+  "meta": {
+    "title": "General Terms of Sale (GTS) — Aimediart.com",
+    "version": "Version of 15 May 2026 — reference language: French — primary scope of application: SaaS services, digital services and artificial intelligence features intended primarily for professionals in the art sector.",
+    "languageNotice": "These Terms and Conditions may be provided in multiple languages. In case of any discrepancy in interpretation, the French version shall prevail, subject to any mandatory provisions of applicable law."
+  },
+  "nav": {
+    "back_home": "← Back to the public homepage",
+    "language_aria": "Choose display language"
+  },
+  "sections": {
+    "intro": {
+      "p1": "These General Terms of Sale govern the terms under which Aimediart.com provides, for consideration, digital services, SaaS software, artificial intelligence features, cultural mediation tools, dashboards, application hosting services and related services to customers using the platform.",
+      "p2": "Aimediart.com forms part of a SaaS platform project for the art world, in particular around digital mediation of exhibitions, QR codes, conversational tools, assisted rewriting and dashboards, with a primarily B2B positioning for galleries, agencies, institutions and cultural stakeholders.",
+      "p3": "These GTS are intended to frame international contractual relationships, subject to mandatory provisions applicable in the customer's country, in particular concerning consumer law, personal data protection and digital services."
+    },
+    "sellerIdentity": {
+      "title": "2. Identity of the seller",
+      "p1": "The seller is the entity operating Aimediart.com, whose legal information, registration details, contact information, billing information and, where applicable, intra-EU VAT number, must be stated in the legal notice and/or on any quotation, purchase order, invoice or contractual subscription page.",
+      "p2": "The customer acknowledges that these GTS must be read together with the legal notice, the privacy policy, the cookie policy and, where applicable, the platform terms of use."
+    },
+    "definitions": {
+      "title": "3. Definitions",
+      "intro": "For the purposes of these GTS:",
+      "list": {
+        "platform": "“Platform”: the website, application, administration interfaces, APIs, dashboards and services accessible via Aimediart.com;",
+        "client": "“Customer”: any legal entity or natural person contracting with Aimediart.com;",
+        "user": "“Authorised user”: any person authorised by the customer to access the platform;",
+        "services": "“Services”: all SaaS services, AI modules, hosting, maintenance, support, configuration and related services;",
+        "clientContent": "“Customer content”: data, text, images, files, biographies, works, metadata, prompts, exhibition elements and any content transmitted or generated at the initiative of the customer or its users;",
+        "subscription": "“Subscription”: recurring access plan, monthly or annual, to all or part of the services;",
+        "order": "“Order”: online subscription, accepted quotation, signed purchase order, or any other act evidencing the customer's agreement to the offer and price."
+      }
+    },
+    "documents": {
+      "title": "4. Contractual documents and order of priority",
+      "p1": "Unless expressly agreed otherwise, the contractual relationship is governed, in descending order of priority, by: (i) the special conditions or accepted quotation, (ii) these GTS, (iii) the technical or commercial annexes, (iv) the privacy policy, and (v) the platform terms of use.",
+      "p2": "In the event of inconsistency, the higher-ranking document prevails. The customer's general purchasing terms are binding only if expressly accepted in writing by Aimediart.com."
+    },
+    "clientsScope": {
+      "title": "5. Nature of customers and commercial scope",
+      "p1": "Aimediart.com is designed primarily for business customers, in particular galleries, agencies, exhibition curators, collectives, cultural institutions, event organisers, professional artists or similar entities.",
+      "p2": "If consumers subscribe to certain services, mandatory provisions applicable to consumers in their country of habitual residence apply in addition, without depriving Aimediart.com of the other valid provisions of these GTS. The customer declares that it does not use the services in breach of applicable laws on export controls, international sanctions, embargoes, anti-money laundering, anti-corruption and counter-terrorism financing. Aimediart.com may refuse or suspend a commercial relationship when it reasonably considers that it would expose the platform or its partners to a significant risk of breach of such regulations."
+    },
+    "servicesDescription": {
+      "title": "6. Description of the services",
+      "p1": "Depending on the subscribed offer, the services may include: creation and management of artist or work records, digital mediation via QR code, multilingual content, simplification or AI-assisted rewriting tools, chatbots or conversational assistants, collection of visitor feedback, dashboards, hosting, maintenance, support and integration or configuration services.",
+      "p2": "Aimediart.com may develop the services to improve security, performance, regulatory compliance and usability, or to add/remove non-essential features, provided that it does not substantially alter the agreed service during a subscription period already paid for, except where required by major legal, security or technical necessity.",
+      "p3": "Demonstrations, screenshots, prototypes, mock-ups, commercial presentations or marketing pages are illustrative only and have no contractual value, unless expressly stated otherwise in an order or quotation."
+    },
+    "contractFormation": {
+      "title": "7. Formation of the contract",
+      "p1": "The contract is formed on the date of online validation of the order, signature of the quotation, acceptance of a purchase order, or any commencement of performance accepted by the customer.",
+      "p2": "The customer declares that, before concluding the contract, it received the essential information relating to the service, price, duration, renewal terms, support, any restrictions and, where applicable, the existence or absence of a right of withdrawal.",
+      "p3": "For B2C or mixed journeys accessible in the European Union, the subscription interface must present clear and understandable pre-contractual information, including on the total price, duration, renewal, termination means and modalities for exercising the right of withdrawal where it exists."
+    },
+    "prices": {
+      "title": "9. Prices",
+      "p1": "The applicable prices are those indicated on the website, in the subscription interface, in the quotation or in the special conditions on the date of the order. Unless stated otherwise, prices are exclusive of tax for business customers and inclusive of all taxes where applicable law so requires for consumers.",
+      "p2": "The price may depend in particular on the plan chosen, number of users, volume of works, usage level, options, support, specific operations or additional services, which is consistent with the SaaS economic model being structured for Aimediart.com.",
+      "p3": "Any set-up, integration, training, configuration, support, migration or bespoke service fees are invoiced separately, unless otherwise provided in the commercial offer."
+    },
+    "payment": {
+      "title": "11. Payment terms",
+      "p1": "Invoices are payable on order or according to the payment schedule provided in the contract. Payments may be made by card, direct debit, bank transfer or any other means offered at subscription.",
+      "p2": "Any late payment or payment incident authorises Aimediart.com, after formal notice or reasonable notification depending on the circumstances, to suspend all or part of the services until payment is brought up to date, without prejudice to amounts due. For business customers, any late payment may entail statutory late interest calculated at the applicable legal rate or the rate stated on the invoice, and a fixed recovery fee where applicable law permits."
+    },
+    "accessDelivery": {
+      "title": "8. Customer account and access to the platform",
+      "p1": "Access to the services may require creation of an administrator account and/or user accounts. The customer undertakes to provide accurate, complete and up-to-date information and to maintain the confidentiality of access credentials.",
+      "p2": "The customer is responsible for actions carried out through its accounts and must notify Aimediart.com without delay of any compromise, unauthorised use or security vulnerability of which it becomes aware. Aimediart.com may suspend or restrict access in the event of a security risk, non-payment, contractual breach, unlawful use, threat to platform integrity or legal obligation."
+    },
+    "duration": {
+      "title": "10. Subscriptions, duration and renewal",
+      "p1": "Unless agreed otherwise, subscriptions are entered into for the term stated at order, usually monthly or annual, with automatic renewal for successive identical periods, unless terminated as provided below.",
+      "p2": "The customer must be informed before subscription of the commitment period, renewal conditions, termination time limits and procedures, and any applicable notice period.",
+      "p3": "For contracts concluded with consumers in the European Union, where the right of withdrawal or simplified withdrawal mechanisms apply, the subscription and contract management interface must incorporate them in accordance with applicable rules, including new electronic withdrawal interface requirements applying from 19 June 2026 in the cases concerned."
+    },
+    "rightOfWithdrawal": {
+      "title": "12. Right of withdrawal and cancellation",
+      "p1": "Unless mandatory law provides otherwise, business customers do not benefit from a right of withdrawal. Any order is firm and definitive upon conclusion, subject to cases expressly provided by law or by special conditions.",
+      "p2": "Where a customer acts as a consumer and applicable law recognises a right of withdrawal, it may in principle be exercised within 14 days for distance contracts, in particular for digital services and digital content, subject to applicable legal exceptions. If performance of a digital service or supply of digital content not supplied on a tangible medium begins before the end of the withdrawal period at the express request of the consumer, Aimediart.com must obtain the consents and acknowledgements required by applicable law in order, where applicable, to limit or extinguish the right of withdrawal in accordance with the rules in force. For concerned B2C interfaces in the European Union, a clear online mechanism for exercising withdrawal must be provided where regulation so requires."
+    },
+    "clientObligations": {
+      "title": "13. Customer obligations",
+      "intro": "The customer undertakes in particular to:",
+      "list": {
+        "item1": "use the services in accordance with applicable laws, these GTS, third-party rights and public policy. It shall in particular refrain from using the platform to distribute unlawful, infringing, defamatory, misleading, hateful or violent content, or content that infringes copyright, personal rights or applicable regulations;",
+        "item2": "warrant that it holds all rights, authorisations, licences, legal bases and consents necessary for customer content, images, biographies, works, personal data, instructions and elements transmitted to Aimediart.com or processed via the platform;",
+        "item3": "remain solely responsible for the accuracy, quality, lawfulness and relevance of content and data that it imports, publishes, processes or has processed via the platform;",
+        "item4": "acknowledge that the services may include artificial intelligence features intended to assist drafting, translation, simplification, mediation, enrichment or analysis of content. These features produce probabilistic outputs that may be incorrect, incomplete, biased, outdated or unsuitable for a specific use. The customer remains solely responsible for human verification and editorial, legal, scientific, heritage, linguistic and commercial validation of AI-generated or AI-assisted content before any publication, dissemination, communication to the public or decision-making. Aimediart.com does not warrant absolute originality, freedom from error or absence of potential infringement of third-party rights arising from content generated from instructions or data provided by the customer, except where proven fault on its own part;",
+        "item5": "refrain from using AI services to generate unlawful, misleading, defamatory or discriminatory content, content harmful to third-party rights, or content intended to circumvent legal or contractual obligations."
+      }
+    },
+    "providerObligations": {
+      "title": "Aimediart.com's commitments",
+      "intro": "Aimediart.com undertakes in particular to:",
+      "list": {
+        "item1": "provide the services diligently and in accordance with professional standards applicable to a professional SaaS service. Unless mandatory law provides otherwise, no warranty of commercial result, universal compatibility, complete freedom from error, uninterrupted availability or fitness for a particular customer need is granted;",
+        "item2": "implement reasonable technical and organisational measures to ensure security, integrity, confidentiality and availability of the services, without this constituting an absolute obligation of result;",
+        "item3": "where the services qualify as an intermediary or online platform service under applicable law, and in particular the Digital Services Act in the European Union, Aimediart.com may implement reporting, moderation, removal, suspension or dereferencing mechanisms for content or accounts in the event of unlawful content, well-founded complaint, contractual breach or regulatory obligation. The customer acknowledges that Aimediart.com may retain technical traces, notify certain measures, cooperate with competent authorities and adapt transparency, reporting handling and risk management processes in accordance with applicable obligations;",
+        "item4": "provide support according to the service level set out in the subscribed offer or special conditions. Unless stated otherwise, support covers resolution of reproducible malfunctions, standard usage assistance and reasonable technical questions relating to the platform. Unless otherwise agreed, bespoke development, complex third-party integrations, legal audits, editorial validation, complex data migration or tailored advisory services are not covered by standard support;",
+        "item5": "use subcontractors, hosts, cloud infrastructure providers, analytics tools, AI services, payment, messaging, support or other technical partners to perform all or part of the services. Aimediart.com remains responsible for its subcontractors within the limits provided by applicable law and its contractual commitments, without prejudice to the liability limitations set out herein."
+      }
+    },
+    "warranty": {
+      "title": "22. Warranties",
+      "p1": "Aimediart.com undertakes to provide the services diligently and in accordance with professional standards applicable to a professional SaaS service. Unless mandatory law provides otherwise, no warranty of commercial result, universal compatibility, complete freedom from error, uninterrupted availability or fitness for a particular customer need is granted.",
+      "p2": "The customer acknowledges that any digital project depends on numerous external factors, including data quality, configuration, usage, equipment, connectivity, third-party providers, local regulatory constraints and customer involvement. Where mandatory consumer law rules apply, they prevail over any incompatible clause in these GTS."
+    },
+    "liability": {
+      "title": "23. Liability",
+      "p1": "Each party is liable for direct damage it causes the other through proven fault. Except in the case of gross negligence, fraud, infringement of fundamental rights, personal injury or mandatory provision to the contrary, Aimediart.com's total liability for a contractual year shall not exceed the total amount excluding tax paid or payable by the customer in the twelve preceding months for the service concerned.",
+      "p2": "Aimediart.com shall not be liable for indirect loss, loss of profit, loss of opportunity, loss of data not attributable to its fault, reputational harm, commercial prejudice, consequences of decisions based on AI-generated content, or damage resulting from improper use of the services by the customer or a third party authorised by it, unless mandatory law provides otherwise.",
+      "p3": "The customer is solely responsible for its use of content, analyses, recommendations, reformulations, translations or outputs generated via the platform."
+    },
+    "intellectualProperty": {
+      "title": "16. Intellectual property",
+      "p1": "Aimediart.com remains the owner of all intellectual property rights relating to the platform, its architecture, software, databases, interfaces, graphic elements, brands, logos, documentation, developments, proprietary content, know-how and improvements, subject to rights held by third parties or by the customer over its own content. Subject to full payment of amounts due, Aimediart.com grants the customer a personal, non-exclusive, non-assignable and non-transferable right to access and use the services for its internal or contractually agreed needs, for the term of the contract and within the limits of the subscribed offer.",
+      "p2": "The customer retains its rights in its pre-existing content. It grants Aimediart.com the rights strictly necessary for hosting, processing, backup, display, performance, maintenance, moderation, technical improvement of the services and performance of the contract. Unless expressly agreed, no assignment of intellectual property rights in favour of the customer is granted on platform elements or generic developments made by Aimediart.com."
+    },
+    "personalData": {
+      "title": "17. Personal data",
+      "p1": "Processing of personal data in connection with the services is governed by the privacy policy and, where applicable, by a data processing agreement (DPA) where Aimediart.com acts as processor on behalf of the customer. Where the GDPR or equivalent regulation applies, each party undertakes to comply with its respective obligations, in particular regarding legal basis, information, security, sub-processor governance, international transfers, exercising data subjects' rights and breach notification where necessary.",
+      "p2": "The customer warrants that it has the necessary legal basis to import or have processed via the platform the personal data of its users, artists, visitors, staff, prospects or other data subjects."
+    },
+    "serviceModification": {
+      "title": "30. Amendment of the GTS",
+      "p1": "Aimediart.com may amend these GTS to reflect legal, regulatory, case law, technical, economic or functional developments. The new GTS will apply to new orders as soon as they are published online and, for ongoing contracts, from their effective date subject to reasonable prior notice and the customer's mandatory rights.",
+      "p2": "In the event of a material adverse change to an ongoing subscription, the business customer may, unless legal or security necessity so requires, terminate for the next renewal period according to procedures communicated by Aimediart.com."
+    },
+    "termination": {
+      "title": "25. Termination",
+      "p1": "Unless a firm commitment is ongoing, either party may terminate the contract at the end of the current period according to termination procedures stated at subscription or in special conditions.",
+      "p2": "In the event of serious or repeated breach by a party of its contractual obligations, not remedied within a reasonable period after written notice, the other party may terminate the contract as of right, without prejudice to any damages.",
+      "p3": "Termination entails cessation of access to the services as from its effective date, subject to provisions on reversibility, legal retention of certain data, surviving clauses and payment of amounts due. On expiry or termination, the customer may request, within a reasonable period and according to procedures stated by Aimediart.com, return of exportable data concerning it in a usable format, subject to full payment of amounts due and applicable technical constraints. Aimediart.com may then delete or anonymise data per its retention policy, legal obligations, security constraints and applicable regulation. Each party undertakes to keep confidential information, documents, data, processes, trade secrets, credentials, configurations, negotiated prices and generally any non-public information obtained in the course of the contractual relationship, unless otherwise agreed, required by law or publicly available through no fault of the receiving party. This obligation shall survive for a reasonable period after the end of the contract."
+    },
+    "forceMajeure": {
+      "title": "24. Force majeure",
+      "p1": "Neither party shall be liable for failure resulting from an event beyond its reasonable control with the characteristics of force majeure or equivalent under applicable law, including natural disaster, war, pandemic, widespread cyber attack, massive network failure, power outage, administrative decision or major failure of an essential provider. If the impediment continues beyond a reasonable period, either party may terminate the contract for the future without indemnity, subject to payment for services already performed."
+    },
+    "disputes": {
+      "title": "31. Applicable law and dispute resolution",
+      "p1": "Unless mandatory law provides otherwise, these GTS are governed by French law. Any dispute relating to their validity, interpretation, performance or termination shall fall within the exclusive jurisdiction of the courts with substantive jurisdiction in the place of the seller's registered office, including in the case of multiple defendants or third-party proceedings.",
+      "p2": "For consumers, mandatory consumer protection rules of the law of their habitual residence remain applicable where they cannot be contractually waived. The consumer may also benefit, where applicable law so provides, from mediation or out-of-court dispute resolution mechanisms available in their country or at European level."
+    },
+    "applicableLaw": {
+      "title": "29. Partial nullity and severability",
+      "p1": "If a provision of these GTS is held null, unenforceable or ineffective, the remaining provisions shall remain in force and the provision concerned shall be interpreted or replaced to the fullest extent permitted to reflect as closely as possible the parties' original economic intention."
+    },
+    "finalRecommendations": {
+      "title": "32. Version, language and evidence — 27. Commercial references",
+      "p1": "Aimediart.com's computerised records, connection logs, electronic confirmations, support tickets, technical logs, emails, online validations, timestamps and invoices may be validly produced as evidence, subject to their probative force under applicable law.",
+      "p2": "Unless the customer objects in writing, Aimediart.com may mention the customer's name, trade name and logo as a commercial reference, without disclosing confidential information, in particular on its website, commercial materials or presentations.",
+      "p3": "Any detailed case study, named quote, publication of results or in-depth communication shall be subject to the customer's prior specific agreement."
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "title": "Policy on use of artificial intelligence features (AI Policy)",
+    "version": "Version: 16 May 2026",
+    "workNotice": "Working document to be reviewed / adapted by legal counsel before contractual use.",
+    "languageRef": "Translations are provided for information only. The reference language and the legally prevailing version is French, subject to mandatory applicable provisions."
+  },
+  "sections": {
+    "scope": {
+      "title": "1. Purpose and scope",
+      "p1": "This AI Policy governs the use of artificial intelligence (AI) features built into AIMEDIArt, including reformulation, simplification, assisted translation, drafting of mediation text outlines, and assistance with classifying or organising content.",
+      "p2": "It applies to all users of the platform, in addition to the GTS, ToU and Privacy Policy."
+    },
+    "natureLimits": {
+      "title": "2. Nature and limits of the AI offered",
+      "list": {
+        "i1": "AI features rely on statistical models trained on large volumes of data. Outputs are generated in a probabilistic manner.",
+        "i2": "Generated content may be inaccurate, incomplete, biased, outdated or unsuited to a particular context (artistic, legal, educational, inclusive, etc.).",
+        "i3": "Outputs provided do not constitute legal, tax, medical or professional advice. They do not replace human expertise."
+      }
+    },
+    "editorialResponsibility": {
+      "title": "3. Editorial responsibility and human review",
+      "list": {
+        "i1": "The customer and its users remain fully responsible for how suggestions produced by AI are used.",
+        "i2": "Any AI output intended for public distribution (labels, mediation texts, educational content, newsletters, social media, etc.) must be carefully reviewed by a human before publication.",
+        "i3": "The user must correct, supplement or remove inaccurate, discriminatory, inappropriate or organisation-guideline-inconsistent parts."
+      }
+    },
+    "allowedUses": {
+      "title": "4. Permitted / prohibited uses",
+      "allowedIntro": "Permitted uses (to be tailored by each customer):",
+      "allowed": {
+        "i1": "generating outlines of mediation texts, summaries, paraphrases, tone variations, working translations;",
+        "i2": "helping simplify texts to make them more accessible (easy read, popularisation);",
+        "i3": "suggesting question ideas for a chatbot or a visitor route;",
+        "i4": "helping structure or reorganise existing content."
+      },
+      "forbiddenIntro": "Prohibited uses:",
+      "forbidden": {
+        "i1": "using AI deliberately to produce hateful, discriminatory, defamatory, misleading content or content intended to manipulate the public;",
+        "i2": "generating content presented as verified facts without checking, especially concerning real people, sensitive events or legal information;",
+        "i3": "feeding AI sensitive or highly confidential personal data (health, political opinions, detailed financial data, non-pseudonymised trade secrets) without a legal basis and appropriate security measures;",
+        "i4": "attempting to circumvent the technical safeguards of AI models."
+      }
+    },
+    "aiData": {
+      "title": "5. Data sent to AI services",
+      "list": {
+        "i1": "Texts or excerpts sent to AI may be transmitted to third-party AI providers under a contractual framework limiting use strictly to service delivery needs.",
+        "i2": "We seek to use configurations that do not allow public training of models on customer data, within the options offered by providers.",
+        "i3": "Prompts and outputs may be logged for supervision, performance improvement and security purposes, in compliance with the Privacy Policy."
+      }
+    },
+    "regulation": {
+      "title": "6. Regulatory developments (AI Act, guidelines)",
+      "p1": "Legal obligations applicable to AI systems are evolving rapidly (in particular the European AI Act and authority recommendations). We will adapt this AI Policy, the information provided and technical settings to remain aligned with requirements applicable to our category of service."
+    }
+  }
+}

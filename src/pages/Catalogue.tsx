@@ -981,12 +981,12 @@ const Catalogue = () => {
                   </div>
                 </div>
 
-                <div className="relative flex min-h-[156px] min-w-0 flex-1 flex-col justify-end self-stretch">
-                  <div className="pointer-events-none absolute left-0 top-0 z-10 flex w-[150px] max-w-[150px] flex-col">
-                    <h3 className="line-clamp-1 w-[150px] max-w-full font-serif font-bold text-lg">
+                <div className="relative flex min-h-[156px] min-w-0 flex-1 flex-col self-stretch">
+                  <div className="pointer-events-none absolute left-0 top-0 right-[250px] z-10 flex min-w-0 flex-col">
+                    <h3 className="min-w-0 w-full truncate font-serif font-bold text-lg">
                       {aw.artwork_title ?? t("artwork_untitled")}
                     </h3>
-                    <p className="line-clamp-1 text-sm text-primary italic">{artistLabel}</p>
+                    <p className="min-w-0 w-full truncate text-sm text-primary italic">{artistLabel}</p>
                     <div
                       className="pointer-events-auto mt-2 inline-flex min-w-0 max-w-full items-center gap-2"
                       onClick={(e) => e.stopPropagation()}
@@ -1007,8 +1007,8 @@ const Catalogue = () => {
                     </div>
                   </div>
 
-                  <div className="relative z-0 ml-auto flex h-[156px] w-[300px] min-w-[300px] shrink-0 flex-col justify-between gap-3 p-0">
-                    <div className="ml-auto flex w-[180px] flex-col gap-2">
+                  <div className="relative z-0 ml-auto flex min-h-[156px] flex-1 w-[250px] min-w-[250px] shrink-0 flex-col justify-start items-start gap-3 p-0">
+                    <div className="ml-auto flex w-[180px] flex-col gap-2 pt-[35px]">
                     <Button
                       type="button"
                       variant="outline"
@@ -1037,6 +1037,21 @@ const Catalogue = () => {
                       disabled={!aw.artwork_qrcode_image && !aw.artwork_qr_code_url}
                     >
                       {t("btn_print_cartel")}
+                    </Button>
+                    <Button
+                      type="button"
+                      className="w-full justify-center gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const ex = (aw.expo_id ?? aw.artwork_expo_id)?.trim();
+                        navigate(
+                          ex
+                            ? `/artwork/${encodeURIComponent(aw.artwork_id)}?expo_id=${encodeURIComponent(ex)}`
+                            : `/artwork/${encodeURIComponent(aw.artwork_id)}`,
+                        );
+                      }}
+                    >
+                      {t("btn_visitor_visual")}
                     </Button>
                     </div>
                     <div className="flex w-full shrink-0 flex-col items-end gap-2 pt-3 mt-auto">

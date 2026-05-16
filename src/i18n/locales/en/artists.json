@@ -58,6 +58,8 @@
   "form_birthdate_placeholder": "Choose a date",
   "form_address_label": "Address",
   "form_address_placeholder": "Address",
+  "form_address_line2_label": "Address line 2",
+  "form_address_line2_placeholder": "Building, floor, unit…",
   "form_zipcode_label": "Postal code",
   "form_zipcode_placeholder": "Postal code",
   "form_city_label": "City",

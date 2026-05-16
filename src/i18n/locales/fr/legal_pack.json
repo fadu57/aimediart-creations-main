@@ -1,0 +1,174 @@
+{
+  "dpa": {
+    "meta": {
+      "title": "Modèle d’Accord de sous-traitance (DPA)",
+      "fullTitle": "Accord de traitement de données (Data Processing Agreement – DPA)"
+    },
+    "sections": {
+      "object": {
+        "title": "1. Objet",
+        "p1": "Le présent Accord de traitement de données (Data Processing Agreement – DPA) fait partie intégrante du contrat principal conclu entre le Client et AIMEDIArt (ci-après les « Parties ») et définit les conditions dans lesquelles AIMEDIArt traite, en tant que sous-traitant, des données personnelles pour le compte du Client, responsable de traitement."
+      },
+      "processingDescription": {
+        "title": "2. Description des traitements",
+        "p1": "Un descriptif détaillé des traitements confiés est précisé en annexe (catégories de données, catégories de personnes concernées, finalités, durée, types de traitements, nature des opérations, lieux de traitement).",
+        "p2": "À titre indicatif, les traitements peuvent inclure :",
+        "list": {
+          "i1": "hébergement et stockage des données dans la plateforme ;",
+          "i2": "mise à disposition d’outils de médiation, collecte de retours visiteurs, formulaires ;",
+          "i3": "génération assistée de contenus via IA ;",
+          "i4": "production de tableaux de bord et statistiques agrégées ;",
+          "i5": "sauvegarde, support et maintenance."
+        }
+      },
+      "processorObligations": {
+        "title": "3. Obligations d’AIMEDIArt en tant que sous-traitant",
+        "intro": "AIMEDIArt s’engage à :",
+        "list": {
+          "i1": "traiter les données personnelles uniquement sur instruction documentée du Client, sauf obligation légale contraire ;",
+          "i2": "garantir que les personnes autorisées à traiter les données s’engagent à la confidentialité ou soient soumises à une obligation légale appropriée ;",
+          "i3": "prendre toutes les mesures de sécurité techniques et organisationnelles appropriées pour protéger les données, conformément à l’article 32 du RGPD ;",
+          "i4": "aider le Client, dans la mesure du possible, à s’acquitter de ses obligations en matière de sécurité, de gestion des violations de données, d’analyses d’impact et de consultation préalable des autorités compétentes ;",
+          "i5": "aider le Client à répondre aux demandes d’exercice de droits des personnes concernées, lorsque celles-ci lui sont adressées directement et concernent des traitements pour lesquels le Client est responsable ;",
+          "i6": "au terme de la prestation, supprimer ou renvoyer au Client, selon son choix, l’ensemble des données personnelles, et détruire les copies existantes, sauf obligation légale de conservation ;",
+          "i7": "mettre à disposition du Client toutes les informations nécessaires pour démontrer le respect des obligations prévues au présent DPA et accepter des audits raisonnables dans les conditions convenues entre les Parties."
+        }
+      },
+      "subProcessing": {
+        "title": "4. Sous-traitance ultérieure",
+        "list": {
+          "i1": "AIMEDIArt est autorisé à faire appel à des sous-traitants ultérieurs (hébergeurs, prestataires d’IA, outils d’emailing, etc.), sous réserve d’informer le Client des catégories de prestataires utilisés.",
+          "i2": "AIMEDIArt impose à ces sous-traitants les mêmes obligations de protection des données que celles énoncées dans le présent DPA.",
+          "i3": "AIMEDIArt demeure pleinement responsable envers le Client de l’exécution des obligations de ces sous-traitants ultérieurs."
+        }
+      },
+      "transfers": {
+        "title": "5. Transferts hors UE",
+        "list": {
+          "i1": "Lorsqu’un traitement implique un transfert de données hors de l’Espace économique européen, AIMEDIArt met en place les garanties appropriées (décision d’adéquation, clauses contractuelles types, BCR, etc.).",
+          "i2": "Les modalités spécifiques de ces transferts peuvent être précisées dans le DPA ou ses annexes."
+        }
+      },
+      "breachNotification": {
+        "title": "6. Notification des violations de données",
+        "p1": "AIMEDIArt notifie au Client toute violation de données personnelles dans les meilleurs délais après en avoir pris connaissance, avec les informations disponibles, afin que le Client puisse remplir, le cas échéant, ses obligations de notification auprès de l’autorité de contrôle et des personnes concernées.",
+        "p2": "Les Parties coopèrent de bonne foi afin de limiter les effets de l’incident et d’y remédier."
+      }
+    }
+  },
+  "dsa": {
+    "meta": {
+      "title": "Procédure de signalement / modération (DSA light)"
+    },
+    "sections": {
+      "object": {
+        "title": "1. Objet",
+        "p1": "La présente section décrit la procédure par laquelle toute personne (utilisateur, visiteur, tiers) peut signaler un contenu qu’elle estime illicite ou contraire aux présentes politiques, ainsi que les principes de modération appliqués par AIMEDIArt.",
+        "p2": "Elle vise à s’aligner, de manière proportionnée, sur les exigences de transparence et de traitement des signalements prévues par le Digital Services Act (DSA) pour les services intermédiaires, dans la mesure où Aimediart.com héberge des contenus générés ou importés par ses clients."
+      },
+      "howToReport": {
+        "title": "2. Comment signaler un contenu",
+        "intro": "Un signalement peut être adressé :",
+        "channels": {
+          "i1": "via un formulaire dédié sur le site ou la plateforme, lorsque cette fonctionnalité est disponible ;",
+          "i2": "ou par email à une adresse de contact indiquée (ex. abuse@aimediart.com ou legal@aimediart.com)."
+        },
+        "contentIntro": "Pour être pris en compte efficacement, le signalement doit contenir autant que possible :",
+        "contentList": {
+          "i1": "l’URL précise ou tout élément permettant d’identifier le contenu en cause ;",
+          "i2": "une description du contenu et des raisons pour lesquelles il est considéré comme illicite ou problématique ;",
+          "i3": "la catégorie juridique ou la base invoquée (ex. diffamation, droits d’auteur, haine en ligne, données personnelles publiées sans consentement, etc.) ;",
+          "i4": "tout élément de preuve utile (captures d’écran, références, etc.) ;",
+          "i5": "les coordonnées de la personne qui signale, si elle souhaite recevoir une réponse."
+        }
+      },
+      "handling": {
+        "title": "3. Traitement des signalements",
+        "list": {
+          "i1": "AIMEDIArt accuse réception du signalement lorsqu’une adresse de contact est fournie.",
+          "i2": "Un examen raisonnable du contenu signalé est effectué dans un délai proportionné à la gravité potentielle et à la charge de travail.",
+          "i3": "Selon le cas, AIMEDIArt peut :",
+          "i4": "conserver le contenu en l’état ;",
+          "i5": "restreindre son accès ;",
+          "i6": "le déréférencer ;",
+          "i7": "le supprimer ;",
+          "i8": "ou suspendre un compte utilisateur en cas de violation évidente et grave.",
+          "i9": "Lorsqu’un contenu est retiré ou restreint, AIMEDIArt s’efforce, dans la mesure du possible et du raisonnable, d’informer le client concerné des raisons de la mesure."
+        }
+      },
+      "abuse": {
+        "title": "4. Abus de signalement",
+        "p1": "Les signalements manifestement infondés ou abusifs peuvent ne pas recevoir de suite.",
+        "p2": "En cas de signalements répétés de mauvaise foi, AIMEDIArt peut prendre des mesures appropriées (blocage de l’adresse email de signalement, restrictions techniques, etc.), dans le respect du droit applicable."
+      }
+    }
+  },
+  "msa": {
+    "meta": {
+      "title": "Conditions particulières B2B / Master Service Agreement (MSA)",
+      "introNote": "Cette partie fournit une ossature pour des conditions particulières ou un MSA à adapter par client (galerie, musée, réseau, institution) en complément des CGV."
+    },
+    "sections": {
+      "object": {
+        "title": "1. Objet et hiérarchie contractuelle",
+        "p1": "Le présent MSA / conditions particulières B2B (ci-après le « Contrat ») encadre, pour un client professionnel identifié, l’utilisation des services AIMEDIArt dans le cadre de projets spécifiques (expositions, saisons culturelles, réseaux de lieux, etc.).",
+        "p2": "Sauf stipulation contraire, le Contrat complète les CGV. En cas de contradiction expresse, les présentes clauses particulières prévalent pour les seuls points concernés."
+      },
+      "projectScope": {
+        "title": "2. Périmètre du projet",
+        "intro": "Une annexe décrit :",
+        "list": {
+          "i1": "les sites ou établissements concernés ;",
+          "i2": "les types de contenus, expositions ou événements couverts ;",
+          "i3": "les volumes estimés (nombre d’œuvres, de visiteurs, d’espaces, etc.) ;",
+          "i4": "les fonctionnalités activées (IA, analytics avancés, intégrations spécifiques) ;",
+          "i5": "les éventuels développements sur mesure."
+        }
+      },
+      "sla": {
+        "title": "3. Niveaux de service (SLA)",
+        "intro": "Selon les besoins du client, des engagements de service peuvent être définis, par exemple :",
+        "list": {
+          "i1": "taux de disponibilité mensuel/annuel cible de la plateforme ;",
+          "i2": "plages horaires de support prioritaire ;",
+          "i3": "délais cibles de prise en compte et de résolution des incidents."
+        },
+        "p1": "Les SLA doivent rester compatibles avec les capacités techniques et économiques d’AIMEDIArt et peuvent donner lieu, le cas échéant, à des crédits de service en cas de non-respect répété."
+      },
+      "governance": {
+        "title": "4. Gouvernance et pilotage",
+        "intro": "Le Contrat peut prévoir :",
+        "list": {
+          "i1": "la désignation de référents côté client et côté AIMEDIArt ;",
+          "i2": "des comités de suivi périodiques (par exemple trimestriels) pour faire le point sur l’usage, les incidents et les évolutions ;",
+          "i3": "un processus de validation des feuilles de route (roadmap) pour les évolutions spécifiques au client."
+        }
+      },
+      "financial": {
+        "title": "5. Conditions financières spécifiques",
+        "p1": "Des conditions financières adaptées peuvent être définies pour les grands comptes (remises, paliers d’usage, forfaits de mise en service, budgets de TMA, etc.), sous réserve de compatibilité avec le modèle économique général.",
+        "p2": "Les modalités précises (tarifs, remises, indexation, facturation, délais de paiement) sont décrites dans une annexe financière."
+      },
+      "ip": {
+        "title": "6. Propriété intellectuelle et livrables spécifiques",
+        "intro": "Pour les développements spécifiques réalisés pour un client donné, le Contrat doit préciser :",
+        "list": {
+          "i1": "ce qui reste propriété d’AIMEDIArt (socle SaaS, briques communes, composants génériques) ;",
+          "i2": "ce qui peut faire l’objet de droits plus étendus au profit du client (par exemple une licence élargie sur certains modules, ou une cession de certains développements sur mesure) ;",
+          "i3": "la possibilité pour AIMEDIArt de réutiliser certains éléments de manière anonymisée ou générique pour améliorer la plateforme."
+        }
+      },
+      "termReversibility": {
+        "title": "7. Durée, résiliation et réversibilité",
+        "list": {
+          "i1": "La durée d’engagement initiale (par exemple 1 à 3 ans), les conditions de renouvellement et les préavis de résiliation sont adaptés au profil du client.",
+          "i2": "Une clause de réversibilité précise les modalités de restitution des données et, le cas échéant, d’assistance à la migration vers une autre solution (formats, délais, coûts éventuels)."
+        }
+      },
+      "law": {
+        "title": "8. Loi applicable et juridiction",
+        "p1": "En l’absence de choix contraire dans un MSA spécifique, la loi applicable et la juridiction compétente sont celles prévues dans les CGV, sous réserve des dispositions impératives applicables."
+      }
+    }
+  }
+}

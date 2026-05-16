@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "Platform Terms of Use (ToU)",
+    "version": "Version: 16 May 2026",
+    "workNotice": "Working document to be reviewed / adapted by legal counsel before contractual use.",
+    "languageRef": "Translations are provided for information only. The reference language and the legally prevailing version is French, subject to mandatory applicable provisions."
+  },
+  "sections": {
+    "object": {
+      "title": "1. Purpose",
+      "p1": "These Platform Terms of Use (hereinafter the “ToU”) set out the rules applicable to any user with an account on the AIMEDIArt platform (administrators, team members, curators, gallerists, mediation officers, etc.), whether acting on behalf of a business customer or under a demonstration access arrangement.",
+      "p2": "The ToU supplement the General Terms of Sale (GTS) entered into with the paying customer and prevail over any contradictory notice that may be displayed in the interface, unless otherwise agreed in writing."
+    },
+    "accessSecurity": {
+      "title": "2. Account access and security",
+      "list": {
+        "i1": "The user must have personal credentials (email and password, or other authentication mechanism) provided or validated by the business customer or by AIMEDIArt.",
+        "i2": "The user undertakes to keep these credentials strictly confidential, not to share them and to choose a strong password.",
+        "i3": "Any action carried out using a user’s credentials is deemed to have been performed by that user, unless there is proof to the contrary of fraudulent use that has been duly reported.",
+        "i4": "The user must promptly notify AIMEDIArt and/or their internal administrator of any suspected compromise (loss, theft, unauthorised access) so that access can be reset."
+      }
+    },
+    "acceptableUse": {
+      "title": "3. Acceptable use rules",
+      "respectIntro": "The user undertakes to use the platform in compliance with:",
+      "respectList": {
+        "i1": "applicable laws and regulations;",
+        "i2": "third-party rights (copyright, image rights, personal data protection, trade secrets, etc.);",
+        "i3": "the business customer’s internal policies where applicable;",
+        "i4": "AIMEDIArt’s GTS and AI Policy."
+      },
+      "forbiddenIntro": "In particular, the following is prohibited:",
+      "forbiddenList": {
+        "i1": "uploading, creating or distributing manifestly unlawful content (incitement to hatred, discrimination, apology of crime, terrorist content, illegal pornography, etc.);",
+        "i2": "harming the reputation of a person or institution through defamatory or false content;",
+        "i3": "using the platform to harass, threaten or intimidate third parties;",
+        "i4": "circumventing security mechanisms, attempting to access accounts or areas the user is not authorised to access, scanning or testing system resilience without written authorisation;",
+        "i5": "deliberately overloading the platform (denial-of-service attack, abusive scripts, etc.);",
+        "i6": "using AI features to generate content that is unlawful, misleading, discriminatory or contrary to the good practice described in the AI Policy."
+      }
+    },
+    "contentResponsibility": {
+      "title": "4. Submitted content and editorial responsibility",
+      "list": {
+        "i1": "The business customer remains responsible for editorial content published via the platform (mediation texts, biographies, information about works, educational materials, etc.).",
+        "i2": "The user warrants that they hold the necessary rights to the content they import (texts, images, videos, audio recordings, etc.).",
+        "i3": "The user undertakes not to publish sensitive personal data without an appropriate legal basis or prior information of the data subjects.",
+        "i4": "AIMEDIArt does not carry out systematic prior editorial control but may moderate or remove manifestly unlawful or non-compliant content, in accordance with the reporting procedure described in Part 4."
+      }
+    },
+    "personalData": {
+      "title": "5. Personal data",
+      "list": {
+        "i1": "When the user enters personal data in the platform (e.g. names of artists, staff, contacts, visitors), they do so within the purposes defined by the customer acting as controller.",
+        "i2": "The user must comply with AIMEDIArt’s Privacy Policy as well as that of their organisation, in particular regarding information of data subjects, retention periods and exercising of rights."
+      }
+    },
+    "suspension": {
+      "title": "6. Account suspension and closure",
+      "list": {
+        "i1": "In the event of serious or repeated breach of these ToU, AIMEDIArt or the business customer may suspend or close a user’s account after notification, except in cases of manifest urgency (gravely unlawful content, security incidents, etc.).",
+        "i2": "Suspension may be temporary (pending verification) or permanent.",
+        "i3": "Deleting a user account does not affect data and content created or managed under the customer’s responsibility, subject to data subjects’ rights and retention obligations."
+      }
+    }
+  }
+}

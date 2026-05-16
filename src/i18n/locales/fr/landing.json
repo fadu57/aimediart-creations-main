@@ -1,0 +1,39 @@
+{
+  "welcome": {
+    "title": "Bienvenue sur AIMEDIArt",
+    "subtitle": "Qui utilisez-vous l’application aujourd’hui ?",
+    "btn_organizer": "Organisateur",
+    "btn_visitor": "Visiteur",
+    "hint_remember": "Votre choix est enregistré sur cet appareil (stockage local).",
+    "change_choice": "Réinitialiser mon choix"
+  },
+  "visitor_gate": {
+    "badge": "Espace visiteur",
+    "aha": "Scannez et choisissez votre guide (Poète, Expert, Enfant…).",
+    "lead": "Une médiation adaptée à votre envie du moment.",
+    "btn_quick": "Visite rapide (anonyme)",
+    "btn_profile": "Créer mon profil pour me souvenir de mes visites",
+    "benefits_title": "Pourquoi créer un profil ?",
+    "benefit_summary": "Bilan de visite et historique de vos parcours",
+    "benefit_artist": "Envoyer des messages aux artistes",
+    "benefit_profile": "Profil permanent et retrouvable sur vos prochaines expositions",
+    "link_organizer": "Espace organisateur",
+    "login_existing": "Déjà un compte ? Se connecter"
+  },
+  "cookie_banner": {
+    "aria_label": "Choix cookies et traceurs",
+    "message": "Nous utilisons des cookies indispensables au fonctionnement du service et, si vous acceptez, un identifiant technique anonyme pour faciliter la continuité de votre session.",
+    "link_cgv": "Conditions générales (CGV)",
+    "link_rgpd": "Données personnelles (RGPD)",
+    "accept": "Tout accepter",
+    "refuse": "Refuser",
+    "privacy_note": "Votre choix est enregistré dans un cookie et le stockage local du navigateur. Vous pouvez le réinitialiser en effaçant les données du site."
+  },
+  "legal_pages": {
+    "back": "Retour",
+    "cgv_title": "Conditions générales de vente et d’utilisation",
+    "cgv_body": "Emplacement réservé : insérez ici le texte définitif validé par votre conseil (CGV / CGU).\n\nPour pointer vers un document sur votre site plutôt que cette page, définissez la variable d’environnement VITE_LEGAL_CGV_URL.",
+    "rgpd_title": "Protection des données personnelles",
+    "rgpd_body": "Emplacement réservé : politique de confidentialité, base légale des traitements, droits des personnes concernées, DPO ou contact, durées de conservation.\n\nPour un document externe, utilisez VITE_LEGAL_RGPD_URL."
+  }
+}

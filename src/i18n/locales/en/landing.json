@@ -1,0 +1,39 @@
+{
+  "welcome": {
+    "title": "Welcome to AIMEDIArt",
+    "subtitle": "How are you using the app today?",
+    "btn_organizer": "Organizer",
+    "btn_visitor": "Visitor",
+    "hint_remember": "Your choice is saved on this device (local storage).",
+    "change_choice": "Reset my choice"
+  },
+  "visitor_gate": {
+    "badge": "Visitor area",
+    "aha": "Scan and choose your guide (Poet, Expert, Child…).",
+    "lead": "Mediation tailored to how you feel today.",
+    "btn_quick": "Quick visit (anonymous)",
+    "btn_profile": "Create my profile to remember my visits",
+    "benefits_title": "Why create a profile?",
+    "benefit_summary": "Visit summary and history of your paths",
+    "benefit_artist": "Send messages to artists",
+    "benefit_profile": "A lasting profile for your next exhibitions",
+    "link_organizer": "Organizer area",
+    "login_existing": "Already have an account? Log in"
+  },
+  "cookie_banner": {
+    "aria_label": "Cookies and tracking choice",
+    "message": "We use cookies that are essential for the service. If you accept, we may also use an anonymous technical identifier to make your session more consistent.",
+    "link_cgv": "Terms & conditions (CGV)",
+    "link_rgpd": "Personal data (GDPR)",
+    "accept": "Accept all",
+    "refuse": "Refuse",
+    "privacy_note": "Your choice is stored in a cookie and browser local storage. Clear site data to reset it."
+  },
+  "legal_pages": {
+    "back": "Back",
+    "cgv_title": "General terms of sale and use",
+    "cgv_body": "Placeholder: add your legal team–approved terms (GTC / ToS).\n\nSet VITE_LEGAL_CGV_URL to link to an external document instead.",
+    "rgpd_title": "Personal data protection",
+    "rgpd_body": "Placeholder: privacy policy, legal bases, data subject rights, contact/DPO, retention.\n\nSet VITE_LEGAL_RGPD_URL for an external policy."
+  }
+}

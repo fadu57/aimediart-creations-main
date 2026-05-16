@@ -177,6 +177,11 @@
   },
   "footer": {
     "contact": "Contacto",
+    "cgv": "CGV",
+    "cookies": "Cookies",
+    "privacy": "Política de privacidad",
+    "terms": "Condiciones de uso",
+    "ai_policy": "Política IA",
     "login": "Acceso"
   }
 }

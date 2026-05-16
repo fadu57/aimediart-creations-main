@@ -31,6 +31,11 @@ import {
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { normalizeArtistBioForStorage } from "@/lib/artistBio";
+import {
+  normalizePostalCode,
+  postalPlaceholderForCountryLabel,
+  validatePostalCodeForCountryLabel,
+} from "@/lib/postalCode";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -51,7 +56,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -74,21 +78,36 @@ function RequiredAsterisk() {
 
 const socialSchema = z.record(z.string());
 
-const artistFormSchema = z.object({
+const artistFormSchemaBase = z.object({
   artist_firstname: z.string().min(1, "Le prénom est obligatoire.").trim(),
   artist_lastname: z.string().min(1, "Le nom est obligatoire.").trim(),
   artist_typ: z.array(z.string()).min(1, "Sélectionnez au moins un type d’art."),
   artist_bio: z.string().trim().default(""),
-  artist_address: z.string().optional(),
-  artist_zipcode: z.string().optional(),
-  artist_city: z.string().optional(),
-  pays: z.string().optional(),
+  country: z.string().optional(),
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  postalCode: z.string().optional(),
+  city: z.string().optional(),
   artist_nickname: z.string().optional(),
   artist_photo_url: z.string().optional(),
   email: z.union([z.literal(""), z.string().email("Format d’e-mail invalide.")]).optional(),
   phone: z.string().optional(),
   birth_date: z.date().optional().nullable(),
   social: socialSchema.optional(),
+});
+
+const artistFormSchema = artistFormSchemaBase.superRefine((data, ctx) => {
+  const normalizedPostal = normalizePostalCode(data.postalCode ?? "");
+  if (!normalizedPostal) return;
+
+  const res = validatePostalCodeForCountryLabel(normalizedPostal, data.country ?? "");
+  if (res.ok === false) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["postalCode"],
+      message: res.message,
+    });
+  }
 });
 
 export type ArtistFormInput = z.infer<typeof artistFormSchema>;
@@ -100,10 +119,15 @@ type DbArtistRow = {
   artist_id: string;
   artist_firstname?: string | null;
   artist_lastname?: string | null;
+  artist_pays?: string | null;
+  /** @deprecated côté DB à privilégier `artist_pays` ; conservé pour lecture héritée. */
+  pays?: string | null;
+  artist_adresse?: string | null;
+  artist_adresse2?: string | null;
+  artist_ville?: string | null;
   artist_address?: string | null;
   artist_zipcode?: string | null;
   artist_city?: string | null;
-  pays?: string | null;
   artist_nickname?: string | null;
   artist_bio?: string | null;
   artist_photo_url?: string | null;
@@ -136,10 +160,11 @@ function getDefaultValues(): ArtistFormInput {
   return {
     artist_firstname: "",
     artist_lastname: "",
-    artist_address: "",
-    artist_zipcode: "",
-    artist_city: "",
-    pays: "France",
+    country: "France",
+    addressLine1: "",
+    addressLine2: "",
+    postalCode: "",
+    city: "",
     artist_nickname: "",
     artist_bio: "",
     artist_photo_url: "",
@@ -196,7 +221,7 @@ export function AddArtistDialog({
   const firstname = useWatch({ control: form.control, name: "artist_firstname" });
   const lastname = useWatch({ control: form.control, name: "artist_lastname" });
   const artistTyp = useWatch({ control: form.control, name: "artist_typ" });
-  const pays = useWatch({ control: form.control, name: "pays" });
+  const country = useWatch({ control: form.control, name: "country" });
   const photoUrl = useWatch({ control: form.control, name: "artist_photo_url" });
 
   const agencyForBiosHook = useMemo(() => {
@@ -207,6 +232,10 @@ export function AddArtistDialog({
   }, [agency_id, resolvedArtistAgencyId, selectedAgencyId]);
 
   const { bios, loading: biosLoading } = useArtistBios(open ? editingArtistId : null, agencyForBiosHook);
+
+  useEffect(() => {
+    void form.trigger("postalCode");
+  }, [country, form]);
 
   const previewSrc = useMemo(() => {
     if (pendingPhotoFile) {
@@ -429,20 +458,25 @@ export function AddArtistDialog({
         }
       }
 
-      let paysValue = "France";
-      if (row.pays && COUNTRY_OPTIONS.some((c) => c.label === row.pays)) {
-        paysValue = row.pays;
-      } else if (row.pays?.trim()) {
-        paysValue = "Autres";
+      let countryValue = "France";
+      const paysRaw = row.artist_pays ?? row.pays ?? "";
+      if (paysRaw && COUNTRY_OPTIONS.some((c) => c.label === paysRaw)) {
+        countryValue = paysRaw;
+      } else if (paysRaw.trim()) {
+        countryValue = "Autres";
       }
+
+      const line1 = (row.artist_adresse ?? "").trim() || (row.artist_address ?? "").trim();
+      const cityVal = (row.artist_ville ?? "").trim() || (row.artist_city ?? "").trim();
 
       form.reset({
         artist_firstname: row.artist_firstname ?? "",
         artist_lastname: row.artist_lastname ?? "",
-        artist_address: row.artist_address ?? "",
-        artist_zipcode: row.artist_zipcode ?? "",
-        artist_city: row.artist_city ?? "",
-        pays: paysValue,
+        country: countryValue,
+        addressLine1: line1,
+        addressLine2: row.artist_adresse2 ?? "",
+        postalCode: row.artist_zipcode ?? "",
+        city: cityVal,
         artist_nickname: row.artist_nickname ?? "",
         artist_bio: "",
         artist_photo_url: row.artist_photo_url ?? "",
@@ -732,6 +766,22 @@ export function AddArtistDialog({
       const birthStored = values.birth_date ? format(values.birth_date, "yyyy-MM-dd") : null;
       const controlStored = computeArtistControl(values.artist_firstname, values.artist_lastname, values.artist_typ);
 
+      const addr1 = (values.addressLine1 ?? "").trim();
+      const addr2 = (values.addressLine2 ?? "").trim();
+      const cityStored = (values.city ?? "").trim();
+      const countryStored = (values.country ?? "").trim();
+      const postalNormalized = normalizePostalCode(values.postalCode ?? "");
+
+      const addressDbPayload = {
+        artist_pays: countryStored || null,
+        artist_zipcode: postalNormalized || null,
+        artist_ville: cityStored || null,
+        artist_adresse: addr1 || null,
+        artist_adresse2: addr2 || null,
+        artist_address: addr1 || null,
+        artist_city: cityStored || null,
+      };
+
       const payloadBase = {
         artist_firstname: values.artist_firstname,
         artist_lastname: values.artist_lastname,
@@ -741,6 +791,7 @@ export function AddArtistDialog({
         artist_email: (values.email ?? "").trim() || null,
         artist_phone: phoneStored || null,
         artist_birth_date: birthStored,
+        ...addressDbPayload,
       };
 
       let savedArtistId = editingArtistId ?? null;
@@ -748,8 +799,8 @@ export function AddArtistDialog({
       if (editingArtistId) {
         if (photoPublicUrl) {
           const payloadCandidates: ArtistsTableUpdate[] = [
-            { ...payloadBase, artist_image: photoPublicUrl },
-            { ...payloadBase, artist_photo_url: photoPublicUrl },
+            { ...(payloadBase as ArtistsTableUpdate), artist_image: photoPublicUrl },
+            { ...(payloadBase as ArtistsTableUpdate), artist_photo_url: photoPublicUrl },
           ];
 
           let lastError: Error | null = null;
@@ -767,7 +818,10 @@ export function AddArtistDialog({
 
           if (lastError) throw lastError;
         } else {
-          const { error } = await supabase.from("artists").update(payloadBase).eq("artist_id", editingArtistId);
+          const { error } = await supabase
+            .from("artists")
+            .update(payloadBase as ArtistsTableUpdate)
+            .eq("artist_id", editingArtistId);
           if (error) {
             throw error instanceof Error
               ? error
@@ -779,8 +833,8 @@ export function AddArtistDialog({
         toast.success("Artiste mis à jour.");
       } else {
         const payloadCandidates: ArtistsTableInsert[] = [
-          { ...payloadBase, artist_image: photoPublicUrl },
-          { ...payloadBase, artist_photo_url: photoPublicUrl },
+          { ...(payloadBase as ArtistsTableInsert), artist_image: photoPublicUrl },
+          { ...(payloadBase as ArtistsTableInsert), artist_photo_url: photoPublicUrl },
         ];
 
         let lastError: Error | null = null;
@@ -861,6 +915,8 @@ export function AddArtistDialog({
     .join(" ")
     .trim();
 
+  const postalPlaceholder = postalPlaceholderForCountryLabel(country ?? "");
+
   return (
     <Dialog
       open={open}
@@ -914,25 +970,6 @@ export function AddArtistDialog({
                     </Button>
                   )}
 
-                  {canShowGenerateBio && (
-                    <Button
-                      type="button"
-                      variant="default"
-                      className="h-9 px-3 text-sm shrink-0 gap-2 border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                      onClick={() => void handleGenerateBio()}
-                      disabled={generatingBio || !hasTripleRequired}
-                    >
-                      {generatingBio ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {t("btn_generating_bio")}
-                        </>
-                      ) : (
-                        t("btn_generate_bio")
-                      )}
-                    </Button>
-                  )}
-
                   <Button
                     type="button"
                     variant="default"
@@ -966,10 +1003,35 @@ export function AddArtistDialog({
             </div>
 
             <div className="space-y-4 w-full">
-              <div className="flex h-[180px] min-h-0 min-w-0 flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-1">
+              {!ficheReadOnly && (
+                <p className="w-[500px] text-xs text-destructive -mt-0.5">
+                  <span className="font-semibold">*</span> {t("required_fields_note")}
+                </p>
+              )}
+
+              <div className="flex h-[180px] flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="flex min-h-0 min-w-0 w-full max-w-[550px] flex-col gap-2 sm:w-[550px] sm:max-w-none sm:shrink-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
                   {!ficheReadOnly && <RequiredAsterisk />}
+                  {canShowGenerateBio && (
+                    <Button
+                      type="button"
+                      variant="default"
+                      className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                      onClick={() => void handleGenerateBio()}
+                      disabled={generatingBio || !hasTripleRequired}
+                    >
+                      {generatingBio ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          {t("btn_generating_bio")}
+                        </>
+                      ) : (
+                        t("btn_generate_bio")
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 {biosLoading && editingArtistId ? (
@@ -1013,70 +1075,8 @@ export function AddArtistDialog({
                     ))}
                   </Tabs>
                 )}
-              </div>
-
-              {!ficheReadOnly && (
-                <p className="text-xs text-destructive -mt-0.5">
-                  <span className="font-semibold">*</span> {t("required_fields_note")}
-                </p>
-              )}
-
-              {duplicateRow && !editingArtistId && !ficheReadOnly && (
-                <Alert variant="destructive" className="border-destructive/60">
-                  <AlertTitle>{t("duplicate_title")}</AlertTitle>
-                  <AlertDescription className="space-y-3">
-                    <p>{t("duplicate_desc")}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={handleDuplicateNo}>
-                        {t("btn_duplicate_no")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
-                        onClick={handleDuplicateYes}
-                      >
-                        {t("btn_duplicate_yes")}
-                      </Button>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {needsAgencyPicker && (
-                <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-3">
-                  <Label htmlFor="artist-target-agency" className="inline-flex items-center">
-                    {t("agency_label")}
-                    {!ficheReadOnly && <RequiredAsterisk />}
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground leading-snug">{t("agency_hint")}</p>
-
-                  {loadingAgencies ? (
-                    <p className="text-xs text-muted-foreground">{t("agency_loading")}</p>
-                  ) : (
-                    <Select
-                      value={selectedAgencyId}
-                      onValueChange={(v) => setSelectedAgencyId(v)}
-                      disabled={ficheReadOnly || agencyOptions.length === 0}
-                    >
-                      <SelectTrigger id="artist-target-agency" disabled={ficheReadOnly || agencyOptions.length === 0}>
-                        <SelectValue
-                          placeholder={agencyOptions.length ? t("agency_select_placeholder") : t("agency_select_empty")}
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {agencyOptions.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
-              )}
 
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div className="group relative h-40 w-40 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
                   {previewSrc ? (
                     <img src={previewSrc} alt={t("photo_alt_preview")} className="h-full w-full object-cover" />
@@ -1145,8 +1145,64 @@ export function AddArtistDialog({
                     }}
                   />
                 </div>
+              </div>
 
-                <div className="min-w-0 flex-1 space-y-3">
+              {duplicateRow && !editingArtistId && !ficheReadOnly && (
+                <Alert variant="destructive" className="border-destructive/60">
+                  <AlertTitle>{t("duplicate_title")}</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>{t("duplicate_desc")}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={handleDuplicateNo}>
+                        {t("btn_duplicate_no")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                        onClick={handleDuplicateYes}
+                      >
+                        {t("btn_duplicate_yes")}
+                      </Button>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {needsAgencyPicker && (
+                <div className="w-[550px] space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-3">
+                  <Label htmlFor="artist-target-agency" className="inline-flex items-center">
+                    {t("agency_label")}
+                    {!ficheReadOnly && <RequiredAsterisk />}
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground leading-snug">{t("agency_hint")}</p>
+
+                  {loadingAgencies ? (
+                    <p className="text-xs text-muted-foreground">{t("agency_loading")}</p>
+                  ) : (
+                    <Select
+                      value={selectedAgencyId}
+                      onValueChange={(v) => setSelectedAgencyId(v)}
+                      disabled={ficheReadOnly || agencyOptions.length === 0}
+                    >
+                      <SelectTrigger id="artist-target-agency" disabled={ficheReadOnly || agencyOptions.length === 0}>
+                        <SelectValue
+                          placeholder={agencyOptions.length ? t("agency_select_placeholder") : t("agency_select_empty")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {agencyOptions.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              <div className="min-w-0 w-full space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <FormField
                       control={form.control}
@@ -1315,51 +1371,6 @@ export function AddArtistDialog({
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-10">
-                <FormField
-                  control={form.control}
-                  name="artist_address"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-5">
-                      <FormLabel>{t("form_address_label")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("form_address_placeholder")} {...field} disabled={ficheReadOnly} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="artist_zipcode"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>{t("form_zipcode_label")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("form_zipcode_placeholder")} {...field} disabled={ficheReadOnly} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="artist_city"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-3">
-                      <FormLabel>{t("form_city_label")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={ficheReadOnly} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               {checkingDuplicate && (
@@ -1369,12 +1380,55 @@ export function AddArtistDialog({
                 </p>
               )}
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-10">
+                <div className="sm:col-span-10">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+                    <div className="order-2 min-w-0 flex-1 sm:order-1">
+                      <FormField
+                        control={form.control}
+                        name="addressLine2"
+                        render={({ field }) => (
+                          <FormItem className="space-y-[5px]">
+                            <FormLabel>{t("form_address_line2_label")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t("form_address_line2_placeholder")}
+                                {...field}
+                                disabled={ficheReadOnly}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="order-1 w-full max-w-full sm:order-2 sm:w-[363px] sm:shrink-0">
+                      <FormField
+                        control={form.control}
+                        name="addressLine1"
+                        render={({ field }) => (
+                          <FormItem className="space-y-[5px]">
+                            <FormLabel>{t("form_address_label")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t("form_address_placeholder")}
+                                {...field}
+                                disabled={ficheReadOnly}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="pays"
+                  name="country"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="w-[100px] max-w-full justify-self-start space-y-[5px] sm:col-span-1">
                       <FormLabel>{t("form_country_label")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={ficheReadOnly}>
                         <FormControl>
@@ -1400,18 +1454,51 @@ export function AddArtistDialog({
 
                 <FormField
                   control={form.control}
+                  name="postalCode"
+                  render={({ field }) => (
+                    <FormItem className="w-[115px] max-w-full justify-self-start space-y-[5px] sm:col-span-2">
+                      <FormLabel>{t("form_zipcode_label")}</FormLabel>
+                      <FormControl>
+                        <Input placeholder={postalPlaceholder} {...field} disabled={ficheReadOnly} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem className="space-y-[5px] sm:col-span-7">
+                      <FormLabel>{t("form_city_label")}</FormLabel>
+                      <FormControl>
+                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={ficheReadOnly} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
                   name="phone"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-[5px]">
                       <FormLabel>{t("form_phone_label")}</FormLabel>
                       <FormControl>
                         <SmartPhoneInput
                           value={field.value ?? ""}
                           onChange={field.onChange}
                           onValidityChange={setPhoneValid}
-                          countryName={pays}
+                          countryName={country}
+                          countrySelectorLocked={
+                            Boolean((country ?? "").trim()) && country !== "Autres"
+                          }
                           onCountryNameChange={(name) =>
-                            form.setValue("pays", name, { shouldDirty: true, shouldValidate: true })
+                            form.setValue("country", name, { shouldDirty: true, shouldValidate: true })
                           }
                           disabled={ficheReadOnly}
                         />
@@ -1434,50 +1521,6 @@ export function AddArtistDialog({
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <Separator className="my-0" />
-
-              <div className={cn(!editingArtistId && "-mt-3")}>
-                {!editingArtistId ? (
-                  <div className="mb-[5px] flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                    <span className="min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
-                      {t("form_social_label")}
-                    </span>
-                  </div>
-                ) : (
-                  <Label className="mb-1 block text-sm font-medium leading-tight">
-                    {t("form_social_label")}
-                  </Label>
-                )}
-
-                <div className="grid max-h-[140px] gap-1 overflow-y-auto overflow-x-hidden pr-1">
-                  {SOCIAL_LINK_TYPES.map((type) => (
-                    <FormField
-                      key={type}
-                      control={form.control}
-                      name={`social.${type}` as const}
-                      render={({ field }) => (
-                        <FormItem className="space-y-0">
-                          <div className="grid gap-1 sm:grid-cols-[minmax(0,7.5rem)_1fr] sm:items-center">
-                            <FormLabel className="text-xs font-normal leading-tight text-muted-foreground">
-                              {type === "web" ? "Web" : type}
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                className="h-8 text-sm"
-                                placeholder="https://…"
-                                {...field}
-                                disabled={ficheReadOnly}
-                              />
-                            </FormControl>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ))}
-                </div>
               </div>
             </div>
           </form>

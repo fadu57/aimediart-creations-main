@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "Nutzungsbedingungen der Plattform (ToU)",
+    "version": "Version: 16. Mai 2026",
+    "workNotice": "Arbeitsunterlage, die von der Rechtsberatung vor vertraglicher Verwendung geprüft / angepasst werden sollte.",
+    "languageRef": "Die Übersetzungen dienen nur zur Information. Referenzsprache und rechtlich maßgebliche Fassung ist Französisch, vorbehaltlich zwingender anwendbarer Vorschriften."
+  },
+  "sections": {
+    "object": {
+      "title": "1. Gegenstand",
+      "p1": "Diese Nutzungsbedingungen der Plattform (nachfolgend „ToU“) legen die Regeln fest, die für jeden Nutzer mit einem Konto auf der AIMEDIArt-Plattform gelten (Administratoren, Teammitglieder, Kuratoren, Galeristen, Mitarbeitende der Mediation usw.), unabhängig davon, ob er im Auftrag eines gewerblichen Kunden oder im Rahmen eines Demonstrationszugangs handelt.",
+      "p2": "Die ToU ergänzen die mit dem zahlenden Kunden geschlossenen Allgemeinen Verkaufsbedingungen (AVB) und gehen etwaigen widersprüchlichen Hinweisen in der Benutzeroberfläche vor, sofern nicht schriftlich etwas anderes vereinbart ist."
+    },
+    "accessSecurity": {
+      "title": "2. Kontozugang und Sicherheit",
+      "list": {
+        "i1": "Der Nutzer muss über persönliche Zugangsdaten (E-Mail und Passwort oder ein anderes Authentifizierungsverfahren) verfügen, die vom gewerblichen Kunden oder von AIMEDIArt bereitgestellt oder bestätigt wurden.",
+        "i2": "Der Nutzer verpflichtet sich, diese Zugangsdaten streng vertraulich zu behalten, sie nicht weiterzugeben und ein sicheres Passwort zu wählen.",
+        "i3": "Handlungen, die mit den Zugangsdaten eines Nutzers durchgeführt werden, gelten als von diesem Nutzer vorgenommen, sofern nicht das Gegenteil durch nachgewiesenen Missbrauch belegt ist, der ordnungsgemäß gemeldet wurde.",
+        "i4": "Der Nutzer teilt AIMEDIArt und/oder seinem internen Administrator unverzüglich jeden Verdacht auf Kompromittierung (Verlust, Diebstahl, unbefugter Zugriff) mit, damit die Zugänge zurückgesetzt werden können."
+      }
+    },
+    "acceptableUse": {
+      "title": "3. Regeln einer zulässigen Nutzung",
+      "respectIntro": "Der Nutzer verpflichtet sich, die Plattform unter Wahrung Folgender zu nutzen:",
+      "respectList": {
+        "i1": "der geltenden Gesetze und Vorschriften;",
+        "i2": "der Rechte Dritter (Urheberrecht, Recht am eigenen Bild, Schutz personenbezogener Daten, Geschäftsgeheimnisse usw.);",
+        "i3": "der internen Richtlinien des gewerblichen Kunden, soweit anwendbar;",
+        "i4": "der AVB und der KI-Richtlinie von AIMEDIArt."
+      },
+      "forbiddenIntro": "Insbesondere ist untersagt:",
+      "forbiddenList": {
+        "i1": "offensichtlich rechtswidrige Inhalte hochzuladen, zu erstellen oder zu verbreiten (Hassrede, Diskriminierung, Verherrlichung von Straftaten, terroristische Inhalte, illegale Pornografie usw.);",
+        "i2": "den Ruf einer Person oder Institution durch diffamierende oder unwahre Inhalte zu schädigen;",
+        "i3": "die Plattform zu nutzen, um Dritte zu belästigen, zu bedrohen oder einzuschüchtern;",
+        "i4": "Sicherheitsmechanismen zu umgehen, zu versuchen, auf Konten oder Bereiche zuzugreifen, für die der Nutzer nicht berechtigt ist, die Belastbarkeit des Systems ohne schriftliche Genehmigung zu scannen oder zu testen;",
+        "i5": "die Plattform vorsätzlich zu überlasten (Denial-of-Service-Angriff, missbräuchliche Skripte usw.);",
+        "i6": "KI-Funktionen zu nutzen, um rechtswidrige, irreführende, diskriminierende Inhalte zu erzeugen oder solche, die den in der KI-Richtlinie beschriebenen guten Praktiken widersprechen."
+      }
+    },
+    "contentResponsibility": {
+      "title": "4. Eingegebene Inhalte und redaktionelle Verantwortung",
+      "list": {
+        "i1": "Der gewerbliche Kunde bleibt für die über die Plattform veröffentlichten redaktionellen Inhalte verantwortlich (Mediationstexte, Biografien, Informationen zu Werken, didaktische Materialien usw.).",
+        "i2": "Der Nutzer gewährleistet, über die erforderlichen Rechte an den von ihm importierten Inhalten zu verfügen (Texte, Bilder, Videos, Tonaufnahmen usw.).",
+        "i3": "Der Nutzer verpflichtet sich, keine sensiblen personenbezogenen Daten ohne angemessene Rechtsgrundlage oder vorherige Information der Betroffenen zu veröffentlichen.",
+        "i4": "AIMEDIArt übt keine systematische redaktionelle Vorabkontrolle aus, kann aber offensichtlich rechtswidrige oder gegen diese Bedingungen verstoßende Inhalte moderieren oder entfernen, gemäß dem in Teil 4 beschriebenen Meldeverfahren."
+      }
+    },
+    "personalData": {
+      "title": "5. Personenbezogene Daten",
+      "list": {
+        "i1": "Wenn der Nutzer personenbezogene Daten in die Plattform eingibt (z. B. Namen von Künstlerinnen und Künstlern, Mitarbeitenden, Kontakten, Besucherinnen und Besuchern), geschieht dies im Rahmen der vom Kunden als Verantwortlichem definierten Zwecke.",
+        "i2": "Der Nutzer muss die Datenschutzerklärung von AIMEDIArt sowie die seines Unternehmens einhalten, insbesondere hinsichtlich Information der Betroffenen, Aufbewahrungsfristen und Ausübung von Rechten."
+      }
+    },
+    "suspension": {
+      "title": "6. Kontosperrung und -schließung",
+      "list": {
+        "i1": "Bei schwerem oder wiederholtem Verstoß gegen diese ToU können AIMEDIArt oder der gewerbliche Kunde das Konto eines Nutzers nach Benachrichtigung sperren oder schließen, außer bei offenkundiger Dringlichkeit (schwerwiegend rechtswidrige Inhalte, Sicherheitsvorfälle usw.).",
+        "i2": "Die Sperrung kann vorübergehend sein (während Prüfungen) oder dauerhaft.",
+        "i3": "Die Löschung eines Nutzerkontos berührt nicht die unter Verantwortung des Kunden erstellten oder verwalteten Daten und Inhalte, vorbehaltlich der Rechte der Betroffenen und Aufbewahrungspflichten."
+      }
+    }
+  }
+}

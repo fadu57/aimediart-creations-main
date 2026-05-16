@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "title": "Richtlinie zur Nutzung von KI-Funktionen (KI-Richtlinie)",
+    "version": "Version: 16. Mai 2026",
+    "workNotice": "Arbeitsunterlage, die von der Rechtsberatung vor vertraglicher Verwendung geprüft / angepasst werden sollte.",
+    "languageRef": "Die Übersetzungen dienen nur zur Information. Referenzsprache und rechtlich maßgebliche Fassung ist Französisch, vorbehaltlich zwingender anwendbarer Vorschriften."
+  },
+  "sections": {
+    "scope": {
+      "title": "1. Gegenstand und Anwendungsbereich",
+      "p1": "Diese KI-Richtlinie regelt die Nutzung der in AIMEDIArt integrierten Funktionen der künstlichen Intelligenz (KI), insbesondere Umschreibung, Vereinfachung, assistierte Übersetzung, Erstellung von Entwürfen für Mediationstexte sowie Hilfe bei der Klassifizierung oder Organisation von Inhalten.",
+      "p2": "Sie gilt für alle Nutzer der Plattform ergänzend zu den AVB, den ToU und der Datenschutzerklärung."
+    },
+    "natureLimits": {
+      "title": "2. Art und Grenzen des angebotenen KI",
+      "list": {
+        "i1": "KI-Funktionen basieren auf statistischen Modellen, die mit großen Datenmengen trainiert wurden. Die Ergebnisse werden probabilistisch erzeugt.",
+        "i2": "Generierte Inhalte können unrichtig, unvollständig, verzerrt, veraltet oder für einen bestimmten Kontext (künstlerisch, rechtlich, didaktisch, inklusiv usw.) ungeeignet sein.",
+        "i3": "Die bereitgestellten Ergebnisse stellen keine Rechts-, Steuer-, medizinischen oder beruflichen Auskünfte dar. Sie ersetzen keine menschliche Expertise."
+      }
+    },
+    "editorialResponsibility": {
+      "title": "3. Redaktionelle Verantwortung und menschliche Prüfung",
+      "list": {
+        "i1": "Der Kunde und seine Nutzer bleiben vollständig verantwortlich für die Nutzung der von der KI erzeugten Vorschläge.",
+        "i2": "Jede KI-Ausgabe, die öffentlich verbreitet werden soll (Schilder, Mediationstexte, didaktische Inhalte, Newsletter, soziale Medien usw.), muss vor der Veröffentlichung sorgfältig von einer Person geprüft werden.",
+        "i3": "Der Nutzer muss unrichtige, diskriminierende, unangemessene oder gegen die Vorgaben seiner Organisation verstoßende Teile korrigieren, ergänzen oder entfernen."
+      }
+    },
+    "allowedUses": {
+      "title": "4. Zulässige / unzulässige Nutzungen",
+      "allowedIntro": "Zulässige Nutzungen (von jedem Kunden anzupassen):",
+      "allowed": {
+        "i1": "Erstellung von Entwürfen für Mediationstexte, Zusammenfassungen, Umschreibungen, Tonvariationen, Arbeitsübersetzungen;",
+        "i2": "Hilfe bei der Textvereinfachung zur besseren Zugänglichkeit (leicht lesen, Popularisierung);",
+        "i3": "Vorschläge für Fragen an einen Chatbot oder einen Besuchsweg;",
+        "i4": "Hilfe bei der Strukturierung oder Neuordnung bestehender Inhalte."
+      },
+      "forbiddenIntro": "Unzulässige Nutzungen:",
+      "forbidden": {
+        "i1": "die KI vorsätzlich zu nutzen, um hasserfüllte, diskriminierende, diffamierende, irreführende Inhalte zu erzeugen oder solche zur Manipulation der Öffentlichkeit;",
+        "i2": "Inhalte zu erzeugen, die als verifizierte Fakten ohne Prüfung dargestellt werden, insbesondere betreffend reale Personen, sensible Ereignisse oder Rechtsinformationen;",
+        "i3": "der KI sensible oder streng vertrauliche personenbezogene Daten (Gesundheit, politische Meinungen, detaillierte Finanzdaten, nicht pseudonymisierte Geschäftsgeheimnisse) ohne Rechtsgrundlage und angemessene Sicherheitsmaßnahmen zuzuführen;",
+        "i4": "versuchen, die technischen Schutzmechanismen der KI-Modelle zu umgehen."
+      }
+    },
+    "aiData": {
+      "title": "5. An KI-Dienste übermittelte Daten",
+      "list": {
+        "i1": "An die KI gesendete Texte oder Auszüge können an Drittanbieter von KI übermittelt werden, im Rahmen eines Vertrags, der die Nutzung strikt auf die Belieferung des Dienstes beschränkt.",
+        "i2": "Wir bemühen uns, Konfigurationen zu nutzen, die keine öffentliche Modelltrainierung auf Kundendaten zulassen, soweit die Anbieter solche Optionen bieten.",
+        "i3": "Eingaben (Prompts) und Ausgaben können zu Zwecken der Aufsicht, Leistungsverbesserung und Sicherheit protokolliert werden, im Einklang mit der Datenschutzerklärung."
+      }
+    },
+    "regulation": {
+      "title": "6. Regulatorische Entwicklungen (AI Act, Leitlinien)",
+      "p1": "Die auf KI-Systeme anwendbaren rechtlichen Pflichten entwickeln sich rasch (insbesondere der europäische AI Act und Empfehlungen der Behörden). Wir werden diese KI-Richtlinie, die bereitgestellten Informationen und technische Einstellungen anpassen, um den Anforderungen für unsere Dienstekategorie zu entsprechen."
+    }
+  }
+}

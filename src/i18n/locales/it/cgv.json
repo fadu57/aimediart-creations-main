@@ -1,0 +1,158 @@
+{
+  "meta": {
+    "title": "Condizioni Generali di Vendita — Aimediart.com",
+    "version": "Versione del 15 maggio 2026 — lingua di riferimento: francese — ambito prioritario di applicazione: servizi SaaS, servizi digitali e funzionalità di intelligenza artificiale destinati principalmente ai professionisti del settore artistico.",
+    "languageNotice": "Le presenti Condizioni Generali di Vendita possono essere fornite in più lingue. In caso di divergenza interpretativa, prevarrà la versione in francese, fatti salvi i disposti inderogabili del diritto applicabile."
+  },
+  "nav": {
+    "back_home": "← Torna alla home pubblica",
+    "language_aria": "Scegli la lingua di visualizzazione"
+  },
+  "sections": {
+    "intro": {
+      "p1": "Le presenti Condizioni Generali di Vendita disciplinano le condizioni in cui Aimediart.com fornisce, a titolo oneroso, servizi digitali, software in modalità SaaS, funzionalità di intelligenza artificiale, strumenti di mediazione culturale, cruscotti, servizi di hosting applicativo e servizi connessi ai clienti che utilizzano la piattaforma.",
+      "p2": "Aimediart.com fa parte di un progetto di piattaforma SaaS per il mondo dell’arte, in particolare intorno alla mediazione digitale delle mostre, ai codici QR, agli strumenti conversazionali, alla riscrittura assistita e ai cruscotti, con un posizionamento prevalentemente B2B per gallerie, agenzie, istituzioni e attori culturali.",
+      "p3": "Le presenti CGV intendono incorniciare le relazioni contrattuali internazionali, fatte salve le disposizioni inderogabili applicabili nel Paese del cliente, in particolare in materia di diritto dei consumatori, protezione dei dati e servizi digitali."
+    },
+    "sellerIdentity": {
+      "title": "2. Identità del venditore",
+      "p1": "Il venditore è l’entità che gestisce Aimediart.com, le cui informazioni legali, di registrazione, di contatto, di fatturazione e, ove applicabile, partita IVA intracomunitaria, devono figurare nelle note legali e/o su qualsiasi preventivo, ordine d’acquisto, fattura o pagina di sottoscrizione contrattuale.",
+      "p2": "Il cliente riconosce che le presenti CGV devono essere lette congiuntamente alle note legali, all’informativa sulla privacy, alla policy sui cookie e, ove applicabile, alle condizioni d’uso della piattaforma."
+    },
+    "definitions": {
+      "title": "3. Definizioni",
+      "intro": "Ai fini delle presenti CGV:",
+      "list": {
+        "platform": "«Piattaforma»: il sito, l’applicazione, le interfacce di amministrazione, le API, i cruscotti e i servizi accessibili tramite Aimediart.com;",
+        "client": "«Cliente»: qualsiasi persona giuridica o fisica che contrae con Aimediart.com;",
+        "user": "«Utente autorizzato»: qualsiasi persona autorizzata dal cliente ad accedere alla piattaforma;",
+        "services": "«Servizi»: l’insieme delle prestazioni SaaS, moduli IA, hosting, manutenzione, supporto, configurazione e servizi connessi;",
+        "clientContent": "«Contenuti del cliente»: dati, testi, immagini, file, biografie, opere, metadati, prompt, elementi espositivi e qualsiasi contenuto trasmesso o generato su iniziativa del cliente o dei suoi utenti;",
+        "subscription": "«Abbonamento»: formula di accesso ricorrente, mensile o annuale, a tutti o parte dei servizi;",
+        "order": "«Ordine»: sottoscrizione online, preventivo accettato, ordine d’acquisto firmato o qualsiasi altro atto che attesti l’accordo del cliente su offerta e prezzo."
+      }
+    },
+    "documents": {
+      "title": "4. Documenti contrattuali e ordine di priorità",
+      "p1": "Salvo diverso patto espresso, il rapporto contrattuale è regolato, in ordine decrescente di priorità, da: (i) le condizioni particolari o il preventivo accettato, (ii) le presenti CGV, (iii) gli allegati tecnici o commerciali, (iv) l’informativa sulla privacy e (v) le condizioni d’uso della piattaforma.",
+      "p2": "In caso di contraddizione, prevale il documento di rango superiore. Le condizioni generali di acquisto del cliente sono opponibili solo se accettate per iscritto in modo espresso da Aimediart.com."
+    },
+    "clientsScope": {
+      "title": "5. Natura dei clienti e ambito commerciale",
+      "p1": "Aimediart.com è concepito principalmente per clienti business, in particolare gallerie, agenzie, curatori di mostra, collettivi, istituzioni culturali, organizzatori di eventi, artisti professionisti o entità assimilabili.",
+      "p2": "Se i consumatori sottoscrivono determinati servizi, le disposizioni imperative applicabili ai consumatori nel loro Paese di residenza abituale si applicano in aggiunta, senza privare Aimediart.com delle altre clausole valide delle presenti CGV. Il cliente dichiara di non utilizzare i servizi in violazione delle leggi applicabili in materia di controlli all’exportazione, sanzioni internazionali, embarghi, antiriciclaggio, anticorruzione e finanziamento del terrorismo. Aimediart.com può rifiutare o sospendere un rapporto commerciale quando ritiene ragionevolmente che esso esporrebbe la piattaforma o i suoi partner a un rischio significativo di violazione di tali norme."
+    },
+    "servicesDescription": {
+      "title": "6. Descrizione dei servizi",
+      "p1": "A seconda dell’offerta sottoscritta, i servizi possono includere: creazione e gestione di schede artista o opera, mediazione digitale tramite codice QR, contenuti multilingue, strumenti di semplificazione o riscrittura assistita da IA, chatbot o assistenti conversazionali, raccolta di feedback dei visitatori, cruscotti, hosting, manutenzione, supporto e servizi di integrazione o configurazione.",
+      "p2": "Aimediart.com può evolvere i servizi per migliorare sicurezza, prestazioni, conformità normativa e usabilità, o aggiungere/rimuovere funzionalità non essenziali, purché non alteri sostanzialmente la prestazione concordata durante un periodo di abbonamento già pagato, salvo necessità legale, di sicurezza o tecnica rilevante.",
+      "p3": "Dimostrazioni, screenshot, prototipi, mock-up, presentazioni commerciali o pagine di marketing hanno valore meramente illustrativo e non hanno valore contrattuale, salvo menzione espressa in contrario in un ordine o preventivo."
+    },
+    "contractFormation": {
+      "title": "7. Formazione del contratto",
+      "p1": "Il contratto si forma alla data di validazione online dell’ordine, firma del preventivo, accettazione di un ordine d’acquisto o qualsiasi inizio di esecuzione accettato dal cliente.",
+      "p2": "Il cliente dichiara di aver ricevuto, prima della conclusione del contratto, le informazioni essenziali relative al servizio, al prezzo, alla durata, alle modalità di rinnovo, al supporto, alle restrizioni eventuali e, ove applicabile, all’esistenza o meno di un diritto di recesso.",
+      "p3": "Per i percorsi B2C o misti accessibili nell’Unione europea, l’interfaccia di sottoscrizione deve presentare informazioni precontrattuali chiare e comprensibili, inclusi prezzo totale, durata, rinnovo, mezzi di risoluzione e modalità di esercizio del diritto di recesso ove esistente."
+    },
+    "prices": {
+      "title": "9. Prezzi",
+      "p1": "I prezzi applicabili sono quelli indicati sul sito, nell’interfaccia di sottoscrizione, nel preventivo o nelle condizioni particolari alla data dell’ordine. Salvo diversa indicazione, i prezzi sono al netto delle imposte per i clienti business e imposte incluse ove il diritto applicabile lo imponga per i consumatori.",
+      "p2": "Il prezzo può dipendere in particolare dal piano scelto, dal numero di utenti, dal volume di opere, dal livello di utilizzo, dalle opzioni, dal supporto, da operazioni specifiche o da servizi aggiuntivi, in linea con il modello economico SaaS in costruzione per Aimediart.com.",
+      "p3": "Eventuali costi di avvio, integrazione, formazione, configurazione, accompagnamento, migrazione o servizi su misura sono fatturati separatamente, salvo diversa previsione nell’offerta commerciale."
+    },
+    "payment": {
+      "title": "11. Modalità di pagamento",
+      "p1": "Le fatture sono pagabili all’ordine o secondo il piano di pagamento previsto dal contratto. I pagamenti possono essere effettuati con carta, addebito diretto, bonifico o altro mezzo offerto alla sottoscrizione.",
+      "p2": "Qualsiasi ritardo o inadempimento di pagamento autorizza Aimediart.com, dopo diffida o ragionevole preavviso secondo le circostanze, a sospendere tutti o parte dei servizi fino a regolarizzazione, senza pregiudizio delle somme dovute. Per i clienti business, ogni ritardo può comportare interessi moratori al tasso legale applicabile o a quello indicato in fattura, nonché un’indennità forfettaria per il recupero crediti ove il diritto applicabile lo consenta."
+    },
+    "accessDelivery": {
+      "title": "8. Account cliente e accesso alla piattaforma",
+      "p1": "L’accesso ai servizi può richiedere la creazione di un account amministratore e/o di account utente. Il cliente si impegna a fornire informazioni esatte, complete e aggiornate e a mantenere la riservatezza delle credenziali di accesso.",
+      "p2": "Il cliente è responsabile delle azioni effettuate tramite i propri account e deve informare senza indugio Aimediart.com di qualsiasi compromissione, uso non autorizzato o vulnerabilità di sicurezza di cui venga a conoscenza. Aimediart.com può sospendere o limitare l’accesso in caso di rischio per la sicurezza, mancato pagamento, inadempimento contrattuale, uso illecito, minaccia all’integrità della piattaforma o obbligo legale."
+    },
+    "duration": {
+      "title": "10. Abbonamenti, durata e rinnovo",
+      "p1": "Salvo diverso accordo, gli abbonamenti sono conclusi per la durata indicata all’ordine, di solito mensile o annuale, con rinnovo automatico per periodi successivi identici, salvo disdetta alle condizioni di cui appresso.",
+      "p2": "Il cliente deve essere informato prima della sottoscrizione della durata dell’impegno, delle condizioni di rinnovo, dei termini e modalità di disdetta e di ogni preavviso applicabile.",
+      "p3": "Per i contratti conclusi con consumatori nell’Unione europea, ove si applichino il diritto di recesso o meccanismi semplificati di ritiro, l’interfaccia di sottoscrizione e gestione del contratto deve integrarli conformemente alle regole applicabili, inclusi i nuovi requisiti di interfaccia elettronica di recesso applicabili dal 19 giugno 2026 nei casi concerniti."
+    },
+    "rightOfWithdrawal": {
+      "title": "12. Diritto di recesso e annullamento",
+      "p1": "Salvo disposizione inderogabile in contrario, i clienti business non beneficiano di un diritto di recesso. Ogni ordine è fermo e definitivo alla conclusione, salvo i casi espressamente previsti dalla legge o dalle condizioni particolari.",
+      "p2": "Quando il cliente agisce in qualità di consumatore e il diritto applicabile riconosce un diritto di recesso, in linea di principio esso può essere esercitato entro 14 giorni per i contratti a distanza, in particolare per servizi e contenuti digitali, fatte salve le eccezioni legali applicabili. Se l’esecuzione di un servizio digitale o la fornitura di un contenuto digitale non fornito su supporto materiale inizia prima della scadenza del periodo di recesso su richiesta espressa del consumatore, Aimediart.com deve raccogliere i consensi e le attestazioni richiesti dal diritto applicabile per, ove applicabile, limitare o estinguere il diritto di recesso secondo le regole vigenti. Per le interfacce B2C concernite nell’Unione europea, deve essere previsto un meccanismo online chiaro per l’esercizio del recesso ove la regolamentazione lo imponga."
+    },
+    "clientObligations": {
+      "title": "13. Obblighi del cliente",
+      "intro": "Il cliente si impegna in particolare a:",
+      "list": {
+        "item1": "utilizzare i servizi conformemente alle leggi applicabili, alle presenti CGV, ai diritti di terzi e all’ordine pubblico. Si asterrà in particolare dall’utilizzare la piattaforma per diffondere contenuti illeciti, contraffatti, diffamatori, ingannevoli, d’odio, violenti, che ledano diritti d’autore, diritti della personalità o norme applicabili;",
+        "item2": "garantire di detenere tutti i diritti, autorizzazioni, licenze, basi giuridiche e consensi necessari sui contenuti del cliente, immagini, biografie, opere, dati personali, istruzioni ed elementi trasmessi ad Aimediart.com o trattati tramite la piattaforma;",
+        "item3": "restare l’unico responsabile dell’esattezza, qualità, liceità e pertinenza dei contenuti e dei dati che importa, pubblica, tratta o fa trattare tramite la piattaforma;",
+        "item4": "riconoscere che i servizi possono includere funzionalità di intelligenza artificiale destinate ad assistere la redazione, traduzione, semplificazione, mediazione, arricchimento o analisi dei contenuti. Tali funzionalità producono risultati probabilistici che possono essere inesatti, incompleti, distorti, obsoleti o inadeguati a un uso specifico. Il cliente resta l’unico responsabile della verifica umana e della validazione editoriale, giuridica, scientifica, patrimoniale, linguistica e commerciale dei contenuti generati o assistiti da IA prima di qualsiasi pubblicazione, diffusione, comunicazione al pubblico o decisione. Aimediart.com non garantisce l’originalità assoluta, l’assenza totale di errori o l’assenza di potenziali violazioni di diritti di terzi derivanti da contenuti generati da istruzioni o dati forniti dal cliente, salvo colpa propria comprovata;",
+        "item5": "astenersi dall’utilizzare i servizi di IA per generare contenuti illeciti, ingannevoli, diffamatori o discriminatori, lesivi di diritti di terzi o destinati a eludere obblighi legali o contrattuali."
+      }
+    },
+    "providerObligations": {
+      "title": "Impegni di Aimediart.com",
+      "intro": "Aimediart.com si impegna in particolare a:",
+      "list": {
+        "item1": "erogare i servizi con diligenza e secondo le regole dell’arte applicabili a un servizio SaaS professionale. Salvo disposizione inderogabile in contrario, non si concede garanzia di risultato commerciale, compatibilità universale, assenza totale di errori, disponibilità ininterrotta o idoneità a un bisogno particolare del cliente;",
+        "item2": "implementare misure tecniche e organizzative ragionevoli per garantire sicurezza, integrità, riservatezza e disponibilità dei servizi, senza che ciò costituisca un obbligo assoluto di risultato;",
+        "item3": "ove i servizi rientrino nella qualificazione di servizio intermediario o di piattaforma online ai sensi del diritto applicabile, in particolare il Digital Services Act nell’Unione europea, Aimediart.com può attuare meccanismi di segnalazione, moderazione, rimozione, sospensione o dereferenziazione di contenuti o account in caso di contenuto illecito, reclamo fondato, inadempimento contrattuale o obbligo normativo. Il cliente riconosce che Aimediart.com può conservare tracce tecniche, notificare determinate misure, cooperare con le autorità competenti e adattare i processi di trasparenza, gestione delle segnalazioni e gestione del rischio conformemente agli obblighi applicabili;",
+        "item4": "fornire supporto secondo il livello di servizio previsto nell’offerta sottoscritta o nelle condizioni particolari. Salvo diversa indicazione, il supporto copre la risoluzione di malfunzionamenti riproducibili, assistenza all’uso standard e domande tecniche ragionevoli relative alla piattaforma. Salvo diverso accordo, non sono coperti dal supporto standard sviluppi su misura, integrazioni complesse con terzi, audit legali, validazione editoriale, migrazioni di dati complesse o consulenza personalizzata;",
+        "item5": "utilizzare subappaltatori, host, fornitori di infrastrutture cloud, strumenti di analisi, servizi di IA, pagamento, messaggistica, supporto o altri partner tecnici per eseguire tutti o parte dei servizi. Aimediart.com resta responsabile dei propri subappaltatori nei limiti previsti dal diritto applicabile e dai propri impegni contrattuali, senza pregiudizio delle limitazioni di responsabilità qui previste."
+      }
+    },
+    "warranty": {
+      "title": "22. Garanzie",
+      "p1": "Aimediart.com si impegna a erogare i servizi con diligenza e secondo le regole dell’arte applicabili a un servizio SaaS professionale. Salvo disposizione inderogabile in contrario, non si concede garanzia di risultato commerciale, compatibilità universale, assenza totale di errori, disponibilità ininterrotta o idoneità a un bisogno particolare del cliente.",
+      "p2": "Il cliente riconosce che ogni progetto digitale dipende da numerosi fattori esterni, tra cui la qualità dei dati, la configurazione, l’uso, le apparecchiature, la connettività, i fornitori terzi, i vincoli normativi locali e il coinvolgimento del cliente. Ove si applichino norme imperative di diritto dei consumatori, prevalgono su qualsiasi clausola incompatibile delle presenti CGV."
+    },
+    "liability": {
+      "title": "23. Responsabilità",
+      "p1": "Ciascuna parte è responsabile del danno diretto causato all’altra per colpa provata. Salvo dolo, colpa grave, violazione di diritti fondamentali, danno alle persone o disposizione inderogabile in contrario, la responsabilità totale di Aimediart.com per un anno contrattuale non supererà l’importo totale al netto delle imposte pagato o pagabile dal cliente nei dodici mesi precedenti per il servizio concernito.",
+      "p2": "Aimediart.com non sarà responsabile di danno indiretto, mancato guadagno, perdita di chance, perdita di dati non imputabile alla sua colpa, danno reputazionale, pregiudizio commerciale, conseguenze di decisioni basate su contenuti generati da IA, o danno derivante da uso improprio dei servizi da parte del cliente o di un terzo da esso autorizzato, salvo disposizione inderogabile in contrario.",
+      "p3": "Il cliente è l’unico responsabile dell’uso che fa di contenuti, analisi, raccomandazioni, riformulazioni, traduzioni o output generati tramite la piattaforma."
+    },
+    "intellectualProperty": {
+      "title": "16. Proprietà intellettuale",
+      "p1": "Aimediart.com resta titolare di tutti i diritti di proprietà intellettuale relativi alla piattaforma, alla sua architettura, software, banche dati, interfacce, elementi grafici, marchi, loghi, documentazione, sviluppi, contenuti proprietari, know-how e miglioramenti, fatto salvo quanto detenuto da terzi o dal cliente sui propri contenuti. Fatto salvo il pagamento integrale delle somme dovute, Aimediart.com concede al cliente un diritto personale, non esclusivo, non cedibile e non trasferibile di accesso e utilizzo dei servizi per le sue esigenze interne o quelle contrattualmente concordate, per la durata del contratto e nei limiti dell’offerta sottoscritta.",
+      "p2": "Il cliente conserva i diritti sui propri contenuti preesistenti. Concede ad Aimediart.com i diritti strettamente necessari per hosting, trattamento, backup, visualizzazione, esecuzione, manutenzione, moderazione, miglioramento tecnico dei servizi ed esecuzione del contratto. Salvo accordo espresso, non si concede alcuna cessione di diritti di proprietà intellettuale a favore del cliente su elementi della piattaforma o sviluppi generici effettuati da Aimediart.com."
+    },
+    "personalData": {
+      "title": "17. Dati personali",
+      "p1": "Il trattamento dei dati personali connesso ai servizi è regolato dall’informativa sulla privacy e, ove applicabile, da un accordo di trattamento dati (DPA) ove Aimediart.com agisce in qualità di responsabile del trattamento per conto del cliente. Ove si applichi il GDPR o normativa equivalente, ciascuna parte si impegna a rispettare i rispettivi obblighi, in particolare su base giuridica, informazione, sicurezza, governance dei sub-responsabili, trasferimenti internazionali, esercizio dei diritti degli interessati e notifica delle violazioni ove necessario.",
+      "p2": "Il cliente garantisce di disporre delle basi giuridiche necessarie per importare o far trattare tramite la piattaforma i dati personali dei propri utenti, artisti, visitatori, personale, prospect o altri interessati."
+    },
+    "serviceModification": {
+      "title": "30. Modifica delle CGV",
+      "p1": "Aimediart.com può modificare le presenti CGV per riflettere evoluzioni legislative, normative, giurisprudenziali, tecniche, economiche o funzionali. Le nuove CGV si applicheranno ai nuovi ordini dalla pubblicazione online e, per i contratti in corso, dalla loro data di efficacia, con ragionevole preavviso e rispetto dei diritti inderogabili del cliente.",
+      "p2": "In caso di modifica sostanziale sfavorevole a un abbonamento in corso, il cliente business potrà, salvo necessità legale o di sicurezza, recedere per il successivo periodo di rinnovo secondo le procedure comunicate da Aimediart.com."
+    },
+    "termination": {
+      "title": "25. Disdetta e risoluzione",
+      "p1": "Salvo impegno fermo in corso, ciascuna parte può porre fine al contratto alla scadenza del periodo in corso secondo le procedure di recesso indicate alla sottoscrizione o nelle condizioni particolari.",
+      "p2": "In caso di violazione grave o reiterata da parte di un contraente dei propri obblighi contrattuali, non sanata entro termine ragionevole dopo diffida scritta, l’altra parte potrà recedere dal contratto con effetto immediato, senza pregiudizio di eventuali risarcimenti.",
+      "p3": "Il recesso comporta la cessazione dell’accesso ai servizi a partire dalla sua data di efficacia, fatte salve le disposizioni sulla reversibilità, conservazione legale di taluni dati, clausole sopravvissute e pagamento delle somme dovute. Alla scadenza o al recesso, il cliente può richiedere, entro termine ragionevole e secondo procedure indicate da Aimediart.com, la restituzione dei dati esportabili che lo concernono in formato utilizzabile, fatto salvo il pagamento integrale delle somme dovute e i vincoli tecnici applicabili. Aimediart.com potrà quindi cancellare o anonimizzare i dati secondo la propria policy di conservazione, obblighi di legge, vincoli di sicurezza e normativa applicabile. Ciascuna parte si impegna a mantenere riservate informazioni, documenti, dati, processi, segreti commerciali, credenziali, configurazioni, prezzi negoziati e in generale qualsiasi informazione non pubblica ottenuta nel corso del rapporto contrattuale, salvo patto contrario, obbligo di legge o disponibilità pubblica senza colpa. Tale obbligo sopravvive per un periodo ragionevole dopo la fine del contratto."
+    },
+    "forceMajeure": {
+      "title": "24. Forza maggiore",
+      "p1": "Nessuna parte sarà responsabile per inadempimenti derivanti da un evento di forza maggiore o equivalente ai sensi del diritto applicabile al di fuori del suo ragionevole controllo, inclusi disastri naturali, guerra, pandemia, cyberattacco diffuso, fallimento massiccio di rete, interruzione di energia, decisione amministrativa o grave fallimento di un fornitore essenziale. Se l’impedimento persiste oltre un termine ragionevole, ciascuna parte può recedere dal contratto per il futuro senza indennità, fatto salvo il pagamento di servizi già erogati."
+    },
+    "disputes": {
+      "title": "31. Legge applicabile e risoluzione delle controversie",
+      "p1": "Salvo disposizione inderogabile in contrario, le presenti CGV sono regolate dalla legge francese. Qualsiasi controversia relativa alla loro validità, interpretazione, esecuzione o cessazione ricadrà nella competenza esclusiva dei tribunali materialmente competenti del luogo della sede sociale del venditore, anche in caso di molteplicità di convenuti o chiamata in garanzia.",
+      "p2": "Per i consumatori, le regole imperative di protezione previste dalla legge del loro luogo di residenza abituale restano applicabili ove non possano essere derogate per contratto. Il consumatore può inoltre beneficiare, ove il diritto applicabile lo preveda, di meccanismi di mediazione o risoluzione stragiudiziale delle controversie disponibili nel proprio Paese o a livello europeo."
+    },
+    "applicableLaw": {
+      "title": "29. Nullità parziale e separabilità",
+      "p1": "Se una disposizione delle presenti CGV è dichiarata nulla, inapplicabile o inefficace, le altre disposizioni restano in vigore e la disposizione concernita sarà interpretata o sostituita nella misura massima consentita per riflettere il più fedelmente possibile l’intenzione economica originaria delle parti."
+    },
+    "finalRecommendations": {
+      "title": "32. Versione, lingua e prova — 27. Riferimenti commerciali",
+      "p1": "I registri informatizzati, i log di connessione, le conferme elettroniche, i ticket di supporto, i log tecnici, le email, le validazioni online, le marche temporali e le fatture di Aimediart.com possono essere validamente prodotti come elementi di prova, fatto salvo il loro valore probatorio secondo il diritto applicabile.",
+      "p2": "Salvo opposizione scritta del cliente, Aimediart.com può menzionare la denominazione, il nome commerciale e il logo del cliente a titolo di riferimento commerciale, senza divulgare informazioni riservate, in particolare sul proprio sito, materiali commerciali o presentazioni.",
+      "p3": "Qualsiasi case study dettagliato, citazione nominativa, pubblicazione di risultati o comunicazione approfondita sarà soggetta al preventivo accordo specifico del cliente."
+    }
+  }
+}

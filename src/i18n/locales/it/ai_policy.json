@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "title": "Policy sull’uso delle funzionalità di IA (Policy IA)",
+    "version": "Versione: 16 maggio 2026",
+    "workNotice": "Documento di lavoro da far rivedere / adattare da un legale prima dell’uso contrattuale.",
+    "languageRef": "Le traduzioni sono fornite a titolo informativo. La lingua di riferimento e la versione giuridicamente prevalente è il francese, fatti salvi i disposti inderogabili applicabili."
+  },
+  "sections": {
+    "scope": {
+      "title": "1. Oggetto e ambito",
+      "p1": "La presente Policy IA disciplina l’uso delle funzionalità di intelligenza artificiale (IA) integrate in AIMEDIArt, in particolare i moduli di riformulazione, semplificazione, traduzione assistita, redazione di bozze di testi di mediazione, supporto alla classificazione o all’organizzazione dei contenuti.",
+      "p2": "Si applica a tutti gli utenti della piattaforma, oltre alle CGV, alle ToU e all’Informativa sulla privacy."
+    },
+    "natureLimits": {
+      "title": "2. Natura e limiti dell’IA offerta",
+      "list": {
+        "i1": "Le funzionalità di IA si basano su modelli statistici addestrati su grandi quantità di dati. I risultati sono generati in modo probabilistico.",
+        "i2": "I contenuti generati possono essere inaccurati, incompleti, distorti, obsoleti o inadeguati a un contesto particolare (artistico, giuridico, didattico, inclusivo, ecc.).",
+        "i3": "I risultati forniti non costituiscono pareri legali, fiscali, medici o professionali. Non sostituiscono l’esperienza umana."
+      }
+    },
+    "editorialResponsibility": {
+      "title": "3. Responsabilità editoriale e revisione umana",
+      "list": {
+        "i1": "Il cliente e i suoi utenti restano pienamente responsabili dell’uso che viene fatto dei suggerimenti prodotti dall’IA.",
+        "i2": "Ogni output dell’IA destinato alla diffusione al pubblico (cartellini, testi di mediazione, contenuti didattici, newsletter, social media, ecc.) deve essere sottoposto a un’attenta revisione umana prima della pubblicazione.",
+        "i3": "L’utente deve correggere, integrare o eliminare le parti inesatte, discriminatorie, inappropriate o contrarie alle direttive della propria organizzazione."
+      }
+    },
+    "allowedUses": {
+      "title": "4. Usi consentiti / vietati",
+      "allowedIntro": "Usi consentiti (da adattare da ogni cliente):",
+      "allowed": {
+        "i1": "generare bozze di testi di mediazione, riassunti, parafrasi, variazioni di tono, traduzioni di lavoro;",
+        "i2": "aiutare a semplificare i testi per renderli più accessibili (facile lettura, divulgazione);",
+        "i3": "proporre idee di domande per un chatbot o un percorso di visita;",
+        "i4": "aiutare a strutturare o riorganizzare contenuti esistenti."
+      },
+      "forbiddenIntro": "Usi vietati:",
+      "forbidden": {
+        "i1": "utilizzare l’IA per produrre consapevolmente contenuti d’odio, discriminatori, diffamatori, fuorvianti o destinati a manipolare il pubblico;",
+        "i2": "generare contenuti presentati come fatti verificati senza controllo, in particolare se riguardano persone reali, eventi sensibili o informazioni giuridiche;",
+        "i3": "immettere nell’IA dati personali sensibili o altamente riservati (salute, opinioni politiche, dati finanziari dettagliati, segreti industriali non pseudonimizzati) senza base giuridica e misure di sicurezza adeguate;",
+        "i4": "tentare di aggirare le misure di sicurezza tecniche dei modelli di IA."
+      }
+    },
+    "aiData": {
+      "title": "5. Dati inviati ai servizi di IA",
+      "list": {
+        "i1": "I testi o estratti inviati all’IA possono essere trasmessi a fornitori terzi di IA, in un quadro contrattuale che ne limita l’uso alle sole esigenze di erogazione del servizio.",
+        "i2": "Ci impegniamo a utilizzare configurazioni che non consentano l’addestramento pubblico dei modelli sui dati dei clienti, nella misura delle opzioni offerte dai fornitori.",
+        "i3": "Prompt e output possono essere registrati a fini di supervisione, miglioramento delle prestazioni e sicurezza, nel rispetto dell’Informativa sulla privacy."
+      }
+    },
+    "regulation": {
+      "title": "6. Evoluzioni normative (AI Act, linee guida)",
+      "p1": "Gli obblighi legali applicabili ai sistemi di IA evolvono rapidamente (in particolare con l’AI Act europeo e le raccomandazioni delle autorità). Adatteremo la presente Policy IA, le informazioni fornite e i parametri tecnici per restare allineati ai requisiti applicabili alla nostra categoria di servizio."
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "title": "Condizioni d’uso della piattaforma (ToU)",
+    "version": "Versione: 16 maggio 2026",
+    "workNotice": "Documento di lavoro da far rivedere / adattare da un legale prima dell’uso contrattuale.",
+    "languageRef": "Le traduzioni sono fornite a titolo informativo. La lingua di riferimento e la versione giuridicamente prevalente è il francese, fatti salvi i disposti inderogabili applicabili."
+  },
+  "sections": {
+    "object": {
+      "title": "1. Oggetto",
+      "p1": "Le presenti Condizioni d’uso della piattaforma (di seguito le «ToU») definiscono le regole applicabili a ogni utente titolare di un account sulla piattaforma AIMEDIArt (amministratori, membri del team, curatori, galleristi, incaricati della mediazione, ecc.), sia che agisca per conto di un cliente professionale o nell’ambito di un accesso dimostrativo.",
+      "p2": "Le ToU integrano le Condizioni Generali di Vendita (CGV) concluse con il cliente pagatore e prevalgono su qualsiasi avviso contraddittorio eventualmente mostrato nell’interfaccia, salvo diverso accordo scritto."
+    },
+    "accessSecurity": {
+      "title": "2. Accesso all’account e sicurezza",
+      "list": {
+        "i1": "L’utente deve disporre di identificativi personali (email e password, o altro meccanismo di autenticazione) forniti o convalidati dal cliente professionale o da AIMEDIArt.",
+        "i2": "L’utente si impegna a mantenere tali identificativi strettamente riservati, a non condividerli e a scegliere una password robusta.",
+        "i3": "Qualsiasi azione effettuata tramite gli identificativi di un utente si presume compiuta da quest’ultimo, salva prova contraria di uso fraudolento debitamente segnalato.",
+        "i4": "L’utente segnala senza ritardo ad AIMEDIArt e/o al proprio amministratore interno ogni sospetto di compromissione (smarrimento, furto, accesso non autorizzato) affinché gli accessi possano essere reimpostati."
+      }
+    },
+    "acceptableUse": {
+      "title": "3. Regole di uso ammissibile",
+      "respectIntro": "L’utente si impegna a utilizzare la piattaforma nel rispetto:",
+      "respectList": {
+        "i1": "delle leggi e dei regolamenti applicabili;",
+        "i2": "dei diritti di terzi (diritto d’autore, diritto all’immagine, protezione dei dati personali, segreto industriale, ecc.);",
+        "i3": "delle policy interne del cliente professionale ove applicabile;",
+        "i4": "delle CGV e della Policy IA di AIMEDIArt."
+      },
+      "forbiddenIntro": "È in particolare vietato:",
+      "forbiddenList": {
+        "i1": "caricare, creare o diffondere contenuti manifestamente illeciti (istigazione all’odio, discriminazione, apologia di reati, contenuti terroristici, pornografia illegale, ecc.) ;",
+        "i2": "nuocere alla reputazione di una persona o istituzione con contenuti diffamatori o mendaci;",
+        "i3": "utilizzare la piattaforma per molestare, minacciare o intimidire terzi;",
+        "i4": "aggirare i meccanismi di sicurezza, tentare di accedere a account o spazi per i quali l’utente non è autorizzato, scansionare o testare la resistenza del sistema senza autorizzazione scritta;",
+        "i5": "sovraccaricare deliberatamente la piattaforma (attacco di denial of service, script abusivi, ecc.);",
+        "i6": "utilizzare le funzionalità di IA per generare contenuti illeciti, fuorvianti, discriminatori o contrari alle buone pratiche descritte nella Policy IA."
+      }
+    },
+    "contentResponsibility": {
+      "title": "4. Contenuti inseriti e responsabilità editoriale",
+      "list": {
+        "i1": "Il cliente professionale resta responsabile dei contenuti editoriali pubblicati tramite la piattaforma (testi di mediazione, biografie, informazioni sulle opere, materiali didattici, ecc.).",
+        "i2": "L’utente garantisce di detenere i diritti necessari sui contenuti che importa (testi, immagini, video, registrazioni audio, ecc.).",
+        "i3": "L’utente si impegna a non pubblicare dati personali sensibili senza base giuridica adeguata né informazione preventiva degli interessati.",
+        "i4": "AIMEDIArt non effettua un controllo editoriale sistematico a priori ma può moderare o rimuovere un contenuto manifestamente illecito o contrario alle presenti, secondo la procedura di segnalazione descritta nella Parte 4."
+      }
+    },
+    "personalData": {
+      "title": "5. Dati personali",
+      "list": {
+        "i1": "Quando l’utente inserisce dati personali nella piattaforma (es. nomi di artisti, collaboratori, contatti, visitatori), lo fa nell’ambito delle finalità definite dal cliente responsabile del trattamento.",
+        "i2": "L’utente deve rispettare l’Informativa sulla privacy di AIMEDIArt nonché quella della propria organizzazione, in particolare per quanto riguarda informazione degli interessati, durata di conservazione ed esercizio dei diritti."
+      }
+    },
+    "suspension": {
+      "title": "6. Sospensione e chiusura dell’account",
+      "list": {
+        "i1": "In caso di violazione grave o ripetuta delle presenti ToU, AIMEDIArt o il cliente professionale possono sospendere o chiudere l’account di un utente dopo notifica, salvo urgenza manifesta (contenuti gravemente illeciti, incidenti di sicurezza, ecc.).",
+        "i2": "La sospensione può essere temporanea (per il tempo delle verifiche) o definitiva.",
+        "i3": "La cancellazione di un account utente non incide sui dati e sui contenuti creati o gestiti sotto la responsabilità del cliente, fatto salvo il rispetto dei diritti degli interessati e degli obblighi di conservazione."
+      }
+    }
+  }
+}

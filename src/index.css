@@ -94,12 +94,15 @@
   html,
   body {
     min-height: 100vh;
+    min-height: 100dvh;
     background-color: #121212;
   }
 
   #root {
-    height: 300px;
-    background-color: #121212;
+    min-height: 100vh;
+    min-height: 100dvh;
+    /* Laisse voir les fonds plein écran (vitrine, pages légales Vanta) ; le back-office garde ses fonds sombres sur les routes concernées */
+    background-color: transparent;
   }
 
   * {

@@ -19,6 +19,7 @@ type RequestBody = {
   user_photo_url?: string | null;
   user_expo_id?: string | null;
   visitor_uuid?: string | null;
+  device_fingerprint?: string | null;
 };
 
 function jsonResponse(status: number, payload: unknown) {
@@ -70,6 +71,7 @@ serve(async (req: Request) => {
   const userPhotoUrl = body.user_photo_url?.trim() || null;
   const expoId = body.user_expo_id?.trim() || null;
   const visitorUuid = body.visitor_uuid?.trim() || null;
+  const deviceFingerprint = body.device_fingerprint?.trim().slice(0, 128) || null;
 
   if (!isEmailLike(email)) {
     return jsonResponse(400, { ok: false, code: "invalid_email", error: "Adresse e-mail invalide." });
@@ -147,6 +149,19 @@ serve(async (req: Request) => {
   const userId = created.user?.id;
   if (!userId) {
     return jsonResponse(500, { ok: false, code: "missing_user_id", error: "ID utilisateur non retourné." });
+  }
+
+  if (deviceFingerprint) {
+    const mergedMeta = {
+      ...(typeof created.user?.user_metadata === "object" && created.user?.user_metadata !== null
+        ? created.user.user_metadata
+        : {}),
+      device_fingerprint: deviceFingerprint,
+    };
+    const { error: metaErr } = await admin.auth.admin.updateUserById(userId, { user_metadata: mergedMeta });
+    if (metaErr && Deno.env.get("DENO_DEPLOYMENT_ID")) {
+      /* métadonnée secondaire : ne bloque pas l’inscription */
+    }
   }
 
   const payload = {

@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "title": "Politique d’utilisation des fonctionnalités d’IA (Politique IA)",
+    "version": "Version : 16 mai 2026",
+    "workNotice": "Document de travail à faire relire / adapter par un conseil juridique avant usage contractuel.",
+    "languageRef": "Les traductions sont fournies à titre informatif. La langue de référence et la version juridiquement prévalente est le français, sous réserve des dispositions impératives applicables."
+  },
+  "sections": {
+    "scope": {
+      "title": "1. Objet et périmètre",
+      "p1": "La présente Politique IA encadre l’utilisation des fonctionnalités d’intelligence artificielle (IA) intégrées à AIMEDIArt, notamment les modules de reformulation, simplification, traduction assistée, rédaction d’ébauches de textes de médiation, aide à la classification ou à l’organisation de contenus.",
+      "p2": "Elle s’applique à tous les utilisateurs de la plateforme, en complément des CGV, des ToU et de la Politique de confidentialité."
+    },
+    "natureLimits": {
+      "title": "2. Nature et limites de l’IA proposée",
+      "list": {
+        "i1": "Les fonctionnalités d’IA reposent sur des modèles statistiques entraînés sur de grandes quantités de données. Les résultats sont générés de manière probabiliste.",
+        "i2": "Les contenus générés peuvent être inexacts, incomplets, biaisés, obsolètes ou inadaptés à un contexte particulier (artistique, juridique, pédagogique, inclusif, etc.).",
+        "i3": "Les résultats fournis ne constituent pas des avis juridiques, fiscaux, médicaux ou professionnels. Ils ne remplacent pas l’expertise humaine."
+      }
+    },
+    "editorialResponsibility": {
+      "title": "3. Responsabilité éditoriale et relecture humaine",
+      "list": {
+        "i1": "Le client et ses utilisateurs demeurent entièrement responsables de l’usage qui est fait des suggestions produites par l’IA.",
+        "i2": "Toute sortie IA destinée à être diffusée au public (cartels, textes de médiation, contenus pédagogiques, newsletters, réseaux sociaux, etc.) doit faire l’objet d’une relecture humaine attentive avant publication.",
+        "i3": "L’utilisateur doit corriger, compléter ou supprimer les parties inexactes, discriminatoires, inappropriées ou contraires aux directives de son organisation."
+      }
+    },
+    "allowedUses": {
+      "title": "4. Types d’usages autorisés / interdits",
+      "allowedIntro": "Usages autorisés (à adapter par chaque client) :",
+      "allowed": {
+        "i1": "générer des ébauches de textes de médiation, résumés, paraphrases, variations de ton, traductions de travail ;",
+        "i2": "aider à la simplification de textes pour les rendre plus accessibles (FALC, vulgarisation) ;",
+        "i3": "proposer des idées de questions pour un chatbot ou un parcours de visite ;",
+        "i4": "aider à structurer ou réorganiser des contenus existants."
+      },
+      "forbiddenIntro": "Usages interdits :",
+      "forbidden": {
+        "i1": "utiliser l’IA pour produire sciemment des contenus haineux, discriminatoires, diffamatoires, trompeurs ou destinés à manipuler le public ;",
+        "i2": "générer des contenus présentés comme des faits avérés sans vérification, en particulier s’ils concernent des personnes réelles, des événements sensibles ou des informations juridiques ;",
+        "i3": "introduire dans l’IA des données personnelles sensibles ou hautement confidentielles (santé, opinions politiques, données financières détaillées, secrets d’affaires non pseudonymisés) sans base légale et mesures de sécurité adaptées ;",
+        "i4": "tenter de contourner les garde-fous techniques des modèles d’IA."
+      }
+    },
+    "aiData": {
+      "title": "5. Données envoyées aux services d’IA",
+      "list": {
+        "i1": "Les textes ou extraits envoyés à l’IA peuvent être transmis à des prestataires tiers d’IA, dans un cadre contractuel limitant leur usage aux seuls besoins de fourniture du service.",
+        "i2": "Nous nous efforçons d’utiliser des configurations qui n’autorisent pas l’entraînement public des modèles sur les données des clients, dans la mesure des options offertes par les fournisseurs.",
+        "i3": "Les prompts et sorties peuvent être journalisés à des fins de supervision, d’amélioration des performances et de sécurité, dans le respect de la Politique de confidentialité."
+      }
+    },
+    "regulation": {
+      "title": "6. Évolutions réglementaires (AI Act, lignes directrices)",
+      "p1": "Les obligations légales applicables aux systèmes d’IA évoluent rapidement (notamment avec l’AI Act européen et les recommandations des autorités). Nous adapterons la présente Politique IA, les informations fournies et les paramètres techniques pour rester alignés sur les exigences applicables à notre catégorie de service."
+    }
+  }
+}

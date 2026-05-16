@@ -16,6 +16,7 @@
     "deploy:supabase:analyze-image": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy-analyze-artwork-image.ps1"
   },
   "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^4.6.2",
     "@hookform/resolvers": "^3.10.0",
     "@lottiefiles/lottie-player": "^2.0.12",
     "@lottiefiles/react-lottie-player": "^3.6.0",

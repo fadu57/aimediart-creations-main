@@ -1,0 +1,241 @@
+{
+  "meta": {
+    "title": "Privacy Policy – Aimediart.com",
+    "version": "Version: 16 May 2026",
+    "scope": "Scope: Aimediart.com marketing site, AIMEDIArt SaaS platform and related services (support, billing, digital mediation, AI features, basic analytics).",
+    "languageRef": "Translations are provided for information only. The reference language and the legally prevailing version is French, subject to mandatory applicable provisions."
+  },
+  "sections": {
+    "controller": {
+      "title": "1. Who is responsible for your data?",
+      "p1": "The controller of personal data collected via Aimediart.com is the publisher of the site and the AIMEDIArt platform (hereinafter “we” or “the Publisher”), whose identity and full contact details are given in the legal notice.",
+      "p2": "You may contact us with any data protection questions at: contact@aimediart.com (to be adapted) or via the site contact form.",
+      "p3": "Depending on the processing, we may act as:",
+      "list": {
+        "i1": "controller, when we determine the purposes and means (e.g. customer account management, billing, commercial follow-up, platform security);",
+        "i2": "processor, when we process data on behalf of professional clients who remain controllers (e.g. exhibition visitor data collected for a gallery, institution, museum or agency using AIMEDIArt)."
+      },
+      "p4": "In the latter case, a data processing agreement (DPA) supplements these provisions."
+    },
+    "dataCollected": {
+      "title": "2. What data do we collect?",
+      "p1": "We only collect data that is relevant to providing and improving our services. The main categories are:",
+      "accountId": {
+        "title": "2.1 Account and identification data",
+        "list": {
+          "i1": "Name, first name, and where applicable role or function (e.g. curator, gallerist, mediation officer);",
+          "i2": "Professional contact details (email address, phone, organisation);",
+          "i3": "Login credentials (login, password hash, connection logs);",
+          "i4": "Language preferences and profile settings."
+        }
+      },
+      "contractBilling": {
+        "title": "2.2 Contract and billing data",
+        "list": {
+          "i1": "Billing information (organisation, postal address, VAT number where applicable);",
+          "i2": "Data relating to orders, subscriptions, renewals and terminations;",
+          "i3": "Payment history (via a third-party payment provider);",
+          "i4": "Exchanges relating to negotiation or ongoing business relations."
+        }
+      },
+      "contentProject": {
+        "title": "2.3 Content and project data",
+        "list": {
+          "i1": "Content uploaded to the platform: texts, biographies, artwork descriptions, visuals, metadata, mediation scripts, prompts sent to the AI, etc.;",
+          "i2": "Structuring of exhibitions, visitor journeys, QR codes, digital mediation settings;",
+          "i3": "Comments or feedback from project teams."
+        },
+        "p1": "Such content may include personal data (for example an artist’s name, biography, contact person) under the primary responsibility of the professional client."
+      },
+      "logsSecurity": {
+        "title": "2.4 Logging and security data",
+        "list": {
+          "i1": "Technical server logs (IP addresses, technical identifiers, timestamps, error codes, security events);",
+          "i2": "Action logs in the interface (creation, modification, deletion of items, logins / logouts);",
+          "i3": "Information related to use of APIs and AI features."
+        }
+      },
+      "navigation": {
+        "title": "2.5 Browsing and audience measurement data",
+        "p1": "On the marketing site and, where applicable, on certain platform interfaces, we collect browsing data via cookies and similar technologies, in line with our cookie policy:",
+        "list": {
+          "i1": "pages viewed, time spent, clicks on certain areas;",
+          "i2": "approximate origin (country / region), device and browser type;",
+          "i3": "acceptance or refusal of cookies."
+        },
+        "p2": "This data is in principle aggregated and pseudonymised and is not used to build individual marketing profiles."
+      },
+      "support": {
+        "title": "2.6 Data exchanged with support",
+        "list": {
+          "i1": "Content of support requests (emails, forms, screenshots);",
+          "i2": "Information needed for diagnosis (technical configuration, error logs, anonymised content extracts where possible);",
+          "i3": "Ticket and correspondence history."
+        }
+      }
+    },
+    "purposes": {
+      "title": "3. For what purposes do we use your data and on what legal bases?",
+      "p1": "We process data for specific, explicit and legitimate purposes. Depending on the case, the legal basis may be: performance of a contract, compliance with a legal obligation, our legitimate interests, or your consent.",
+      "accountServices": {
+        "title": "3.1 Account management and service delivery",
+        "list": {
+          "i1": "Creating and managing user accounts;",
+          "i2": "Providing platform features (mediation, AI, dashboards, QR codes, etc.);",
+          "i3": "User support and technical assistance."
+        },
+        "legalBasis": "Legal basis: performance of a contract or pre-contractual measures (Article 6(1)(b) GDPR)."
+      },
+      "b2bClient": {
+        "title": "3.2 B2B customer relationship management",
+        "list": {
+          "i1": "Business development (reasonable B2B prospecting, demo follow-up, pre-contractual exchanges);",
+          "i2": "Management of contracts, subscriptions, renewals and terminations;",
+          "i3": "Billing, accounting, overdue payments and disputes."
+        },
+        "legalBasis": "Legal basis: performance of the contract (6(1)(b)) and compliance with legal obligations (accounting, 6(1)(c)), legitimate interests for managing and developing B2B activities (6(1)(f)), subject to the rights of data subjects."
+      },
+      "platformSecurity": {
+        "title": "3.3 Platform improvement and security",
+        "list": {
+          "i1": "Aggregated analysis of usage to improve usability, performance and reliability;",
+          "i2": "Anomaly detection, prevention of abuse and fraud, securing infrastructure;",
+          "i3": "Testing, audits and technical improvements."
+        },
+        "legalBasis": "Legal basis: legitimate interests (6(1)(f)) in ensuring security, service quality and continuous improvement of the platform, without disproportionately affecting individuals’ rights and freedoms."
+      },
+      "audience": {
+        "title": "3.4 Audience measurement",
+        "list": {
+          "i1": "Audience measurement for the marketing site and certain sections of the platform;",
+          "i2": "Aggregated statistics on views, journeys and interactions."
+        },
+        "legalBasisIntro": "Legal basis: depending on the configuration chosen:",
+        "legalList": {
+          "i1": "consent (6(1)(a)) for non-strictly necessary trackers;",
+          "i2": "or, in the limited cases provided by the French CNIL for certain exempt audience measurements, legitimate interest subject to strict compliance with applicable criteria."
+        }
+      },
+      "communication": {
+        "title": "3.5 Communication and information",
+        "list": {
+          "i1": "Sending information about subscribed services (updates, changes to terms, incidents, security);",
+          "i2": "Sending news or editorial content relating to AIMEDIArt where the person has consented or where permitted by law (reasonable B2B prospecting)."
+        },
+        "legalBasis": "Legal basis: performance of the contract (information strictly necessary for the service) or legitimate interests / consent depending on the type of communication and status (customer, prospect, professional, consumer)."
+      },
+      "legalObligations": {
+        "title": "3.6 Compliance with our legal obligations",
+        "list": {
+          "i1": "Handling requests to exercise rights of access, rectification, erasure, restriction, portability and objection;",
+          "i2": "Handling requests from authorities (tax, administrative, judicial);",
+          "i3": "Combating fraud, money laundering or terrorist financing where applicable."
+        },
+        "legalBasis": "Legal basis: compliance with legal obligations to which we are subject (6(1)(c) and, where applicable, performance of tasks in the public interest where required by law."
+      }
+    },
+    "retention": {
+      "title": "4. How long do we keep your data?",
+      "p1": "We keep personal data only for as long as necessary for the purposes for which it is processed, plus statutory limitation or archiving periods.",
+      "p2": "Indicatively:",
+      "list": {
+        "i1": "Account data: for the duration of use of the service, then for a limited period after closure for evidence and dispute management (e.g. 3 to 5 years);",
+        "i2": "Billing data: for the statutory accounting retention period (generally 10 years from the end of the financial year);",
+        "i3": "Connection and security logs: a few months to one year, depending on sensitivity and security requirements;",
+        "i4": "Support data: for the time needed to handle the request, then limited archiving;",
+        "i5": "Cookies and audience measurement: retention periods in line with the cookie policy (generally 6 to 13 months for trackers, depending on exact configuration)."
+      },
+      "p3": "Exact periods may vary by country and type of processing. They are specified or refined in our internal processing register and, where applicable, in contracts with professional clients."
+    },
+    "recipients": {
+      "title": "5. Who may access your data?",
+      "p1": "Personal data may be accessed, within the limits of their respective duties and solely for the purposes pursued, by the following categories:",
+      "list": {
+        "i1": "Members of the AIMEDIArt team responsible for customer relations, support and maintenance;",
+        "i2": "Technical providers (hosting, cloud infrastructure, monitoring tools, AI services, payment providers, email solutions, etc.) acting as processors;",
+        "i3": "External advisers (lawyers, accountants, auditors) where necessary and appropriately bound;",
+        "i4": "Competent authorities (administrative, judicial, tax, regulatory) where required by law."
+      },
+      "p2": "Where we use processors, we ensure they provide sufficient security and confidentiality guarantees and that processing is governed by a processing agreement compliant with Article 28 GDPR."
+    },
+    "transfers": {
+      "title": "6. Where is your data stored and are there transfers outside the EU?",
+      "p1": "In principle, we seek to host data in the European Union or in countries benefiting from an adequacy decision by the European Commission.",
+      "p2": "However, some technical providers or subprocessors may be located outside the EU or use subprocessors based outside the EU (e.g. for certain AI, analytics or emailing features).",
+      "p3": "In such cases, we ensure that transfers are covered by one of the mechanisms provided for by the GDPR:",
+      "list": {
+        "i1": "European Commission adequacy decision;",
+        "i2": "standard contractual clauses (SCCs) approved by the Commission;",
+        "i3": "binding corporate rules (BCRs);",
+        "i4": "or, failing that, specific derogations under the GDPR in exceptional cases."
+      },
+      "p4": "Information on main subprocessors and significant transfers may be provided to professional clients on reasonable request or via a DPA."
+    },
+    "rights": {
+      "title": "7. What are your rights?",
+      "p1": "Under the GDPR and applicable law, you have the following rights regarding your personal data, within the limits set out in those texts:",
+      "list": {
+        "i1": "Right of access: obtain confirmation as to whether data concerning you are processed and, where applicable, access them;",
+        "i2": "Right to rectification: request correction of inaccurate or incomplete data;",
+        "i3": "Right to erasure: obtain erasure of your data in certain cases (e.g. when no longer necessary, or withdrawal of consent, subject to legal retention obligations);",
+        "i4": "Right to restriction: obtain temporary restriction of processing in certain situations;",
+        "i5": "Right to object: object to certain processing based on our legitimate interests, on grounds relating to your particular situation;",
+        "i6": "Right to data portability: receive data you have provided in a structured, commonly used and machine-readable format, where processing is based on consent or contract and carried out by automated means;",
+        "i7": "Right to give post-mortem instructions (where local law provides) regarding your data after your death."
+      },
+      "p2": "You may exercise these rights by contacting us at the address given at the beginning of this policy, including any information needed to verify your identity. We will respond as soon as possible and in principle within one month, extendable for complex or multiple requests.",
+      "p3": "If we have reasonable doubt about your identity, we may ask you for further information."
+    },
+    "complaints": {
+      "title": "8. Right to lodge a complaint",
+      "p1": "If, after contacting us, you consider that your rights are not respected or that processing of your data is not compliant with the GDPR, you may lodge a complaint with the competent supervisory authority.",
+      "p2": "For users located in France, this is the CNIL (Commission nationale de l’informatique et des libertés): www.cnil.fr.",
+      "p3": "If you are located in another European Economic Area country, you may also contact the data protection authority of your habitual country of residence."
+    },
+    "security": {
+      "title": "9. Data security",
+      "p1": "We implement reasonable technical and organisational measures to protect personal data against accidental or unlawful destruction, loss, alteration, unauthorised disclosure or unauthorised access.",
+      "p2": "These measures may include for example:",
+      "list": {
+        "i1": "encryption of data in transit, separation of environments;",
+        "i2": "access control, permission management, strong authentication where appropriate;",
+        "i3": "logging of access and security events;",
+        "i4": "regular backups and recovery procedures;",
+        "i5": "internal policy for vulnerability management and updates."
+      },
+      "p3": "No system is perfectly secure; we cannot therefore guarantee absolute security. In the event of a security incident affecting your personal data likely to result in a high risk to your rights and freedoms, we will inform you under the conditions provided by applicable law."
+    },
+    "processorRole": {
+      "title": "10. Processing as a processor (professional clients)",
+      "p1": "When we provide the AIMEDIArt platform to professional clients (e.g. a gallery, museum, cultural institution or agency) and they use the platform to process personal data of their own users, visitors or contacts, they remain in principle controllers and we act as processor.",
+      "p2": "In this context:",
+      "list": {
+        "i1": "the professional client chooses the purposes and means of processing (e.g. collecting visitor feedback, managing contact lists, creating mediation content);",
+        "i2": "we process data only on documented instructions from the client and within the limits of the contract;",
+        "i3": "a processing agreement (DPA) may specify roles, responsibilities, security measures, cooperation for exercising rights, breach management and any transfers."
+      },
+      "p3": "Data subjects (visitors, contacts, etc.) should refer primarily to the privacy policy of the controller client, who remains the main point of contact for their requests, subject to any specific obligations that apply directly to us."
+    },
+    "ai": {
+      "title": "11. Specific aspects of AI features",
+      "p1": "Some AIMEDIArt platform features may rely on artificial intelligence (AI) services provided by us or third parties (e.g. rephrasing text, simplification, translation, drafting assistance, generating content suggestions).",
+      "p2": "In this context:",
+      "list": {
+        "i1": "data sent to the AI may include excerpts of content you provide (mediation texts, artwork descriptions, prompts, etc.);",
+        "i2": "we seek to limit personal data sent to AI engines to what is necessary to provide the feature;",
+        "i3": "where third-party AI providers are used, we contractually seek to ensure they do not use such data to train their models publicly in an uncontrolled manner, within the limits of the features offered and the configuration chosen."
+      },
+      "p3": "AI-generated results may be inaccurate, incomplete or inappropriate and must not be treated as legal, scientific, medical or professional advice. Human review remains necessary before any public distribution."
+    },
+    "thirdPartyLinks": {
+      "title": "12. Links to third-party sites or services",
+      "p1": "The site and platform may contain links to other sites, content or services operated by third parties (e.g. collaboration tools, video platforms, social networks, external emailing or analytics services).",
+      "p2": "Those third parties have their own privacy policies over which we have no control. We recommend that you read them directly. We cannot be held responsible for how those third parties process your personal data, subject to obligations that specifically apply to us as controller or processor."
+    },
+    "updates": {
+      "title": "13. Updates to this policy",
+      "p1": "We may update this privacy policy to reflect changes in our processing, services, regulation or case law.",
+      "p2": "The applicable version is the one published on this page on the date of your visit. In the event of a material change affecting your rights or how we process your data, we will inform you by appropriate means (notification in the platform, email, information banner, etc.)."
+    }
+  }
+}

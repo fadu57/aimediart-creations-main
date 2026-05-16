@@ -1,0 +1,134 @@
+{
+  "meta": {
+    "title": "Cookie- und Tracker-Richtlinie – Aimediart.com",
+    "version": "Version: 15. Mai 2026",
+    "languageRef": "Diese Cookie- und Tracking-Richtlinie kann in mehreren Sprachen bereitgestellt werden. Im Falle von Auslegungsunterschieden ist die französische Fassung maßgeblich, vorbehaltlich zwingender Bestimmungen des anwendbaren Rechts."
+  },
+  "nav": {
+    "back_home": "← Zurück zur öffentlichen Startseite",
+    "language_aria": "Anzeigesprache wählen"
+  },
+  "sections": {
+    "object": {
+      "title": "1. Zweck dieser Richtlinie",
+      "p1": "Diese Richtlinie zu „Cookies und Trackern“ erläutert, wie die Website Aimediart.com Cookies und ähnliche Technologien auf ihren Marketingseiten und auf der SaaS-Plattform AIMEDIArt einsetzt, zu welchen Zwecken und wie Sie Ihre Entscheidungen über das Einwilligungsbanner (CMP) und die Einstellungen Ihres Browsers verwalten können.",
+      "p2": "Sie ergänzt die Allgemeinen Geschäftsbedingungen und die Datenschutzerklärung und gilt für jeden Besucher oder Nutzer unserer Online-Dienste."
+    },
+    "whatIsCookie": {
+      "title": "2. Was ist ein Cookie?",
+      "p1": "Ein Cookie ist eine kleine Textdatei, die auf Ihrem Endgerät (Computer, Smartphone, Tablet) abgelegt und/oder ausgelesen wird, wenn Sie eine Website oder Anwendung besuchen. Andere Technologien können eine ähnliche Funktion erfüllen (z. B. Local Storage, Pixel, SDKs, Sitzungskennungen); der Einfachheit halber bezeichnen wir sie zusammenfassend als „Cookies“ oder „Tracker“.",
+      "p2": "Einige Cookies sind für den technischen Betrieb der Website oder die Erbringung eines von Ihnen ausdrücklich angeforderten Dienstes unbedingt erforderlich; andere unterliegen Ihrer vorherigen Einwilligung, insbesondere Reichweitenmessungs- und nicht befreiten Statistik-Cookies."
+    },
+    "whoResponsible": {
+      "title": "3. Wer ist verantwortlich für Cookies, die auf Aimediart.com gesetzt werden?",
+      "intro": "Die Cookies, die bei Ihrem Besuch auf Aimediart.com gesetzt werden, können sein:",
+      "list": {
+        "i1": "vom Betreiber der Website („First-Party“- oder interne Cookies);",
+        "i2": "oder gegebenenfalls von Dienstleistern (z. B. eine Lösung zur Reichweitenmessung)."
+      },
+      "p1": "Die Aimediart.com als Betreiber auftretende Stelle ist im Impressum der Website genannt. Sie bleibt für die mittels Cookies erfolgenden Verarbeitungen verantwortlich und handelt im Einklang mit geltendem Recht (DSGVO, ePrivacy-Richtlinie, Empfehlungen der CNIL usw.)."
+    },
+    "types": {
+      "title": "4. Welche Arten von Cookies verwenden wir und zu welchen Zwecken?",
+      "necessary": {
+        "title": "4.1 Unbedingt erforderliche Cookies (obligatorisch)",
+        "p1": "Diese Cookies sind für den technischen Betrieb der Website oder für die Erbringung eines von Ihnen ausdrücklich gewünschten Dienstes unerlässlich (z. B.: Anzeige der Website, Sitzungsverwaltung, Absicherung, Sprachwahl, Speicherung Ihrer Einwilligungspräferenzen). Ohne sie könnte die Website nicht ordnungsgemäß funktionieren.",
+        "p2": "Sie werden ohne Ihre vorherige Einwilligung gesetzt, gestützt auf unser berechtigtes Interesse an einem ordnungsgemäßen Betrieb und der Sicherheit der Website, soweit dies nach den Vorschriften zulässig ist.",
+        "examples": {
+          "e1": "Sitzungs-Cookie zur Authentifizierung in der Verwaltungsoberfläche.",
+          "e2": "Cookie, das Ihre Auswahl im Einwilligungsbanner speichert (Zustimmung/Ablehnung).",
+          "e3": "Cookie zum Schutz vor CSRF-Angriffen oder ähnlichen Angriffen."
+        }
+      },
+      "analytics": {
+        "title": "4.2 Reichweitenmessungs- und Statistik-Cookies",
+        "p1": "Wir setzen Reichweitenmessungs-Tools ein, um die Nutzung der Website besser zu verstehen und die Benutzerfreundlichkeit zu verbessern (z. B. Matomo oder Google Analytics, je nach gewählter Konfiguration). Diese Cookies ermöglichen es uns, aggregierte und pseudonymisierte Informationen zu erfassen, z. B.:",
+        "list": {
+          "i1": "aufgerufene Seiten;",
+          "i2": "auf den Seiten verbrachte Zeit;",
+          "i3": "Navigationspfad;",
+          "i4": "Geräte- und Browsertyp."
+        },
+        "p2": "Sofern wir Matomo nicht im „befreiten“ Modus betreiben (ohne Cookies, streng anonyme Daten, Aggregation, keine Zusammenführung usw.), erfordern diese Cookies Ihre vorherige Einwilligung, im Einklang mit den europäischen Leitlinien und den Empfehlungen der CNIL.",
+        "p3": "In der Standardkonfiguration von Lösungen wie Google Analytics sind diese Cookies nicht unbedingt erforderlich und unterliegen daher der Einwilligung. Sie werden erst nach Ihrer ausdrücklichen Zustimmung über das Cookie-Banner / CMP gesetzt und können jederzeit deaktiviert werden."
+      }
+    },
+    "noAds": {
+      "title": "5. Keine zielgerichtete Werbung und kein Retargeting",
+      "p1": "Derzeit verwendet Aimediart.com nicht:",
+      "list": {
+        "i1": "Werb-Cookies zur Einblendung von Drittanbieter-Bannerwerbung;",
+        "i2": "Tracker für Werbe-Retargeting;",
+        "i3": "automatische Weitergabe von Kennungen an externe Werbenetzwerke."
+      },
+      "p2": "Sollte sich dies ändern (z. B. Hinzufügung von Anzeigenkampagnen, Drittanbieter-Pixel usw.), wird diese Richtlinie aktualisiert und vorab eine spezifische Einwilligung von Ihnen eingeholt."
+    },
+    "cmp": {
+      "title": "6. Wie wird Ihre Einwilligung eingeholt (CMP)?",
+      "p1": "Bei Ihrem ersten Besuch auf Aimediart.com (und danach in regelmäßigen Abständen) wird ein Einwilligungsbanner (CMP) angezeigt, damit Sie Ihre Cookie-Präferenzen wählen können.",
+      "p2": "Dieses Banner erlaubt Ihnen mindestens:",
+      "choices": {
+        "i1": "alle nicht notwendigen Cookies zu akzeptieren;",
+        "i2": "alle nicht notwendigen Cookies ebenso leicht abzulehnen wie anzunehmen;",
+        "i3": "Ihre Auswahl nach Zweck anzupassen (z. B. „Reichweitenmessung“)."
+      },
+      "defaultTitle": "Standardmäßig:",
+      "defaults": {
+        "i1": "Es wird kein nicht unbedingt erforderliches Cookie (wie übliche Reichweitenmessungs-Cookies) gesetzt, solange Sie nicht ausdrücklich eingewilligt haben;",
+        "i2": "Ihre Wahl wird für eine begrenzte Dauer gespeichert (z. B. 6 Monate), woraufhin wir Sie erneut um Ihre Einwilligung bitten können."
+      },
+      "p3": "Wir bewahren einen Nachweis Ihrer Einwilligung (oder Ablehnung) auf, um im Falle einer Prüfung die Einhaltung unserer Pflichten nachweisen zu können, im Einklang mit den Empfehlungen der CNIL und der DSGVO."
+    },
+    "changeChoices": {
+      "title": "7. Wie können Sie Ihre Auswahl später ändern?",
+      "p1": "Sie können Ihre Entscheidung jederzeit ändern:",
+      "ways": {
+        "i1": "entweder über einen Link oder eine Schaltfläche „Cookies verwalten“ / „Cookie-Einstellungen“ am Seitenende oder in der Fußzeile der Website;",
+        "i2": "oder erneut durch Klick auf das CMP-Symbol oder den dafür gewiesenen Bereich, sofern angezeigt."
+      },
+      "p2": "Sie können dann:",
+      "then": {
+        "i1": "Ihre Einwilligung widerrufen;",
+        "i2": "eine teilweise Einwilligung (nach Zweck) erteilen;",
+        "i3": "oder wieder eine Ablehnung aller nicht notwendigen Cookies vornehmen."
+      },
+      "p3": "Der Widerruf der Einwilligung berührt nicht die Rechtmäßigkeit der auf Einwilligung gestützten Verarbeitung vor dem Widerruf."
+    },
+    "browser": {
+      "title": "8. Einstellungen Ihres Browsers",
+      "p1": "Ergänzend zum CMP können Sie Ihren Browser so konfigurieren, dass:",
+      "list": {
+        "i1": "alle Cookies pauschal abgelehnt werden;",
+        "i2": "Cookies je Einzelfall angenommen oder abgelehnt werden;",
+        "i3": "bereits gesetzte Cookies regelmäßig von Ihrem Endgerät gelöscht werden."
+      },
+      "p2": "Die Einstellungen unterscheiden sich je nach Browser (Chrome, Firefox, Safari, Edge usw.). In der Hilfefunktion Ihres Browsers finden Sie die genauen Schritte.",
+      "p3": "Achtung: Das Blockieren unbedingt erforderlicher Cookies kann den Betrieb der Website und einzelner Dienste erheblich beeinträchtigen (Authentifizierung, Warenkorb, Oberflächenpräferenzen usw.)."
+    },
+    "retention": {
+      "title": "9. Aufbewahrungsdauer",
+      "p1": "Cookies werden für eine Höchstdauer aufbewahrt, die vom jeweiligen Zweck abhängt:",
+      "list": {
+        "i1": "unbedingt erforderliche Cookies: auf die Sitzung oder auf wenige Stunden/Tage je nach technischem Bedarf beschränkt;",
+        "i2": "Reichweitenmessungs-Cookies: in der Regel höchstens 13 Monate (Empfehlung der CNIL) für Analyse-Tracker und kürzer für Rohprotokolle, vorbehaltlich der tatsächlichen Tool-Konfiguration."
+      },
+      "p2": "Die genauen Dauerangaben finden sich in der CMP-Konfiguration oder können in einer detaillierten Tabelle (Anhang zu dieser Richtlinie) ergänzt werden."
+    },
+    "updates": {
+      "title": "10. Aktualisierung der Cookie-Richtlinie",
+      "p1": "Diese Richtlinie kann aktualisiert werden, insbesondere aufgrund:",
+      "list": {
+        "i1": "rechtlicher oder regulatorischer Änderungen (DSGVO, ePrivacy, nationale Leitlinien);",
+        "i2": "Hinzufügens oder Entfernens technischer Partner (Analyse-Lösung, CMP usw.);",
+        "i3": "Änderungen der Zwecke oder der Art der verwendeten Cookies."
+      },
+      "p2": "Die geltende Fassung ist die zum Zeitpunkt Ihres Besuchs auf dieser Seite veröffentlichte. Wir empfehlen, sie regelmäßig einzusehen."
+    },
+    "contact": {
+      "title": "11. Kontakt",
+      "p1": "Bei Fragen zu dieser Cookie-Richtlinie erreichen Sie uns unter:",
+      "p2": "contact@aimediart.com (anzupassen),",
+      "p3": "oder über das auf Aimediart.com vorgesehene Kontaktformular."
+    }
+  }
+}

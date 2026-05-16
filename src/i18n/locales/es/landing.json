@@ -1,0 +1,39 @@
+{
+  "welcome": {
+    "title": "Bienvenido a AIMEDIArt",
+    "subtitle": "¿Cómo usas la aplicación hoy?",
+    "btn_organizer": "Organizador",
+    "btn_visitor": "Visitante",
+    "hint_remember": "Tu elección se guarda en este dispositivo (almacenamiento local).",
+    "change_choice": "Restablecer mi elección"
+  },
+  "visitor_gate": {
+    "badge": "Espacio visitante",
+    "aha": "Escanea y elige tu guía (Poeta, Experto, Niño…).",
+    "lead": "Mediación adaptada a tu estado de ánimo.",
+    "btn_quick": "Visita rápida (anónima)",
+    "btn_profile": "Crear mi perfil para recordar mis visitas",
+    "benefits_title": "¿Por qué crear un perfil?",
+    "benefit_summary": "Resumen de visita e historial de recorridos",
+    "benefit_artist": "Enviar mensajes a los artistas",
+    "benefit_profile": "Perfil permanente para tus próximas exposiciones",
+    "link_organizer": "Espacio organizador",
+    "login_existing": "¿Ya tienes cuenta? Iniciar sesión"
+  },
+  "cookie_banner": {
+    "aria_label": "Elección de cookies y rastreo",
+    "message": "Usamos cookies necesarias para el servicio. Si aceptas, podemos usar un identificador técnico anónimo para mejorar la continuidad de la sesión.",
+    "link_cgv": "Condiciones generales (CGV)",
+    "link_rgpd": "Datos personales (RGPD)",
+    "accept": "Aceptar todo",
+    "refuse": "Rechazar",
+    "privacy_note": "Tu elección se guarda en una cookie y en el almacenamiento local. Borra los datos del sitio para restablecerla."
+  },
+  "legal_pages": {
+    "back": "Volver",
+    "cgv_title": "Condiciones generales",
+    "cgv_body": "Marcador de posición para el texto legal.\n\nExterno: VITE_LEGAL_CGV_URL.",
+    "rgpd_title": "Protección de datos",
+    "rgpd_body": "Marcador de posición para la política de privacidad.\n\nExterno: VITE_LEGAL_RGPD_URL."
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "welcome": {
+    "title": "Willkommen bei AIMEDIArt",
+    "subtitle": "Wie nutzen Sie die App heute?",
+    "btn_organizer": "Veranstalter",
+    "btn_visitor": "Besucher",
+    "hint_remember": "Ihre Wahl wird auf diesem Gerät gespeichert (lokal).",
+    "change_choice": "Auswahl zurücksetzen"
+  },
+  "visitor_gate": {
+    "badge": "Besucherbereich",
+    "aha": "Scannen und Führer wählen (Poet, Expert, Kind…).",
+    "lead": "Vermittlung passend zu Ihrer Stimmung.",
+    "btn_quick": "Schnellbesuch (anonym)",
+    "btn_profile": "Profil anlegen, um Besuche zu merken",
+    "benefits_title": "Warum ein Profil?",
+    "benefit_summary": "Besuchsübersicht und Verlauf",
+    "benefit_artist": "Nachrichten an Künstler",
+    "benefit_profile": "Dauerhaftes Profil für weitere Ausstellungen",
+    "link_organizer": "Veranstalterbereich",
+    "login_existing": "Bereits registriert? Anmelden"
+  },
+  "cookie_banner": {
+    "aria_label": "Cookie- und Tracking-Wahl",
+    "message": "Wir verwenden technisch notwendige Cookies. Bei Zustimmung kann zusätzlich eine anonyme technische Kennung die Session unterstützen.",
+    "link_cgv": "Allgemeine Geschäftsbedingungen",
+    "link_rgpd": "Datenschutz (DSGVO)",
+    "accept": "Alle akzeptieren",
+    "refuse": "Ablehnen",
+    "privacy_note": "Ihre Wahl wird in einem Cookie und lokal gespeichert. Zum Zurücksetzen: Websitedaten löschen."
+  },
+  "legal_pages": {
+    "back": "Zurück",
+    "cgv_title": "Allgemeine Geschäftsbedingungen",
+    "cgv_body": "Platzhalter für den finalen Text (AGB).\n\nExtern: VITE_LEGAL_CGV_URL.",
+    "rgpd_title": "Datenschutz",
+    "rgpd_body": "Platzhalter für die Datenschutzerklärung.\n\nExtern: VITE_LEGAL_RGPD_URL."
+  }
+}

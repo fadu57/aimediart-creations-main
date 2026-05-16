@@ -1,0 +1,241 @@
+{
+  "meta": {
+    "title": "Datenschutzerklärung – Aimediart.com",
+    "version": "Version: 16. Mai 2026",
+    "scope": "Anwendungsbereich: Marketing-Website Aimediart.com, SaaS-Plattform AIMEDIArt und zugehörige Leistungen (Support, Rechnungsstellung, digitale Vermittlung, KI-Funktionen, grundlegende Analytics).",
+    "languageRef": "Die Übersetzungen dienen nur zur Information. Referenzsprache und rechtlich maßgebliche Fassung ist Französisch, vorbehaltlich zwingender anwendbarer Vorschriften."
+  },
+  "sections": {
+    "controller": {
+      "title": "1. Wer ist für Ihre Daten verantwortlich?",
+      "p1": "Verantwortlicher für die über Aimediart.com erhobenen personenbezogenen Daten ist der Betreiber der Website und der Plattform AIMEDIArt (nachfolgend „wir“ oder „der Betreiber“), dessen Identität und vollständige Kontaktdaten im Impressum angegeben sind.",
+      "p2": "Sie können uns bei datenschutzrechtlichen Fragen unter folgender Adresse erreichen: contact@aimediart.com (anpassen) oder über das Kontaktformular der Website.",
+      "p3": "Je nach Verarbeitung können wir handeln als:",
+      "list": {
+        "i1": "Verantwortlicher, wenn wir Zwecke und Mittel bestimmen (z. B. Verwaltung von Kundenkonten, Abrechnung, Vertriebsbetreuung, Sicherheit der Plattform);",
+        "i2": "Auftragsverarbeiter, wenn wir Daten im Auftrag professioneller Kunden verarbeiten, die Verantwortliche bleiben (z. B. Ausstellungsbesucherdaten für eine Galerie, Institution, Museum oder Agentur, die AIMEDIArt nutzt)."
+      },
+      "p4": "In letzterem Fall ergänzt eine Auftragsverarbeitungsvereinbarung (AVV) diese Bestimmungen."
+    },
+    "dataCollected": {
+      "title": "2. Welche Daten erheben wir?",
+      "p1": "Wir erheben nur Daten, die für die Erbringung und Verbesserung unserer Leistungen relevant sind. Die wichtigsten Kategorien sind:",
+      "accountId": {
+        "title": "2.1 Konten- und Identifikationsdaten",
+        "list": {
+          "i1": "Name, Vorname, ggf. Funktion oder Rolle (z. B. Kurator, Galerist, Vermittlungsbeauftragter);",
+          "i2": "Geschäftliche Kontaktdaten (E-Mail-Adresse, Telefon, Einrichtung);",
+          "i3": "Anmeldedaten (Login, Passwort-Hash, Verbindungsprotokolle);",
+          "i4": "Spracheinstellungen und Profileinstellungen."
+        }
+      },
+      "contractBilling": {
+        "title": "2.2 Vertrags- und Abrechnungsdaten",
+        "list": {
+          "i1": "Rechnungsinformationen (Einrichtung, Postanschrift, ggf. USt-IdNr.);",
+          "i2": "Daten zu Bestellungen, Abonnements, Verlängerungen und Kündigungen;",
+          "i3": "Zahlungshistorie (über einen Zahlungsdienstleister Dritter);",
+          "i4": "Austausch im Rahmen von Verhandlungen oder der Geschäftsbeziehung."
+        }
+      },
+      "contentProject": {
+        "title": "2.3 Inhalts- und Projektdaten",
+        "list": {
+          "i1": "Auf die Plattform hochgeladene Inhalte: Texte, Biografien, Werkbeschreibungen, Bildmaterial, Metadaten, Vermittlungsskripte, an die KI gesendete Prompts usw.;",
+          "i2": "Strukturierung von Ausstellungen, Besucherwegen, QR-Codes, Einstellungen digitaler Vermittlung;",
+          "i3": "Kommentare oder Rückmeldungen der Projektteams."
+        },
+        "p1": "Diese Inhalte können personenbezogene Daten enthalten (z. B. Name eines Künstlers, Biografie, Ansprechpartner) unter der primären Verantwortung des professionellen Kunden."
+      },
+      "logsSecurity": {
+        "title": "2.4 Protokollierungs- und Sicherheitsdaten",
+        "list": {
+          "i1": "Technische Serverprotokolle (IP-Adressen, technische Kennungen, Zeitstempel, Fehlercodes, Sicherheitsereignisse);",
+          "i2": "Aktionsprotokolle in der Benutzeroberfläche (Erstellen, Ändern, Löschen von Elementen, An- und Abmeldungen);",
+          "i3": "Informationen zur Nutzung von APIs und KI-Funktionen."
+        }
+      },
+      "navigation": {
+        "title": "2.5 Navigations- und Reichweitenmessungsdaten",
+        "p1": "Auf der Marketing-Website und ggf. in bestimmten Plattformoberflächen erfassen wir Navigationsdaten mittels Cookies und ähnlicher Technologien gemäß unserer Cookie-Richtlinie:",
+        "list": {
+          "i1": "aufgerufene Seiten, Verweildauer, Klicks in bestimmten Bereichen;",
+          "i2": "ungefährer Herkunftsort (Land / Region), Geräte- und Browsertyp;",
+          "i3": "Annahme oder Ablehnung von Cookies."
+        },
+        "p2": "Diese Daten werden in der Regel aggregiert und pseudonymisiert und dienen nicht der Erstellung individualisierter Marketingprofile."
+      },
+      "support": {
+        "title": "2.6 Mit dem Support ausgetauschte Daten",
+        "list": {
+          "i1": "Inhalt der Supportanfragen (E-Mails, Formulare, Screenshots);",
+          "i2": "für die Diagnose erforderliche Informationen (technische Konfiguration, Fehlerprotokolle, ggf. anonymisierte Inhaltsauszüge);",
+          "i3": "Ticket- und Kommunikationsverlauf."
+        }
+      }
+    },
+    "purposes": {
+      "title": "3. Zu welchen Zwecken und auf welcher Rechtsgrundlage nutzen wir Ihre Daten?",
+      "p1": "Wir verarbeiten Daten für bestimmte, eindeutige und legitime Zwecke. Je nach Fall kann die Rechtsgrundlage sein: Vertragserfüllung, rechtliche Verpflichtung, berechtigtes Interesse oder Ihre Einwilligung.",
+      "accountServices": {
+        "title": "3.1 Kontoverwaltung und Erbringung der Leistungen",
+        "list": {
+          "i1": "Erstellung und Verwaltung von Benutzerkonten;",
+          "i2": "Bereitstellung der Plattformfunktionen (Vermittlung, KI, Dashboards, QR-Codes usw.);",
+          "i3": "Benutzersupport und technische Unterstützung."
+        },
+        "legalBasis": "Rechtsgrundlage: Vertragserfüllung oder vorvertragliche Maßnahmen (Art. 6 Abs. 1 lit. b DSGVO)."
+      },
+      "b2bClient": {
+        "title": "3.2 B2B-Kundenbeziehung",
+        "list": {
+          "i1": "Vertriebsbetreuung (angemessene B2B-Akquise, Demo-Nachfass, vorvertraglicher Austausch);",
+          "i2": "Verwaltung von Verträgen, Abonnements, Verlängerungen und Kündigungen;",
+          "i3": "Rechnungsstellung, Buchhaltung, offene Posten und Streitigkeiten."
+        },
+        "legalBasis": "Rechtsgrundlage: Vertragserfüllung (6 Abs. 1 lit. b) und Erfüllung gesetzlicher Verpflichtungen (Buchhaltung, 6 Abs. 1 lit. c), berechtigte Interessen an Verwaltung und Entwicklung der B2B-Aktivitäten (6 Abs. 1 lit. f), vorbehaltlich der Rechte der Betroffenen."
+      },
+      "platformSecurity": {
+        "title": "3.3 Plattformverbesserung und Sicherheit",
+        "list": {
+          "i1": "Aggregierte Nutzungsanalyse zur Verbesserung von Bedienung, Leistung und Zuverlässigkeit;",
+          "i2": "Erkennung von Anomalien, Vorbeugung von Missbrauch und Betrug, Absicherung der Infrastruktur;",
+          "i3": "Tests, Audits und technische Weiterentwicklung."
+        },
+        "legalBasis": "Rechtsgrundlage: berechtigte Interessen (6 Abs. 1 lit. f) an Sicherheit, Servicequalität und kontinuierlicher Verbesserung der Plattform, ohne die Rechte und Freiheiten der Personen übermäßig zu beeinträchtigen."
+      },
+      "audience": {
+        "title": "3.4 Reichweitenmessung",
+        "list": {
+          "i1": "Reichweitenmessung der Marketing-Website und bestimmter Plattformbereiche;",
+          "i2": "aggregierte Statistiken zu Aufrufen, Wegen und Interaktionen."
+        },
+        "legalBasisIntro": "Rechtsgrundlage: je nach gewählter Konfiguration:",
+        "legalList": {
+          "i1": "Einwilligung (6 Abs. 1 lit. a) für nicht zwingend erforderliche Tracker;",
+          "i2": "oder, in den eng begrenzten Fällen der französischen CNIL für bestimmte befreite Reichweitenmessungen, berechtigtes Interesse unter strikter Einhaltung der anwendbaren Kriterien."
+        }
+      },
+      "communication": {
+        "title": "3.5 Kommunikation und Information",
+        "list": {
+          "i1": "Versand von Informationen zu gebuchten Leistungen (Updates, Änderungen der Bedingungen, Vorfälle, Sicherheit);",
+          "i2": "Versand von Neuigkeiten oder redaktionellem Inhalt zu AIMEDIArt, sofern die Person eingewilligt hat oder dies gesetzlich zulässig ist (angemessene B2B-Ansprache)."
+        },
+        "legalBasis": "Rechtsgrundlage: Vertragserfüllung (für den Dienst zwingend erforderliche Informationen) oder berechtigte Interessen / Einwilligung je nach Art der Kommunikation und Status (Kunde, Interessent, Unternehmer, Verbraucher)."
+      },
+      "legalObligations": {
+        "title": "3.6 Erfüllung gesetzlicher Pflichten",
+        "list": {
+          "i1": "Bearbeitung von Anfragen zu Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch;",
+          "i2": "Bearbeitung von Anfragen von Behörden (Steuer-, Verwaltungs-, Justiz-);",
+          "i3": "Bekämpfung von Betrug, Geldwäsche und Terrorismusfinanzierung, soweit einschlägig."
+        },
+        "legalBasis": "Rechtsgrundlage: Erfüllung gesetzlicher Verpflichtungen, denen wir unterliegen (6 Abs. 1 lit. c), ggf. Wahrnehmung einer Aufgabe im öffentlichen Interesse, sofern gesetzlich vorgeschrieben."
+      }
+    },
+    "retention": {
+      "title": "4. Wie lange bewahren wir Ihre Daten auf?",
+      "p1": "Wir speichern personenbezogene Daten nur so lange wie für die Zwecke der Verarbeitung erforderlich, zuzüglich gesetzlicher Verjährungs- oder Aufbewahrungsfristen.",
+      "p2": "Indikativ:",
+      "list": {
+        "i1": "Kontodaten: für die Nutzungsdauer des Dienstes, danach begrenzte Zeit nach Abschluss für Beweise und Streitigkeiten (z. B. 3 bis 5 Jahre);",
+        "i2": "Abrechnungsdaten: für die gesetzliche Aufbewahrungsfrist der Buchführung (in der Regel 10 Jahre ab Abschluss des Geschäftsjahres);",
+        "i3": "Verbindungs- und Sicherheitsprotokolle: einige Monate bis ein Jahr, je nach Sensibilität und Sicherheitsanforderungen;",
+        "i4": "Supportdaten: solange zur Bearbeitung erforderlich, danach eingeschränkte Archivierung;",
+        "i5": "Cookies und Reichweitenmessung: Fristen gemäß Cookie-Richtlinie (in der Regel 6 bis 13 Monate für Tracker, je nach genauer Konfiguration)."
+      },
+      "p3": "Die genauen Fristen können je nach Land und Art der Verarbeitung variieren. Sie sind in unserem internen Verarbeitungsverzeichnis und ggf. in Verträgen mit professionellen Kunden präzisiert oder verfeinert."
+    },
+    "recipients": {
+      "title": "5. Wer kann auf Ihre Daten zugreifen?",
+      "p1": "Personenbezogene Daten können im Rahmen der jeweiligen Zuständigkeiten und ausschließlich für die verfolgten Zwecke von folgenden Kategorien eingesehen werden:",
+      "list": {
+        "i1": "Mitglieder des AIMEDIArt-Teams für Kundenbeziehung, Support und Wartung;",
+        "i2": "technische Dienstleister (Hosting, Cloud-Infrastruktur, Monitoring-Tools, KI-Dienste, Zahlungsdienstleister, E-Mail-Lösungen usw.) als Auftragsverarbeiter;",
+        "i3": "externe Berater (Rechtsanwälte, Wirtschaftsprüfer, Auditoren), soweit erforderlich und angemessen gebunden;",
+        "i4": "zuständige Behörden (Verwaltungs-, Justiz-, Steuer-, Aufsichts-), soweit gesetzlich vorgeschrieben."
+      },
+      "p2": "Bei Auftragsverarbeitern stellen wir sicher, dass ausreichende Garantien für Sicherheit und Vertraulichkeit bestehen und die Verarbeitung durch einen mit Art. 28 DSGVO konformen Vertrag geregelt ist."
+    },
+    "transfers": {
+      "title": "6. Wo werden Daten gespeichert und gibt es Übermittlungen außerhalb der EU?",
+      "p1": "Grundsätzlich streben wir Hosting in der Europäischen Union oder in Ländern mit Angemessenheitsbeschluss der Europäischen Kommission an.",
+      "p2": "Bestimmte technische Anbieter oder Unterauftragsverarbeiter können jedoch außerhalb der EU sitzen oder selbst Unterauftragsverarbeiter außerhalb der EU einsetzen (z. B. für KI-, Analytics- oder E-Mail-Funktionen).",
+      "p3": "In diesen Fällen stellen wir sicher, dass Übermittlungen durch eines der in der DSGVO vorgesehenen Instrumente abgedeckt sind:",
+      "list": {
+        "i1": "Angemessenheitsbeschluss der Europäischen Kommission;",
+        "i2": "Standardvertragsklauseln (SVK), von der Kommission gebilligt;",
+        "i3": "verbindliche interne Datenschutzvorschriften (BCR);",
+        "i4": "oder im Übrigen spezifische Ausnahmen der DSGVO in Ausnahmefällen."
+      },
+      "p4": "Informationen zu wesentlichen Auftragsverarbeitern und relevanten Übermittlungen können professionellen Kunden auf angemessene Anfrage oder per AVV mitgeteilt werden."
+    },
+    "rights": {
+      "title": "7. Welche Rechte haben Sie?",
+      "p1": "Gemäß DSGVO und anwendbarem Recht stehen Ihnen folgende Rechte in Bezug auf Ihre personenbezogenen Daten zu, innerhalb der in den Vorschriften genannten Grenzen:",
+      "list": {
+        "i1": "Auskunftsrecht: Bestätigung, ob Sie betreffende Daten verarbeitet werden, und ggf. Zugang;",
+        "i2": "Recht auf Berichtigung: Berichtigung unrichtiger oder Vervollständigung unvollständiger Daten;",
+        "i3": "Recht auf Löschung: Löschung Ihrer Daten unter bestimmten Voraussetzungen (z. B. wenn sie nicht mehr erforderlich sind oder Sie die Einwilligung widerrufen haben, vorbehaltlich gesetzlicher Aufbewahrung);",
+        "i4": "Recht auf Einschränkung: vorübergehende Einschränkung der Verarbeitung unter bestimmten Voraussetzungen;",
+        "i5": "Widerspruchsrecht: Widerspruch gegen bestimmte auf unseren berechtigten Interessen beruhende Verarbeitungen aus Gründen Ihrer besonderen Situation;",
+        "i6": "Recht auf Datenübertragbarkeit: Erhalt der von Ihnen bereitgestellten Daten in einem strukturierten, gängigen und maschinenlesbaren Format, wenn Verarbeitung auf Einwilligung oder Vertrag und mit automatisierten Verfahren erfolgt;",
+        "i7": "Recht auf Regelungen für den Zeitpunkt nach dem Tod (soweit lokales Recht dies vorsieht) zum Schicksal Ihrer Daten."
+      },
+      "p2": "Sie können diese Rechte unter der zu Beginn dieser Erklärung angegebenen Adresse ausüben und dabei alle zur Identitätsprüfung erforderlichen Angaben beifügen. Wir antworten schnellstmöglich und in der Regel innerhalb eines Monats, bei komplexen oder vielen Anfragen verlängerbar.",
+      "p3": "Bei begründeten Zweifeln an Ihrer Identität können wir weitere Informationen anfordern."
+    },
+    "complaints": {
+      "title": "8. Recht auf Beschwerde bei einer Aufsichtsbehörde",
+      "p1": "Wenn Sie nach Kontaktaufnahme mit uns der Ansicht sind, dass Ihre Rechte nicht gewahrt werden oder die Verarbeitung nicht DSGVO-konform ist, können Sie sich bei der zuständigen Aufsichtsbehörde beschweren.",
+      "p2": "Für Nutzer in Frankreich ist dies die CNIL (Commission nationale de l’informatique et des libertés): www.cnil.fr.",
+      "p3": "Wenn Sie in einem anderen Staat des Europäischen Wirtschaftsraums leben, können Sie sich auch an die Datenschutzbehörde Ihres gewöhnlichen Aufenthaltsortes wenden."
+    },
+    "security": {
+      "title": "9. Datensicherheit",
+      "p1": "Wir setzen angemessene technische und organisatorische Maßnahmen ein, um personenbezogene Daten vor zufälliger oder unrechtmäßiger Zerstörung, Verlust, Veränderung, unbefugter Offenlegung oder unbefugtem Zugang zu schützen.",
+      "p2": "Dazu können z. B. gehören:",
+      "list": {
+        "i1": "Verschlüsselung von Daten während der Übertragung, Trennung von Umgebungen;",
+        "i2": "Zugangskontrolle, Berechtigungsverwaltung, starke Authentifizierung wo angemessen;",
+        "i3": "Protokollierung von Zugriffen und Sicherheitsereignissen;",
+        "i4": "regelmäßige Sicherungen und Wiederherstellungsverfahren;",
+        "i5": "interne Regelungen zur Schwachstellenverwaltung und Updates."
+      },
+      "p3": "Kein System ist vollkommen sicher; wir können daher keine absolute Sicherheit garantieren. Bei einem Sicherheitsvorfall, der Ihre personenbezogenen Daten betrifft und voraussichtlich ein hohes Risiko für Ihre Rechte und Freiheiten darstellt, informieren wir Sie unter den Bedingungen des anwendbaren Rechts."
+    },
+    "processorRole": {
+      "title": "10. Verarbeitung als Auftragsverarbeitung (professionelle Kunden)",
+      "p1": "Wenn wir die Plattform AIMEDIArt professionellen Kunden (z. B. Galerie, Museum, Kultureinrichtung, Agentur) bereitstellen und diese die Plattform nutzen, um personenbezogene Daten ihrer eigenen Nutzer, Besucher oder Kontakte zu verarbeiten, bleiben sie in der Regel Verantwortliche und wir handeln als Auftragsverarbeiter.",
+      "p2": "In diesem Rahmen:",
+      "list": {
+        "i1": "wählt der professionelle Kunde Zwecke und Mittel der Verarbeitung (z. B. Rückmeldungen von Besuchern, Kontaktlisten, Vermittlungsinhalte);",
+        "i2": "verarbeiten wir Daten nur auf dokumentierte Weisung des Kunden und im Rahmen des Vertrags;",
+        "i3": "kann eine AVV Rollen, Verantwortlichkeiten, Sicherheitsmaßnahmen, Zusammenarbeit bei Rechtsausübung, Verletzungsmanagement und ggf. Übermittlungen regeln."
+      },
+      "p3": "Betroffene Personen (Besucher, Kontakte usw.) sollten sich in erster Linie an die Datenschutzerklärung des verantwortlichen Kunden wenden, der Hauptansprechpartner für deren Anfragen bleibt, vorbehaltlich etwaiger spezifischer Pflichten unsererseits."
+    },
+    "ai": {
+      "title": "11. Besonderheiten bei KI-Funktionen",
+      "p1": "Einige Funktionen der Plattform AIMEDIArt können auf künstliche Intelligenz (KI) gestützt sein, die von uns oder Dritten bereitgestellt wird (z. B. Umformulierung, Vereinfachung, Übersetzung, Texthilfe, Vorschläge für Inhalte).",
+      "p2": "In diesem Rahmen:",
+      "list": {
+        "i1": "können an die KI gesendete Daten Auszüge von Inhalten umfassen, die Sie bereitstellen (Vermittlungstexte, Werkbeschreibungen, Prompts usw.);",
+        "i2": "bemühen wir uns, personenbezogene Daten an KI-Engines auf das für die Funktion Erforderliche zu beschränken;",
+        "i3": "stellen wir bei Drittanbieter-KI vertraglich sicher, dass diese Daten nicht unkontrolliert zur öffentlichen Modelltrainingsnutzung verwendet werden, im Rahmen der angebotenen Funktionen und gewählten Konfiguration."
+      },
+      "p3": "KI-generierte Ergebnisse können unrichtig, unvollständig oder ungeeignet sein und dürfen nicht als Rechts-, Wissenschafts-, Medizin- oder Beratungsmeinung verstanden werden. Vor jeder öffentlichen Verbreitung ist eine menschliche Prüfung erforderlich."
+    },
+    "thirdPartyLinks": {
+      "title": "12. Links zu Websites oder Diensten Dritter",
+      "p1": "Die Website und Plattform können Links zu anderen Websites, Inhalten oder Diensten Dritter enthalten (z. B. Kollaborationstools, Videoplattformen, soziale Netzwerke, externe E-Mail- oder Analytics-Dienste).",
+      "p2": "Diese Dritten haben eigene Datenschutzerklärungen, auf die wir keinen Einfluss haben. Wir empfehlen, diese direkt zu lesen. Für die Verarbeitung Ihrer Daten durch Dritte können wir nicht haftbar gemacht werden, vorbehaltlich der uns als Verantwortlichem oder Auftragsverarbeiter speziell obliegenden Pflichten."
+    },
+    "updates": {
+      "title": "13. Aktualisierung dieser Erklärung",
+      "p1": "Wir können diese Datenschutzerklärung anpassen, um Änderungen unserer Verarbeitungen, Leistungen, der Rechtslage oder Rechtsprechung widerzuspiegeln.",
+      "p2": "Maßgeblich ist die zum Zeitpunkt Ihres Besuchs auf dieser Seite veröffentlichte Version. Bei wesentlichen Änderungen, die Ihre Rechte oder unsere Verarbeitung betreffen, informieren wir Sie auf geeignete Weise (Benachrichtigung in der Plattform, E-Mail, Informationsbanner usw.)."
+    }
+  }
+}

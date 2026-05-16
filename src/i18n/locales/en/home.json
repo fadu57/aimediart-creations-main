@@ -177,6 +177,11 @@
   },
   "footer": {
     "contact": "Contact",
+    "cgv": "Terms of sale",
+    "cookies": "Cookies",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "ai_policy": "AI Policy",
     "login": "Login"
   }
 }

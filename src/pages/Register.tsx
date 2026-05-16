@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { isVisitorRole } from "@/lib/authUser";
 import { getStoredVisitorUuid } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
-import { USER_AGE_OPTIONS } from "@/lib/userAgeOptions";
+import { getAnonymousTrackingConsent, loadOrCreateFingerprintJsId } from "@/lib/fingerprintConsent";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -58,6 +58,7 @@ type RegisterVisitorInstantPayload = {
   user_photo_url?: string | null;
   user_expo_id?: string | null;
   visitor_uuid?: string | null;
+  device_fingerprint?: string | null;
 };
 
 type RegisterVisitorInstantResponse = {
@@ -68,12 +69,28 @@ type RegisterVisitorInstantResponse = {
 };
 
 const Register = () => {
-  const { t } = useTranslation("auth");
+  const { t, i18n } = useTranslation("auth");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { session, loading: authLoading, role_name, role_id } = useAuthUser();
   const expoIdFromUrl = searchParams.get("expo_id")?.trim() || "";
   const agencyIdFromUrl = searchParams.get("agency_id")?.trim() || "";
+
+  const birthMonthOptions = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, idx) => {
+        const value = String(idx + 1).padStart(2, "0");
+        const raw = new Intl.DateTimeFormat(i18n.language || "fr", { month: "long" }).format(new Date(2000, idx, 1));
+        const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+        return { value, label };
+      }),
+    [i18n.language],
+  );
+
+  const birthYearOptions = useMemo(() => {
+    const y = new Date().getFullYear();
+    return Array.from({ length: 110 }, (_, i) => String(y - i));
+  }, []);
 
   const formatSignUpError = useCallback(
     (message: string): string => {
@@ -101,7 +118,8 @@ const Register = () => {
 
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
-  const [userAge, setUserAge] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [userPhoneValid, setUserPhoneValid] = useState(true);
   const [userPhotoUrl, setUserPhotoUrl] = useState("");
@@ -216,7 +234,7 @@ const Register = () => {
     const trimmed = email.trim();
     const trimmedPrenom = prenom.trim();
     const trimmedNom = nom.trim();
-    const trimmedAge = userAge.trim();
+    const birthIso = birthMonth && birthYear ? `${birthYear}-${birthMonth}` : "";
     const trimmedPhone = userPhone.trim();
 
     if (!trimmed || !password) {
@@ -237,6 +255,11 @@ const Register = () => {
     }
     setSubmitting(true);
     try {
+      let deviceFingerprint: string | null = null;
+      if (getAnonymousTrackingConsent() === "granted") {
+        deviceFingerprint = await loadOrCreateFingerprintJsId();
+      }
+
       if (isBypassEmail(trimmed)) {
         const { error: bypassSignInError } = await supabase.auth.signInWithPassword({
           email: trimmed,
@@ -256,11 +279,12 @@ const Register = () => {
         prenom: trimmedPrenom,
         nom: trimmedNom,
         agency_id: agencyIdFromUrl || null,
-        user_age: trimmedAge || null,
+        user_age: birthIso || null,
         user_phone: trimmedPhone || null,
         user_photo_url: userPhotoUrl.trim() || null,
         user_expo_id: expoIdFromUrl || null,
         visitor_uuid: getStoredVisitorUuid(),
+        device_fingerprint: deviceFingerprint,
       };
 
       const { data: createData, error: createError } = await supabase.functions.invoke<RegisterVisitorInstantResponse>(
@@ -492,7 +516,10 @@ const Register = () => {
               </p>
             </div>
           ) : (
-            <form onSubmit={(e) => void handleFinalize(e)} className="space-y-2">
+            <form onSubmit={(e) => void handleFinalize(e)} className="space-y-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t("register_visitor.section_identity")}
+              </p>
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-prenom" className="w-20 shrink-0 text-xs">
                   {t("register_visitor.label_firstname")}
@@ -525,22 +552,45 @@ const Register = () => {
                   required
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="register-age" className="w-20 shrink-0 text-xs">
-                  {t("register_visitor.label_age")}
-                </Label>
-                <Select value={userAge} onValueChange={setUserAge} disabled={submitting || uploadingPhoto}>
-                  <SelectTrigger id="register-age" className="h-9 flex-1 text-sm">
-                    <SelectValue placeholder={t("register_visitor.age_placeholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {USER_AGE_OPTIONS.map((age) => (
-                      <SelectItem key={age} value={age}>
-                        {age}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="register-birth-month" className="text-xs">
+                    {t("register_visitor.label_birth_month")}
+                  </Label>
+                  <Select
+                    value={birthMonth}
+                    onValueChange={setBirthMonth}
+                    disabled={submitting || uploadingPhoto}
+                  >
+                    <SelectTrigger id="register-birth-month" className="h-9 text-sm">
+                      <SelectValue placeholder={t("register_visitor.birth_month_placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {birthMonthOptions.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="register-birth-year" className="text-xs">
+                    {t("register_visitor.label_birth_year")}
+                  </Label>
+                  <Select value={birthYear} onValueChange={setBirthYear} disabled={submitting || uploadingPhoto}>
+                    <SelectTrigger id="register-birth-year" className="h-9 text-sm">
+                      <SelectValue placeholder={t("register_visitor.birth_year_placeholder")} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[220px]">
+                      {birthYearOptions.map((y) => (
+                        <SelectItem key={y} value={y}>
+                          {y}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="register-phone" className="w-20 shrink-0 text-xs">
@@ -555,8 +605,20 @@ const Register = () => {
                   className="flex-1"
                 />
               </div>
-              <div className="rounded-md border border-border/70 bg-muted/30 p-2">
-                <div className="flex items-center gap-2">
+              <div className="rounded-md border border-dashed border-border/80 bg-muted/25 p-3">
+                <p className="mb-2 text-[11px] font-medium text-muted-foreground">{t("register_visitor.selfie_section")}</p>
+                <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                  {userPhotoUrl ? (
+                    <img
+                      src={userPhotoUrl}
+                      alt={t("register_visitor.selfie_alt")}
+                      className="h-[104px] w-[104px] rounded-full border border-border object-cover shadow-sm"
+                    />
+                  ) : (
+                    <div className="flex h-[104px] w-[104px] shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border/90 bg-background/50 text-[10px] text-muted-foreground">
+                      {t("register_visitor.selfie_empty_hint")}
+                    </div>
+                  )}
                   <label
                     htmlFor="register-selfie"
                     className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
@@ -572,11 +634,6 @@ const Register = () => {
                     disabled={submitting || uploadingPhoto}
                     className="hidden"
                   />
-                  {userPhotoUrl ? (
-                    <img src={userPhotoUrl} alt={t("register_visitor.selfie_alt")} className="h-[100px] w-[100px] rounded-full object-cover" />
-                  ) : (
-                    <div className="h-[100px] w-[100px] rounded-full border border-dashed border-border/80 bg-muted/40" />
-                  )}
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
