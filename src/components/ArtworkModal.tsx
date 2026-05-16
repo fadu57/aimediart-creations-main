@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronsUpDown, Loader2, Upload } from "lucide-react";
 import QRCode from "qrcode";
@@ -38,28 +38,12 @@ import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/l
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 
-async function getQrBaseOriginFromSettings(): Promise<string> {
-  const { data, error } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "settings_general_links_qr")
-    .maybeSingle();
-  if (error) return "";
-  const rawValue = typeof data?.value === "string" ? data.value : "";
-  if (!rawValue.trim()) return "";
-  try {
-    const parsed = JSON.parse(rawValue) as { public_site_origin?: string | null };
-    return (parsed.public_site_origin ?? "").trim();
-  } catch {
-    return "";
-  }
-}
-
-async function generateAndSaveQrCode(artworkId: string): Promise<void> {
-  const originOverride = await getQrBaseOriginFromSettings();
-  const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
-  if (!targetUrl) return;
+async function generateAndSaveQrCode(artworkId: string, expoId?: string | null): Promise<string | null> {
+  const originOverride = await fetchQrPublicSiteOriginFromSettings();
+  const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoId);
+  if (!targetUrl) return null;
 
   const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
   const blob = await (await fetch(dataUrl)).blob();
@@ -73,11 +57,13 @@ async function generateAndSaveQrCode(artworkId: string): Promise<void> {
   if (uploadError) throw uploadError;
 
   const { data: pub } = supabase.storage.from("qrcode").getPublicUrl(path);
+  const publicUrl = pub.publicUrl;
   const { error: updateError } = await supabase
     .from("artworks")
-    .update({ artwork_qr_code_url: pub.publicUrl, artwork_qrcode_image: pub.publicUrl })
+    .update({ artwork_qr_code_url: publicUrl, artwork_qrcode_image: publicUrl })
     .eq("artwork_id", artworkId);
   if (updateError) throw updateError;
+  return publicUrl;
 }
 
 type ArtworkModalProps = {
@@ -192,6 +178,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [generatingMediation, setGeneratingMediation] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [regeneratingQr, setRegeneratingQr] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [analyzeImageError, setAnalyzeImageError] = useState<string | null>(null);
   const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(null);
@@ -225,6 +212,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   useEffect(() => {
     if (!open) {
       setShowCloseConfirm(false);
+      setRegeneratingQr(false);
       return;
     }
     let cancelled = false;
@@ -478,6 +466,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         const { error } = await supabase.from("artworks").update(payload).eq("artwork_id", editingArtworkId);
         if (error) throw error;
         toast.success(t("toast_artwork_updated"));
+        void generateAndSaveQrCode(editingArtworkId, artworkExpoId.trim() || null).catch((e) => {
+          console.warn("[ArtworkModal] QR régénération échouée :", e);
+        });
       } else {
         const { data: inserted, error } = await supabase
           .from("artworks")
@@ -498,11 +489,31 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
 
     if (newArtworkId) {
-      void generateAndSaveQrCode(newArtworkId).catch((e) => {
+      void generateAndSaveQrCode(newArtworkId, artworkExpoId.trim() || null).catch((e) => {
         console.warn("[ArtworkModal] QR auto-génération échouée :", e);
       });
     }
   };
+
+  const handleRegenerateQr = useCallback(async () => {
+    if (!editingArtworkId || isVisitorLocked) return;
+    setRegeneratingQr(true);
+    try {
+      const url = await generateAndSaveQrCode(editingArtworkId, artworkExpoId.trim() || null);
+      if (!url) {
+        toast.error(t("toast_qr_regenerate_failed"));
+        return;
+      }
+      const withBust = `${url}${url.includes("?") ? "&" : "?"}cb=${Date.now()}`;
+      setArtworkQrImageUrl(withBust);
+      toast.success(t("toast_qr_regenerated"));
+    } catch (e) {
+      console.warn("[ArtworkModal] QR régénération :", e);
+      toast.error(e instanceof Error ? e.message : t("toast_qr_regenerate_failed"));
+    } finally {
+      setRegeneratingQr(false);
+    }
+  }, [editingArtworkId, isVisitorLocked, artworkExpoId, t]);
 
   const selectedArtistLabel = useMemo(
     () => [selectedArtist?.artist_firstname, selectedArtist?.artist_lastname].filter(Boolean).join(" ").trim(),
@@ -772,7 +783,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                       }`
                     : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
                 }
-                disabled={isVisitorLocked || isSubmitting || isLoading || isAiBusy}
+                disabled={isVisitorLocked || isSubmitting || isLoading || isAiBusy || regeneratingQr}
                 onClick={() => void handleSave()}
               >
                 {isSubmitting ? t("btn_saving") : t("btn_save")}
@@ -846,7 +857,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 <Button
                   type="button"
                   variant="secondary"
-                  className="pointer-events-auto justify-center bg-white/10 text-white hover:bg-white/15 border border-white/20"
+                  className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={isVisitorLocked || isLoading || uploadingImage}
                 >
@@ -882,7 +893,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               </div>
               <div
                 className={cn(
-                  "flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
+                  "group relative flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
                   artworkQrImageUrl && "bg-white",
                 )}
               >
@@ -896,6 +907,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   <p className="px-2 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">
                     {t("qr_empty")}
                   </p>
+                )}
+
+                {editingArtworkId && !isVisitorLocked && (
+                  <>
+                    <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
+                    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
+                        onClick={() => void handleRegenerateQr()}
+                        disabled={regeneratingQr || isLoading}
+                      >
+                        {regeneratingQr ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                            {t("btn_regenerating_qr")}
+                          </>
+                        ) : (
+                          t("btn_regenerate_qr")
+                        )}
+                      </Button>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

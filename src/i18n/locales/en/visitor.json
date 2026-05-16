@@ -16,6 +16,8 @@
   "title_prev_artwork": "Previous artwork by the same artist",
   "aria_next_artwork": "Next artwork",
   "title_next_artwork": "Next artwork by the same artist",
+  "same_artist_nav_prev_caption": "Previous artwork\nby the same artist",
+  "same_artist_nav_next_caption": "Next artwork\nby the same artist",
   "see_artist_bio": "See artist photo and bio",
   "ai_select_style": "Select how AI should talk to you",
   "ai_styles_error": "ALERT: no rows in prompt_style (or access denied).",

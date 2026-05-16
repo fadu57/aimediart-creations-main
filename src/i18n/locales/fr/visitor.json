@@ -16,6 +16,8 @@
   "title_prev_artwork": "Oeuvre précédente du même artiste",
   "aria_next_artwork": "Oeuvre suivante",
   "title_next_artwork": "Oeuvre suivante du même artiste",
+  "same_artist_nav_prev_caption": "Précédente œuvre\ndu même artiste",
+  "same_artist_nav_next_caption": "Œuvre suivante\ndu même artiste",
   "see_artist_bio": "Voir la photo et la bio de l'artiste",
   "ai_select_style": "Sélectionnez comment l'IA doit vous parler",
   "ai_styles_error": "ALERTE : aucune ligne dans prompt_style (ou accès refusé).",

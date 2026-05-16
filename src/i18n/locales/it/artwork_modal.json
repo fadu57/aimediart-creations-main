@@ -13,6 +13,8 @@
   "qr_alt": "QR code dell'opera",
   "qr_empty": "Nessun QR code per quest'opera al momento.",
   "btn_change_photo": "Cambia foto",
+  "btn_regenerate_qr": "Rigenera QR",
+  "btn_regenerating_qr": "Rigenerazione…",
   "btn_uploading": "Caricamento…",
   "label_title": "Titolo dell'opera",
   "btn_analyze": "✨ Analizza immagine con IA",
@@ -54,6 +56,8 @@
   "toast_error_artwork_load": "Opera non trovata.",
   "toast_image_uploaded": "Immagine caricata.",
   "toast_error_upload": "Caricamento immagine fallito.",
+  "toast_qr_regenerated": "QR code aggiornato.",
+  "toast_qr_regenerate_failed": "Impossibile rigenerare il QR code.",
   "dialog_edit_desc": "Modifica le informazioni e i testi di mediazione dell'opera.",
   "dialog_new_desc": "Crea una nuova scheda opera con testi di mediazione e immagine.",
   "tab_version_placeholder": "Versione \"{{label}}\""

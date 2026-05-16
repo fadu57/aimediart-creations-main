@@ -19,6 +19,23 @@ export function getPublicSiteOrigin(): string {
   return "";
 }
 
+/** Origine utilisée pour les QR imprimés lorsqu’aucun override ni env public fiable (ex. localhost → prod). */
+export const DEFAULT_QR_SITE_ORIGIN = "https://www.aimediart.com";
+
+/**
+ * Origine pour encoder un QR : préfixe explicite (Réglages, `public_site_origin`) si fourni,
+ * sinon `VITE_PUBLIC_URL` / origine courante (hors localhost) puis `www.aimediart.com`.
+ */
+export function resolveQrSiteOrigin(originOverride?: string | null): string {
+  const fromSettings = (originOverride ?? "").trim().replace(/\/+$/, "");
+  if (fromSettings) return fromSettings;
+  const fromEnv = getPublicSiteOrigin().replace(/\/+$/, "");
+  if (fromEnv && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(fromEnv)) {
+    return fromEnv;
+  }
+  return DEFAULT_QR_SITE_ORIGIN;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UUID_IN_TEXT_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -47,7 +64,9 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
       if (fromQuery && UUID_RE.test(fromQuery)) return fromQuery;
 
       const parts = u.pathname.split("/").filter(Boolean);
-      const œuvreIdx = parts.findIndex((p) => ["artwork", "œuvre", "oeuvre"].includes(p.toLowerCase()));
+      const œuvreIdx = parts.findIndex((p) =>
+        ["artwork", "artworks", "œuvre", "oeuvre"].includes(p.toLowerCase()),
+      );
       if (œuvreIdx >= 0 && parts[œuvreIdx + 1]) {
         const seg = decodeURIComponent(parts[œuvreIdx + 1]);
         if (UUID_RE.test(seg)) return seg;
@@ -63,10 +82,28 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
   return m ? m[0] : "";
 }
 
-/** URL absolue a encoder dans un QR : une seule fois `/artwork/<uuid>`. */
-export function buildOeuvreQrUrl(artworkId: string | null | undefined, originOverride?: string | null): string {
+/**
+ * URL absolue encodée dans les QR œuvre :
+ * `{préfixe}/artwork/{artwork_id}` puis `?expo_id={uuid}` si `expoId` est un UUID valide
+ * (typiquement `artworks.artwork_expo_id`).
+ *
+ * Le **préfixe** attendu est la valeur Réglages « préfixe QR » (`public_site_origin` dans
+ * `settings_general_links_qr`) — obtenir via `fetchQrPublicSiteOriginFromSettings()`, passée en
+ * `originOverride`. Si vide, repli : `resolveQrSiteOrigin` (env public / hors localhost / prod).
+ * (Les anciens QR `/artworks/:id` sont encore pris en charge côté routage par redirection.)
+ */
+export function buildOeuvreQrUrl(
+  artworkId: string | null | undefined,
+  originOverride?: string | null,
+  expoId?: string | null,
+): string {
   const id = parseArtworkIdFromInput(artworkId);
-  const origin = (originOverride ?? getPublicSiteOrigin()).trim().replace(/\/+$/, "");
-  if (!origin || !id) return "";
-  return `${origin}/artwork/${encodeURIComponent(id)}`;
+  const origin = resolveQrSiteOrigin(originOverride);
+  if (!id) return "";
+  const base = `${origin}/artwork/${encodeURIComponent(id)}`;
+  const ex = (expoId ?? "").trim();
+  if (ex && UUID_RE.test(ex)) {
+    return `${base}?expo_id=${encodeURIComponent(ex)}`;
+  }
+  return base;
 }

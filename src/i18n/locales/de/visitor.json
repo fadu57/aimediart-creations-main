@@ -16,6 +16,8 @@
   "title_prev_artwork": "Vorheriges Kunstwerk desselben Künstlers",
   "aria_next_artwork": "Nächstes Kunstwerk",
   "title_next_artwork": "Nächstes Kunstwerk desselben Künstlers",
+  "same_artist_nav_prev_caption": "Vorheriges Kunstwerk\nvom selben Künstler",
+  "same_artist_nav_next_caption": "Nächstes Kunstwerk\nvom selben Künstler",
   "see_artist_bio": "Foto und Biografie des Künstlers ansehen",
   "ai_select_style": "Wählen Sie, wie die KI mit Ihnen sprechen soll",
   "ai_styles_error": "ALARM: keine Zeilen in prompt_style (oder Zugang verweigert).",

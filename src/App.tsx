@@ -19,7 +19,6 @@ import ArtistsCorbeille from "./pages/ArtistsCorbeille";
 import Catalogue from "./pages/admin/Catalogue";
 import Catalogue2 from "./pages/Catalogue2";
 import CatalogueCorbeille from "./pages/CatalogueCorbeille";
-import QRCodes from "./pages/QRCodes";
 import Statistics from "./pages/Statistics";
 import SettingsPage from "./pages/Settings";
 import Agencies from "./pages/Agencies";
@@ -72,6 +71,13 @@ function OeuvreToArtworkRedirect() {
     : "/artwork";
   return <Navigate to={to} replace />;
 }
+
+/** QR canonique : /artworks -> /artwork (même query). */
+function ArtworksListRedirect() {
+  const [searchParams] = useSearchParams();
+  const qs = searchParams.toString();
+  return <Navigate to={`/artwork${qs ? `?${qs}` : ""}`} replace />;
+}
 /**
  * Shell commun : header (état connecté / invité) + zone de contenu.
  * Permet d’afficher « Aucun user connecté » sur `/login` tout en gardant la même barre.
@@ -86,7 +92,7 @@ function AppShell() {
     .replace(/Œ/g, "oe");
   const hideGlobalHeader =
     normalizedPathname === "/" ||
-    /(^|\/)(oeuvre|artwork)(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvre|artworks|artwork)(\/|$)/.test(normalizedPathname) ||
     /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
@@ -153,7 +159,7 @@ function RootEntryRoute() {
 /**
  * - `/login` : public (formulaire), avec header
  * - `/scan-work1` : page scanner visiteur / public
- * - `/artwork` : page contenu œuvre après scan
+ * - `/artwork` : page œuvre ; `/artworks/*` : redirection seulement (anciens QR au pluriel)
  * - `/visitor/*` : public, sans header applicatif
  * - autres routes : `RequireBackoffice` (session + rôle gestion)
  */
@@ -192,6 +198,8 @@ const AppRoutes = () => (
         <Route path="register_visitor" element={<RegisterVisitor />} />
         <Route path="visitor" element={<VisitorWelcome />} />
         <Route element={<OeuvrePageAccessGuard />}>
+          <Route path="artworks" element={<ArtworksListRedirect />} />
+          <Route path="artworks/:artworkId" element={<OeuvreToArtworkRedirect />} />
           <Route path="artwork" element={<ArtworkDetail />} />
           <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
           <Route path="artworks_artist" element={<OeuvresArtiste />} />

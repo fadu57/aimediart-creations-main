@@ -28,6 +28,7 @@ import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
+import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 
 const EXPO_QR_CACHE_KEY = "aimediart-expo-qr-cache-v1";
 
@@ -55,23 +56,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = (err) => reject(err);
     img.src = url;
   });
-}
-
-async function getQrBaseOriginFromSettings(): Promise<string> {
-  const { data, error } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "settings_general_links_qr")
-    .maybeSingle();
-  if (error) return "";
-  const rawValue = typeof data?.value === "string" ? data.value : "";
-  if (!rawValue.trim()) return "";
-  try {
-    const parsed = JSON.parse(rawValue) as { public_site_origin?: string | null };
-    return (parsed.public_site_origin ?? "").trim();
-  } catch {
-    return "";
-  }
 }
 
 /** Extrait bucket + chemin objet depuis une URL publique Supabase Storage. */
@@ -410,7 +394,7 @@ const Expos = () => {
     setGeneratingQrForExpoId(expoId);
     try {
       const origin =
-        (await getQrBaseOriginFromSettings()) ||
+        (await fetchQrPublicSiteOriginFromSettings()) ||
         (typeof window !== "undefined" && window.location?.origin?.trim()) ||
         "https://www.aimediart.com";
       const targetUrl = `${origin}/scan?expo_id=${encodeURIComponent(expoId)}`;
@@ -423,7 +407,7 @@ const Expos = () => {
 
   const handleGenerateExpoPanel = useCallback(async (expo: ExpoRow, format: "a4" | "a3") => {
     const origin =
-      (await getQrBaseOriginFromSettings()) ||
+      (await fetchQrPublicSiteOriginFromSettings()) ||
       (typeof window !== "undefined" && window.location?.origin?.trim()) ||
       "https://www.aimediart.com";
     const targetUrl = `${origin}/scan?expo_id=${encodeURIComponent(expo.id)}`;

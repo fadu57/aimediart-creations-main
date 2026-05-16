@@ -13,6 +13,8 @@
   "qr_alt": "QR-Code des Kunstwerks",
   "qr_empty": "Noch kein QR-Code für dieses Kunstwerk.",
   "btn_change_photo": "Foto ändern",
+  "btn_regenerate_qr": "QR neu erzeugen",
+  "btn_regenerating_qr": "QR wird erzeugt…",
   "btn_uploading": "Wird hochgeladen…",
   "label_title": "Titel des Kunstwerks",
   "btn_analyze": "✨ Bild mit KI analysieren",
@@ -54,6 +56,8 @@
   "toast_error_artwork_load": "Kunstwerk nicht gefunden.",
   "toast_image_uploaded": "Bild hochgeladen.",
   "toast_error_upload": "Bild-Upload fehlgeschlagen.",
+  "toast_qr_regenerated": "QR-Code aktualisiert.",
+  "toast_qr_regenerate_failed": "QR-Code konnte nicht neu erzeugt werden.",
   "dialog_edit_desc": "Kunstwerk-Informationen und Mediationstexte bearbeiten.",
   "dialog_new_desc": "Eine neue Kunstwerkdatei mit Mediationstexten und Bild erstellen.",
   "tab_version_placeholder": "Version \"{{label}}\""

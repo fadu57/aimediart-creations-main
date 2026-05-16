@@ -13,6 +13,8 @@
   "qr_alt": "Artwork QR code",
   "qr_empty": "No QR code for this artwork yet.",
   "btn_change_photo": "Change photo",
+  "btn_regenerate_qr": "Regenerate QR",
+  "btn_regenerating_qr": "Regenerating…",
   "btn_uploading": "Uploading…",
   "label_title": "Artwork title",
   "btn_analyze": "✨ Analyze image with AI",
@@ -54,6 +56,8 @@
   "toast_error_artwork_load": "Artwork not found.",
   "toast_image_uploaded": "Image uploaded.",
   "toast_error_upload": "Image upload failed.",
+  "toast_qr_regenerated": "QR code updated.",
+  "toast_qr_regenerate_failed": "Could not regenerate QR code.",
   "dialog_edit_desc": "Edit the artwork information and mediation texts.",
   "dialog_new_desc": "Create a new artwork entry with mediation texts and image.",
   "tab_version_placeholder": "Version \"{{label}}\""

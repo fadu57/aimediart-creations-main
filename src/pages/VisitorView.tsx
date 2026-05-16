@@ -1078,26 +1078,35 @@ const VisitorView = () => {
       >
         {isSameArtistNavigation && (
           <div className="œuvre-full-width-box mb-2 mt-0 px-5">
-            <div ref={sameArtistNavRef} className="grid grid-cols-[32px_minmax(0,1fr)_32px] items-center gap-2">
-              <button
-                type="button"
-                aria-label={t("aria_prev_artwork")}
-                title={t("title_prev_artwork")}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
-                onClick={() => handleSameArtistNavigationClick(-1)}
-              >
-                <ChevronLeft className="h-4 w-4" aria-hidden />
-              </button>
-              <span aria-hidden />
-              <button
-                type="button"
-                aria-label={t("aria_next_artwork")}
-                title={t("title_next_artwork")}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
-                onClick={() => handleSameArtistNavigationClick(1)}
-              >
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
+            <div ref={sameArtistNavRef} className="flex w-full items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={t("aria_prev_artwork")}
+                  title={t("title_prev_artwork")}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
+                  onClick={() => handleSameArtistNavigationClick(-1)}
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden />
+                </button>
+                <p className="m-0 min-w-0 text-left text-[9px] font-semibold leading-tight text-[#F0F0F0]/95 whitespace-pre-line">
+                  {t("same_artist_nav_prev_caption")}
+                </p>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                <p className="m-0 min-w-0 text-right text-[9px] font-semibold leading-tight text-[#F0F0F0]/95 whitespace-pre-line">
+                  {t("same_artist_nav_next_caption")}
+                </p>
+                <button
+                  type="button"
+                  aria-label={t("aria_next_artwork")}
+                  title={t("title_next_artwork")}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
+                  onClick={() => handleSameArtistNavigationClick(1)}
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1187,6 +1196,38 @@ const VisitorView = () => {
             </div>
           ) : (
             <>
+              <div ref={thumbsSectionRef}>
+                <Swiper
+                  modules={[Thumbs, FreeMode]}
+                  onSwiper={setThumbsSwiper}
+                  loop
+                  centeredSlides
+                  freeMode
+                  watchSlidesProgress
+                  slidesPerView="auto"
+                  spaceBetween={8}
+                  className="thumbs-swiper mt-0 px-0 pb-1"
+                >
+                  {aiSlides.map((slide) => {
+                    const isConteur = (slide.label ?? "").toLowerCase().includes("conteur");
+                    return (
+                      <SwiperSlide key={`thumb-ai-${slide.sid}`} className="thumbs-slide">
+                        <button
+                          type="button"
+                          className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0] h-[88px]"
+                          onClick={() => setSelectedPromptStyleId(slide.sid)}
+                        >
+                          <span className={`text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`} aria-hidden>
+                            {slide.icon}
+                          </span>
+                          <span className="w-full whitespace-normal break-words text-center leading-tight">{slide.label}</span>
+                        </button>
+                      </SwiperSlide>
+                    );
+                  })}
+                </Swiper>
+              </div>
+
               <Swiper
                 modules={[Thumbs]}
                 loop
@@ -1194,7 +1235,7 @@ const VisitorView = () => {
                 autoHeight
                 slidesPerView={1}
                 spaceBetween={10}
-                className="px-5"
+                className="mt-2 px-5"
                 thumbs={{
                   swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null,
                 }}
@@ -1216,38 +1257,6 @@ const VisitorView = () => {
                   </SwiperSlide>
                 ))}
               </Swiper>
-
-              <div ref={thumbsSectionRef}>
-                <Swiper
-                  modules={[Thumbs, FreeMode]}
-                  onSwiper={setThumbsSwiper}
-                  loop
-                  centeredSlides
-                  freeMode
-                  watchSlidesProgress
-                  slidesPerView="auto"
-                  spaceBetween={8}
-                  className="thumbs-swiper mt-[5px] px-0 pb-1"
-                >
-                  {aiSlides.map((slide) => {
-                    const isConteur = (slide.label ?? "").toLowerCase().includes("conteur");
-                    return (
-                      <SwiperSlide key={`thumb-ai-${slide.sid}`} className="thumbs-slide">
-                        <button
-                          type="button"
-                          className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0] h-[88px]"
-                          onClick={() => setSelectedPromptStyleId(slide.sid)}
-                        >
-                          <span className={`text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`} aria-hidden>
-                            {slide.icon}
-                          </span>
-                          <span className="w-full whitespace-normal break-words text-center leading-tight">{slide.label}</span>
-                        </button>
-                      </SwiperSlide>
-                    );
-                  })}
-                </Swiper>
-              </div>
             </>
           )}
         </div>

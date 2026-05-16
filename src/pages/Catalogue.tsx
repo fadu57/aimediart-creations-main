@@ -26,6 +26,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
@@ -86,22 +87,6 @@ function countGeneratedMediationTexts(value: ArtworkRow["artwork_description"]):
   return Object.values(descriptions).filter((entry) => typeof entry === "string" && entry.trim().length > 0).length;
 }
 
-async function getQrBaseOriginFromSettings(): Promise<string> {
-  const { data, error } = await supabase
-    .from("app_settings")
-    .select("value")
-    .eq("key", "settings_general_links_qr")
-    .maybeSingle();
-  if (error) return "";
-  const rawValue = typeof data?.value === "string" ? data.value : "";
-  if (!rawValue.trim()) return "";
-  try {
-    const parsed = JSON.parse(rawValue) as { public_site_origin?: string | null };
-    return (parsed.public_site_origin ?? "").trim();
-  } catch {
-    return "";
-  }
-}
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -589,7 +574,7 @@ const Catalogue = () => {
     const ids = artworks.map((a) => a.artwork_id?.trim()).filter(Boolean) as string[];
     if (ids.length === 0) return;
 
-    const originOverride = await getQrBaseOriginFromSettings();
+    const originOverride = await fetchQrPublicSiteOriginFromSettings();
     setBulkQrProgress({ done: 0, total: ids.length });
 
     let successCount = 0;
@@ -598,7 +583,9 @@ const Catalogue = () => {
     for (let i = 0; i < ids.length; i++) {
       const artworkId = ids[i];
       try {
-        const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
+        const row = artworks.find((a) => a.artwork_id === artworkId);
+        const expoForQr = ((row?.expo_id ?? row?.artwork_expo_id) ?? "").trim() || null;
+        const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
         if (!targetUrl) { errorCount++; continue; }
 
         const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
@@ -677,9 +664,10 @@ const Catalogue = () => {
       const bottomSafe = pageHeight - margin;
       const maxTextWidth = pageWidth - 2 * margin;
 
-      // QR = une seule URL canonique : https://site/œuvre/<uuid>
-      const originOverride = await getQrBaseOriginFromSettings();
-      const targetUrl = buildOeuvreQrUrl(artworkId, originOverride);
+      // QR = URL publique canonique : .../artwork/<uuid>?expo_id=... si exposition liée
+      const originOverride = await fetchQrPublicSiteOriginFromSettings();
+      const expoForQr = ((aw.expo_id ?? aw.artwork_expo_id) ?? "").trim() || null;
+      const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
       if (!targetUrl) {
         toast.error(t("pdf_error_no_qr_url"));
         return;
@@ -1043,12 +1031,14 @@ const Catalogue = () => {
                       className="w-full justify-center gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const ex = (aw.expo_id ?? aw.artwork_expo_id)?.trim();
-                        navigate(
-                          ex
-                            ? `/artwork/${encodeURIComponent(aw.artwork_id)}?expo_id=${encodeURIComponent(ex)}`
-                            : `/artwork/${encodeURIComponent(aw.artwork_id)}`,
-                        );
+                        void (async () => {
+                          const ex = (aw.expo_id ?? aw.artwork_expo_id)?.trim();
+                          const origin = await fetchQrPublicSiteOriginFromSettings();
+                          const pub = buildOeuvreQrUrl(aw.artwork_id, origin || undefined, ex ?? undefined);
+                          if (!pub) return;
+                          const u = new URL(pub);
+                          navigate(`${u.pathname}${u.search}`);
+                        })();
                       }}
                     >
                       {t("btn_visitor_visual")}
