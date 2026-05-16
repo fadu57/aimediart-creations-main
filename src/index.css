@@ -92,9 +92,13 @@
 
 @layer base {
   html,
-  body,
-  #root {
+  body {
     min-height: 100vh;
+    background-color: #121212;
+  }
+
+  #root {
+    height: 300px;
     background-color: #121212;
   }
 
