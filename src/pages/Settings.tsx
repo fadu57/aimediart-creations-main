@@ -44,6 +44,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { approxOutputTokensFromMaxChars } from "@/lib/charsToOutputTokens";
+import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2 } from "lucide-react";
 import RetentionSettings from "@/components/settings/RetentionSettings";
 
@@ -58,24 +59,39 @@ type AppSettingRow = {
   [key: string]: unknown;
 };
 
-type PromptStyleRow = {
+type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
-  name?: string | null;
   icon?: string | null;
-  persona_identity?: string | null;
   style_rules?: string | null;
   system_instruction?: string | null;
   max_tokens?: number | null;
 };
 
 type PromptStyleForm = {
-  name: string;
+  name_fr: string;
+  name_en: string;
+  name_de: string;
+  name_es: string;
+  name_it: string;
   icon: string;
-  persona_identity: string;
   style_rules: string;
   system_instruction: string;
   max_tokens: string;
 };
+
+const PROMPT_STYLE_SETTINGS_SELECT =
+  "id, name_fr, name_en, name_de, name_es, name_it, icon, style_rules, system_instruction, max_tokens";
+
+async function fetchPromptStylesForSettingsPage() {
+  let res = await supabase
+    .from("prompt_style")
+    .select(PROMPT_STYLE_SETTINGS_SELECT)
+    .order("id", { ascending: true });
+  if (res.error) {
+    res = await supabase.from("prompt_style").select("*").order("id", { ascending: true });
+  }
+  return res;
+}
 
 const NAV_MATRIX_I18N_KEYS: Record<NavMatrixCible, string> = {
   menu_home: "nav_entry_menu_home",
@@ -289,7 +305,7 @@ function PermissionCell({
 }
 
 export default function SettingsPage() {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
 
   const sectionsCatalog = useMemo((): SettingSection[] => [
     {
@@ -349,9 +365,12 @@ export default function SettingsPage() {
   const [editPromptOpen, setEditPromptOpen] = useState(false);
   const [editingPromptRow, setEditingPromptRow] = useState<PromptStyleRow | null>(null);
   const [editingPromptForm, setEditingPromptForm] = useState<PromptStyleForm>({
-    name: "",
+    name_fr: "",
+    name_en: "",
+    name_de: "",
+    name_es: "",
+    name_it: "",
     icon: "",
-    persona_identity: "",
     style_rules: "",
     system_instruction: "",
     max_tokens: "",
@@ -458,10 +477,7 @@ export default function SettingsPage() {
         const [rolesRes, criticalAppRes, promptStyleRes, matriceRes] = await Promise.all([
           supabase.from("roles_user").select("*"),
           supabase.from("app_settings").select("key, value, max_caract, max_tokens").in("key", ALL_SETTINGS_PAGE_KEYS),
-          supabase
-            .from("prompt_style")
-            .select("id, name, icon, persona_identity, style_rules, system_instruction, max_tokens")
-            .order("id", { ascending: true }),
+          fetchPromptStylesForSettingsPage(),
           supabase
             .from("matrice_securite")
             .select("role_id, ressource, lecture, ecriture")
@@ -469,9 +485,15 @@ export default function SettingsPage() {
         ]);
 
         if (cancelled) return;
-        if (rolesRes.error) throw rolesRes.error;
-        if (criticalAppRes.error) throw criticalAppRes.error;
-        if (promptStyleRes.error) throw promptStyleRes.error;
+        if (rolesRes.error) {
+          throw new Error(`roles_user — ${rolesRes.error.message}`);
+        }
+        if (criticalAppRes.error) {
+          throw new Error(`app_settings — ${criticalAppRes.error.message}`);
+        }
+        if (promptStyleRes.error) {
+          throw new Error(`prompt_style — ${promptStyleRes.error.message}`);
+        }
 
         setRoleLabelsById(mapRoles(rolesRes.data as Record<string, unknown>[] | null | undefined));
         setAppSettingsRows((criticalAppRes.data as AppSettingRow[] | null) ?? []);
@@ -530,9 +552,12 @@ export default function SettingsPage() {
   const openPromptStyleEditor = (row: PromptStyleRow) => {
     setEditingPromptRow(row);
     setEditingPromptForm({
-      name: row.name ?? "",
+      name_fr: row.name_fr ?? "",
+      name_en: row.name_en ?? "",
+      name_de: row.name_de ?? "",
+      name_es: row.name_es ?? "",
+      name_it: row.name_it ?? "",
       icon: row.icon ?? "",
-      persona_identity: row.persona_identity ?? "",
       style_rules: row.style_rules ?? "",
       system_instruction: row.system_instruction ?? "",
       max_tokens: row.max_tokens == null ? "" : String(row.max_tokens),
@@ -556,10 +581,7 @@ export default function SettingsPage() {
   const refreshPromptsData = async () => {
     const [appSettingsRes, promptStyleRes] = await Promise.all([
       supabase.from("app_settings").select("key, value, max_caract, max_tokens").order("key", { ascending: true }),
-      supabase
-        .from("prompt_style")
-        .select("id, name, icon, persona_identity, style_rules, system_instruction, max_tokens")
-        .order("id", { ascending: true }),
+      fetchPromptStylesForSettingsPage(),
     ]);
     if (appSettingsRes.error) throw appSettingsRes.error;
     if (promptStyleRes.error) throw promptStyleRes.error;
@@ -632,10 +654,18 @@ export default function SettingsPage() {
       setEditError(t("settings_error_max_tokens_invalid"));
       return;
     }
+    const name_fr = editingPromptForm.name_fr.trim() || null;
+    const name_en = editingPromptForm.name_en.trim() || null;
+    const name_de = editingPromptForm.name_de.trim() || null;
+    const name_es = editingPromptForm.name_es.trim() || null;
+    const name_it = editingPromptForm.name_it.trim() || null;
     const payload = {
-      name: editingPromptForm.name.trim() || null,
+      name_fr,
+      name_en,
+      name_de,
+      name_es,
+      name_it,
       icon: editingPromptForm.icon.trim() || null,
-      persona_identity: editingPromptForm.persona_identity.trim() || null,
       style_rules: editingPromptForm.style_rules.trim() || null,
       system_instruction: editingPromptForm.system_instruction.trim() || null,
       max_tokens: parsedTokens,
@@ -702,11 +732,12 @@ export default function SettingsPage() {
                 <tbody>
                   {promptStyleRows.map((row) => (
                     <tr key={`prompt-style-${row.id}`} className="align-top">
-                      <td className="border-b border-border/40 px-2 py-1.5">{row.name || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5">
+                        {getStyleLabelFromDb(row, i18n.language) || t("dash_emdash")}
+                      </td>
                       <td className="border-b border-border/40 px-2 py-1.5">{row.icon || t("dash_emdash")}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.persona_identity || t("dash_emdash")}</td>
-                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.style_rules || t("dash_emdash")}</td>
                       <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.system_instruction || t("dash_emdash")}</td>
+                      <td className="border-b border-border/40 px-2 py-1.5 whitespace-pre-wrap">{row.style_rules || t("dash_emdash")}</td>
                       <td className="border-b border-border/40 px-2 py-1.5">{row.max_tokens ?? t("dash_emdash")}</td>
                       <td className="border-b border-border/40 px-2 py-1.5">
                         <Button type="button" size="sm" variant="outline" onClick={() => openPromptStyleEditor(row)}>
@@ -1691,41 +1722,35 @@ export default function SettingsPage() {
             <DialogTitle>{t("settings_dialog_prompt_title")}</DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto space-y-3 pr-1">
-            <div className="space-y-1">
-              <label htmlFor="edit-prompt-style-name" className="text-xs font-semibold text-muted-foreground">
-                {t("settings_field_name")}
-              </label>
-              <Input
-                id="edit-prompt-style-name"
-                name="prompt_style_name"
-                value={editingPromptForm.name}
-                onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, name: e.target.value }))}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ["name_fr", "settings_field_name_fr", "edit-prompt-style-name-fr"],
+                  ["name_en", "settings_field_name_en", "edit-prompt-style-name-en"],
+                  ["name_de", "settings_field_name_de", "edit-prompt-style-name-de"],
+                  ["name_es", "settings_field_name_es", "edit-prompt-style-name-es"],
+                  ["name_it", "settings_field_name_it", "edit-prompt-style-name-it"],
+                ] as const
+              ).map(([field, labelKey, inputId]) => (
+                <div key={field} className="space-y-1 sm:col-span-1">
+                  <label htmlFor={inputId} className="text-xs font-semibold text-muted-foreground">
+                    {t(labelKey)}
+                  </label>
+                  <Input
+                    id={inputId}
+                    name={`prompt_style_${field}`}
+                    value={editingPromptForm[field]}
+                    onChange={(e) =>
+                      setEditingPromptForm((prev) => ({
+                        ...prev,
+                        [field]: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
             </div>
-            <div className="space-y-1">
-              <label htmlFor="edit-prompt-style-icon" className="text-xs font-semibold text-muted-foreground">
-                {t("settings_field_icon")}
-              </label>
-              <Input
-                id="edit-prompt-style-icon"
-                name="prompt_style_icon"
-                value={editingPromptForm.icon}
-                onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, icon: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="edit-prompt-style-persona_identity" className="text-xs font-semibold text-muted-foreground">
-                {t("settings_field_persona")}
-              </label>
-              <Textarea
-                id="edit-prompt-style-persona_identity"
-                name="prompt_style_persona_identity"
-                value={editingPromptForm.persona_identity}
-                onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, persona_identity: e.target.value }))}
-                className="min-h-[90px]"
-              />
-            </div>
-            <div className="space-y-1">
+            <div className="w-[618px] space-y-1">
               <label htmlFor="edit-prompt-style-style_rules" className="text-xs font-semibold text-muted-foreground">
                 {t("settings_field_style_rules")}
               </label>
@@ -1734,10 +1759,10 @@ export default function SettingsPage() {
                 name="prompt_style_style_rules"
                 value={editingPromptForm.style_rules}
                 onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, style_rules: e.target.value }))}
-                className="min-h-[90px]"
+                className="min-h-[90px] w-full"
               />
             </div>
-            <div className="space-y-1">
+            <div className="w-[618px] space-y-1">
               <label htmlFor="edit-prompt-style-system_instruction" className="text-xs font-semibold text-muted-foreground">
                 {t("settings_field_system_instruction")}
               </label>
@@ -1746,19 +1771,34 @@ export default function SettingsPage() {
                 name="prompt_style_system_instruction"
                 value={editingPromptForm.system_instruction}
                 onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, system_instruction: e.target.value }))}
-                className="min-h-[90px]"
+                className="min-h-[90px] w-full"
               />
             </div>
-            <div className="space-y-1">
-              <label htmlFor="edit-prompt-style-max_tokens" className="text-xs font-semibold text-muted-foreground">
-                {t("settings_field_max_tokens")}
-              </label>
-              <Input
-                id="edit-prompt-style-max_tokens"
-                name="prompt_style_max_tokens"
-                value={editingPromptForm.max_tokens}
-                onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, max_tokens: e.target.value }))}
-              />
+            <div className="flex flex-wrap items-start gap-6">
+              <div className="w-[160px] space-y-1">
+                <label htmlFor="edit-prompt-style-max_tokens" className="text-xs font-semibold text-muted-foreground">
+                  {t("settings_field_max_tokens")}
+                </label>
+                <Input
+                  id="edit-prompt-style-max_tokens"
+                  name="prompt_style_max_tokens"
+                  value={editingPromptForm.max_tokens}
+                  onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, max_tokens: e.target.value }))}
+                  className="w-full"
+                />
+              </div>
+              <div className="w-[100px] space-y-1">
+                <label htmlFor="edit-prompt-style-icon" className="text-xs font-semibold text-muted-foreground">
+                  {t("settings_field_icon")}
+                </label>
+                <Input
+                  id="edit-prompt-style-icon"
+                  name="prompt_style_icon"
+                  value={editingPromptForm.icon}
+                  onChange={(e) => setEditingPromptForm((prev) => ({ ...prev, icon: e.target.value }))}
+                  className="w-[100px]"
+                />
+              </div>
             </div>
             {editError && <p className="text-sm text-destructive">{editError}</p>}
           </div>

@@ -56,12 +56,35 @@ function normalizePromptStyleName(s: string): string {
 }
 
 /** Même logique que `isImageAnalysisPromptStyleName` côté app (ligne Prompts IA « Analyse de l'image »). */
-function isImageAnalysisPromptStyleRow(name: string | null | undefined): boolean {
+function isImageAnalysisPromptStyleName(name: string | null | undefined): boolean {
   const n = normalizePromptStyleName(name ?? "");
   if (!n) return false;
   if (n === "analyse de l'image" || n === "analyse de l image") return true;
-  return n.includes("analyse") && n.includes("image");
+  if (n.includes("analyse") && n.includes("image")) return true;
+  if (n.includes("analysis") && n.includes("image")) return true;
+  return false;
 }
+
+type PromptStyleLabelCols = {
+  name?: string | null;
+  name_fr?: string | null;
+  name_en?: string | null;
+  name_de?: string | null;
+  name_es?: string | null;
+  name_it?: string | null;
+};
+
+function isImageAnalysisPromptStyleRow(r: PromptStyleLabelCols): boolean {
+  return [r.name, r.name_fr, r.name_en, r.name_de, r.name_es, r.name_it].some((v) =>
+    isImageAnalysisPromptStyleName(v),
+  );
+}
+
+type PromptStyleAnalysisHit = PromptStyleLabelCols & {
+  style_rules?: string | null;
+  system_instruction?: string | null;
+  max_tokens?: number | null;
+};
 
 function clampGeminiMaxOutputTokens(n: number | null | undefined): number {
   if (n == null || !Number.isFinite(n) || n <= 0) return 2200;
@@ -74,8 +97,8 @@ type LoadAnalysisPromptResult = { template: string; maxOutputTokens: number };
  * Ordre de résolution du texte envoyé à Gemini (première source non vide gagne) :
  * 1. `app_settings.key` = "Analyse de l'image" (libellé métier, valeur = texte du prompt brut)
  * 2. `app_settings.key` = "analysis_prompt" (clé historique / page Paramètres dédiée)
- * 3. Ligne `prompt_style` dont le name correspond à « Analyse de l'image »
- *    (persona_identity + style_rules + system_instruction concaténés)
+ * 3. Ligne `prompt_style` dont un libellé multilingue (`name_*`) correspond à « Analyse de l'image »
+ *    (`style_rules` + `system_instruction` concaténés)
  * 4. Constante DEFAULT_ANALYSIS_PROMPT dans ce fichier
  */
 async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
@@ -120,18 +143,12 @@ async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
 
   const { data: psRows, error: psErr } = await admin
     .from("prompt_style")
-    .select("name, persona_identity, style_rules, system_instruction, max_tokens");
+    .select("name_fr, name_en, name_de, name_es, name_it, style_rules, system_instruction, max_tokens");
 
   if (!psErr && Array.isArray(psRows)) {
-    const hit = (psRows as {
-      name?: string | null;
-      persona_identity?: string | null;
-      style_rules?: string | null;
-      system_instruction?: string | null;
-      max_tokens?: number | null;
-    }[]).find((r) => isImageAnalysisPromptStyleRow(r?.name ?? null));
+    const hit = (psRows as PromptStyleAnalysisHit[]).find((r) => isImageAnalysisPromptStyleRow(r));
     if (hit) {
-      const parts = [hit.persona_identity, hit.style_rules, hit.system_instruction]
+      const parts = [hit.style_rules, hit.system_instruction]
         .map((s) => (typeof s === "string" ? s.trim() : ""))
         .filter(Boolean);
       const combined = parts.join("\n\n");

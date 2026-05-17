@@ -13,22 +13,42 @@ export type PromptStyleLabelFields = {
   name_it?: string | null;
 };
 
+const NAME_LOCALE_ORDER: (keyof PromptStyleLabelFields)[] = [
+  "name_fr",
+  "name_en",
+  "name_de",
+  "name_es",
+  "name_it",
+];
+
 /**
  * Libellé affiché depuis `prompt_style`, aligné sur les colonnes Supabase.
  *
  * Ordre :
  *   1. `name_<lang>` (ex. `name_en` pour lang="en")
- *   2. `name_fr` si la langue demandée est vide
- *   3. `name`
+ *   2. autres `name_*` dans l’ordre fr → en → de → es → it (sans redonder la colonne déjà testée)
+ *   3. `name` (colonne historique)
  *   4. `id` en string
  */
 export function getStyleLabelFromDb(style: PromptStyleLabelFields, currentLang: string): string {
   const lang = currentLang.split("-")[0].toLowerCase();
-  const col = `name_${lang}` as keyof PromptStyleLabelFields;
-  const localized = style[col];
-  if (typeof localized === "string" && localized.trim()) return localized.trim();
+  const tryCol = (key: keyof PromptStyleLabelFields): string | null => {
+    const v = style[key];
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  };
 
-  if (style.name_fr?.trim()) return style.name_fr.trim();
-  if (style.name?.trim()) return style.name.trim();
+  const primaryKey = `name_${lang}` as keyof PromptStyleLabelFields;
+  const primary = tryCol(primaryKey);
+  if (primary) return primary;
+
+  for (const k of NAME_LOCALE_ORDER) {
+    if (k === primaryKey) continue;
+    const v = tryCol(k);
+    if (v) return v;
+  }
+
+  const legacy = tryCol("name");
+  if (legacy) return legacy;
+
   return style.id != null ? String(style.id) : "";
 }

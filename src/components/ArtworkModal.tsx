@@ -34,11 +34,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { prepareArtworkImageForAnalysis } from "@/utils/imageAnalysisPrep";
-import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
+import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
+import {
+  type MediationDescriptionKey,
+  type MediationUiLang,
+  MEDIATION_DESCRIPTION_KEYS,
+  MEDIATION_UI_LANGS,
+  createEmptyDescriptionsByLang,
+  normalizeArtworkDescriptionToByLang,
+  resolveMediationUiLang,
+  serializeMediationDescriptionsByLang,
+  serializeMediationDraftFingerprint,
+} from "@/lib/artworkDescriptionI18n";
 
 async function generateAndSaveQrCode(artworkId: string, expoId?: string | null): Promise<string | null> {
   const originOverride = await fetchQrPublicSiteOriginFromSettings();
@@ -80,7 +91,7 @@ type ArtistOption = {
   artist_nickname?: string | null;
 };
 
-type DescriptionKey = "enfant" | "expert" | "ado" | "conteur" | "rap" | "poetique" | "simple" | "neutre";
+type DescriptionKey = MediationDescriptionKey;
 type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
   nom?: string | null;
@@ -101,17 +112,6 @@ const DEFAULT_STYLE_TABS: StyleTabEntry[] = [
   { key: "neutre", label: "Neutre", maxTokens: 700 },
 ];
 
-const EMPTY_DESCRIPTIONS: Record<DescriptionKey, string> = {
-  enfant: "",
-  expert: "",
-  ado: "",
-  conteur: "",
-  rap: "",
-  poetique: "",
-  simple: "",
-  neutre: "",
-};
-
 type DraftSnapshot = {
   title: string;
   artistId: string;
@@ -119,18 +119,8 @@ type DraftSnapshot = {
   artworkAgencyId: string;
   imageUrl: string;
   sourceMaterial: string;
-  descriptions: Record<string, string>;
+  mediationFingerprint: string;
 };
-
-function normalizeDraftDescriptions(
-  descriptions: Record<DescriptionKey, string>,
-): Record<string, string> {
-  const normalized: Record<string, string> = {};
-  for (const key of Object.keys(descriptions).sort()) {
-    normalized[key] = (descriptions[key as DescriptionKey] ?? "").trim();
-  }
-  return normalized;
-}
 
 function buildDraftSnapshot(input: {
   title: string;
@@ -139,7 +129,7 @@ function buildDraftSnapshot(input: {
   artworkAgencyId: string;
   imageUrl: string;
   sourceMaterial: string;
-  descriptions: Record<DescriptionKey, string>;
+  descriptionsByLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>;
 }): DraftSnapshot {
   return {
     title: input.title.trim(),
@@ -148,7 +138,7 @@ function buildDraftSnapshot(input: {
     artworkAgencyId: input.artworkAgencyId.trim(),
     imageUrl: input.imageUrl.trim(),
     sourceMaterial: input.sourceMaterial.trim(),
-    descriptions: normalizeDraftDescriptions(input.descriptions),
+    mediationFingerprint: serializeMediationDraftFingerprint(input.descriptionsByLang),
   };
 }
 
@@ -172,7 +162,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [imageUrl, setImageUrl] = useState("");
   const [artworkQrImageUrl, setArtworkQrImageUrl] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
-  const [descriptions, setDescriptions] = useState(EMPTY_DESCRIPTIONS);
+  const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
+  const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
   const [activeTab, setActiveTab] = useState<DescriptionKey>("enfant");
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
@@ -235,7 +226,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     const loadPromptStyles = async () => {
       let res = await supabase
         .from("prompt_style")
-        .select("id, name, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement, max_tokens")
+        .select("id, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement, max_tokens")
         .order("ordonnancement", { ascending: true });
       if (res.error) {
         res = await supabase.from("prompt_style").select("*").order("id", { ascending: true });
@@ -263,12 +254,22 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
       for (const row of rows) {
         if (tabs.length >= 8) break;
-        if (isImageAnalysisPromptStyleName(row.name ?? row.nom)) continue;
-        const labelSource = row.name ?? row.nom ?? "";
-        const nameNorm = normalize(labelSource);
+        if (isImageAnalysisPromptStyleRow(row)) continue;
+        const keySource = [
+          row.name_fr,
+          row.name,
+          row.nom,
+          row.name_en,
+          row.name_de,
+          row.name_es,
+          row.name_it,
+        ]
+          .map((v) => (typeof v === "string" ? v.trim() : ""))
+          .find((v) => v.length > 0) ?? "";
+        const nameNorm = normalize(keySource);
 
         let key: DescriptionKey | null = null;
-        const inferred = inferJsonKeyFromDisplayName(labelSource);
+        const inferred = inferJsonKeyFromDisplayName(keySource);
         if (inferred && allowedKeys.includes(inferred as DescriptionKey)) {
           key = inferred as DescriptionKey;
         }
@@ -324,7 +325,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         onOpenChange(false);
         return;
       }
-      const desc = (data.artwork_description ?? {}) as Record<string, string | null>;
+      const nextByLang = normalizeArtworkDescriptionToByLang(data.artwork_description);
       setEditingArtworkId(data.artwork_id as string);
       setTitle((data.artwork_title as string | null) ?? "");
       setArtistId((data.artwork_artist_id as string | null) ?? "");
@@ -336,17 +337,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         ((data as { artwork_qr_code_url?: string | null }).artwork_qr_code_url ?? "").trim();
       setArtworkQrImageUrl(qrImg);
       setSourceMaterial((data.artwork_source_material as string | null) ?? "");
-      const nextDescriptions = {
-        enfant: desc.enfant ?? "",
-        expert: desc.expert ?? "",
-        ado: desc.ado ?? "",
-        conteur: desc.conteur ?? "",
-        rap: desc.rap ?? "",
-        poetique: desc.poetique ?? "",
-        simple: desc.simple ?? "",
-        neutre: desc.neutre ?? "",
-      };
-      setDescriptions(nextDescriptions);
+      setDescriptionsByLang(nextByLang);
+      setMediationEditLang(resolveMediationUiLang(i18n.language));
       const initialSnapshot = buildDraftSnapshot({
         title: (data.artwork_title as string | null) ?? "",
         artistId: (data.artwork_artist_id as string | null) ?? "",
@@ -354,7 +346,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         artworkAgencyId: (data.artwork_agency_id as string | null) ?? "",
         imageUrl: (data.artwork_image_url as string | null) ?? "",
         sourceMaterial: (data.artwork_source_material as string | null) ?? "",
-        descriptions: nextDescriptions,
+        descriptionsByLang: nextByLang,
       });
       setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
     };
@@ -374,7 +366,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setImageUrl("");
       setArtworkQrImageUrl("");
       setSourceMaterial("");
-      setDescriptions(EMPTY_DESCRIPTIONS);
+      const emptyMed = createEmptyDescriptionsByLang();
+      setDescriptionsByLang(emptyMed);
+      setMediationEditLang(resolveMediationUiLang(i18n.language));
       setDuplicateArtwork(null);
       const initialSnapshot = buildDraftSnapshot({
         title: "",
@@ -383,7 +377,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         artworkAgencyId: agency_id ?? "",
         imageUrl: "",
         sourceMaterial: "",
-        descriptions: EMPTY_DESCRIPTIONS,
+        descriptionsByLang: emptyMed,
       });
       setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
     }
@@ -458,7 +452,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         artwork_agency_id: artworkAgencyId.trim() || null,
         artwork_image_url: imageUrl.trim() || null,
         artwork_source_material: sourceMaterial.trim() || null,
-        artwork_description: descriptions,
+        artwork_description: serializeMediationDescriptionsByLang(descriptionsByLang),
         artwork_fingerprint: fingerprint || null,
       };
 
@@ -584,10 +578,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       artworkAgencyId,
       imageUrl,
       sourceMaterial,
-      descriptions,
+      descriptionsByLang,
     });
     return serializeDraftSnapshot(snapshot);
-  }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterial, descriptions]);
+  }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterial, descriptionsByLang]);
   const hasUnsavedChanges = Boolean(initialDraftSignature) && currentDraftSignature !== initialDraftSignature;
 
   const requestCloseModal = () => {
@@ -691,27 +685,38 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
     setGeneratingMediation(true);
     try {
-      const generated = await generateMediation({
-        sourceText: [
-          title.trim() ? `Titre: ${title.trim()}` : "",
-          selectedArtistLabel ? `Artiste: ${selectedArtistLabel}` : "",
-          sourceMaterial.trim(),
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        styles: styleTabs.map((style) => ({
-          id: style.key,
-          label: style.label,
-          max_tokens: style.maxTokens,
-        })),
-      });
+      const sourceText = [
+        title.trim() ? `Titre: ${title.trim()}` : "",
+        selectedArtistLabel ? `Artiste: ${selectedArtistLabel}` : "",
+        sourceMaterial.trim(),
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const stylesPayload = styleTabs.map((style) => ({
+        id: style.key,
+        label: style.label,
+        max_tokens: style.maxTokens,
+      }));
 
-      const next = { ...EMPTY_DESCRIPTIONS };
-      for (const tab of styleTabs) {
-        const raw = (generated[tab.key] ?? "").trim();
-        next[tab.key] = raw;
+      const base = createEmptyDescriptionsByLang();
+      for (const L of MEDIATION_UI_LANGS) {
+        for (const k of MEDIATION_DESCRIPTION_KEYS) {
+          base[L][k] = descriptionsByLang[L][k];
+        }
       }
-      setDescriptions(next);
+
+      for (const lang of MEDIATION_UI_LANGS) {
+        const generated = await generateMediation({
+          sourceText,
+          styles: stylesPayload,
+          lang,
+        });
+        for (const tab of styleTabs) {
+          base[lang][tab.key] = (generated[tab.key] ?? "").trim();
+        }
+      }
+
+      setDescriptionsByLang(base);
       setActiveTab(styleTabs[0].key);
       toast.success(t("toast_mediation_generated"));
     } catch (e) {
@@ -1104,6 +1109,24 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
         <div className="space-y-2">
           <Label>{t("label_mediations")}</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            {MEDIATION_UI_LANGS.map((lng) => (
+              <Button
+                key={lng}
+                type="button"
+                size="sm"
+                variant={mediationEditLang === lng ? "default" : "outline"}
+                className={cn(
+                  "h-8 min-w-[2.75rem] px-2 text-xs font-semibold",
+                  mediationEditLang === lng ? "bg-amber-700 text-white hover:bg-amber-800" : "border-amber-300/60",
+                )}
+                onClick={() => setMediationEditLang(lng)}
+              >
+                {lng.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">{t("mediation_lang_help")}</p>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
             <TabsList className="grid w-full grid-cols-4 gap-2 rounded-none border-0 bg-transparent p-2 text-amber-900 shadow-none [grid-auto-rows:minmax(0,auto)]">
               {styleTabs.map((tab) => (
@@ -1130,15 +1153,18 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               return (
               <TabsContent key={tab.key} value={tab.key}>
                 <Textarea
-                  value={descriptions[tab.key]}
+                  value={descriptionsByLang[mediationEditLang][tab.key]}
                   onChange={(e) =>
-                    setDescriptions((prev) => ({
+                    setDescriptionsByLang((prev) => ({
                       ...prev,
-                      [tab.key]: e.target.value,
+                      [mediationEditLang]: {
+                        ...prev[mediationEditLang],
+                        [tab.key]: e.target.value,
+                      },
                     }))
                   }
                   disabled={isVisitorLocked || isLoading}
-                  className="min-h-[140px] text-sm"
+                  className="min-h-[140px] w-full text-sm"
                   placeholder={t("tab_version_placeholder", { label: placeholderLabel })}
                 />
               </TabsContent>

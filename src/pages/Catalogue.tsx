@@ -29,6 +29,7 @@ import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { cn } from "@/lib/utils";
+import { countMaxMediationStylesAcrossLangs } from "@/lib/artworkDescriptionI18n";
 import { useTranslation } from "react-i18next";
 type ArtworkRow = {
   artwork_id: string;
@@ -63,29 +64,6 @@ type ExpoOption = {
   name: string;
   agency_id?: string | null;
 };
-
-function parseArtworkDescription(value: ArtworkRow["artwork_description"]): Record<string, string | null> {
-  if (!value) return {};
-  if (typeof value === "object") {
-    return value as Record<string, string | null>;
-  }
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value) as unknown;
-      if (parsed && typeof parsed === "object") {
-        return parsed as Record<string, string | null>;
-      }
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
-function countGeneratedMediationTexts(value: ArtworkRow["artwork_description"]): number {
-  const descriptions = parseArtworkDescription(value);
-  return Object.values(descriptions).filter((entry) => typeof entry === "string" && entry.trim().length > 0).length;
-}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -906,7 +884,7 @@ const Catalogue = () => {
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
           const statusLabel = currentStatusRaw || t("status_empty");
           const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
-          const generatedTextsCount = countGeneratedMediationTexts(aw.artwork_description);
+          const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description);
           const hasGeneratedMediation = generatedTextsCount > 0;
 
           return (

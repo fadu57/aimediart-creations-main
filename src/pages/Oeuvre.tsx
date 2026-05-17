@@ -6,13 +6,15 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { getOrCreateVisitorUuid, getVisitorLocaleMetadata } from "@/lib/visitorIdentity";
 import { getCurrentExpoId, setCurrentExpoId } from "@/lib/expoContext";
 import aimediartLogoUrl from "@/assets/aimediart-logo.png";
-import { isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
+import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
+import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
+import { primaryBlurbFromArtworkDescription } from "@/lib/artworkDescriptionI18n";
 import { SETTINGS_KEYS, type SettingsVisitorsBehavior, DEFAULT_VISITORS, parseJsonSetting } from "@/lib/settingsKeys";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
 
-type PromptStyleRow = {
+type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
-  name?: string | null;
   nom?: string | null;
   style_name?: string | null;
   icon?: string | null;
@@ -62,6 +64,7 @@ type ArtworkRow = {
 
 const Oeuvre = () => {
   const { artworkId: artworkIdFromPath } = useParams<{ artworkId?: string }>();
+  const { i18n } = useTranslation();
   const { session, role_id, agency_id, expo_id, loading: authLoading } = useAuthUser();
   const [styles, setStyles] = useState<PromptStyleRow[]>([]);
   const [stylesLoading, setStylesLoading] = useState(true);
@@ -136,7 +139,7 @@ const Oeuvre = () => {
       setStylesLoading(true);
       let res = await supabase
         .from("prompt_style")
-        .select("id, name, icon, ordonnancement")
+        .select("id, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement")
         .order("ordonnancement", { ascending: true });
       if (res.error) {
         res = await supabase.from("prompt_style").select("*").order("id", { ascending: true });
@@ -146,7 +149,7 @@ const Oeuvre = () => {
         setStyles([]);
       } else {
         const raw = (res.data as PromptStyleRow[]) ?? [];
-        setStyles(raw.filter((s) => !isImageAnalysisPromptStyleName(s.name ?? s.nom)));
+        setStyles(raw.filter((s) => !isImageAnalysisPromptStyleRow(s)));
       }
       setStylesLoading(false);
     };
@@ -278,10 +281,8 @@ const Oeuvre = () => {
   }, []);
 
   const getNomStyle = (style: PromptStyleRow): string => {
-    // Important: libellé = `prompt_style.name` (colonne "Name" dans Supabase).
-    // Si absent, on affiche l'id pour éviter d'afficher un autre champ.
-    const n = (style.name ?? "").trim();
-    return n || String(style.id);
+    const label = getStyleLabelFromDb(style, i18n.language).trim();
+    return label || String(style.id);
   };
 
   const getNomEmotion = (emotion: EmotionRow): string => {
@@ -306,19 +307,8 @@ const Oeuvre = () => {
   const artworkId = artwork?.artwork_id ?? requestedArtworkId ?? "w2";
   const artworkDescriptionText = (() => {
     const raw = artwork?.artwork_description;
-    if (!raw) return "Description de l'œuvre indisponible pour le moment.";
-    if (typeof raw === "string") return raw;
-    return (
-      raw.enfant ||
-      raw.simple ||
-      raw.neutre ||
-      raw.expert ||
-      raw.ado ||
-      raw.conteur ||
-      raw.rap ||
-      raw.poetique ||
-      "Description de l'œuvre indisponible pour le moment."
-    );
+    const text = primaryBlurbFromArtworkDescription(raw, i18n.language);
+    return text || "Description de l'œuvre indisponible pour le moment.";
   })();
   const artworkDimensions = (artwork?.artwork_dimensions ?? artwork?.dimensions ?? "").trim();
   const artworkTechnique = (artwork?.artwork_technique ?? artwork?.technique ?? "").trim();

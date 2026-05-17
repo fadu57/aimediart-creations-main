@@ -14,7 +14,8 @@ import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
-import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleName } from "@/lib/inferPromptStyleKey";
+import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
+import { mediationTextForStyleAndLang } from "@/lib/artworkDescriptionI18n";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
@@ -77,75 +78,6 @@ type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
   icon?: string | null;
 };
-
-function stringFromObj(obj: Record<string, string | null | undefined>, key: string): string {
-  const v = obj[key];
-  return typeof v === "string" && v.trim() ? v : "";
-}
-
-/** Ordre de repli si aucune clé ne correspond au style : d’abord Simple, puis les autres, puis toute valeur restante. */
-const MEDIATION_FALLBACK_ORDER = [
-  "simple",
-  "neutre",
-  "enfant",
-  "expert",
-  "poetique",
-  "ado",
-  "conteur",
-  "rap",
-] as const;
-
-function firstNonEmptyMediationText(obj: Record<string, string | null | undefined>): string {
-  for (const k of MEDIATION_FALLBACK_ORDER) {
-    const t = stringFromObj(obj, k);
-    if (t) return t;
-  }
-  for (const v of Object.values(obj)) {
-    if (typeof v === "string" && v.trim()) return v;
-  }
-  return "";
-}
-
-/**
- * Texte de médiation pour le style sélectionné : clé exacte, clé inférée depuis le nom, id, puis repli simple / premier disponible.
- */
-function mediationTextForStyle(
-  artworkDescription: ArtworkRow["artwork_description"],
-  style: PromptStyleRow | undefined,
-): string {
-  if (!style) return "";
-  const raw = artworkDescription;
-  if (raw == null) return "";
-  if (typeof raw === "string") return raw.trim();
-
-  const obj = raw as Record<string, string | null | undefined>;
-
-  // code = clé canonique stable (ex. "poete", "hiphop", "enfant_5")
-  if (style.code?.trim()) {
-    const byCode = stringFromObj(obj, style.code.trim());
-    if (byCode) return byCode;
-  }
-
-  const nameKey = style.name;
-  if (nameKey != null && nameKey !== "") {
-    const direct = stringFromObj(obj, nameKey);
-    if (direct) return direct;
-  }
-
-  const inferred = inferJsonKeyFromDisplayName(style.name);
-  if (inferred) {
-    const byInferred = stringFromObj(obj, inferred);
-    if (byInferred) return byInferred;
-  }
-
-  const byId = stringFromObj(obj, String(style.id));
-  if (byId) return byId;
-
-  const simple = stringFromObj(obj, "simple");
-  if (simple) return simple;
-
-  return firstNonEmptyMediationText(obj);
-}
 
 /**
  * Résout le label d'affichage d'une émotion depuis les colonnes multilingues de la table `emotions`.
@@ -535,7 +467,7 @@ const VisitorView = () => {
         // Si une colonne manque (ex. schéma plus ancien), le 2e essai en select('*') récupère quand même les lignes.
         let res = await supabase
           .from("prompt_style")
-          .select("id, name, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement")
+          .select("id, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement")
           .order("ordonnancement", { ascending: true });
 
         if (res.error) {
@@ -552,7 +484,7 @@ const VisitorView = () => {
 
         setStylesQueryError(null);
         const raw = (res.data as PromptStyleRow[]) ?? [];
-        setPromptStylesDb(raw.filter((s) => !isImageAnalysisPromptStyleName(s.name)));
+        setPromptStylesDb(raw.filter((s) => !isImageAnalysisPromptStyleRow(s)));
       } finally {
         // Toujours débloquer l’UI (évite spinner infini si Strict Mode / cleanup).
         setPromptStylesLoading(false);
@@ -580,7 +512,7 @@ const VisitorView = () => {
           sid,
           label: getStyleLabelFromDb(style, language) || sid,
           icon: style.icon ?? "",
-          text: mediationTextForStyle(artwork?.artwork_description, style).trim() || "—",
+          text: mediationTextForStyleAndLang(artwork?.artwork_description, style, language).trim() || "—",
         };
       }),
     [promptStylesDb, artwork?.artwork_description, language],

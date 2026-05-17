@@ -1,3 +1,5 @@
+import type { PromptStyleLabelFields } from "@/lib/promptStyleLabel";
+
 /**
  * Fait correspondre le libellé affiché en base (ex. « L'Expert », « Le Poète »)
  * aux clés JSON de `artwork_description` (expert, poetique, …).
@@ -16,7 +18,22 @@ export function isImageAnalysisPromptStyleName(name: string | null | undefined):
   const n = normalizeStyleNameForMatch(name ?? "");
   if (!n) return false;
   if (n === "analyse de l'image" || n === "analyse de l image") return true;
-  return n.includes("analyse") && n.includes("image");
+  if (n.includes("analyse") && n.includes("image")) return true;
+  if (n.includes("analysis") && n.includes("image")) return true;
+  return false;
+}
+
+/** Vrai si au moins une colonne de libellé (`name` ou `name_*`) correspond au prompt « analyse d’image ». */
+export function isImageAnalysisPromptStyleRow(style: PromptStyleLabelFields): boolean {
+  const candidates: (string | null | undefined)[] = [
+    style.name_fr,
+    style.name_en,
+    style.name_de,
+    style.name_es,
+    style.name_it,
+    style.name,
+  ];
+  return candidates.some((v) => isImageAnalysisPromptStyleName(v));
 }
 
 export function inferJsonKeyFromDisplayName(name: string | null | undefined): string | null {
