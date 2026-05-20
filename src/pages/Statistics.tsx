@@ -1119,6 +1119,15 @@ const Statistics = () => {
         throw new Error(errText.slice(0, 500));
       }
 
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/pdf")) {
+        throw new Error(
+          import.meta.env.PROD
+            ? "Réponse invalide (HTML au lieu de PDF). Redéployez l’app avec la route API /pdf-export."
+            : "Réponse invalide — le serveur PDF est-il démarré ?",
+        );
+      }
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const tab = window.open(url, "aimediart_statistics_pdf");
@@ -1131,7 +1140,16 @@ const Statistics = () => {
       setTimeout(() => URL.revokeObjectURL(url), 600_000);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
+      if (import.meta.env.PROD && printPreviewOpen) {
+        const useBrowserPrint = window.confirm(`${t("preview.pdfExportServerError")}\n\n${detail}\n\n${t("preview.pdfExportBrowserPrintFallback")}`);
+        if (useBrowserPrint) {
+          window.print();
+          setPrintExportBusy(false);
+          return;
+        }
+      } else {
+        window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
+      }
     }
 
     setPrintExportBusy(false);

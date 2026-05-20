@@ -1,1 +1,15 @@
-{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+{
+  "functions": {
+    "api/export/statistics-pdf.ts": {
+      "maxDuration": 120,
+      "memory": 3008
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/pdf-export/export/statistics-pdf",
+      "destination": "/api/export/statistics-pdf"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
