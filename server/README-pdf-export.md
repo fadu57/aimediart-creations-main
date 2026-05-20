@@ -63,7 +63,9 @@ Healthcheck : `GET http://127.0.0.1:3847/health`
 ## Production (Vercel — www.aimediart.com)
 
 Le déploiement Vercel inclut une **fonction serverless** `api/export/statistics-pdf.ts` (Chromium via `@sparticuz/chromium`).  
-L’app appelle `/pdf-export/export/statistics-pdf` ; `vercel.json` redirige vers cette API.
+L’app appelle `/pdf-export/export/statistics-pdf` ; `vercel.json` utilise `builds` + `routes` (un projet **Vite seul** n’expose pas `/api` sans cette config).
+
+Dans l’onglet **Resources** du déploiement, vous devez voir `api/export/statistics-pdf` après build. Sinon : vérifier les Build Logs (ligne « Building Serverless Function »).
 
 **Variables à définir dans le projet Vercel** (Settings → Environment Variables) :
 

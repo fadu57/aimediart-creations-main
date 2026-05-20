@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { Session } from "@supabase/supabase-js";
-import { generateStatisticsPdfBuffer } from "../../server/statisticsPdfExportCore";
+import { generateStatisticsPdfBuffer } from "../_lib/statisticsPdfExportCore";
+
+export const config = {
+  maxDuration: 120,
+  memory: 3008,
+};
 
 type ExportBody = {
   session: Session;

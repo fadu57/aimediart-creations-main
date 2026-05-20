@@ -8,7 +8,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import type { Session } from "@supabase/supabase-js";
-import { generateStatisticsPdfBuffer } from "./statisticsPdfExportCore";
+import { generateStatisticsPdfBuffer } from "../api/_lib/statisticsPdfExportCore";
 
 const PORT = Number(process.env.PDF_SERVER_PORT ?? 3847);
 const HOST = process.env.PDF_SERVER_HOST ?? "127.0.0.1";

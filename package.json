@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:all": "concurrently -n \"vite,pdf\" -c \"cyan,magenta\" \"npm run dev\" \"npm run pdf-server\"",
     "build": "vite build",
+    "vercel-build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
