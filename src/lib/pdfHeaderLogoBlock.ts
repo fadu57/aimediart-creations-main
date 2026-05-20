@@ -1,51 +1,70 @@
 /**
- * Rendu du bloc marque (Header : carré rouge + cœur + libellés), pour inclusion dans un PDF.
- * Aligné visuellement sur `src/components/Header.tsx` (Logo).
+ * Export PNG haute résolution du bloc logo Header pour les PDF (cartel œuvre, etc.).
  */
 
-const LOGO_RED = "hsl(0 65% 48%)";
+import {
+  AIMEDIART_BRAND_LOGO,
+  AIMEDIART_LOGO_RED,
+  LUCIDE_HEART_PATH,
+} from "@/lib/aimediartBrandLogo";
 
-/** Carré rouge (cœur) : légèrement plus petit que le header web pour le PDF */
-const BOX_PX = 30;
-const BOX_RADIUS_PX = 5;
-const GAP_PX = 8;
-const CANVAS_W = 300;
-const CANVAS_H = 52;
+const RENDER_SCALE = 4;
 
-function fillRoundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-  ctx.fill();
+function buildBrandLogoSvg(): string {
+  const { widthPx, heightPx, boxPx, boxRadiusPx, textX, titleFontSizePx, subtitleFontSizePx } =
+    AIMEDIART_BRAND_LOGO;
+  const heartOffset = (boxPx - 24) / 2;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">
+  <rect x="0" y="0" width="${boxPx}" height="${boxPx}" rx="${boxRadiusPx}" fill="${AIMEDIART_LOGO_RED}" />
+  <g transform="translate(${heartOffset}, ${heartOffset})">
+    <path
+      d="${LUCIDE_HEART_PATH}"
+      fill="none"
+      stroke="#ffffff"
+      stroke-width="2.25"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+  <text
+    x="${textX}"
+    y="15"
+    font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+    font-size="${titleFontSizePx}"
+    font-weight="700"
+    letter-spacing="-0.025em"
+    fill="${AIMEDIART_LOGO_RED}"
+  >AIMEDIArt.com</text>
+  <text
+    x="${textX}"
+    y="32"
+    font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+    font-size="${subtitleFontSizePx}"
+    font-weight="700"
+    font-style="italic"
+    fill="${AIMEDIART_LOGO_RED}"
+  >Art-mediation with AI</text>
+</svg>`;
 }
 
-/** Cœur plein (repère 24×24 type Material), centré dans la boîte rouge */
-function drawHeartInBox(ctx: CanvasRenderingContext2D, boxX: number, boxY: number, boxSize: number) {
-  const cx = boxX + boxSize / 2;
-  const cy = boxY + boxSize / 2;
-  const scale = (boxSize * 0.45) / 24;
-  const heart = new Path2D(
-    "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z",
-  );
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.translate(-12, -12);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill(heart);
-  ctx.restore();
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Chargement image logo impossible."));
+    img.src = url;
+  });
+}
+
+async function ensureInterFontLoaded(): Promise<void> {
+  if (typeof document === "undefined" || !document.fonts?.load) return;
+  await Promise.all([
+    document.fonts.load("700 16px Inter"),
+    document.fonts.load("italic 700 10px Inter"),
+  ]).catch(() => undefined);
+  await document.fonts.ready;
 }
 
 export type PdfHeaderLogoBlock = {
@@ -55,41 +74,48 @@ export type PdfHeaderLogoBlock = {
 };
 
 /**
- * PNG (data URL) du bandeau logo, fond transparent hors du dessin.
+ * PNG (data URL) du bandeau logo en résolution native ×4 pour impression nette.
  */
-export function createAimediaHeaderLogoBlockPng(): PdfHeaderLogoBlock {
+export async function createAimediaHeaderLogoBlockPng(): Promise<PdfHeaderLogoBlock> {
   if (typeof document === "undefined") {
     throw new Error("Génération du logo PDF impossible hors navigateur.");
   }
 
-  const dpr = Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 2);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(CANVAS_W * dpr);
-  canvas.height = Math.round(CANVAS_H * dpr);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Canvas 2D indisponible.");
+  await ensureInterFontLoaded();
+
+  const { widthPx, heightPx } = AIMEDIART_BRAND_LOGO;
+  const svg = buildBrandLogoSvg();
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  try {
+    const img = await loadImage(svgUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = widthPx * RENDER_SCALE;
+    canvas.height = heightPx * RENDER_SCALE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Canvas 2D indisponible.");
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      widthPx,
+      heightPx,
+    };
+  } finally {
+    URL.revokeObjectURL(svgUrl);
   }
+}
 
-  ctx.scale(dpr, dpr);
-  const boxY = (CANVAS_H - BOX_PX) / 2;
-
-  ctx.fillStyle = LOGO_RED;
-  fillRoundedRect(ctx, 0, boxY, BOX_PX, BOX_PX, BOX_RADIUS_PX);
-
-  drawHeartInBox(ctx, 0, boxY, BOX_PX);
-
-  const textX = BOX_PX + GAP_PX;
-  ctx.fillStyle = LOGO_RED;
-  ctx.textBaseline = "top";
-  ctx.font = '600 15px system-ui, -apple-system, "Segoe UI", sans-serif';
-  ctx.fillText("AIMEDIArt.com", textX, boxY + 4);
-  ctx.font = 'italic 600 10px system-ui, -apple-system, "Segoe UI", sans-serif';
-  ctx.fillText("Art-mediation with AI", textX, boxY + 22);
-
+/** Largeur / hauteur en mm pour jsPDF (96 CSS px → mm). */
+export function brandLogoSizeMm(): { widthMm: number; heightMm: number } {
+  const { widthPx, heightPx } = AIMEDIART_BRAND_LOGO;
   return {
-    dataUrl: canvas.toDataURL("image/png"),
-    widthPx: CANVAS_W,
-    heightPx: CANVAS_H,
+    widthMm: (widthPx * 25.4) / 96,
+    heightMm: (heightPx * 25.4) / 96,
   };
 }

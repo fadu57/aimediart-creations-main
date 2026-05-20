@@ -155,6 +155,7 @@ export interface Database {
           artist_id: string;
           artist_firstname?: string | null;
           artist_lastname?: string | null;
+          artist_nickname?: string | null;
           artist_typ?: string | null;
           artist_bio?: string | null;
           artist_control?: string | null;
@@ -168,6 +169,7 @@ export interface Database {
           artist_id?: string;
           artist_firstname?: string | null;
           artist_lastname?: string | null;
+          artist_nickname?: string | null;
           artist_typ?: string | null;
           artist_bio?: string | null;
           artist_control?: string | null;
@@ -180,6 +182,7 @@ export interface Database {
         Update: {
           artist_firstname?: string | null;
           artist_lastname?: string | null;
+          artist_nickname?: string | null;
           artist_typ?: string | null;
           artist_bio?: string | null;
           artist_control?: string | null;
@@ -188,6 +191,76 @@ export interface Database {
           artist_birth_date?: string | null;
           artist_photo_url?: string | null;
           artist_image?: string | null;
+        };
+        Relationships: [];
+      };
+      artworks: {
+        Row: {
+          artwork_id: string;
+          artwork_artist_id: string | null;
+          artwork_expo_id: string | null;
+          artwork_agency_id: string | null;
+          artwork_title: string | null;
+          artwork_description_i18n: Json;
+          artwork_source_material: string | null;
+          artwork_source_material_i18n?: Json;
+          artwork_photo_url?: string | null;
+          artwork_image_url: string | null;
+          artwork_qr_code_url: string | null;
+          artwork_qrcode_image: string | null;
+          artwork_room_name?: string | null;
+          artwork_status?: string | null;
+          artwork_prompt_style_id?: string | null;
+          artwork_fingerprint: string | null;
+          artwork_moyenne_coeurs?: number | null;
+          artwork_total_visites?: number | null;
+          artwork_created_at?: string | null;
+          artwork_deleted_at?: string | null;
+          deleted_at: string | null;
+        };
+        Insert: {
+          artwork_id?: string;
+          artwork_artist_id?: string | null;
+          artwork_expo_id?: string | null;
+          artwork_agency_id?: string | null;
+          artwork_title?: string | null;
+          artwork_description_i18n?: Json;
+          artwork_source_material?: string | null;
+          artwork_source_material_i18n?: Json;
+          artwork_photo_url?: string | null;
+          artwork_image_url?: string | null;
+          artwork_qr_code_url?: string | null;
+          artwork_qrcode_image?: string | null;
+          artwork_room_name?: string | null;
+          artwork_status?: string | null;
+          artwork_prompt_style_id?: string | null;
+          artwork_fingerprint?: string | null;
+          artwork_moyenne_coeurs?: number | null;
+          artwork_total_visites?: number | null;
+          artwork_created_at?: string | null;
+          artwork_deleted_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Update: {
+          artwork_artist_id?: string | null;
+          artwork_expo_id?: string | null;
+          artwork_agency_id?: string | null;
+          artwork_title?: string | null;
+          artwork_description_i18n?: Json;
+          artwork_source_material?: string | null;
+          artwork_source_material_i18n?: Json;
+          artwork_photo_url?: string | null;
+          artwork_image_url?: string | null;
+          artwork_qr_code_url?: string | null;
+          artwork_qrcode_image?: string | null;
+          artwork_room_name?: string | null;
+          artwork_status?: string | null;
+          artwork_prompt_style_id?: string | null;
+          artwork_fingerprint?: string | null;
+          artwork_moyenne_coeurs?: number | null;
+          artwork_total_visites?: number | null;
+          artwork_deleted_at?: string | null;
+          deleted_at?: string | null;
         };
         Relationships: [];
       };
@@ -255,6 +328,38 @@ export interface Database {
           language?: string;
           bio_text?: string | null;
           updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      ai_usage_logs: {
+        Row: {
+          id: string;
+          model_id: string;
+          provider: string;
+          prompt_tokens: number | null;
+          completion_tokens: number | null;
+          total_tokens: number | null;
+          artwork_id: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          model_id: string;
+          provider: string;
+          prompt_tokens?: number | null;
+          completion_tokens?: number | null;
+          total_tokens?: number | null;
+          artwork_id?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          model_id?: string;
+          provider?: string;
+          prompt_tokens?: number | null;
+          completion_tokens?: number | null;
+          total_tokens?: number | null;
+          artwork_id?: string | null;
+          created_at?: string | null;
         };
         Relationships: [];
       };

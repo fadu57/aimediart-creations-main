@@ -1,10 +1,12 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, Building2, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { Swiper as SwiperInstance } from "swiper";
-import { FreeMode, Thumbs } from "swiper/modules";
+import { Thumbs } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/free-mode";
@@ -15,7 +17,16 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
-import { mediationTextForStyleAndLang } from "@/lib/artworkDescriptionI18n";
+import {
+  resolveVisitorMediationText,
+  rowCanonicalMediationStyle,
+} from "@/lib/mediationVisitorStyles";
+import { normalizeMediationStyleKeyForLookup } from "@/lib/artworkDescriptionI18n";
+import {
+  expandSlidesForInfiniteCarousel,
+  mediationCarouselLogicalIndex,
+  type MediationCarouselSlide,
+} from "@/lib/mediationSwiperLoop";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
@@ -25,7 +36,7 @@ import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 type ArtworkRow = {
   artwork_id: string;
   artwork_title?: string | null;
-  artwork_description?: string | Record<string, string | null> | null;
+  artwork_description_i18n?: string | Record<string, string | null> | null;
   artwork_photo_url?: string | null;
   artwork_image_url?: string | null;
   artwork_artist_id?: string | null;
@@ -77,6 +88,18 @@ type EmotionRow = {
 type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
   icon?: string | null;
+  ordonnancement?: number | null;
+};
+
+type MediationAiSlide = {
+  /** Identifiant stable pour sélection / Swiper (prompt_style.id). */
+  sid: string;
+  /** Clé utilisée pour lire `artwork_description_i18n.<lang>[clé]`. */
+  jsonLookupKey: string;
+  canonicalCode: ReturnType<typeof rowCanonicalMediationStyle>;
+  label: string;
+  icon: string;
+  text: string;
 };
 
 /**
@@ -138,6 +161,7 @@ const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: 
 
 const VisitorView = () => {
   const { t } = useTranslation("visitor");
+  const { t: tHeader } = useTranslation("header");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isEmbedded = searchParams.get("embed") === "1";
@@ -179,6 +203,10 @@ const VisitorView = () => {
   const [artworkZoomOrigin, setArtworkZoomOrigin] = useState("50% 50%");
   const [isValidationPopupOpen, setIsValidationPopupOpen] = useState(false);
   const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
+  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [pendingCommentText, setPendingCommentText] = useState("");
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperInstance | null>(null);
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -189,6 +217,7 @@ const VisitorView = () => {
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
   const thumbsSectionRef = useRef<HTMLDivElement | null>(null);
+  const mediationMainSwiperRef = useRef<SwiperInstance | null>(null);
   const artistPhotoCloseTimerRef = useRef<number | null>(null);
   const quickFeedbackTimerRef = useRef<number | null>(null);
 
@@ -496,27 +525,92 @@ const VisitorView = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!promptStylesDb.length) return;
-    const ids = new Set(promptStylesDb.map((s) => String(s.id)));
-    if (!selectedPromptStyleId || !ids.has(selectedPromptStyleId)) {
-      setSelectedPromptStyleId(String(promptStylesDb[0].id));
-    }
-  }, [promptStylesDb, selectedPromptStyleId]);
-
-  const aiSlides = useMemo(
-    () =>
-      promptStylesDb.map((style) => {
-        const sid = String(style.id);
-        return {
-          sid,
-          label: getStyleLabelFromDb(style, language) || sid,
-          icon: style.icon ?? "",
-          text: mediationTextForStyleAndLang(artwork?.artwork_description, style, language).trim() || "—",
-        };
-      }),
-    [promptStylesDb, artwork?.artwork_description, language],
+  const artworkDescriptionResolved = useMemo(
+    () => artwork?.artwork_description_i18n,
+    [artwork?.artwork_description_i18n],
   );
+
+  const aiSlides = useMemo((): MediationAiSlide[] => {
+    const ordered = [...promptStylesDb].sort((a, b) => {
+      const oa =
+        typeof a.ordonnancement === "number" && !Number.isNaN(a.ordonnancement) ? a.ordonnancement : 9999;
+      const ob =
+        typeof b.ordonnancement === "number" && !Number.isNaN(b.ordonnancement) ? b.ordonnancement : 9999;
+      if (oa !== ob) return oa - ob;
+      const ida = Number(a.id);
+      const idb = Number(b.id);
+      if (Number.isFinite(ida) && Number.isFinite(idb)) return ida - idb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+    return ordered.map((row) => {
+      const canonical = rowCanonicalMediationStyle(row);
+      const fromCode = normalizeMediationStyleKeyForLookup(row.code?.trim() ?? "");
+      const jsonLookupKey =
+        canonical ?? (fromCode || (row.id != null ? String(row.id).trim() : "") || "");
+
+      const sid = row.id != null && String(row.id).trim() ? String(row.id) : `code:${jsonLookupKey || "row"}`;
+
+      // Libellé + icône : strictement `prompt_style` (name_* + icon) selon la langue UI du visiteur.
+      const label = getStyleLabelFromDb(row, language).trim() || sid;
+      const icon = (row.icon ?? "").trim();
+
+      // Texte : `artworks.artwork_description_i18n` pour `artwork_id` courant et langue `language` (repli `fr` déjà géré dans mediationTextForStyleCodeAndLang).
+      const rawText = resolveVisitorMediationText(artworkDescriptionResolved, jsonLookupKey, language, row).trim();
+      const text = rawText || t("mediation_text_missing");
+
+      return {
+        sid,
+        jsonLookupKey,
+        canonicalCode: canonical,
+        label,
+        icon,
+        text,
+      };
+    });
+  }, [promptStylesDb, artworkDescriptionResolved, language, t]);
+
+  const mediationSlideCount = aiSlides.length;
+  const mediationSwiperLoop = mediationSlideCount > 1;
+
+  /** Copies DOM pour boucle infinie (Swiper clone + assez de slides pour `auto`). */
+  const carouselSlides = useMemo(
+    (): MediationCarouselSlide<MediationAiSlide>[] =>
+      mediationSwiperLoop ? expandSlidesForInfiniteCarousel(aiSlides) : aiSlides.map((s) => ({ ...s, loopSlideKey: s.sid })),
+    [aiSlides, mediationSwiperLoop],
+  );
+
+  const resolveLogicalSlide = useCallback(
+    (swiperIndex: number) => {
+      const idx = mediationCarouselLogicalIndex(swiperIndex, mediationSlideCount);
+      return aiSlides[idx] ?? null;
+    },
+    [aiSlides, mediationSlideCount],
+  );
+
+  const goToMediationSlide = useCallback(
+    (logicalIndex: number) => {
+      const main = mediationMainSwiperRef.current;
+      const thumbs = thumbsSwiper;
+      if (main && !main.destroyed) {
+        if (mediationSwiperLoop) main.slideToLoop(logicalIndex);
+        else main.slideTo(logicalIndex);
+      }
+      if (thumbs && !thumbs.destroyed) {
+        if (mediationSwiperLoop) thumbs.slideToLoop(logicalIndex);
+        else thumbs.slideTo(logicalIndex);
+      }
+    },
+    [thumbsSwiper, mediationSwiperLoop],
+  );
+
+  useEffect(() => {
+    if (!aiSlides.length) return;
+    const ids = new Set(aiSlides.map((s) => s.sid));
+    if (!selectedPromptStyleId || !ids.has(selectedPromptStyleId)) {
+      setSelectedPromptStyleId(aiSlides[0].sid);
+    }
+  }, [aiSlides, selectedPromptStyleId]);
 
   useEffect(() => {
     return () => {
@@ -586,6 +680,8 @@ const VisitorView = () => {
   const canSubmitFeedback = Boolean(selectedEmotion && heartRating > 0);
   const isAnonymousVisitor = !isAuthenticated;
   const isVisitorMenuRestricted = !isAuthenticated || role_id === 7;
+  /** Rôles globaux SaaS (1–3) : accès page Configuration, comme le header backoffice. */
+  const canSeeSettings = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
   const userMeta = (session?.user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const headerFirstName =
@@ -626,6 +722,27 @@ const VisitorView = () => {
       sessionStorage.setItem("redirectAfterAuth", window.location.href);
     }
     navigate("/register");
+  };
+
+  const openCommentModal = () => {
+    setCommentDraft(pendingCommentText);
+    setCommentError(null);
+    setIsCommentModalOpen(true);
+  };
+
+  const closeCommentModal = () => {
+    setIsCommentModalOpen(false);
+    setCommentError(null);
+  };
+
+  const handleSaveCommentDraft = () => {
+    const text = commentDraft.trim();
+    if (!text) {
+      setCommentError(t("comment_empty"));
+      return;
+    }
+    setPendingCommentText(text);
+    closeCommentModal();
   };
 
   const handleValidateFeeling = async () => {
@@ -678,7 +795,8 @@ const VisitorView = () => {
       }
     }
 
-    const payload = {
+    const trimmedComment = pendingCommentText.trim();
+    const payload: Record<string, unknown> = {
       agency_id: validAgencyId,
       artwork_id: resolvedArtworkId,
       visitor_id: visitorId,
@@ -686,6 +804,9 @@ const VisitorView = () => {
       heart_rating: heartRating,
       expo_id: validExpoId,
     };
+    if (trimmedComment) {
+      payload.comment_text = trimmedComment;
+    }
     console.log("Tentative d'insertion avec :", payload);
 
     setSubmittingFeedback(true);
@@ -721,6 +842,7 @@ const VisitorView = () => {
       return;
     }
 
+    setPendingCommentText("");
     window.scrollTo({ top: 0, behavior: "smooth" });
     triggerHeartConfetti();
     if (isSameArtistNavigation) {
@@ -734,6 +856,10 @@ const VisitorView = () => {
     setSelectedEmotion(null);
     setHeartRating(0);
     setHoverRating(0);
+    setPendingCommentText("");
+    setCommentDraft("");
+    setIsCommentModalOpen(false);
+    setCommentError(null);
   };
 
   const handleScanAnotherArtwork = () => {
@@ -944,6 +1070,20 @@ const VisitorView = () => {
                     </NavLink>
                   );
                 })}
+              {isAuthenticated && !isVisitorMenuRestricted && canSeeSettings && (
+                <NavLink
+                  to="/settings"
+                  className="fab-item fab-nav-link"
+                  aria-label={tHeader("settings")}
+                  title={tHeader("settings")}
+                  target={isEmbedded ? "_top" : undefined}
+                  rel={isEmbedded ? "noopener noreferrer" : undefined}
+                  onClick={() => setIsFabOpen(false)}
+                >
+                  <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
+                  <span className="fab-item-label">{tHeader("settings")}</span>
+                </NavLink>
+              )}
               <div className="fab-item fab-language-item px-2" aria-label={t("aria_language")}>
                 <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
                   <span className={activeLanguage.flagClass} aria-hidden />
@@ -1119,35 +1259,36 @@ const VisitorView = () => {
             <div className="flex min-h-[120px] items-center justify-center" aria-busy="true" aria-label={t("aria_loading_styles")}>
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
             </div>
-          ) : !aiSlides.length ? (
-            <div className="space-y-1 px-5 text-center text-xs text-red-600">
-              <p className="font-semibold">{t("ai_styles_error")}</p>
-              <p className="font-normal text-muted-foreground">
-                {t("ai_styles_error_rls")}
-              </p>
-            </div>
           ) : (
             <>
               <div ref={thumbsSectionRef}>
                 <Swiper
-                  modules={[Thumbs, FreeMode]}
+                  key={`med-thumbs-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
+                  modules={[Thumbs]}
                   onSwiper={setThumbsSwiper}
-                  loop
+                  loop={mediationSwiperLoop}
+                  loopAdditionalSlides={2}
                   centeredSlides
-                  freeMode
+                  slideToClickedSlide={false}
                   watchSlidesProgress
                   slidesPerView="auto"
                   spaceBetween={8}
                   className="thumbs-swiper mt-0 px-0 pb-1"
                 >
-                  {aiSlides.map((slide) => {
-                    const isConteur = (slide.label ?? "").toLowerCase().includes("conteur");
+                  {carouselSlides.map((slide) => {
+                    const isConteur = slide.canonicalCode === "conteur";
+                    const logicalIdx = aiSlides.findIndex((s) => s.sid === slide.sid);
                     return (
-                      <SwiperSlide key={`thumb-ai-${slide.sid}`} className="thumbs-slide">
+                      <SwiperSlide key={`thumb-ai-${slide.loopSlideKey}`} className="thumbs-slide">
                         <button
                           type="button"
+                          data-mediation-key={slide.jsonLookupKey}
+                          aria-label={`${slide.label} — ${slide.jsonLookupKey}`}
                           className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0] h-[88px]"
-                          onClick={() => setSelectedPromptStyleId(slide.sid)}
+                          onClick={() => {
+                            if (logicalIdx >= 0) goToMediationSlide(logicalIdx);
+                            setSelectedPromptStyleId(slide.sid);
+                          }}
                         >
                           <span className={`text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`} aria-hidden>
                             {slide.icon}
@@ -1160,35 +1301,47 @@ const VisitorView = () => {
                 </Swiper>
               </div>
 
+              {thumbsSwiper && !thumbsSwiper.destroyed ? (
               <Swiper
+                key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
                 modules={[Thumbs]}
-                loop
+                onSwiper={(swiper) => {
+                  mediationMainSwiperRef.current = swiper;
+                }}
+                loop={mediationSwiperLoop}
+                loopAdditionalSlides={2}
+                watchSlidesProgress
                 centeredSlides
                 autoHeight
                 slidesPerView={1}
                 spaceBetween={10}
                 className="mt-2 px-5"
-                thumbs={{
-                  swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null,
-                }}
+                thumbs={{ swiper: thumbsSwiper }}
                 onSlideChange={(swiper) => {
-                  const active = aiSlides[swiper.realIndex];
+                  const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
+                  const active = resolveLogicalSlide(raw);
                   if (active) setSelectedPromptStyleId(active.sid);
                 }}
               >
-                {aiSlides.map((slide) => (
-                  <SwiperSlide key={`main-ai-${slide.sid}`}>
+                {carouselSlides.map((slide) => (
+                  <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
                     <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-sm leading-relaxed text-[#F0F0F0]/90">
-                      <p className="text-sm leading-relaxed text-[#F0F0F0]/90">
-                        <span className="mr-2 inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-relaxed text-white align-baseline">
-                          <span>{slide.label}</span>
+                      <div className="mb-2">
+                        <span className="inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-relaxed text-white">
+                          {slide.label}
                         </span>
-                        {slide.text}
-                      </p>
+                      </div>
+                      <VisitorMediationMarkdown
+                        text={slide.text}
+                        verseMode={slide.canonicalCode === "poetique"}
+                      />
                     </article>
                   </SwiperSlide>
                 ))}
               </Swiper>
+              ) : (
+                <div className="mt-2 min-h-[120px] px-5" aria-hidden />
+              )}
             </>
           )}
         </div>
@@ -1300,7 +1453,12 @@ const VisitorView = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
+                onClick={openCommentModal}
+                className={`w-[100px] h-12 shadow-none border-white/35 bg-[#1E1E1E] text-center text-sm font-semibold text-white transition-colors duration-150 hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white ${
+                  pendingCommentText ? "border-[#E63946]/70" : ""
+                }`}
+                aria-label={t("btn_comment")}
+                title={pendingCommentText ? t("comment_saved_hint") : t("btn_comment")}
               >
                 {t("btn_comment")}
               </Button>
@@ -1391,6 +1549,66 @@ const VisitorView = () => {
             >
               {t("btn_close")}
             </button>
+          </div>
+        </div>
+      )}
+
+      {isCommentModalOpen && (
+        <div
+          className="fixed inset-0 z-[115] flex items-center justify-center bg-black/60 px-4"
+          onClick={closeCommentModal}
+          role="presentation"
+        >
+          <div
+            className="relative w-full max-w-[320px] rounded-lg border border-white/15 bg-[#1E1E1E] p-4 pt-10 text-left shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("aria_comment_dialog")}
+          >
+            <button
+              type="button"
+              onClick={closeCommentModal}
+              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#F0F0F0]/80 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label={t("btn_close")}
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+            <h2 className="pr-6 text-base font-semibold text-[#F0F0F0]">{t("comment_modal_title")}</h2>
+            <p className="mt-1 text-xs text-[#F0F0F0]/75">{t("comment_modal_hint")}</p>
+            <Textarea
+              value={commentDraft}
+              onChange={(e) => {
+                setCommentDraft(e.target.value);
+                if (commentError) setCommentError(null);
+              }}
+              placeholder={t("comment_placeholder")}
+              className="mt-3 min-h-[120px] resize-y border-white/25 bg-[#121212] text-sm text-[#F0F0F0] placeholder:text-[#F0F0F0]/45 focus-visible:ring-[#E63946]"
+              maxLength={2000}
+              aria-label={t("comment_placeholder")}
+            />
+            {commentError && (
+              <p className="mt-2 text-xs font-medium text-[#E63946]" role="alert">
+                {commentError}
+              </p>
+            )}
+            <div className="mt-4 flex flex-col gap-2">
+              <Button
+                type="button"
+                className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                onClick={handleSaveCommentDraft}
+              >
+                {t("comment_btn_save")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-white/35 bg-transparent text-[#F0F0F0] hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
+                onClick={closeCommentModal}
+              >
+                {t("btn_close")}
+              </Button>
+            </div>
           </div>
         </div>
       )}

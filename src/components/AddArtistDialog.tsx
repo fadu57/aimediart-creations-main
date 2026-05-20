@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { CalendarIcon, ChevronDown, ImageIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, ChevronDown, ImageIcon, Loader2, X } from "lucide-react";
 import { z } from "zod";
 
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/types/supabase";
-import { computeArtistControl } from "@/lib/artistControl";
+import { artistsMatchForDuplicate, computeArtistControl } from "@/lib/artistControl";
 import {
   ARTIST_TYPE_OPTIONS,
   SOCIAL_LINK_TYPES,
@@ -19,6 +20,7 @@ import {
 import { generateMultilingualBiographyWithGrok } from "@/lib/grokBio";
 import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import { removeSupabaseStorageObjectByPublicUrl } from "@/lib/supabaseStorage";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
 import {
   ARTIST_BIO_LANGUAGES,
@@ -37,8 +39,17 @@ import {
   validatePostalCodeForCountryLabel,
 } from "@/lib/postalCode";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { BirthDatePickerFr } from "@/components/BirthDatePickerFr";
 import { CountryFlagIcon } from "@/components/CountryFlagIcon";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
@@ -193,16 +204,58 @@ export function AddArtistDialog({
   const { user, role_name, role_id, agency_id } = useAuthUser();
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const bypassCloseConfirmRef = useRef(false);
+  const pendingPhotoFileRef = useRef<File | null>(null);
+  const photoDirtyRef = useRef(false);
+  const biosDraftRef = useRef<Record<Language, string>>({ ...EMPTY_BIOS });
+  const biosRef = useRef<Partial<Record<Language, string>>>({});
+  const editingArtistIdRef = useRef<string | null>(null);
+  const loadArtistIntoFormRef = useRef<(row: DbArtistRow) => Promise<void>>(async () => {});
+  const initialLoadDoneRef = useRef<string | null>(null);
+  const artistLoadInFlightRef = useRef<string | null>(null);
+  const onOpenChangeRef = useRef(onOpenChange);
+  const photoChangeTokenRef = useRef(0);
+
+  onOpenChangeRef.current = onOpenChange;
+
+  const markPhotoAsChanged = useCallback((file: File | null) => {
+    if (!file) {
+      photoChangeTokenRef.current = 0;
+      setPendingPhotoFile(null);
+      setPhotoDirty(false);
+      photoDirtyRef.current = false;
+      pendingPhotoFileRef.current = null;
+      return;
+    }
+
+    photoChangeTokenRef.current += 1;
+    setPendingPhotoFile(file);
+    setPhotoDirty(true);
+    photoDirtyRef.current = true;
+    pendingPhotoFileRef.current = file;
+  }, []);
+
+  const clearPendingPhotoState = useCallback(() => {
+    photoChangeTokenRef.current = 0;
+    setPendingPhotoFile(null);
+    setPhotoDirty(false);
+    photoDirtyRef.current = false;
+    pendingPhotoFileRef.current = null;
+  }, []);
 
   const [editingArtistId, setEditingArtistId] = useState<string | null>(null);
   const [ficheReadOnly, setFicheReadOnly] = useState(false);
   const [duplicateRow, setDuplicateRow] = useState<DbArtistRow | null>(null);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [forceCreateDespiteDuplicate, setForceCreateDespiteDuplicate] = useState(false);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatingBio, setGeneratingBio] = useState(false);
   const [typesPopoverOpen, setTypesPopoverOpen] = useState(false);
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [photoDirty, setPhotoDirty] = useState(false);
   const [processingPhoto, setProcessingPhoto] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(open);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const previewObjectUrlRef = useRef<string | null>(null);
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   /** Agence unique pour lecture / écriture des bios (session > détail fiche > picker). */
@@ -232,6 +285,16 @@ export function AddArtistDialog({
   }, [agency_id, resolvedArtistAgencyId, selectedAgencyId]);
 
   const { bios, loading: biosLoading } = useArtistBios(open ? editingArtistId : null, agencyForBiosHook);
+
+  useEffect(() => {
+    if (open) {
+      setInternalOpen(true);
+      bypassCloseConfirmRef.current = false;
+      return;
+    }
+    setInternalOpen(false);
+    setDiscardDialogOpen(false);
+  }, [open]);
 
   useEffect(() => {
     void form.trigger("postalCode");
@@ -292,7 +355,9 @@ export function AddArtistDialog({
     setEditingArtistId(null);
     setFicheReadOnly(false);
     setDuplicateRow(null);
-    setPendingPhotoFile(null);
+    setIsDuplicateModalOpen(false);
+    setForceCreateDespiteDuplicate(false);
+    clearPendingPhotoState();
     setProcessingPhoto(false);
     setCheckingDuplicate(false);
     setGeneratingBio(false);
@@ -306,35 +371,48 @@ export function AddArtistDialog({
       URL.revokeObjectURL(previewObjectUrlRef.current);
       previewObjectUrlRef.current = null;
     }
-  }, [form]);
+  }, [clearPendingPhotoState, form]);
+
+  const hasTripleRequired =
+    Boolean(firstname?.trim()) && Boolean(lastname?.trim()) && (artistTyp?.length ?? 0) >= 1;
 
   const artistControlLive = useMemo(() => {
-    if (!firstname?.trim() || !lastname?.trim() || !artistTyp?.length) return "";
+    if (!hasTripleRequired) return "";
     return computeArtistControl(firstname.trim(), lastname.trim(), artistTyp);
-  }, [firstname, lastname, artistTyp]);
+  }, [firstname, lastname, artistTyp, hasTripleRequired]);
+
+  const duplicateLookupKey = useMemo(() => {
+    if (!hasTripleRequired) return "";
+    return `${firstname?.trim()}\u0000${lastname?.trim()}\u0000${[...(artistTyp ?? [])].sort().join("|")}`;
+  }, [firstname, lastname, artistTyp, hasTripleRequired]);
 
   useEffect(() => {
-    if (!open || !artistControlLive || ficheReadOnly) {
+    setForceCreateDespiteDuplicate(false);
+  }, [duplicateLookupKey]);
+
+  useEffect(() => {
+    if (!open || !hasTripleRequired || ficheReadOnly) {
       setDuplicateRow(null);
+      setIsDuplicateModalOpen(false);
       return;
     }
+
+    const fn = firstname?.trim() ?? "";
+    const ln = lastname?.trim() ?? "";
+    const types = artistTyp ?? [];
 
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         setCheckingDuplicate(true);
 
-        let qb = supabase
+        const { data, error } = await supabase
           .from("artists")
           .select("*")
-          .eq("artist_control", artistControlLive)
-          .is("deleted_at", null);
+          .is("deleted_at", null)
+          .ilike("artist_firstname", fn)
+          .ilike("artist_lastname", ln);
 
-        if (editingArtistId) {
-          qb = qb.neq("artist_id", editingArtistId);
-        }
-
-        const { data, error } = await qb.maybeSingle();
         if (cancelled) return;
 
         setCheckingDuplicate(false);
@@ -345,7 +423,22 @@ export function AddArtistDialog({
           return;
         }
 
-        setDuplicateRow((data as DbArtistRow) ?? null);
+        const rows = (data as DbArtistRow[] | null) ?? [];
+        const match =
+          rows.find(
+            (row) =>
+              row.artist_id !== editingArtistId &&
+              artistsMatchForDuplicate(
+                fn,
+                ln,
+                types,
+                row.artist_firstname ?? "",
+                row.artist_lastname ?? "",
+                parseArtistTypFromDb(row.artist_typ),
+              ),
+          ) ?? null;
+
+        setDuplicateRow(match);
       })();
     }, 450);
 
@@ -353,28 +446,71 @@ export function AddArtistDialog({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [open, artistControlLive, editingArtistId, ficheReadOnly]);
-
-  const hasTripleRequired =
-    Boolean(firstname?.trim()) && Boolean(lastname?.trim()) && (artistTyp?.length ?? 0) >= 1;
+  }, [open, duplicateLookupKey, hasTripleRequired, firstname, lastname, artistTyp, editingArtistId, ficheReadOnly]);
 
   const canShowGenerateBio = !ficheReadOnly;
 
-  const biosEdited = useMemo(() => {
-    if (!editingArtistId || biosLoading) return false;
-    return ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "") !== (bios[lang] ?? ""));
-  }, [bios, biosDraft, biosLoading, editingArtistId]);
+  pendingPhotoFileRef.current = pendingPhotoFile;
+  photoDirtyRef.current = photoDirty;
+  biosDraftRef.current = biosDraft;
+  biosRef.current = bios;
+  editingArtistIdRef.current = editingArtistId;
 
-  const hasAnyBioDraft = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim().length > 0);
+  const hasUnsavedChanges = useMemo(() => {
+    const hasPendingPhoto = Boolean(pendingPhotoFile || photoDirty || photoChangeTokenRef.current > 0);
 
-  const hasArtistChanges = !editingArtistId
-    ? true
-    : Boolean(
-        form.formState.isDirty ||
-          pendingPhotoFile ||
-          biosEdited ||
-          hasAnyBioDraft,
-      );
+    if (editingArtistId) {
+      const biosChanged = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "") !== (bios[lang] ?? ""));
+      return Boolean(form.formState.isDirty || hasPendingPhoto || biosChanged);
+    }
+
+    const hasBio = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim().length > 0);
+    return Boolean(form.formState.isDirty || hasPendingPhoto || hasBio);
+  }, [bios, biosDraft, editingArtistId, form.formState.isDirty, pendingPhotoFile, photoDirty]);
+
+  const hasArtistChanges = hasUnsavedChanges;
+
+  const finalizeClose = useCallback(() => {
+    setDiscardDialogOpen(false);
+    setInternalOpen(false);
+    onOpenChangeRef.current(false);
+  }, []);
+
+  const attemptClose = useCallback(() => {
+    if (bypassCloseConfirmRef.current) {
+      bypassCloseConfirmRef.current = false;
+      finalizeClose();
+      return;
+    }
+
+    if (hasUnsavedChanges) {
+      setDiscardDialogOpen(true);
+      return;
+    }
+
+    finalizeClose();
+  }, [finalizeClose, hasUnsavedChanges]);
+
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen) {
+        setInternalOpen(true);
+        onOpenChangeRef.current(true);
+        return;
+      }
+      attemptClose();
+    },
+    [attemptClose],
+  );
+
+  const handleDialogDismissAttempt = useCallback(
+    (event: Event) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      attemptClose();
+    },
+    [attemptClose, hasUnsavedChanges],
+  );
 
   const needsAgencyPicker = useMemo(() => {
     if ((agency_id ?? "").trim()) return false;
@@ -385,15 +521,14 @@ export function AddArtistDialog({
 
   const agencySelectionOk = !needsAgencyPicker || selectedAgencyId.trim().length > 0;
 
-  const canShowSave =
-    !ficheReadOnly &&
-    hasTripleRequired &&
-    hasAnyBioDraft &&
-    !duplicateRow &&
-    !checkingDuplicate &&
-    !generatingBio &&
-    (!editingArtistId || !biosLoading) &&
-    agencySelectionOk;
+  const canShowSaveButton = editingArtistId
+    ? !ficheReadOnly &&
+      hasTripleRequired &&
+      hasArtistChanges &&
+      !generatingBio &&
+      !biosLoading &&
+      agencySelectionOk
+    : !ficheReadOnly && hasTripleRequired && !generatingBio && agencySelectionOk;
 
   const resolveCurrentAgencyId = useCallback(async (): Promise<string | null> => {
     const agencyFromSession = (agency_id ?? "").trim();
@@ -494,10 +629,11 @@ export function AddArtistDialog({
 
       setEditingArtistId(row.artist_id);
       setDuplicateRow(null);
-      setPendingPhotoFile(null);
     },
     [agency_id, form, needsAgencyPicker, selectedAgencyId],
   );
+
+  loadArtistIntoFormRef.current = loadArtistIntoForm;
 
   useEffect(() => {
     if (!open || !needsAgencyPicker) {
@@ -550,11 +686,18 @@ export function AddArtistDialog({
   useEffect(() => {
     if (!open) {
       resetAll();
+      initialLoadDoneRef.current = null;
+      artistLoadInFlightRef.current = null;
       return;
     }
 
     const id = artistIdProp ?? null;
     if (id) {
+      if (initialLoadDoneRef.current === id || artistLoadInFlightRef.current === id) {
+        return;
+      }
+
+      artistLoadInFlightRef.current = id;
       let cancelled = false;
       void (async () => {
         const { data, error } = await supabase.from("artists").select("*").eq("artist_id", id).single();
@@ -562,13 +705,18 @@ export function AddArtistDialog({
         if (cancelled) return;
 
         if (error || !data) {
+          artistLoadInFlightRef.current = null;
           toast.error(error?.message ?? "Fiche introuvable.");
-          onOpenChange(false);
+          onOpenChangeRef.current(false);
           return;
         }
 
-        await loadArtistIntoForm(data as DbArtistRow);
-        if (!cancelled) setFicheReadOnly(true);
+        await loadArtistIntoFormRef.current(data as DbArtistRow);
+        if (cancelled) return;
+
+        setFicheReadOnly(true);
+        initialLoadDoneRef.current = id;
+        artistLoadInFlightRef.current = null;
       })();
 
       return () => {
@@ -576,19 +724,27 @@ export function AddArtistDialog({
       };
     }
 
+    initialLoadDoneRef.current = null;
+    artistLoadInFlightRef.current = null;
     resetAll();
     setFicheReadOnly(false);
-  }, [open, artistIdProp, onOpenChange, resetAll, loadArtistIntoForm]);
+  }, [open, artistIdProp, resetAll]);
 
-  const handleDuplicateNo = () => {
-    resetAll();
-    onOpenChange(false);
+  const handleUseExistingArtistFiche = () => {
+    if (!duplicateRow) return;
+    setIsDuplicateModalOpen(false);
+    setForceCreateDespiteDuplicate(false);
+    setFicheReadOnly(false);
+    clearPendingPhotoState();
+    void loadArtistIntoForm(duplicateRow).then(() => {
+      initialLoadDoneRef.current = duplicateRow.artist_id;
+    });
   };
 
-  const handleDuplicateYes = () => {
-    if (!duplicateRow) return;
-    setFicheReadOnly(false);
-    void loadArtistIntoForm(duplicateRow);
+  const handleCreateDespiteDuplicate = () => {
+    setForceCreateDespiteDuplicate(true);
+    setIsDuplicateModalOpen(false);
+    void form.handleSubmit(onSubmit)();
   };
 
   const handleGenerateBio = async () => {
@@ -639,43 +795,56 @@ export function AddArtistDialog({
       throw new Error("Aucun fichier à envoyer.");
     }
 
-    const preferredBucket = "images";
-    const fallbackBucket = import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
+    const primaryBucket =
+      import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
+    const fallbackBucket = "images";
 
     const ext =
       pendingPhotoFile.type === "image/webp" || /\.webp$/i.test(pendingPhotoFile.name)
         ? "webp"
-        : "jpg";
+        : pendingPhotoFile.type === "image/png" || /\.png$/i.test(pendingPhotoFile.name)
+          ? "png"
+          : "jpg";
 
-    const objectPath = `artists/${crypto.randomUUID()}.${ext}`;
+    const artistKey = editingArtistId?.trim() || crypto.randomUUID();
+    const objectPath = `artists/${artistKey}.${ext}`;
+    const previousPhotoUrl = (form.getValues("artist_photo_url") ?? "").trim();
+
+    if (previousPhotoUrl && editingArtistId) {
+      await removeSupabaseStorageObjectByPublicUrl(previousPhotoUrl);
+    }
 
     const tryUpload = async (bucket: string) => {
       const { error } = await supabase.storage.from(bucket).upload(objectPath, pendingPhotoFile, {
         cacheControl: "3600",
-        upsert: false,
+        upsert: Boolean(editingArtistId),
       });
-
-      if (error) {
-        return { ok: false as const, error, bucket };
-      }
-
+      if (error) return { ok: false as const, error, bucket };
       const { data: pub } = supabase.storage.from(bucket).getPublicUrl(objectPath);
       return { ok: true as const, publicUrl: pub.publicUrl, bucket };
     };
 
-    const first = await tryUpload(preferredBucket);
-    if (first.ok) {
-      return first.publicUrl;
+    const first = await tryUpload(primaryBucket);
+    if (first.ok) return first.publicUrl;
+
+    const isRls =
+      /row-level security|rls|policy/i.test(first.error.message) &&
+      primaryBucket !== fallbackBucket;
+    if (isRls) {
+      const second = await tryUpload(fallbackBucket);
+      if (second.ok) return second.publicUrl;
+      throw new Error(
+        `Envoi photo refusé (RLS). Exécutez migration_33_artist_photos_storage_rls.sql dans Supabase, ` +
+          `ou vérifiez les policies du bucket « ${primaryBucket} ». Détail : ${first.error.message}`,
+      );
     }
 
-    const second = await tryUpload(fallbackBucket);
-    if (second.ok) {
-      return second.publicUrl;
+    if (primaryBucket !== fallbackBucket) {
+      const second = await tryUpload(fallbackBucket);
+      if (second.ok) return second.publicUrl;
     }
 
-    throw new Error(
-      `Envoi photo : ${first.error.message} (bucket « ${preferredBucket} ») / ${second.error.message} (bucket « ${fallbackBucket} »).`,
-    );
+    throw new Error(`Envoi photo (bucket « ${primaryBucket} ») : ${first.error.message}`);
   };
 
   const persistSocialLinks = async (artistId: string) => {
@@ -707,8 +876,8 @@ export function AddArtistDialog({
   const onSubmit = async (values: ArtistFormInput) => {
     if (ficheReadOnly) return;
 
-    if (duplicateRow && !editingArtistId) {
-      toast.error("Un doublon est détecté : utilisez « Oui » pour modifier la fiche, ou « Non » pour fermer.");
+    if (duplicateRow && !editingArtistId && !forceCreateDespiteDuplicate) {
+      setIsDuplicateModalOpen(true);
       return;
     }
 
@@ -892,8 +1061,12 @@ export function AddArtistDialog({
 
       await persistSocialLinks(savedArtistId);
 
+      clearPendingPhotoState();
+      setForceCreateDespiteDuplicate(false);
       bypassCloseConfirmRef.current = true;
-      onOpenChange(false);
+      setDiscardDialogOpen(false);
+      setInternalOpen(false);
+      onOpenChangeRef.current(false);
       onSuccess?.(savedArtistId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Enregistrement impossible.";
@@ -917,28 +1090,28 @@ export function AddArtistDialog({
 
   const postalPlaceholder = postalPlaceholderForCountryLabel(country ?? "");
 
+  const duplicateDisplayName = duplicateRow
+    ? [duplicateRow.artist_firstname, duplicateRow.artist_lastname]
+        .map((s) => (typeof s === "string" ? s.trim() : ""))
+        .filter(Boolean)
+        .join(" ") || t("artist_no_name")
+    : "";
+  const duplicateTypLabels = duplicateRow ? parseArtistTypFromDb(duplicateRow.artist_typ) : [];
+  const duplicatePhotoSrc = (duplicateRow?.artist_photo_url ?? "").trim() || ARTIST_PHOTO_PLACEHOLDER;
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          if (bypassCloseConfirmRef.current) {
-            bypassCloseConfirmRef.current = false;
-            onOpenChange(false);
-            return;
-          }
-          if (editingArtistId && hasArtistChanges) {
-            const ok = window.confirm("Des modifications non enregistrées existent. Fermer la fiche ?");
-            if (!ok) return;
-          }
-        }
-        onOpenChange(nextOpen);
-      }}
-    >
+    <>
+      <Dialog open={internalOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent
         hideCloseButton
+        onPointerDownOutside={handleDialogDismissAttempt}
+        onInteractOutside={handleDialogDismissAttempt}
+        onEscapeKeyDown={handleDialogDismissAttempt}
         className={cn(
-          "max-w-3xl w-[96vw] max-h-[92vh] overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl",
+          "left-1/2 top-[calc(4.25rem+1rem)] max-h-[calc(100vh-5.5rem)] w-[96vw] max-w-3xl -translate-x-1/2 translate-y-0",
+          "overflow-x-hidden overflow-y-auto border-border bg-background p-0 shadow-xl",
+          "data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4",
+          "data-[state=open]:slide-in-from-left-1/2 data-[state=closed]:slide-out-to-left-1/2",
           "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]",
         )}
         {...(!editingArtistId || ficheReadOnly ? { "aria-describedby": undefined } : {})}
@@ -950,7 +1123,7 @@ export function AddArtistDialog({
         </DialogTitle>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-2 px-4 sm:px-5 pb-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 sm:px-5 pb-4">
             <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
               <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <h2 className="min-w-0 shrink font-serif text-xl text-white sm:text-2xl sm:pr-2">
@@ -974,7 +1147,7 @@ export function AddArtistDialog({
                     type="button"
                     variant="default"
                     className="h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                    onClick={() => onOpenChange(false)}
+                    onClick={() => attemptClose()}
                   >
                     {t("btn_cancel")}
                   </Button>
@@ -982,13 +1155,15 @@ export function AddArtistDialog({
                   {!ficheReadOnly && (
                     <Button
                       type="submit"
-                      disabled={!canShowSave || isSubmitting || processingPhoto}
+                      disabled={!canShowSaveButton || isSubmitting || processingPhoto}
                       className={
                         editingArtistId
                           ? `h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] ${
-                              !hasArtistChanges && !hasAnyBioDraft ? "invisible pointer-events-none" : ""
+                              !canShowSaveButton ? "invisible pointer-events-none" : ""
                             }`
-                          : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                          : `h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground ${
+                              !canShowSaveButton ? "invisible pointer-events-none" : ""
+                            }`
                       }
                     >
                       {isSubmitting
@@ -1003,81 +1178,280 @@ export function AddArtistDialog({
             </div>
 
             <div className="space-y-4 w-full">
-              {!ficheReadOnly && (
-                <p className="w-[500px] text-xs text-destructive -mt-0.5">
-                  <span className="font-semibold">*</span> {t("required_fields_note")}
-                </p>
-              )}
+              <div className="grid gap-3 sm:grid-cols-3">
+                {!ficheReadOnly && (
+                  <p className="col-span-full text-xs leading-tight text-destructive">
+                    <span className="font-semibold">*</span> {t("required_fields_note")}
+                  </p>
+                )}
 
-              <div className="flex h-[180px] flex-col gap-4 sm:flex-row sm:items-start">
-                <div className="flex min-h-0 min-w-0 w-full max-w-[550px] flex-col gap-2 sm:w-[550px] sm:max-w-none sm:shrink-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
-                  {!ficheReadOnly && <RequiredAsterisk />}
-                  {canShowGenerateBio && (
-                    <Button
-                      type="button"
-                      variant="default"
-                      className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                      onClick={() => void handleGenerateBio()}
-                      disabled={generatingBio || !hasTripleRequired}
-                    >
-                      {generatingBio ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          {t("btn_generating_bio")}
-                        </>
-                      ) : (
-                        t("btn_generate_bio")
-                      )}
-                    </Button>
+                <FormField
+                  control={form.control}
+                  name="artist_firstname"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="inline-flex items-center">
+                        {t("form_firstname_label")}
+                        <RequiredAsterisk />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t("form_firstname_placeholder")}
+                          {...field}
+                          disabled={ficheReadOnly || Boolean(editingArtistId)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="artist_lastname"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="inline-flex items-center">
+                        {t("form_lastname_label")}
+                        <RequiredAsterisk />
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={t("form_lastname_placeholder")}
+                          {...field}
+                          disabled={ficheReadOnly || Boolean(editingArtistId)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="artist_nickname"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form_nickname_label")}</FormLabel>
+                      <FormControl>
+                        <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={ficheReadOnly} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+                <div className="w-full max-w-[480px]">
+                  <FormField
+                    control={form.control}
+                    name="artist_typ"
+                    render={() => (
+                      <FormItem className="flex flex-col gap-[5px] space-y-0">
+                        <FormLabel className="inline-flex min-h-[1.25rem] flex-wrap items-center gap-x-1 gap-y-0.5">
+                          <span className="inline-flex items-center">
+                            {t("form_art_types_label")}
+                            <RequiredAsterisk />
+                          </span>
+                          <span className="text-xs font-normal text-muted-foreground">
+                            {t("form_art_types_hint")}
+                          </span>
+                        </FormLabel>
+
+                        <Popover open={typesPopoverOpen} onOpenChange={setTypesPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={ficheReadOnly}
+                                className={cn(
+                                  "h-10 w-full justify-between font-normal",
+                                  !artistTyp?.length && "text-muted-foreground",
+                                )}
+                              >
+                                {artistTyp?.length
+                                  ? t("form_art_types_count", { count: artistTyp.length })
+                                  : t("form_art_types_empty")}
+                                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+
+                          <PopoverContent className="w-[min(560px,calc(100vw-2rem))] p-0" align="start">
+                            <ScrollArea className="max-h-72 p-2">
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pr-3">
+                                {ARTIST_TYPE_OPTIONS.map((opt, idx) => (
+                                  <label
+                                    key={opt}
+                                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/80"
+                                  >
+                                    <Checkbox
+                                      id={`add-artist-type-${idx}`}
+                                      name={`artist_type_${idx}`}
+                                      checked={artistTyp?.includes(opt)}
+                                      disabled={ficheReadOnly}
+                                      onCheckedChange={(c) => toggleArtistType(opt, c === true)}
+                                    />
+                                    <span className="leading-snug">{opt}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
+                <div className="min-w-0 w-full max-w-[280px]">
+                  <FormField
+                    control={form.control}
+                    name="birth_date"
+                    render={({ field }) => (
+                      <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
+                        <FormLabel className="min-h-[1.25rem]">{t("form_birthdate_label")}</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={ficheReadOnly}
+                                className={cn(
+                                  "h-10 w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground",
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP", { locale: fr })
+                                ) : (
+                                  <span>{t("form_birthdate_placeholder")}</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 shrink-0 opacity-60" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <BirthDatePickerFr
+                              selected={field.value ?? undefined}
+                              onSelect={field.onChange}
+                              fromYear={1920}
+                              toYear={new Date().getFullYear()}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="relative flex h-[194px] flex-col gap-4 min-[726px]:flex-row min-[726px]:flex-nowrap min-[726px]:items-start">
+                <div className="absolute left-[180px] flex h-full min-h-0 min-w-0 w-full max-w-[550px] flex-col gap-2 sm:w-[550px] sm:max-w-none sm:shrink-0">
                 {biosLoading && editingArtistId ? (
-                  <div className="flex min-h-[200px] items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/20 text-sm text-muted-foreground">
-                    <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-                    <span>{t("loading_bio_tabs", "Chargement des biographies…")}</span>
-                  </div>
+                  <>
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
+                      {canShowGenerateBio && (
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                          onClick={() => void handleGenerateBio()}
+                          disabled={generatingBio || !hasTripleRequired}
+                        >
+                          {generatingBio ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              {t("btn_generating_bio")}
+                            </>
+                          ) : (
+                            t("btn_generate_bio")
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex min-h-0 flex-1 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/20 text-sm text-muted-foreground">
+                      <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                      <span>{t("loading_bio_tabs", "Chargement des biographies…")}</span>
+                    </div>
+                  </>
                 ) : (
-                  <Tabs value={activeLanguage} onValueChange={(v) => setActiveLanguage(v as Language)}>
-                    <TabsList className="flex h-auto min-h-9 w-full flex-wrap justify-start gap-1">
+                  <Tabs
+                    value={activeLanguage}
+                    onValueChange={(v) => setActiveLanguage(v as Language)}
+                    className="flex h-full min-h-0 flex-col"
+                  >
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
+                      {canShowGenerateBio && (
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                          onClick={() => void handleGenerateBio()}
+                          disabled={generatingBio || !hasTripleRequired}
+                        >
+                          {generatingBio ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              {t("btn_generating_bio")}
+                            </>
+                          ) : (
+                            t("btn_generate_bio")
+                          )}
+                        </Button>
+                      )}
+                      <TabsList className="flex h-auto min-h-9 w-auto shrink-0 flex-wrap justify-start gap-1">
+                        {ARTIST_BIO_LANGUAGES.map((lang) => (
+                          <TabsTrigger
+                            key={lang}
+                            value={lang}
+                            type="button"
+                            className="shrink-0 gap-1.5 px-2.5 text-xs sm:text-sm"
+                          >
+                            {lang.toUpperCase()}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    </div>
+
+                    <div className="mt-2 h-[150px] w-[530px] shrink-0">
                       {ARTIST_BIO_LANGUAGES.map((lang) => (
-                        <TabsTrigger
+                        <TabsContent
                           key={lang}
                           value={lang}
-                          type="button"
-                          className="shrink-0 gap-1.5 px-2.5 text-xs sm:text-sm"
+                          className="mt-0 h-full data-[state=inactive]:hidden"
                         >
-                          {lang.toUpperCase()}
-                        </TabsTrigger>
+                          <Textarea
+                            value={biosDraft[lang]}
+                            onChange={(e) =>
+                              setBiosDraft((prev) => ({
+                                ...prev,
+                                [lang]: e.target.value,
+                              }))
+                            }
+                            placeholder={`Bio en ${lang.toUpperCase()}...`}
+                            disabled={ficheReadOnly}
+                            spellCheck
+                            lang={lang}
+                            className="h-[150px] min-h-[150px] w-[530px] min-w-[530px] resize-none overflow-y-auto p-2 text-xs leading-snug shadow-none"
+                          />
+                        </TabsContent>
                       ))}
-                    </TabsList>
-
-                    {ARTIST_BIO_LANGUAGES.map((lang) => (
-                      <TabsContent key={lang} value={lang}>
-                        <Textarea
-                          value={biosDraft[lang]}
-                          onChange={(e) =>
-                            setBiosDraft((prev) => ({
-                              ...prev,
-                              [lang]: e.target.value,
-                            }))
-                          }
-                          placeholder={`Bio en ${lang.toUpperCase()}...`}
-                          rows={14}
-                          disabled={ficheReadOnly}
-                          spellCheck
-                          lang={lang}
-                          className="w-full min-h-[240px] min-w-0 resize-y overflow-y-auto p-2 text-xs leading-snug shadow-none"
-                        />
-                      </TabsContent>
-                    ))}
+                    </div>
                   </Tabs>
                 )}
                 </div>
 
-                <div className="group relative h-40 w-40 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                <div className="group relative h-40 w-40 shrink-0 self-start overflow-hidden rounded-xl border border-border/60 bg-muted/30">
                   {previewSrc ? (
                     <img src={previewSrc} alt={t("photo_alt_preview")} className="h-full w-full object-cover" />
                   ) : (
@@ -1125,7 +1499,7 @@ export function AddArtistDialog({
                       const f = input.files?.[0] ?? null;
                       input.value = "";
                       if (!f) {
-                        setPendingPhotoFile(null);
+                        markPhotoAsChanged(null);
                         return;
                       }
 
@@ -1133,11 +1507,11 @@ export function AddArtistDialog({
                         setProcessingPhoto(true);
                         try {
                           const prepared = await prepareImageForSupabaseUpload(f);
-                          setPendingPhotoFile(prepared);
+                          markPhotoAsChanged(prepared);
                         } catch (err) {
                           const msg = err instanceof Error ? err.message : "Traitement de l’image impossible.";
                           toast.error(msg);
-                          setPendingPhotoFile(null);
+                          markPhotoAsChanged(null);
                         } finally {
                           setProcessingPhoto(false);
                         }
@@ -1146,28 +1520,6 @@ export function AddArtistDialog({
                   />
                 </div>
               </div>
-
-              {duplicateRow && !editingArtistId && !ficheReadOnly && (
-                <Alert variant="destructive" className="border-destructive/60">
-                  <AlertTitle>{t("duplicate_title")}</AlertTitle>
-                  <AlertDescription className="space-y-3">
-                    <p>{t("duplicate_desc")}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={handleDuplicateNo}>
-                        {t("btn_duplicate_no")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
-                        onClick={handleDuplicateYes}
-                      >
-                        {t("btn_duplicate_yes")}
-                      </Button>
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {needsAgencyPicker && (
                 <div className="w-[550px] space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-3">
@@ -1201,177 +1553,6 @@ export function AddArtistDialog({
                   )}
                 </div>
               )}
-
-              <div className="min-w-0 w-full space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <FormField
-                      control={form.control}
-                      name="artist_firstname"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="inline-flex items-center">
-                            {t("form_firstname_label")}
-                            <RequiredAsterisk />
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder={t("form_firstname_placeholder")}
-                              {...field}
-                              disabled={ficheReadOnly || Boolean(editingArtistId)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="artist_lastname"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="inline-flex items-center">
-                            {t("form_lastname_label")}
-                            <RequiredAsterisk />
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder={t("form_lastname_placeholder")}
-                              {...field}
-                              disabled={ficheReadOnly || Boolean(editingArtistId)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="artist_nickname"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("form_nickname_label")}</FormLabel>
-                          <FormControl>
-                            <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={ficheReadOnly} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
-                    <div className="min-w-0 w-full sm:flex-[2]">
-                      <FormField
-                        control={form.control}
-                        name="artist_typ"
-                        render={() => (
-                          <FormItem className="flex flex-col gap-[5px] space-y-0">
-                            <FormLabel className="inline-flex min-h-[1.25rem] flex-wrap items-center gap-x-1 gap-y-0.5">
-                              <span className="inline-flex items-center">
-                                {t("form_art_types_label")}
-                                <RequiredAsterisk />
-                              </span>
-                              <span className="text-xs font-normal text-muted-foreground">
-                                {t("form_art_types_hint")}
-                              </span>
-                            </FormLabel>
-
-                            <Popover open={typesPopoverOpen} onOpenChange={setTypesPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={ficheReadOnly}
-                                    className={cn(
-                                      "h-10 w-full justify-between font-normal",
-                                      !artistTyp?.length && "text-muted-foreground",
-                                    )}
-                                  >
-                                    {artistTyp?.length
-                                      ? t("form_art_types_count", { count: artistTyp.length })
-                                      : t("form_art_types_empty")}
-                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-
-                              <PopoverContent className="w-[min(560px,calc(100vw-2rem))] p-0" align="start">
-                                <ScrollArea className="max-h-72 p-2">
-                                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 pr-3">
-                                    {ARTIST_TYPE_OPTIONS.map((opt, idx) => (
-                                      <label
-                                        key={opt}
-                                        className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/80"
-                                      >
-                                        <Checkbox
-                                          id={`add-artist-type-${idx}`}
-                                          name={`artist_type_${idx}`}
-                                          checked={artistTyp?.includes(opt)}
-                                          disabled={ficheReadOnly}
-                                          onCheckedChange={(c) => toggleArtistType(opt, c === true)}
-                                        />
-                                        <span className="leading-snug">{opt}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </ScrollArea>
-                              </PopoverContent>
-                            </Popover>
-
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="min-w-0 w-full sm:flex-1">
-                      <FormField
-                        control={form.control}
-                        name="birth_date"
-                        render={({ field }) => (
-                          <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
-                            <FormLabel className="min-h-[1.25rem]">{t("form_birthdate_label")}</FormLabel>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={ficheReadOnly}
-                                    className={cn(
-                                      "h-10 w-full pl-3 text-left font-normal",
-                                      !field.value && "text-muted-foreground",
-                                    )}
-                                  >
-                                    {field.value ? (
-                                      format(field.value, "PPP", { locale: fr })
-                                    ) : (
-                                      <span>{t("form_birthdate_placeholder")}</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 shrink-0 opacity-60" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <BirthDatePickerFr
-                                  selected={field.value ?? undefined}
-                                  onSelect={field.onChange}
-                                  fromYear={1920}
-                                  toYear={new Date().getFullYear()}
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-              </div>
 
               {checkingDuplicate && (
                 <p className="text-xs text-muted-foreground flex items-center gap-2">
@@ -1525,7 +1706,104 @@ export function AddArtistDialog({
             </div>
           </form>
         </Form>
+
+        {isDuplicateModalOpen &&
+          duplicateRow &&
+          typeof document !== "undefined" &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4"
+              onClick={() => setIsDuplicateModalOpen(false)}
+              role="presentation"
+            >
+              <div
+                className="relative w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label={t("duplicate_modal_aria")}
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsDuplicateModalOpen(false)}
+                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                  aria-label={t("btn_cancel")}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+
+                <h3 className="pr-8 text-base font-semibold text-foreground">{t("duplicate_modal_title")}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{t("duplicate_modal_desc")}</p>
+
+                <div className="mt-4 flex gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                  <img
+                    src={duplicatePhotoSrc}
+                    alt=""
+                    className="h-20 w-20 shrink-0 rounded-lg border border-border object-cover"
+                  />
+                  <div className="min-w-0 text-left text-sm">
+                    <p className="font-semibold text-foreground">{duplicateDisplayName}</p>
+                    {duplicateTypLabels.length > 0 && (
+                      <p className="mt-1 text-muted-foreground">
+                        {t("duplicate_existing_types")} : {duplicateTypLabels.join(" · ")}
+                      </p>
+                    )}
+                    {(duplicateRow.artist_email ?? "").trim() && (
+                      <p className="mt-1 truncate text-muted-foreground">{duplicateRow.artist_email}</p>
+                    )}
+                    {(duplicateRow.artist_bio ?? "").trim() && (
+                      <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{duplicateRow.artist_bio}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => setIsDuplicateModalOpen(false)}
+                  >
+                    {t("btn_cancel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={handleCreateDespiteDuplicate}
+                    disabled={isSubmitting}
+                  >
+                    {t("btn_create_new_anyway")}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
+                    onClick={handleUseExistingArtistFiche}
+                  >
+                    {t("btn_use_existing_fiche")}
+                  </Button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
       </DialogContent>
     </Dialog>
+
+      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+        <AlertDialogContent className="z-[250]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Modifications non enregistrées</AlertDialogTitle>
+            <AlertDialogDescription>
+              Des modifications non enregistrées existent. Fermer la fiche ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuer l&apos;édition</AlertDialogCancel>
+            <AlertDialogAction onClick={finalizeClose}>Fermer sans enregistrer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

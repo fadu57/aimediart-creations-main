@@ -90,7 +90,7 @@ Enum `Age` values (use these exact labels, no variants):
 - `artwork_artist_id` uuid NULL
 - `artwork_expo_id` uuid NULL
 - `artwork_agency_id` uuid NULL
-- `artwork_description` jsonb NULL
+- `artwork_description_i18n` jsonb NOT NULL
 - `artwork_photo_url` text NULL
 - `artwork_qr_code_url` text NULL
 - `artwork_room_name` text NULL
@@ -150,3 +150,5 @@ Enum `Age` values (use these exact labels, no variants):
 - When editing an existing file, show only the relevant diff/snippet.
 - Keep comments short and practical.
 - Follow the existing coding style in the project.
+
+“Voir docs/ARCHITECTURE-IA.md pour l’architecture IA (Supabase Edge Functions + Groq + ai_jobs).”

@@ -59,7 +59,14 @@ function Test-SupabaseCli {
 
 function Test-SupabaseLogin {
     # Pas d’équivalent fiable cross-plateforme de `supabase whoami` partout ; on tente `projects list`.
-    $null = & supabase projects list 2>&1
+    # La CLI écrit souvent « A new version… » sur stderr ; avec Stop, PowerShell l’interprète comme une erreur fatale.
+    $prevEa = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "SilentlyContinue"
+        $null = & supabase projects list 2>&1
+    } finally {
+        $ErrorActionPreference = $prevEa
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "La CLI Supabase ne semble pas authentifiée." -ForegroundColor Red
         Write-Host "Lancez une fois : supabase login" -ForegroundColor Yellow

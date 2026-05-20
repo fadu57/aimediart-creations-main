@@ -169,8 +169,7 @@
 | artwork_expo_id              | uuid        | YES      | FK → expos |
 | artwork_agency_id            | uuid        | YES      | FK → agencies |
 | artwork_title                | text        | YES      | —    |
-| artwork_description          | jsonb       | YES      | ⚠️ legacy |
-| artwork_description_i18n     | jsonb       | NO       | ✅ nouveau multilingue |
+| artwork_description_i18n     | jsonb       | NO       | Médiation multilingue (styles / langues) |
 | artwork_source_material      | text        | YES      | —    |
 | artwork_source_material_i18n | jsonb       | NO       | ✅ nouveau multilingue |
 | artwork_photo_url            | text        | YES      | —    |
@@ -321,7 +320,7 @@ profiles ←── retention_settings
 | # | Table | Problème | Priorité |
 |---|-------|----------|----------|
 | 1 | artworks | Doublon `deleted_at` / `artwork_deleted_at` | Moyenne |
-| 2 | artworks | `artwork_description` (legacy) vs `artwork_description_i18n` (nouveau) | Haute |
+| 2 | artworks | Cohérence `artwork_source_material` vs `artwork_source_material_i18n` | Moyenne |
 | 3 | artists | Colonnes adresse redondantes (artist_adresse / artist_address / artist_city / artist_ville) | Basse |
 | 4 | artists | `artist_bio` dans artists vs table `artist_bios` dédiée | Haute |
 | 5 | profiles | 2 policies SELECT redondantes | Basse |

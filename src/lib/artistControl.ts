@@ -26,6 +26,29 @@ export function computeArtistControl(
   return normalizeForArtistControl(raw);
 }
 
+/** Clé nom seule (prénom + nom normalisés), sans les types. */
+export function artistNameControlKey(prenom: string, name: string): string {
+  return normalizeForArtistControl(`${prenom}${name}`);
+}
+
+/**
+ * Doublon métier : même prénom + nom (normalisés) et au moins un type d'art en commun.
+ */
+export function artistsMatchForDuplicate(
+  prenomA: string,
+  nomA: string,
+  typesA: readonly string[],
+  prenomB: string,
+  nomB: string,
+  typesB: readonly string[],
+): boolean {
+  if (artistNameControlKey(prenomA, nomA) !== artistNameControlKey(prenomB, nomB)) {
+    return false;
+  }
+  const setB = new Set(typesB);
+  return typesA.some((t) => setB.has(t));
+}
+
 /**
  * Initiales pour `initiale_artist` : première lettre (en majuscules) de chaque mot
  * du prénom, puis de chaque mot du nom. Les mots sont séparés par des espaces.

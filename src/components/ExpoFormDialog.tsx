@@ -30,6 +30,7 @@ import {
   sortExpoFieldKeys,
   valueToInputString,
 } from "@/lib/expoFormUtils";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Mode = "create" | "edit";
@@ -387,7 +388,10 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       name={`expo_${key}`}
                       value={v}
                       readOnly={readonly || !canEditFields}
-                      className={readonly ? "bg-muted/50" : "shadow-none"}
+                      className={cn(
+                        readonly ? "bg-muted/50" : "shadow-none",
+                        key === "expo_descript_i18n" && "h-[150px]",
+                      )}
                       onChange={(e) => setValues((prev) => ({ ...prev, [key]: e.target.value }))}
                     />
                   )}

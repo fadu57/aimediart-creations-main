@@ -125,12 +125,11 @@ const Artists = () => {
 
   return artists ? (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full shrink-0 items-center gap-4 md:max-w-[680px]">
-          <div>
-            <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
-          </div>
-          <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
+      <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:gap-4">
+        <h2 className="shrink-0 text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:items-center md:gap-4">
+          <div className="relative w-[210px] min-w-[210px] max-w-[210px] shrink-0">
             <Input
               type="text"
               list="artists-search-suggestions"
@@ -156,24 +155,26 @@ const Artists = () => {
               ))}
             </datalist>
           </div>
-        </div>
-        <BackofficeStickyAgencyLogoSlot />
-        <div className="flex shrink-0 items-center gap-2">
-          {canAddArtist && (
-            <Button
-              type="button"
-              className="gradient-gold gradient-gold-hover-bg text-primary-foreground gap-2"
-              onClick={() => {
-                setDialogArtistId(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> {t("btn_new_artist")}
+
+          <BackofficeStickyAgencyLogoSlot className="min-h-[60px] w-auto max-w-[180px] shrink-0 flex-none px-2" />
+
+          <div className="flex shrink-0 items-center gap-2 md:ml-auto">
+            {canAddArtist && (
+              <Button
+                type="button"
+                className="gradient-gold gradient-gold-hover-bg text-primary-foreground gap-2"
+                onClick={() => {
+                  setDialogArtistId(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4" /> {t("btn_new_artist")}
+              </Button>
+            )}
+            <Button type="button" variant="outline" className="gap-2" asChild>
+              <Link to="/artistes/artistes2">{t("btn_table_view")}</Link>
             </Button>
-          )}
-          <Button type="button" variant="outline" className="gap-2" asChild>
-            <Link to="/artistes/artistes2">{t("btn_table_view")}</Link>
-          </Button>
+          </div>
         </div>
       </div>
 

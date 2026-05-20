@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronsUpDown, Loader2, Upload } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, RefreshCw, Upload, X } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
 
 import { AddArtistDialog } from "@/components/AddArtistDialog";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { generateMediation } from "@/services/mediationService";
-import { analyzeArtworkImage } from "@/services/imageAnalysisService";
+import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
+import { generatePersonasBatchWithRetry } from "@/lib/mediationBatchGenerate";
+import { analyzeArtworkImage, type ImageAnalysisPersonaItem } from "@/services/imageAnalysisService";
 import { supabase } from "@/lib/supabase";
 import { checkArtworkExists, generateArtworkFingerprint } from "@/utils/artworkHelpers";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -38,6 +39,7 @@ import { inferJsonKeyFromDisplayName, isImageAnalysisPromptStyleRow } from "@/li
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+import { QR_CODE_STORAGE_OPTIONS } from "@/lib/qrCodeScanFriendly";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import {
   type MediationDescriptionKey,
@@ -45,18 +47,29 @@ import {
   MEDIATION_DESCRIPTION_KEYS,
   MEDIATION_UI_LANGS,
   createEmptyDescriptionsByLang,
+  isMediationUiLang,
   normalizeArtworkDescriptionToByLang,
   resolveMediationUiLang,
   serializeMediationDescriptionsByLang,
   serializeMediationDraftFingerprint,
 } from "@/lib/artworkDescriptionI18n";
+import { FR_MEDIATION_STYLE_LABELS } from "@/lib/mediationVisitorStyles";
+import { CANONICAL_MEDIATION_STYLE_SET } from "@/lib/mediationStyleCodes";
+import {
+  MEDIATION_GENERATION_PROGRESS,
+  langCodeForProgress,
+  mediationPercentByStep,
+  runWithMediationSubProgress,
+} from "@/lib/mediationGenerationProgress";
+import { useMediationGenerationConfig } from "@/hooks/useMediationGenerationConfig";
+import { Progress } from "@/components/ui/progress";
 
 async function generateAndSaveQrCode(artworkId: string, expoId?: string | null): Promise<string | null> {
   const originOverride = await fetchQrPublicSiteOriginFromSettings();
   const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoId);
   if (!targetUrl) return null;
 
-  const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
+  const dataUrl = await QRCode.toDataURL(targetUrl, QR_CODE_STORAGE_OPTIONS);
   const blob = await (await fetch(dataUrl)).blob();
   const path = `qrcodes/${artworkId}.png`;
 
@@ -94,23 +107,38 @@ type ArtistOption = {
 type DescriptionKey = MediationDescriptionKey;
 type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
+  code?: string | null;
   nom?: string | null;
   icon?: string | null;
   max_tokens?: number | null;
+  style_rules?: string | null;
+  system_instruction?: string | null;
 };
 
-type StyleTabEntry = { key: DescriptionKey; label: string; maxTokens: number; icon?: string | null };
+type StyleTabEntry = {
+  key: DescriptionKey;
+  label: string;
+  maxTokens: number;
+  icon?: string | null;
+  styleRules?: string | null;
+  systemInstruction?: string | null;
+};
 
-const DEFAULT_STYLE_TABS: StyleTabEntry[] = [
-  { key: "enfant", label: "Enfant", maxTokens: 700 },
-  { key: "expert", label: "Expert", maxTokens: 900 },
-  { key: "ado", label: "Ado", maxTokens: 700 },
-  { key: "conteur", label: "Conteur", maxTokens: 900 },
-  { key: "rap", label: "Rap", maxTokens: 700 },
-  { key: "poetique", label: "Poétique", maxTokens: 900 },
-  { key: "simple", label: "Simple", maxTokens: 700 },
-  { key: "neutre", label: "Neutre", maxTokens: 700 },
-];
+const DEFAULT_STYLE_TABS: StyleTabEntry[] = MEDIATION_DESCRIPTION_KEYS.map((key) => ({
+  key,
+  label: FR_MEDIATION_STYLE_LABELS[key],
+  maxTokens: key === "expert" || key === "conteur" || key === "poetique" ? 900 : 700,
+}));
+
+function styleTabsToMediationPayload(tabs: StyleTabEntry[]): MediationStyleRequest[] {
+  return tabs.map((style) => ({
+    id: style.key,
+    label: style.label,
+    max_tokens: style.maxTokens,
+    style_rules: style.styleRules ?? undefined,
+    system_instruction: style.systemInstruction ?? undefined,
+  }));
+}
 
 type DraftSnapshot = {
   title: string;
@@ -146,10 +174,83 @@ function serializeDraftSnapshot(snapshot: DraftSnapshot): string {
   return JSON.stringify(snapshot);
 }
 
+type MediationProgressState = {
+  percent: number;
+  detail: string;
+};
+
+function GenerationProgressBar({
+  percent,
+  detail,
+  ariaLabel,
+}: {
+  percent: number;
+  detail: string;
+  ariaLabel: string;
+}) {
+  const { t } = useTranslation("artwork_modal");
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div
+      className="space-y-1.5"
+      role="status"
+      aria-live="polite"
+      aria-busy={clamped < 100}
+      aria-label={ariaLabel}
+    >
+      <Progress
+        value={clamped}
+        className="h-2.5 bg-amber-200/50 [&>div]:rounded-full [&>div]:bg-gradient-to-r [&>div]:from-amber-500 [&>div]:via-amber-600 [&>div]:to-amber-500 [&>div]:transition-all"
+      />
+      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-amber-800/90">
+        <span className="min-w-0 truncate">{detail}</span>
+        <span className="shrink-0 tabular-nums">
+          {t("mediation_progress_percent", { percent: clamped })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MediationGenerationProgressBar({
+  percent,
+  detail,
+}: {
+  percent: number;
+  detail: string;
+}) {
+  const { t } = useTranslation("artwork_modal");
+  const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <GenerationProgressBar
+      percent={percent}
+      detail={detail}
+      ariaLabel={t("mediation_progress_aria", { percent: clamped })}
+    />
+  );
+}
+
+const ANALYZE_PROGRESS_ESTIMATE_MS = 45_000;
+
+function analyzeProgressDetailFromElapsed(elapsedSec: number, t: (key: string) => string): string {
+  if (elapsedSec < 8) return t("analyze_step_1");
+  if (elapsedSec < 18) return t("analyze_step_2");
+  if (elapsedSec < 28) return t("analyze_step_3");
+  return t("analyze_step_4");
+}
+
 export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: ArtworkModalProps) {
   const { t, i18n } = useTranslation("artwork_modal");
   const { role_id, agency_id, expo_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
+  const {
+    primaryLang: mediationPrimaryLang,
+    optionalLang: mediationOptionalLang,
+    setOptionalLang: setMediationOptionalLang,
+    generationLangs,
+    allowsOptionalLang,
+    isAllLanguagesMode,
+  } = useMediationGenerationConfig();
 
   const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,18 +263,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [imageUrl, setImageUrl] = useState("");
   const [artworkQrImageUrl, setArtworkQrImageUrl] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
+  /** Dernière valeur du matériau source (évite un état React stale juste après l’analyse). */
+  const sourceMaterialRef = useRef("");
   const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
   const [activeTab, setActiveTab] = useState<DescriptionKey>("enfant");
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [generatingMediation, setGeneratingMediation] = useState(false);
+  /** Régénération IA d’un seul persona (clé JSON) ; null si aucune requête en cours. */
+  const [regeneratingMediationStyleKey, setRegeneratingMediationStyleKey] = useState<DescriptionKey | null>(null);
+  /** Barre de progression 0–100 % pendant génération / régénération des médiations. */
+  const [mediationProgress, setMediationProgress] = useState<MediationProgressState | null>(null);
+  const [lastMediationAnalyseFr, setLastMediationAnalyseFr] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [regeneratingQr, setRegeneratingQr] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
   const [analyzeImageError, setAnalyzeImageError] = useState<string | null>(null);
-  const [analyzeStartedAt, setAnalyzeStartedAt] = useState<number | null>(null);
-  const [analyzeTick, setAnalyzeTick] = useState(0);
+  const [analyzeTruncatedWarning, setAnalyzeTruncatedWarning] = useState<string | null>(null);
+  const [analyzeProgress, setAnalyzeProgress] = useState<MediationProgressState | null>(null);
+  /** Proposition de génération IA pour une langue dont le persona affiché est vide. */
+  const [langGeneratePrompt, setLangGeneratePrompt] = useState<{
+    lang: MediationUiLang;
+    emptyPersonaCount: number;
+  } | null>(null);
   const [artistSearch, setArtistSearch] = useState("");
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
   const [duplicateArtwork, setDuplicateArtwork] = useState<{ artwork_id: string; artwork_title: string | null } | null>(null);
@@ -182,6 +295,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [artistDialogOpen, setArtistDialogOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [notesFlash, setNotesFlash] = useState(false);
+  /** Édition : true tant que loadArtwork n’a pas fixé la baseline du brouillon */
+  const [artworkDraftLoading, setArtworkDraftLoading] = useState(false);
+  /** Points structurés renvoyés par l’analyse d’image (affichage tolérant, optionnel). */
+  const [imagePersonasFromAnalysis, setImagePersonasFromAnalysis] = useState<ImageAnalysisPersonaItem[]>([]);
 
   const selectedArtist = useMemo(
     () => artists.find((a) => a.artist_id === artistId) ?? null,
@@ -200,10 +317,76 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     [selectedArtist, title],
   );
 
+  /** UUID fiable pour UPDATE : la prop parent est fixée dès l’ouverture ; `editingArtworkId` ne l’est qu’après loadArtwork (fenêtre où la persistance IA était ignorée). */
+  const persistedArtworkId = useMemo(() => {
+    const a = artworkId?.trim() ?? "";
+    const b = editingArtworkId?.trim() ?? "";
+    return a || b || "";
+  }, [artworkId, editingArtworkId]);
+
+  const isEditingExisting = Boolean(persistedArtworkId);
+
+  useEffect(() => {
+    sourceMaterialRef.current = sourceMaterial;
+  }, [sourceMaterial]);
+
+  const persistArtworkSourceMaterial = useCallback(
+    async (material: string): Promise<void> => {
+      if (!persistedArtworkId) return;
+      const trimmed = material.trim();
+      const { data: updatedRows, error } = await supabase
+        .from("artworks")
+        .update({ artwork_source_material: trimmed || null })
+        .eq("artwork_id", persistedArtworkId)
+        .select("artwork_id");
+      if (error) throw error;
+      if (!updatedRows?.length) {
+        throw new Error(
+          "Aucune ligne mise à jour pour artwork_source_material (droits RLS ou œuvre introuvable).",
+        );
+      }
+      setInitialDraftSignature(
+        serializeDraftSnapshot(
+          buildDraftSnapshot({
+            title,
+            artistId,
+            artworkExpoId,
+            artworkAgencyId,
+            imageUrl,
+            sourceMaterial: trimmed,
+            descriptionsByLang,
+          }),
+        ),
+      );
+    },
+    [
+      persistedArtworkId,
+      title,
+      artistId,
+      artworkExpoId,
+      artworkAgencyId,
+      imageUrl,
+      descriptionsByLang,
+    ],
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setRegeneratingMediationStyleKey(null);
+      setMediationProgress(null);
+      setMediationOptionalLang(null);
+      setAnalyzeProgress(null);
+      return;
+    }
+    setMediationEditLang(mediationPrimaryLang);
+  }, [open, mediationPrimaryLang, setMediationOptionalLang]);
+
   useEffect(() => {
     if (!open) {
       setShowCloseConfirm(false);
       setRegeneratingQr(false);
+      setEditingArtworkId(null);
+      setArtworkDraftLoading(false);
       return;
     }
     let cancelled = false;
@@ -226,7 +409,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     const loadPromptStyles = async () => {
       let res = await supabase
         .from("prompt_style")
-        .select("id, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement, max_tokens")
+        .select(
+          "id, code, name_fr, name_en, name_de, name_es, name_it, icon, ordonnancement, max_tokens, style_rules, system_instruction",
+        )
         .order("ordonnancement", { ascending: true });
       if (res.error) {
         res = await supabase.from("prompt_style").select("*").order("id", { ascending: true });
@@ -240,7 +425,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       }
 
       const rows = data as PromptStyleRow[];
-      const allowedKeys: DescriptionKey[] = ["enfant", "expert", "ado", "conteur", "rap", "poetique", "simple", "neutre"];
+      const allowedKeys: DescriptionKey[] = [...MEDIATION_DESCRIPTION_KEYS];
       const normalize = (value: string | null | undefined): string =>
         (value ?? "")
           .normalize("NFD")
@@ -269,8 +454,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         const nameNorm = normalize(keySource);
 
         let key: DescriptionKey | null = null;
+        const codeNorm = normalize(typeof row.code === "string" ? row.code : "");
+        if (codeNorm && allowedKeys.includes(codeNorm as DescriptionKey)) {
+          key = codeNorm as DescriptionKey;
+        }
         const inferred = inferJsonKeyFromDisplayName(keySource);
-        if (inferred && allowedKeys.includes(inferred as DescriptionKey)) {
+        if (!key && inferred && allowedKeys.includes(inferred as DescriptionKey)) {
           key = inferred as DescriptionKey;
         }
         if (!key) {
@@ -299,11 +488,19 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
             : DEFAULT_STYLE_TABS.find((t) => t.key === key)?.maxTokens ?? 700;
         const iconTrim = (row.icon ?? "").trim() || null;
 
+        const styleRules =
+          typeof row.style_rules === "string" && row.style_rules.trim() ? row.style_rules.trim() : null;
+        const systemInstruction =
+          typeof row.system_instruction === "string" && row.system_instruction.trim()
+            ? row.system_instruction.trim()
+            : null;
         tabs.push({
           key,
           label,
           maxTokens,
           icon: iconTrim,
+          styleRules,
+          systemInstruction,
         });
       }
 
@@ -311,51 +508,60 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     };
 
     const loadArtwork = async (id: string) => {
-      const { data, error } = await supabase
-        .from("artworks")
-        .select(
-          "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_description, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url",
-        )
-        .eq("artwork_id", id)
-        .is("deleted_at", null)
-        .single();
-      if (cancelled) return;
-      if (error || !data) {
-        toast.error(error?.message ?? t("toast_error_artwork_load"));
-        onOpenChange(false);
-        return;
+      try {
+        const { data, error } = await supabase
+          .from("artworks")
+          .select(
+            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url",
+          )
+          .eq("artwork_id", id)
+          .is("deleted_at", null)
+          .single();
+        if (cancelled) return;
+        if (error || !data) {
+          toast.error(error?.message ?? t("toast_error_artwork_load"));
+          onOpenChange(false);
+          return;
+        }
+        const nextByLang = normalizeArtworkDescriptionToByLang(
+          (data as { artwork_description_i18n?: unknown }).artwork_description_i18n,
+        );
+        setEditingArtworkId(data.artwork_id as string);
+        setTitle((data.artwork_title as string | null) ?? "");
+        setArtistId((data.artwork_artist_id as string | null) ?? "");
+        setArtworkExpoId((data.artwork_expo_id as string | null) ?? "");
+        setArtworkAgencyId((data.artwork_agency_id as string | null) ?? "");
+        setImageUrl((data.artwork_image_url as string | null) ?? "");
+        const qrImg =
+          ((data as { artwork_qrcode_image?: string | null }).artwork_qrcode_image ?? "").trim() ||
+          ((data as { artwork_qr_code_url?: string | null }).artwork_qr_code_url ?? "").trim();
+        setArtworkQrImageUrl(qrImg);
+        setSourceMaterial((data.artwork_source_material as string | null) ?? "");
+        setImagePersonasFromAnalysis([]);
+        setDescriptionsByLang(nextByLang);
+        setMediationEditLang(resolveMediationUiLang(i18n.language));
+        const initialSnapshot = buildDraftSnapshot({
+          title: (data.artwork_title as string | null) ?? "",
+          artistId: (data.artwork_artist_id as string | null) ?? "",
+          artworkExpoId: (data.artwork_expo_id as string | null) ?? "",
+          artworkAgencyId: (data.artwork_agency_id as string | null) ?? "",
+          imageUrl: (data.artwork_image_url as string | null) ?? "",
+          sourceMaterial: (data.artwork_source_material as string | null) ?? "",
+          descriptionsByLang: nextByLang,
+        });
+        setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
+      } finally {
+        if (!cancelled) setArtworkDraftLoading(false);
       }
-      const nextByLang = normalizeArtworkDescriptionToByLang(data.artwork_description);
-      setEditingArtworkId(data.artwork_id as string);
-      setTitle((data.artwork_title as string | null) ?? "");
-      setArtistId((data.artwork_artist_id as string | null) ?? "");
-      setArtworkExpoId((data.artwork_expo_id as string | null) ?? "");
-      setArtworkAgencyId((data.artwork_agency_id as string | null) ?? "");
-      setImageUrl((data.artwork_image_url as string | null) ?? "");
-      const qrImg =
-        ((data as { artwork_qrcode_image?: string | null }).artwork_qrcode_image ?? "").trim() ||
-        ((data as { artwork_qr_code_url?: string | null }).artwork_qr_code_url ?? "").trim();
-      setArtworkQrImageUrl(qrImg);
-      setSourceMaterial((data.artwork_source_material as string | null) ?? "");
-      setDescriptionsByLang(nextByLang);
-      setMediationEditLang(resolveMediationUiLang(i18n.language));
-      const initialSnapshot = buildDraftSnapshot({
-        title: (data.artwork_title as string | null) ?? "",
-        artistId: (data.artwork_artist_id as string | null) ?? "",
-        artworkExpoId: (data.artwork_expo_id as string | null) ?? "",
-        artworkAgencyId: (data.artwork_agency_id as string | null) ?? "",
-        imageUrl: (data.artwork_image_url as string | null) ?? "",
-        sourceMaterial: (data.artwork_source_material as string | null) ?? "",
-        descriptionsByLang: nextByLang,
-      });
-      setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
     };
 
     void loadArtists();
     void loadPromptStyles();
     if (artworkId) {
+      setArtworkDraftLoading(true);
       void loadArtwork(artworkId);
     } else {
+      setArtworkDraftLoading(false);
       setEditingArtworkId(null);
       setTitle("");
       setArtistId("");
@@ -366,6 +572,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setImageUrl("");
       setArtworkQrImageUrl("");
       setSourceMaterial("");
+      setImagePersonasFromAnalysis([]);
       const emptyMed = createEmptyDescriptionsByLang();
       setDescriptionsByLang(emptyMed);
       setMediationEditLang(resolveMediationUiLang(i18n.language));
@@ -408,7 +615,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           return;
         }
 
-        if (editingArtworkId && existsResult.artworkId === editingArtworkId) {
+        if (persistedArtworkId && existsResult.artworkId === persistedArtworkId) {
           setDuplicateArtwork(null);
           return;
         }
@@ -430,7 +637,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, fingerprint, artistId, title, editingArtworkId]);
+  }, [open, fingerprint, artistId, title, persistedArtworkId]);
 
   const handleSave = async () => {
     if (isVisitorLocked) return;
@@ -445,6 +652,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     setIsSubmitting(true);
     let newArtworkId: string | null = null;
     try {
+      const serializedMediation = serializeMediationDescriptionsByLang(descriptionsByLang);
       const payload = {
         artwork_title: title.trim(),
         artwork_artist_id: artistId,
@@ -452,15 +660,24 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         artwork_agency_id: artworkAgencyId.trim() || null,
         artwork_image_url: imageUrl.trim() || null,
         artwork_source_material: sourceMaterial.trim() || null,
-        artwork_description: serializeMediationDescriptionsByLang(descriptionsByLang),
+        artwork_description_i18n: serializedMediation,
         artwork_fingerprint: fingerprint || null,
       };
 
-      if (editingArtworkId) {
-        const { error } = await supabase.from("artworks").update(payload).eq("artwork_id", editingArtworkId);
+      if (persistedArtworkId) {
+        const { data: updatedRows, error } = await supabase
+          .from("artworks")
+          .update(payload)
+          .eq("artwork_id", persistedArtworkId)
+          .select("artwork_id");
         if (error) throw error;
+        if (!updatedRows?.length) {
+          throw new Error(
+            "Aucune ligne mise à jour pour cette œuvre (droits RLS, œuvre supprimée ou id. invalide).",
+          );
+        }
         toast.success(t("toast_artwork_updated"));
-        void generateAndSaveQrCode(editingArtworkId, artworkExpoId.trim() || null).catch((e) => {
+        void generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null).catch((e) => {
           console.warn("[ArtworkModal] QR régénération échouée :", e);
         });
       } else {
@@ -490,10 +707,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   };
 
   const handleRegenerateQr = useCallback(async () => {
-    if (!editingArtworkId || isVisitorLocked) return;
+    if (!persistedArtworkId || isVisitorLocked) return;
     setRegeneratingQr(true);
     try {
-      const url = await generateAndSaveQrCode(editingArtworkId, artworkExpoId.trim() || null);
+      const url = await generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null);
       if (!url) {
         toast.error(t("toast_qr_regenerate_failed"));
         return;
@@ -507,7 +724,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     } finally {
       setRegeneratingQr(false);
     }
-  }, [editingArtworkId, isVisitorLocked, artworkExpoId, t]);
+  }, [persistedArtworkId, isVisitorLocked, artworkExpoId, t]);
 
   const selectedArtistLabel = useMemo(
     () => [selectedArtist?.artist_firstname, selectedArtist?.artist_lastname].filter(Boolean).join(" ").trim(),
@@ -567,9 +784,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     setArtistSearch(label);
   }, [selectedArtist?.artist_id]);
 
-  const canGenerateMediations = !isVisitorLocked && sourceMaterial.trim().length > 0 && !generatingMediation;
+  const canGenerateMediations =
+    !isVisitorLocked &&
+    sourceMaterial.trim().length > 0 &&
+    !generatingMediation &&
+    regeneratingMediationStyleKey === null &&
+    !analyzingImage;
+
   const canAnalyzeImage = !isVisitorLocked && Boolean(imageUrl) && !analyzingImage;
-  const isAiBusy = generatingMediation || analyzingImage;
+
+  const mediationLangHelp = useMemo(() => {
+    if (isAllLanguagesMode) {
+      return t("mediation_lang_help_all");
+    }
+    if (mediationOptionalLang) {
+      return t("mediation_lang_help_single_optional", {
+        primary: mediationPrimaryLang.toUpperCase(),
+        optional: mediationOptionalLang.toUpperCase(),
+      });
+    }
+    return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
+  }, [isAllLanguagesMode, mediationOptionalLang, mediationPrimaryLang, t]);
+
+  const isAiBusy =
+    generatingMediation || regeneratingMediationStyleKey !== null || analyzingImage;
   const currentDraftSignature = useMemo(() => {
     const snapshot = buildDraftSnapshot({
       title,
@@ -582,7 +820,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     });
     return serializeDraftSnapshot(snapshot);
   }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterial, descriptionsByLang]);
-  const hasUnsavedChanges = Boolean(initialDraftSignature) && currentDraftSignature !== initialDraftSignature;
+  const hasUnsavedChanges =
+    !artworkDraftLoading && currentDraftSignature !== initialDraftSignature;
 
   const requestCloseModal = () => {
     if (isAiBusy) return;
@@ -592,24 +831,6 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
     onOpenChange(false);
   };
-  const analyzeElapsedSec = useMemo(() => {
-    if (!analyzingImage || !analyzeStartedAt) return 0;
-    return Math.max(0, Math.floor((Date.now() - analyzeStartedAt) / 1000));
-  }, [analyzingImage, analyzeStartedAt, analyzeTick]);
-  const analyzeProgressMessage = useMemo(() => {
-    if (!analyzingImage) return t("analyze_init_msg");
-    if (analyzeElapsedSec < 10) return t("analyze_step_1");
-    if (analyzeElapsedSec < 20) return t("analyze_step_2");
-    if (analyzeElapsedSec < 30) return t("analyze_step_3");
-    return t("analyze_step_4");
-  }, [analyzingImage, analyzeElapsedSec, t]);
-
-  useEffect(() => {
-    if (!analyzingImage) return;
-    const interval = window.setInterval(() => setAnalyzeTick((t) => t + 1), 1000);
-    return () => window.clearInterval(interval);
-  }, [analyzingImage]);
-
   const handleAnalyzeImage = async () => {
     if (!imageUrl) return;
     if (isVisitorLocked) return;
@@ -618,36 +839,82 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       return;
     }
     setAnalyzeImageError(null);
+    setAnalyzeTruncatedWarning(null);
     setAnalyzingImage(true);
-    setAnalyzeStartedAt(Date.now());
-    setAnalyzeTick(0);
+    let apiProgressTimer: number | null = null;
     try {
+      setAnalyzeProgress({ percent: 5, detail: t("analyze_progress_prepare") });
       const prepared = await prepareArtworkImageForAnalysis({
         imageUrl,
         maxWidthPx: 1200,
         maxBytes: 2_000_000,
       });
-      const { notes } = await analyzeArtworkImage(
+      setAnalyzeProgress({ percent: 14, detail: t("analyze_progress_send") });
+      const apiStart = Date.now();
+      apiProgressTimer = window.setInterval(() => {
+        const elapsedMs = Date.now() - apiStart;
+        const elapsedSec = Math.floor(elapsedMs / 1000);
+        const percent = Math.min(
+          90,
+          14 + Math.round((elapsedMs / ANALYZE_PROGRESS_ESTIMATE_MS) * 76),
+        );
+        setAnalyzeProgress({
+          percent,
+          detail: analyzeProgressDetailFromElapsed(elapsedSec, t),
+        });
+      }, 400);
+
+      const analyzeResult = await analyzeArtworkImage(
         prepared.kind === "inline"
           ? {
               inlineImage: { mimeType: prepared.mimeType, base64Data: prepared.base64Data },
               artistName: selectedArtistLabel || selectedArtistDisplay,
+              artworkName: title.trim(),
             }
           : {
               imageUrl: prepared.imageUrl,
               artistName: selectedArtistLabel || selectedArtistDisplay,
+              artworkName: title.trim(),
             },
       );
-      // Injection automatique : l'utilisateur peut ensuite éditer.
+      if (apiProgressTimer) {
+        window.clearInterval(apiProgressTimer);
+        apiProgressTimer = null;
+      }
+      if (import.meta.env.DEV) {
+        console.log("Données reçues par le Front-End (analyze-artwork-image, normalisé) :", analyzeResult);
+      }
+      setAnalyzeProgress({ percent: 92, detail: t("analyze_progress_finalize") });
+      if (analyzeResult.truncated) {
+        const maxTok = analyzeResult.max_output_tokens ?? 2000;
+        const warnMsg = t("toast_analyze_truncated", { max: maxTok });
+        toast.warning(warnMsg, { duration: 15_000 });
+        setAnalyzeTruncatedWarning(warnMsg);
+      }
+      const notes = analyzeResult.notes;
+      sourceMaterialRef.current = notes;
       setSourceMaterial(notes);
+      setImagePersonasFromAnalysis(Array.isArray(analyzeResult.personas) ? analyzeResult.personas : []);
+      if (persistedArtworkId) {
+        try {
+          await persistArtworkSourceMaterial(notes);
+        } catch (persistErr) {
+          const persistMsg =
+            persistErr instanceof Error ? persistErr.message : t("toast_error_source_persist");
+          toast.error(persistMsg);
+        }
+      }
       setNotesFlash(true);
       window.setTimeout(() => setNotesFlash(false), 1200);
+      setAnalyzeProgress({ percent: 100, detail: t("analyze_progress_done") });
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {
       const msg = e instanceof Error ? e.message : t("toast_error_analyze");
       setAnalyzeImageError(msg);
     } finally {
+      if (apiProgressTimer) window.clearInterval(apiProgressTimer);
       setAnalyzingImage(false);
-      setAnalyzeStartedAt(null);
+      setAnalyzeProgress(null);
     }
   };
 
@@ -673,6 +940,186 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
   };
 
+  const persistMediationToArtwork = async (
+    base: ReturnType<typeof createEmptyDescriptionsByLang>,
+    successToastKey: string,
+    toastParams?: Record<string, string | number>,
+  ) => {
+    if (persistedArtworkId) {
+      const serializedMediation = serializeMediationDescriptionsByLang(base);
+      const { data: updatedRows, error: persistErr } = await supabase
+        .from("artworks")
+        .update({ artwork_description_i18n: serializedMediation })
+        .eq("artwork_id", persistedArtworkId)
+        .select("artwork_id");
+      if (persistErr) {
+        toast.error(persistErr.message || t("toast_error_save"));
+        return false;
+      }
+      if (!updatedRows?.length) {
+        toast.error(
+          t("toast_error_save") +
+            " — aucune ligne mise à jour (vérifiez RLS ou que l’œuvre existe).",
+        );
+        return false;
+      }
+      setInitialDraftSignature(
+        serializeDraftSnapshot(
+          buildDraftSnapshot({
+            title,
+            artistId,
+            artworkExpoId,
+            artworkAgencyId,
+            imageUrl,
+            sourceMaterial,
+            descriptionsByLang: base,
+          }),
+        ),
+      );
+    }
+    toast.success(t(successToastKey, toastParams));
+    return true;
+  };
+
+  const handleGenerateAllPersonasForLang = async (
+    lang: MediationUiLang,
+    options?: { onlyFillEmpty?: boolean },
+  ) => {
+    if (isVisitorLocked) return;
+    if (!artistId) {
+      toast.error(t("toast_error_artist_generate"));
+      return;
+    }
+    if (!sourceMaterial.trim()) {
+      toast.error(t("toast_error_source_required"));
+      return;
+    }
+    const onlyFillEmpty = options?.onlyFillEmpty ?? true;
+    setGeneratingMediation(true);
+    setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
+    try {
+      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      if (persistedArtworkId) {
+        setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
+        await persistArtworkSourceMaterial(materialForMediation);
+        setMediationProgress({
+          percent: MEDIATION_GENERATION_PROGRESS.persist.end,
+          detail: t("mediation_progress_persist"),
+        });
+      }
+      const sourceText = [
+        title.trim() ? `Titre: ${title.trim()}` : "",
+        selectedArtistLabel ? `Artiste: ${selectedArtistLabel}` : "",
+        materialForMediation,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const stylesPayload = styleTabsToMediationPayload(styleTabs ?? []);
+
+      const base = createEmptyDescriptionsByLang();
+      for (const L of MEDIATION_UI_LANGS) {
+        for (const k of MEDIATION_DESCRIPTION_KEYS) {
+          base[L][k] = descriptionsByLang[L][k];
+        }
+      }
+
+      const stylesToRun = onlyFillEmpty
+        ? stylesPayload.filter((s) => !(base[lang][s.id as DescriptionKey] ?? "").trim())
+        : stylesPayload;
+
+      if (stylesToRun.length === 0) {
+        setMediationEditLang(lang);
+        return;
+      }
+
+      const missingSlots: string[] = [];
+      const stepDetail = t("mediation_progress_lang_all_personas", {
+        lang: langCodeForProgress(lang),
+        personas: stylesToRun.length,
+        current: 1,
+        total: 1,
+      });
+      const updateStepProgress = (sub: number) => {
+        setMediationProgress({
+          percent: mediationPercentByStep(0, 1, sub),
+          detail: stepDetail,
+        });
+      };
+
+      const { stylesById, analyseGlobale } = await runWithMediationSubProgress(
+        () => generatePersonasBatchWithRetry(sourceText, stylesToRun, lang),
+        updateStepProgress,
+      );
+      if (lang === mediationPrimaryLang && analyseGlobale) {
+        setLastMediationAnalyseFr(analyseGlobale);
+      }
+
+      for (const style of stylesToRun) {
+        const styleKey = style.id as DescriptionKey;
+        const personaLabel = style.label?.trim() || style.id;
+        const text = stylesById[style.id] ?? "";
+        if (CANONICAL_MEDIATION_STYLE_SET.has(styleKey)) {
+          base[lang][styleKey] = text;
+        }
+        if (!text) {
+          missingSlots.push(`${personaLabel} (${langCodeForProgress(lang)})`);
+        }
+      }
+
+      setDescriptionsByLang(base);
+      setMediationEditLang(lang);
+
+      if (missingSlots.length > 0) {
+        toast.warning(
+          t("toast_mediation_partial", {
+            count: missingSlots.length,
+            examples: missingSlots.slice(0, 4).join(", "),
+          }),
+        );
+      }
+
+      setMediationProgress({
+        percent: MEDIATION_GENERATION_PROGRESS.save.start,
+        detail: t("mediation_progress_save"),
+      });
+      await persistMediationToArtwork(base, "toast_mediation_lang_generated", {
+        lang: langCodeForProgress(lang),
+        count: stylesToRun.length,
+      });
+      setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t("toast_error_generate");
+      toast.error(msg);
+    } finally {
+      setGeneratingMediation(false);
+      setMediationProgress(null);
+    }
+  };
+
+  const handleMediationLangSelect = (lng: MediationUiLang) => {
+    if (lng === mediationEditLang) return;
+    if (isVisitorLocked || isAiBusy) {
+      setMediationEditLang(lng);
+      return;
+    }
+    const currentPersonaEmpty = !(descriptionsByLang[lng]?.[activeTab] ?? "").trim();
+    if (!currentPersonaEmpty) {
+      setMediationEditLang(lng);
+      return;
+    }
+    if (!sourceMaterial.trim()) {
+      toast.error(t("toast_error_source_required"));
+      setMediationEditLang(lng);
+      return;
+    }
+    const emptyPersonaCount = (styleTabs ?? []).filter(
+      (tab) => !(descriptionsByLang[lng]?.[tab.key] ?? "").trim(),
+    ).length;
+    setMediationEditLang(lng);
+    setLangGeneratePrompt({ lang: lng, emptyPersonaCount });
+  };
+
   const handleGenerateMediations = async () => {
     if (isVisitorLocked) return;
     if (!artistId) {
@@ -684,19 +1131,26 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       return;
     }
     setGeneratingMediation(true);
+    setLastMediationAnalyseFr(null);
+    setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
     try {
+      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      if (persistedArtworkId) {
+        setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
+        await persistArtworkSourceMaterial(materialForMediation);
+        setMediationProgress({
+          percent: MEDIATION_GENERATION_PROGRESS.persist.end,
+          detail: t("mediation_progress_persist"),
+        });
+      }
       const sourceText = [
         title.trim() ? `Titre: ${title.trim()}` : "",
         selectedArtistLabel ? `Artiste: ${selectedArtistLabel}` : "",
-        sourceMaterial.trim(),
+        materialForMediation,
       ]
         .filter(Boolean)
         .join("\n");
-      const stylesPayload = styleTabs.map((style) => ({
-        id: style.key,
-        label: style.label,
-        max_tokens: style.maxTokens,
-      }));
+      const stylesPayload = styleTabsToMediationPayload(styleTabs ?? []);
 
       const base = createEmptyDescriptionsByLang();
       for (const L of MEDIATION_UI_LANGS) {
@@ -705,25 +1159,171 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         }
       }
 
-      for (const lang of MEDIATION_UI_LANGS) {
-        const generated = await generateMediation({
-          sourceText,
-          styles: stylesPayload,
-          lang,
+      const langsToGenerate = generationLangs;
+      const totalSteps = langsToGenerate.length;
+      const missingSlots: string[] = [];
+
+      for (let stepIndex = 0; stepIndex < langsToGenerate.length; stepIndex++) {
+        const lang = langsToGenerate[stepIndex];
+        const stepDetail = t("mediation_progress_lang_all_personas", {
+          lang: langCodeForProgress(lang),
+          personas: stylesPayload.length,
+          current: stepIndex + 1,
+          total: totalSteps,
         });
-        for (const tab of styleTabs) {
-          base[lang][tab.key] = (generated[tab.key] ?? "").trim();
+        const updateStepProgress = (sub: number) => {
+          setMediationProgress({
+            percent: mediationPercentByStep(stepIndex, totalSteps, sub),
+            detail: stepDetail,
+          });
+        };
+
+        const { stylesById, analyseGlobale } = await runWithMediationSubProgress(
+          () => generatePersonasBatchWithRetry(sourceText, stylesPayload, lang),
+          updateStepProgress,
+        );
+        if (lang === mediationPrimaryLang && analyseGlobale) {
+          setLastMediationAnalyseFr(analyseGlobale);
+        }
+
+        for (const style of stylesPayload) {
+          const styleKey = style.id as DescriptionKey;
+          const personaLabel = style.label?.trim() || style.id;
+          const text = stylesById[style.id] ?? "";
+          if (CANONICAL_MEDIATION_STYLE_SET.has(styleKey)) {
+            base[lang][styleKey] = text;
+          }
+          if (!text) {
+            missingSlots.push(`${personaLabel} (${langCodeForProgress(lang)})`);
+          }
         }
       }
 
       setDescriptionsByLang(base);
-      setActiveTab(styleTabs[0].key);
-      toast.success(t("toast_mediation_generated"));
+
+      if (missingSlots.length > 0) {
+        toast.warning(
+          t("toast_mediation_partial", {
+            count: missingSlots.length,
+            examples: missingSlots.slice(0, 4).join(", "),
+          }),
+        );
+      }
+
+      setMediationProgress({
+        percent: MEDIATION_GENERATION_PROGRESS.save.start,
+        detail: t("mediation_progress_save"),
+      });
+      await persistMediationToArtwork(base, "toast_mediation_generated");
+      setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {
       const msg = e instanceof Error ? e.message : t("toast_error_generate");
       toast.error(msg);
     } finally {
       setGeneratingMediation(false);
+      setMediationProgress(null);
+    }
+  };
+
+  const handleRegenerateMediationForStyle = async (styleKey: DescriptionKey) => {
+    if (isVisitorLocked) return;
+    if (!artistId) {
+      toast.error(t("toast_error_artist_generate"));
+      return;
+    }
+    if (!sourceMaterial.trim()) {
+      toast.error(t("toast_error_source_required"));
+      return;
+    }
+    const tab = (styleTabs ?? []).find((s) => s.key === styleKey);
+    if (!tab) {
+      toast.error(t("toast_error_style_tab_unknown"));
+      return;
+    }
+    setRegeneratingMediationStyleKey(styleKey);
+    setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
+    try {
+      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      if (persistedArtworkId) {
+        setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
+        await persistArtworkSourceMaterial(materialForMediation);
+        setMediationProgress({
+          percent: MEDIATION_GENERATION_PROGRESS.persist.end,
+          detail: t("mediation_progress_persist"),
+        });
+      }
+      const sourceText = [
+        title.trim() ? `Titre: ${title.trim()}` : "",
+        selectedArtistLabel ? `Artiste: ${selectedArtistLabel}` : "",
+        materialForMediation,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const stylesPayload = [
+        {
+          id: tab.key,
+          label: tab.label,
+          max_tokens: tab.maxTokens,
+          style_rules: tab.styleRules ?? undefined,
+          system_instruction: tab.systemInstruction ?? undefined,
+        },
+      ];
+
+      const base = createEmptyDescriptionsByLang();
+      for (const L of MEDIATION_UI_LANGS) {
+        for (const k of MEDIATION_DESCRIPTION_KEYS) {
+          base[L][k] = descriptionsByLang[L][k];
+        }
+      }
+
+      const langsToGenerate = generationLangs;
+      for (let i = 0; i < langsToGenerate.length; i++) {
+        const lang = langsToGenerate[i];
+        const langDetail = t("mediation_progress_lang", {
+          lang: langCodeForProgress(lang),
+          current: i + 1,
+          total: langsToGenerate.length,
+        });
+        const updateLangProgress = (sub: number) => {
+          setMediationProgress({
+            percent: mediationPercentByStep(i, langsToGenerate.length, sub),
+            detail: langDetail,
+          });
+        };
+        const generated = await runWithMediationSubProgress(
+          () =>
+            generateMediation({
+              sourceText,
+              styles: stylesPayload,
+              lang,
+            }),
+          updateLangProgress,
+        );
+        if (lang === mediationPrimaryLang) {
+          setLastMediationAnalyseFr(generated.analyseGlobale.trim() || null);
+        }
+        base[lang][styleKey] = (generated.stylesById[tab.key] ?? "").trim();
+      }
+
+      setDescriptionsByLang(base);
+      setMediationProgress({
+        percent: MEDIATION_GENERATION_PROGRESS.save.start,
+        detail: t("mediation_progress_save"),
+      });
+
+      await persistMediationToArtwork(base, "toast_mediation_style_regenerated", {
+        label: tab.label,
+        count: langsToGenerate.length,
+      });
+      setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t("toast_error_generate");
+      toast.error(msg);
+    } finally {
+      setRegeneratingMediationStyleKey(null);
+      setMediationProgress(null);
     }
   };
 
@@ -772,32 +1372,59 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]",
         )}
       >
-        <DialogTitle className="sr-only">{editingArtworkId ? t("title_edit") : t("title_new")}</DialogTitle>
+        <DialogTitle className="sr-only">{isEditingExisting ? t("title_edit") : t("title_new")}</DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
-              {editingArtworkId ? t("title_edit") : t("title_new")}
+              {isEditingExisting ? t("title_edit") : t("title_new")}
             </h2>
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 className={
-                  editingArtworkId
-                    ? `h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] ${
-                        !hasUnsavedChanges ? "invisible pointer-events-none" : ""
-                      }`
+                  isEditingExisting
+                    ? cn(
+                        "h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold",
+                        "hover:bg-[#ffecef] hover:text-[#c92f3b]",
+                        !hasUnsavedChanges && "opacity-40",
+                      )
                     : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
                 }
-                disabled={isVisitorLocked || isSubmitting || isLoading || isAiBusy || regeneratingQr}
+                disabled={
+                  isVisitorLocked ||
+                  isSubmitting ||
+                  isLoading ||
+                  isAiBusy ||
+                  regeneratingQr ||
+                  (isEditingExisting && (artworkDraftLoading || !hasUnsavedChanges))
+                }
                 onClick={() => void handleSave()}
               >
                 {isSubmitting ? t("btn_saving") : t("btn_save")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-md text-white hover:bg-white/20 hover:text-white"
+                disabled={isAiBusy || artistDialogOpen}
+                aria-label={t("btn_close_aria")}
+                onClick={() => {
+                  if (isAiBusy || artistDialogOpen) return;
+                  if (hasUnsavedChanges) {
+                    setShowCloseConfirm(true);
+                    return;
+                  }
+                  onOpenChange(false);
+                }}
+              >
+                <X className="h-5 w-5" aria-hidden />
               </Button>
             </div>
           </div>
         </div>
         <DialogDescription className="sr-only">
-          {editingArtworkId ? t("dialog_edit_desc") : t("dialog_new_desc")}
+          {isEditingExisting ? t("dialog_edit_desc") : t("dialog_new_desc")}
         </DialogDescription>
 
 
@@ -809,7 +1436,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           </Alert>
         )}
 
-        {duplicateArtwork && !editingArtworkId && (
+        {duplicateArtwork && !artworkId?.trim() && (
           <Alert variant="destructive" className="border-destructive/60">
             <AlertTitle>{t("alert_duplicate_title")}</AlertTitle>
             <AlertDescription>{t("alert_duplicate_desc")}</AlertDescription>
@@ -914,7 +1541,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   </p>
                 )}
 
-                {editingArtworkId && !isVisitorLocked && (
+                {isEditingExisting && !isVisitorLocked && (
                   <>
                     <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
                     <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
@@ -1012,15 +1639,6 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   )}
                 </div>
               </div>
-            {analyzingImage && (
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-                <p className="inline-flex items-center gap-2 text-sm font-medium">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("analyze_init_msg")}
-                </p>
-                <p className="mt-1 text-xs">{analyzeProgressMessage}</p>
-              </div>
-            )}
             {!analyzingImage && analyzeImageError && (
               <Alert variant="destructive">
                 <AlertTitle>{t("analyze_error_title")}</AlertTitle>
@@ -1051,12 +1669,21 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
           <div className="space-y-2">
             <Label>{t("label_source_material")}</Label>
+            {analyzingImage && analyzeProgress ? (
+              <GenerationProgressBar
+                percent={analyzeProgress.percent}
+                detail={analyzeProgress.detail}
+                ariaLabel={t("analyze_progress_aria", {
+                  percent: Math.round(analyzeProgress.percent),
+                })}
+              />
+            ) : null}
             <Textarea
               value={sourceMaterial}
               onChange={(e) => setSourceMaterial(e.target.value)}
-              disabled={isVisitorLocked || isLoading}
+              disabled={isVisitorLocked || isLoading || analyzingImage}
               className={cn(
-                "w-full min-h-[170px] text-sm transition-colors",
+                "w-full min-h-[170px] text-xs leading-relaxed transition-colors placeholder:text-xs",
                 notesFlash ? "border-amber-400 ring-2 ring-amber-300" : "",
               )}
               placeholder={t("source_material_placeholder")}
@@ -1064,16 +1691,75 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
             <p className="text-xs text-muted-foreground">
               {t("source_material_help")}
             </p>
+            {analyzeTruncatedWarning ? (
+              <Alert className="border-amber-300/80 bg-amber-50 text-amber-950">
+                <AlertTitle>{t("analyze_truncated_title")}</AlertTitle>
+                <AlertDescription className="text-xs">{analyzeTruncatedWarning}</AlertDescription>
+              </Alert>
+            ) : null}
+            {(imagePersonasFromAnalysis ?? []).length > 0 ? (
+              <details className="rounded-md border border-amber-200/60 bg-background/90 px-3 py-2 text-xs">
+                <summary className="cursor-pointer font-medium text-amber-950/90 hover:underline">
+                  {t("analyze_personas_toggle")}
+                </summary>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t("analyze_personas_hint")}</p>
+                <ul className="mt-2 list-none space-y-3 p-0">
+                  {(imagePersonasFromAnalysis ?? []).map((persona, idx) => (
+                    <li
+                      key={`${String(persona.title)}-${idx}`}
+                      className="rounded border border-border/40 bg-muted/20 p-2"
+                    >
+                      <p className="font-semibold text-amber-950">{persona.title || "—"}</p>
+                      {persona.tone ? (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {t("analyze_persona_tone")}: {persona.tone}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-foreground">
+                        {persona.description}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+            {allowsOptionalLang ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200/70 bg-amber-50/50 px-3 py-2">
+                <Label htmlFor="mediation-optional-lang" className="text-xs text-amber-950 shrink-0">
+                  {t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
+                </Label>
+                <select
+                  id="mediation-optional-lang"
+                  className="h-8 min-w-[5.5rem] rounded-md border border-amber-300/60 bg-background px-2 text-xs font-semibold text-amber-950"
+                  value={mediationOptionalLang ?? ""}
+                  disabled={generatingMediation || regeneratingMediationStyleKey !== null || isLoading}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setMediationOptionalLang(
+                      v && isMediationUiLang(v) ? v : null,
+                    );
+                  }}
+                >
+                  <option value="">{t("mediation_optional_lang_none")}</option>
+                  {MEDIATION_UI_LANGS.filter((lng) => lng !== mediationPrimaryLang).map((lng) => (
+                    <option key={lng} value={lng}>
+                      {lng.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                <p className="w-full text-[11px] text-muted-foreground">{t("mediation_optional_lang_hint")}</p>
+              </div>
+            ) : null}
             <Button
               type="button"
               variant="secondary"
               className="gap-2 border border-amber-300/60 bg-amber-50 text-amber-900 hover:bg-amber-100"
-              disabled={!canGenerateMediations || isLoading || generatingMediation}
+              disabled={!canGenerateMediations || isLoading}
               onClick={() => void handleGenerateMediations()}
             >
               {generatingMediation ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
                   {t("btn_generating")}
                 </>
               ) : sourceMaterial.trim().length === 0 ? (
@@ -1082,8 +1768,82 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 t("btn_generate")
               )}
             </Button>
+            {generatingMediation && mediationProgress ? (
+              <div className="pt-1">
+                <MediationGenerationProgressBar
+                  percent={mediationProgress.percent}
+                  detail={mediationProgress.detail}
+                />
+              </div>
+            ) : null}
+            {lastMediationAnalyseFr ? (
+              <details className="mt-2 rounded-md border border-amber-200/60 bg-background/90 px-3 py-2 text-xs">
+                <summary className="cursor-pointer font-medium text-amber-950/90 hover:underline">
+                  {t("mediation_ai_analysis_toggle")}
+                </summary>
+                <p className="mt-1 text-[11px] text-muted-foreground">{t("mediation_ai_analysis_hint")}</p>
+                <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded border border-border/40 bg-muted/30 p-2 text-[11px] leading-relaxed text-foreground">
+                  {lastMediationAnalyseFr}
+                </pre>
+              </details>
+            ) : null}
           </div>
         </div>
+        <AlertDialog
+          open={langGeneratePrompt !== null}
+          onOpenChange={(open) => {
+            if (!open && langGeneratePrompt) {
+              setMediationEditLang(langGeneratePrompt.lang);
+              setLangGeneratePrompt(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {langGeneratePrompt
+                  ? t("dialog_lang_generate_title", {
+                      lang: langCodeForProgress(langGeneratePrompt.lang),
+                    })
+                  : ""}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {langGeneratePrompt
+                  ? t("dialog_lang_generate_desc", {
+                      lang: langCodeForProgress(langGeneratePrompt.lang),
+                      count: langGeneratePrompt.emptyPersonaCount,
+                      persona: (styleTabs ?? []).find((s) => s.key === activeTab)?.label ?? activeTab,
+                    })
+                  : ""}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  if (langGeneratePrompt) {
+                    setMediationEditLang(langGeneratePrompt.lang);
+                  }
+                  setLangGeneratePrompt(null);
+                }}
+              >
+                {t("dialog_lang_generate_no")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-amber-700 text-white hover:bg-amber-800"
+                onClick={() => {
+                  const lng = langGeneratePrompt?.lang;
+                  setLangGeneratePrompt(null);
+                  if (lng) {
+                    void handleGenerateAllPersonasForLang(lng, { onlyFillEmpty: true });
+                  }
+                }}
+              >
+                {t("dialog_lang_generate_yes")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1120,16 +1880,17 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   "h-8 min-w-[2.75rem] px-2 text-xs font-semibold",
                   mediationEditLang === lng ? "bg-amber-700 text-white hover:bg-amber-800" : "border-amber-300/60",
                 )}
-                onClick={() => setMediationEditLang(lng)}
+                disabled={isAiBusy || isLoading}
+                onClick={() => handleMediationLangSelect(lng)}
               >
                 {lng.toUpperCase()}
               </Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">{t("mediation_lang_help")}</p>
+          <p className="text-xs text-muted-foreground">{mediationLangHelp}</p>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
             <TabsList className="grid w-full grid-cols-4 gap-2 rounded-none border-0 bg-transparent p-2 text-amber-900 shadow-none [grid-auto-rows:minmax(0,auto)]">
-              {styleTabs.map((tab) => (
+              {(styleTabs ?? []).map((tab) => (
                 <TabsTrigger
                   key={tab.key}
                   value={tab.key}
@@ -1148,22 +1909,62 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 </TabsTrigger>
               ))}
             </TabsList>
-            {styleTabs.map((tab) => {
+            {(styleTabs ?? []).map((tab) => {
               const placeholderLabel = [tab.icon?.trim(), tab.label.trim()].filter(Boolean).join(" ").trim();
               return (
               <TabsContent key={tab.key} value={tab.key}>
+                <div className="mb-2 space-y-2">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 border-amber-300/60 text-amber-900 hover:bg-amber-50"
+                      disabled={
+                        isVisitorLocked ||
+                        isLoading ||
+                        !artistId ||
+                        !sourceMaterial.trim() ||
+                        generatingMediation ||
+                        regeneratingMediationStyleKey !== null
+                      }
+                      aria-label={t("btn_regenerate_style_ai_aria", { label: tab.label })}
+                      onClick={() => void handleRegenerateMediationForStyle(tab.key)}
+                    >
+                      {regeneratingMediationStyleKey === tab.key ? (
+                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      )}
+                      {regeneratingMediationStyleKey === tab.key
+                        ? t("btn_regenerating_style_ai")
+                        : t("btn_regenerate_style_ai")}
+                    </Button>
+                  </div>
+                  {regeneratingMediationStyleKey === tab.key && mediationProgress ? (
+                    <MediationGenerationProgressBar
+                      percent={mediationProgress.percent}
+                      detail={mediationProgress.detail}
+                    />
+                  ) : null}
+                </div>
                 <Textarea
-                  value={descriptionsByLang[mediationEditLang][tab.key]}
+                  value={(descriptionsByLang?.[mediationEditLang] ?? {})[tab.key] ?? ""}
                   onChange={(e) =>
                     setDescriptionsByLang((prev) => ({
                       ...prev,
                       [mediationEditLang]: {
-                        ...prev[mediationEditLang],
+                        ...(prev[mediationEditLang] ?? {}),
                         [tab.key]: e.target.value,
                       },
                     }))
                   }
-                  disabled={isVisitorLocked || isLoading}
+                  disabled={
+                    isVisitorLocked ||
+                    isLoading ||
+                    generatingMediation ||
+                    regeneratingMediationStyleKey !== null
+                  }
                   className="min-h-[140px] w-full text-sm"
                   placeholder={t("tab_version_placeholder", { label: placeholderLabel })}
                 />

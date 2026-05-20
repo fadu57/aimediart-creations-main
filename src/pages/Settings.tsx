@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import {
-  ALL_SETTINGS_PAGE_KEYS,
+  APP_SETTINGS_INITIAL_FETCH_KEYS,
+  DEFAULT_MEDIATION_GENERATION,
   DEFAULT_IDENTITY,
   DEFAULT_LANGUAGE,
   DEFAULT_LINKS_QR,
@@ -22,6 +25,8 @@ import {
   SETTINGS_KEYS,
   stringifySetting,
   type SecurityMatrixPermissions,
+  type SettingsMediationGeneration,
+  type SettingsMediationGenerationMode,
   type SettingsGeneralIdentity,
   type SettingsGeneralLanguage,
   type SettingsGeneralLimits,
@@ -43,10 +48,16 @@ import { useTranslation } from "react-i18next";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { approxOutputTokensFromMaxChars } from "@/lib/charsToOutputTokens";
+import {
+  approxMaxCharsFromOutputTokens,
+  approxOutputTokensFromMaxChars,
+  clampGeminiOutputTokens,
+} from "@/lib/charsToOutputTokens";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
-import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2 } from "lucide-react";
+import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
+import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2, Sparkles } from "lucide-react";
 import RetentionSettings from "@/components/settings/RetentionSettings";
+import { AiModelControlPanel } from "@/components/settings/AiModelControlPanel";
 
 type SettingSection = {
   id: string;
@@ -306,6 +317,7 @@ function PermissionCell({
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation("settings");
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const sectionsCatalog = useMemo((): SettingSection[] => [
     {
@@ -333,6 +345,12 @@ export default function SettingsPage() {
       icon: BrainCircuit,
     },
     {
+      id: "ai-control",
+      title: t("section_ai_control_title"),
+      description: t("section_ai_control_desc"),
+      icon: Sparkles,
+    },
+    {
       id: "visitors",
       title: t("section_visitors_title"),
       description: t("section_visitors_desc"),
@@ -351,6 +369,27 @@ export default function SettingsPage() {
       icon: SlidersHorizontal,
     },
   ], [t]);
+
+  const sectionIdSet = useMemo(() => new Set(sectionsCatalog.map((s) => s.id)), [sectionsCatalog]);
+  const accordionSectionParam = searchParams.get("section");
+  const accordionOpenValue =
+    accordionSectionParam != null && sectionIdSet.has(accordionSectionParam) ? accordionSectionParam : undefined;
+
+  const setAccordionSectionInUrl = useCallback(
+    (value: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set("section", value);
+          else next.delete("section");
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const [search, setSearch] = useState("");
   const [roleLabelsById, setRoleLabelsById] = useState<Record<number, string>>({});
   const [appSettingsRows, setAppSettingsRows] = useState<AppSettingRow[]>([]);
@@ -380,6 +419,9 @@ export default function SettingsPage() {
 
   const [identity, setIdentity] = useState<SettingsGeneralIdentity>(DEFAULT_IDENTITY);
   const [language, setLanguage] = useState<SettingsGeneralLanguage>(DEFAULT_LANGUAGE);
+  const [mediationGeneration, setMediationGeneration] = useState<SettingsMediationGeneration>(
+    DEFAULT_MEDIATION_GENERATION,
+  );
   const [linksQr, setLinksQr] = useState<SettingsGeneralLinksQr>(DEFAULT_LINKS_QR);
   const [limits, setLimits] = useState<SettingsGeneralLimits>(DEFAULT_LIMITS);
   const [maintenance, setMaintenance] = useState<SettingsGeneralMaintenance>(DEFAULT_MAINTENANCE);
@@ -412,6 +454,13 @@ export default function SettingsPage() {
   useEffect(() => {
     setIdentity(parseJsonSetting<SettingsGeneralIdentity>(getRawSettingValue(SETTINGS_KEYS.generalIdentity), DEFAULT_IDENTITY));
     setLanguage(parseJsonSetting<SettingsGeneralLanguage>(getRawSettingValue(SETTINGS_KEYS.generalLanguage), DEFAULT_LANGUAGE));
+    const parsedMediationGen = parseJsonSetting<SettingsMediationGeneration>(
+      getRawSettingValue(SETTINGS_KEYS.mediationGeneration),
+      DEFAULT_MEDIATION_GENERATION,
+    );
+    setMediationGeneration({
+      mode: parsedMediationGen.mode === "all_languages" ? "all_languages" : "single_plus_optional",
+    });
     setLinksQr(parseJsonSetting<SettingsGeneralLinksQr>(getRawSettingValue(SETTINGS_KEYS.generalLinksQr), DEFAULT_LINKS_QR));
     setLimits(parseJsonSetting<SettingsGeneralLimits>(getRawSettingValue(SETTINGS_KEYS.generalLimits), DEFAULT_LIMITS));
     setMaintenance(parseJsonSetting<SettingsGeneralMaintenance>(getRawSettingValue(SETTINGS_KEYS.generalMaintenance), DEFAULT_MAINTENANCE));
@@ -446,7 +495,7 @@ export default function SettingsPage() {
       : sectionsCatalog.filter((s) => s.id !== "general");
     // La section "retention" est réservée aux rôles 1-3 uniquement
     if (!canAccessGeneralSettings) {
-      base = base.filter((s) => s.id !== "retention");
+      base = base.filter((s) => s.id !== "retention" && s.id !== "ai-control");
     }
     const q = search.trim().toLowerCase();
     if (!q) return base;
@@ -476,7 +525,7 @@ export default function SettingsPage() {
       try {
         const [rolesRes, criticalAppRes, promptStyleRes, matriceRes] = await Promise.all([
           supabase.from("roles_user").select("*"),
-          supabase.from("app_settings").select("key, value, max_caract, max_tokens").in("key", ALL_SETTINGS_PAGE_KEYS),
+          supabase.from("app_settings").select("key, value, max_caract, max_tokens").in("key", APP_SETTINGS_INITIAL_FETCH_KEYS),
           fetchPromptStylesForSettingsPage(),
           supabase
             .from("matrice_securite")
@@ -538,12 +587,18 @@ export default function SettingsPage() {
 
   const openAppSettingsEditor = (row: AppSettingRow) => {
     setEditingAppRow(row);
-    const rawMc = (row as Record<string, unknown>)["max_caract"];
-    const maxCaractStr =
-      rawMc != null && rawMc !== "" && Number.isFinite(Number(rawMc)) ? String(Number(rawMc)) : "";
+    const r = row as Record<string, unknown>;
+    const rawMt = r["max_tokens"];
+    const rawMc = r["max_caract"];
+    let maxTokensStr = "";
+    if (rawMt != null && rawMt !== "" && Number.isFinite(Number(rawMt))) {
+      maxTokensStr = String(Number(rawMt));
+    } else if (rawMc != null && rawMc !== "" && Number.isFinite(Number(rawMc))) {
+      maxTokensStr = String(approxOutputTokensFromMaxChars(Number(rawMc)));
+    }
     setEditingAppForm({
       value: row.value == null ? "" : String(row.value),
-      max_caract: maxCaractStr,
+      max_tokens: maxTokensStr,
     });
     setEditError(null);
     setEditAppOpen(true);
@@ -617,18 +672,19 @@ export default function SettingsPage() {
       value: castEditedValue(editingAppRow.value, editingAppForm.value ?? ""),
     };
     if (APP_SETTINGS_MAX_LENGTH_KEYS.has(keyValue)) {
-      const rawMc = (editingAppForm.max_caract ?? "").trim();
-      if (rawMc === "") {
+      const rawMt = (editingAppForm.max_tokens ?? "").trim();
+      if (rawMt === "") {
         payload.max_caract = null;
         payload.max_tokens = null;
       } else {
-        const n = Number(rawMc);
-        if (!Number.isFinite(n) || n < 0) {
-          setEditError(t("settings_error_max_caract_invalid"));
+        const n = Number(rawMt);
+        if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+          setEditError(t("settings_error_max_tokens_invalid"));
           return;
         }
-        payload.max_caract = n;
-        payload.max_tokens = approxOutputTokensFromMaxChars(n);
+        const tokens = clampGeminiOutputTokens(n);
+        payload.max_tokens = tokens;
+        payload.max_caract = approxMaxCharsFromOutputTokens(tokens);
       }
     }
     setSavingEdit(true);
@@ -678,6 +734,7 @@ export default function SettingsPage() {
       setEditError(error.message || t("settings_error_modification"));
       return;
     }
+
     setEditPromptOpen(false);
     setEditingPromptRow(null);
     await refreshPromptsData();
@@ -694,6 +751,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-4">
         <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none">
+          <p className="mb-2 text-xs text-muted-foreground">{t("settings_app_settings_image_analysis_hint")}</p>
           {loadingFullAppSettings && (
             <p className="mb-2 text-[11px] text-muted-foreground">{t("settings_loading_full")}</p>
           )}
@@ -724,13 +782,16 @@ export default function SettingsPage() {
         </div>
 
         <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none">
-          {promptStyleRows.length === 0 ? (
+          <p className="mb-2 text-xs text-muted-foreground">{t("settings_prompt_style_mediation_hint")}</p>
+          {promptStyleRows.filter((row) => !isImageAnalysisPromptStyleRow(row)).length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("settings_no_rows")}</p>
           ) : (
             <div className="overflow-x-auto rounded border border-border/50 bg-background">
               <table className="min-w-full text-xs">
                 <tbody>
-                  {promptStyleRows.map((row) => (
+                  {promptStyleRows
+                    .filter((row) => !isImageAnalysisPromptStyleRow(row))
+                    .map((row) => (
                     <tr key={`prompt-style-${row.id}`} className="align-top">
                       <td className="border-b border-border/40 px-2 py-1.5">
                         {getStyleLabelFromDb(row, i18n.language) || t("dash_emdash")}
@@ -1229,6 +1290,50 @@ export default function SettingsPage() {
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
+        <p className="text-sm font-semibold">{t("gen_mediation_generation_heading")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("gen_mediation_generation_intro")}{" "}
+          <code className="rounded bg-muted px-1">{SETTINGS_KEYS.mediationGeneration}</code>.
+        </p>
+        <RadioGroup
+          value={mediationGeneration.mode}
+          onValueChange={(v) =>
+            setMediationGeneration((p) => ({
+              ...p,
+              mode: v as SettingsMediationGenerationMode,
+            }))
+          }
+          className="gap-3"
+        >
+          <div className="flex items-start gap-2">
+            <RadioGroupItem
+              value="single_plus_optional"
+              id="mediation-gen-single-plus-optional"
+              className="mt-0.5"
+            />
+            <Label htmlFor="mediation-gen-single-plus-optional" className="cursor-pointer text-sm font-normal leading-snug">
+              {t("gen_mediation_generation_mode_single")}
+            </Label>
+          </div>
+          <div className="flex items-start gap-2">
+            <RadioGroupItem value="all_languages" id="mediation-gen-all-languages" className="mt-0.5" />
+            <Label htmlFor="mediation-gen-all-languages" className="cursor-pointer text-sm font-normal leading-snug">
+              {t("gen_mediation_generation_mode_all")}
+            </Label>
+          </div>
+        </RadioGroup>
+        <p className="text-[11px] text-muted-foreground">{t("gen_mediation_generation_hint")}</p>
+        <Button
+          type="button"
+          size="sm"
+          disabled={savingSettingsKey === SETTINGS_KEYS.mediationGeneration}
+          onClick={() => void upsertAppSettingJson(SETTINGS_KEYS.mediationGeneration, mediationGeneration)}
+        >
+          {savingSettingsKey === SETTINGS_KEYS.mediationGeneration ? t("form_btn_saving") : t("form_btn_save")}
+        </Button>
+      </div>
+
+      <div className="rounded-md border border-border/60 bg-muted/20 p-3 shadow-none space-y-3">
         <p className="text-sm font-semibold">{t("gen_site_heading")}</p>
         <p className="text-xs text-muted-foreground">{t("gen_site_intro")}</p>
         <div className="space-y-1">
@@ -1608,7 +1713,13 @@ export default function SettingsPage() {
       ) : (
         <Card className="border border-border/50 bg-white/80 shadow-none">
           <CardContent className="p-2 md:p-3">
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={accordionOpenValue}
+              onValueChange={(v) => setAccordionSectionInUrl(v ?? "")}
+            >
               {filteredSections.map((section) => (
                 <AccordionItem key={section.id} value={section.id} className="border-border/50">
                   <AccordionTrigger className="px-3 hover:no-underline">
@@ -1635,6 +1746,8 @@ export default function SettingsPage() {
                       renderNotificationsContent()
                     ) : section.id === "œuvres-navigation" ? (
                       renderOeuvresNavigationContent()
+                    ) : section.id === "ai-control" ? (
+                      <AiModelControlPanel appSettingsRows={appSettingsRows} onRefreshRows={refreshPromptsData} />
                     ) : section.id === "retention" ? (
                       <RetentionSettings roleId={role_id} />
                     ) : (
@@ -1667,30 +1780,53 @@ export default function SettingsPage() {
           </DialogHeader>
           {editingAppRow &&
             APP_SETTINGS_MAX_LENGTH_KEYS.has(String((editingAppRow as Record<string, unknown>).key ?? "").trim()) && (
-              <div className="space-y-1.5">
-                <label htmlFor="edit-app-settings-max-caract" className="text-sm font-medium">
-                  {t("settings_max_caract_label")}
-                </label>
-                <Input
-                  id="edit-app-settings-max-caract"
-                  name="app_settings_max_caract"
-                  type="number"
-                  min={0}
-                  step={1}
-                  inputMode="numeric"
-                  placeholder={t("edit_max_caract_placeholder")}
-                  value={editingAppForm.max_caract ?? ""}
-                  onChange={(e) =>
-                    setEditingAppForm((prev) => ({
-                      ...prev,
-                      max_caract: e.target.value,
-                    }))
-                  }
-                  className="shadow-none"
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  {t("settings_max_caract_help")}
-                </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label htmlFor="edit-app-settings-max-tokens" className="text-sm font-medium">
+                    {t("settings_field_max_tokens")}
+                  </label>
+                  <Input
+                    id="edit-app-settings-max-tokens"
+                    name="app_settings_max_tokens"
+                    type="number"
+                    min={256}
+                    max={4096}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder={t("edit_max_tokens_placeholder")}
+                    value={editingAppForm.max_tokens ?? ""}
+                    onChange={(e) =>
+                      setEditingAppForm((prev) => ({
+                        ...prev,
+                        max_tokens: e.target.value,
+                      }))
+                    }
+                    className="shadow-none"
+                  />
+                  <p className="text-[11px] text-muted-foreground">{t("settings_max_tokens_help")}</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="edit-app-settings-max-caract" className="text-sm font-medium">
+                    {t("settings_max_caract_label")}
+                  </label>
+                  <Input
+                    id="edit-app-settings-max-caract"
+                    name="app_settings_max_caract"
+                    type="number"
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly="true"
+                    value={(() => {
+                      const raw = (editingAppForm.max_tokens ?? "").trim();
+                      if (raw === "") return "";
+                      const n = Number(raw);
+                      if (!Number.isFinite(n) || n <= 0) return "";
+                      return String(approxMaxCharsFromOutputTokens(clampGeminiOutputTokens(n)));
+                    })()}
+                    className="cursor-default bg-muted/50 shadow-none"
+                  />
+                  <p className="text-[11px] text-muted-foreground">{t("settings_max_caract_help")}</p>
+                </div>
               </div>
             )}
           <div className="space-y-2">

@@ -3,13 +3,14 @@ import { useParams } from "react-router-dom";
 import ArtistWorksHeader from "../components/ArtistWorksHeader";
 import CubeSlider from "../components/CubeSlider";
 import { type ArtworkCubeItem } from "../components/CubeFace";
+import { teaserFromArtworkDescription } from "@/lib/artworkDescriptionI18n";
 import { supabase } from "@/lib/supabase";
 
 type ArtworkRow = {
   artwork_id: string;
   artwork_title: string | null;
   artwork_image_url: string | null;
-  artwork_description: unknown;
+  artwork_description_i18n: unknown;
   artwork_artist_id?: string | null;
 };
 
@@ -21,15 +22,6 @@ type ArtistRow = {
 
 const modulo = (value: number, base: number) => ((value % base) + base) % base;
 const NEXT_ARTWORK_MESSAGE = "artworks-artist-next";
-
-const normalizeDescription = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  if (value && typeof value === "object") {
-    const candidate = (value as Record<string, unknown>).fr ?? (value as Record<string, unknown>).text;
-    if (typeof candidate === "string") return candidate;
-  }
-  return "Sans description";
-};
 
 const OeuvresArtiste = () => {
   const { artistId } = useParams<{ artistId: string }>();
@@ -58,7 +50,7 @@ const OeuvresArtiste = () => {
 
       let { data: artworksData } = await supabase
         .from("artworks")
-        .select("artwork_id, artwork_title, artwork_image_url, artwork_description, artwork_artist_id")
+        .select("artwork_id, artwork_title, artwork_image_url, artwork_description_i18n, artwork_artist_id")
         .eq("artwork_artist_id", resolvedArtistId)
         .is("deleted_at", null)
         .order("artwork_created_at", { ascending: true })
@@ -80,7 +72,7 @@ const OeuvresArtiste = () => {
 
           const { data: fallbackArtworks } = await supabase
             .from("artworks")
-            .select("artwork_id, artwork_title, artwork_image_url, artwork_description, artwork_artist_id")
+            .select("artwork_id, artwork_title, artwork_image_url, artwork_description_i18n, artwork_artist_id")
             .eq("artwork_artist_id", resolvedArtistId)
             .is("deleted_at", null)
             .order("artwork_created_at", { ascending: true })
@@ -109,7 +101,10 @@ const OeuvresArtiste = () => {
           id: row.artwork_id,
           title: row.artwork_title || "Oeuvre sans titre",
           imageUrl: row.artwork_image_url || "/placeholder.svg",
-          description: normalizeDescription(row.artwork_description),
+          description: (() => {
+            const teaser = teaserFromArtworkDescription(row.artwork_description_i18n).trim();
+            return teaser || "Sans description";
+          })(),
         })) ?? [];
 
       setArtworks(mapped);

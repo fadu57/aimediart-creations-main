@@ -46,7 +46,7 @@ type ArtistRow = {
 type ArtworkRow = {
   artwork_id: string;
   artwork_title?: string | null;
-  artwork_description?: Record<string, string | null> | string | null;
+  artwork_description_i18n?: Record<string, string | null> | string | null;
   artwork_photo_url?: string | null;
   artwork_image_url?: string | null;
   artwork_qr_code_url?: string | null;
@@ -306,7 +306,7 @@ const Oeuvre = () => {
   })();
   const artworkId = artwork?.artwork_id ?? requestedArtworkId ?? "w2";
   const artworkDescriptionText = (() => {
-    const raw = artwork?.artwork_description;
+    const raw = artwork?.artwork_description_i18n;
     const text = primaryBlurbFromArtworkDescription(raw, i18n.language);
     return text || "Description de l'œuvre indisponible pour le moment.";
   })();

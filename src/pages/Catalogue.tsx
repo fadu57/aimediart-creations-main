@@ -23,18 +23,21 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { Plus, Search, Loader2, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+import { QR_CODE_STORAGE_OPTIONS } from "@/lib/qrCodeScanFriendly";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
-import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
+import { generateCartelPdf } from "@/lib/cartelPdfRenderer";
+import { cartelExplorationLines } from "@/lib/cartelExplorationText";
+import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
+import { CartelFormatDialog } from "@/components/CartelFormatDialog";
 import { cn } from "@/lib/utils";
 import { countMaxMediationStylesAcrossLangs } from "@/lib/artworkDescriptionI18n";
 import { useTranslation } from "react-i18next";
 type ArtworkRow = {
   artwork_id: string;
   artwork_title: string | null;
-  artwork_description?: Record<string, string | null> | string | null;
+  artwork_description_i18n?: Record<string, string | null> | string | null;
   artwork_source_material?: string | null;
   artwork_image_url?: string | null;
   artwork_photo_url?: string | null;
@@ -65,76 +68,21 @@ type ExpoOption = {
   agency_id?: string | null;
 };
 
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = (err) => reject(err);
-    img.src = url;
-  });
-}
-
-/** Tronque avec points de suspension pour tenir sur une ligne (police courante jsPDF). */
 function artworkArtistFromRow(aw: Pick<ArtworkRow, "artists">): ArtistRow | undefined {
   const a = aw.artists;
   if (a == null) return undefined;
   return Array.isArray(a) ? a[0] : a;
 }
 
-function fitPdfLineWithEllipsis(pdf: jsPDF, text: string, maxWidth: number): string {
-  if (pdf.getTextWidth(text) <= maxWidth) return text;
-  const ell = "\u2026";
-  let s = text.replace(/\s+$/, "");
-  while (s.length > 0) {
-    const candidate = `${s.trimEnd()}${ell}`;
-    if (pdf.getTextWidth(candidate) <= maxWidth) return candidate;
-    s = s.slice(0, -1);
-  }
-  return ell;
-}
-
-/** Titre sur au plus 2 lignes : baisse la taille du corps si besoin, puis ellipse sur la 2e ligne. */
-function computePdfTitleUpToTwoLines(
-  pdf: jsPDF,
-  titleText: string,
-  maxTextWidth: number,
-): { lines: string[]; fontSize: number; lineHeight: number } {
-  const minFs = 12;
-  const maxFs = 22;
-  const lineHeightRatio = 6.8 / 22;
-
-  for (let fs = maxFs; fs >= minFs; fs--) {
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(fs);
-    const lines = pdf.splitTextToSize(titleText, maxTextWidth) as string[];
-    if (lines.length <= 2) {
-      return { lines, fontSize: fs, lineHeight: fs * lineHeightRatio };
-    }
-  }
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(minFs);
-  const lines = pdf.splitTextToSize(titleText, maxTextWidth) as string[];
-  if (lines.length <= 2) {
-    return { lines, fontSize: minFs, lineHeight: minFs * lineHeightRatio };
-  }
-  const first = lines[0];
-  const rest = lines.slice(1).join(" ");
-  const second = fitPdfLineWithEllipsis(pdf, rest, maxTextWidth);
-  return {
-    lines: [first, second],
-    fontSize: minFs,
-    lineHeight: minFs * lineHeightRatio,
-  };
-}
-
 const Catalogue = () => {
   const { t } = useTranslation("catalogue");
-  const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q")?.trim() ?? "");
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
-  const [selectedExpoFilter, setSelectedExpoFilter] = useState<string>("all");
+  const [selectedExpoFilter, setSelectedExpoFilter] = useState(
+    () => searchParams.get("expo")?.trim() || "all",
+  );
   const [expoFilterInput, setExpoFilterInput] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +93,8 @@ const Catalogue = () => {
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
   const [bulkQrConfirmOpen, setBulkQrConfirmOpen] = useState(false);
   const [bulkQrProgress, setBulkQrProgress] = useState<{ done: number; total: number } | null>(null);
+  const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
+  const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
   const navigate = useNavigate();
@@ -325,7 +275,7 @@ const Catalogue = () => {
     let query = supabase
       .from("artworks")
       .select(
-        "artwork_id, artwork_title, artwork_description, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
+        "artwork_id, artwork_title, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
       )
       .is("deleted_at", null)
       .order("artwork_title", { ascending: true, nullsFirst: false });
@@ -341,7 +291,7 @@ const Catalogue = () => {
       const fallbackQuery = supabase
         .from("artworks")
         .select(
-          "artwork_id, artwork_title, artwork_description, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status",
+          "artwork_id, artwork_title, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status",
         )
         .is("deleted_at", null)
         .order("artwork_title", { ascending: true, nullsFirst: false });
@@ -406,9 +356,24 @@ const Catalogue = () => {
   }, [loadExpoOptions]);
 
   useEffect(() => {
-    const expoFromUrl = searchParams.get("expo")?.trim();
-    if (expoFromUrl) setSelectedExpoFilter(expoFromUrl);
-  }, [searchParams]);
+    const next = new URLSearchParams();
+    const q = search.trim();
+    if (q) next.set("q", q);
+    if (selectedExpoFilter !== "all") next.set("expo", selectedExpoFilter);
+    const nextStr = next.toString();
+    if (nextStr !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [search, selectedExpoFilter, searchParams, setSearchParams]);
+
+  const catalogueFiltersPath = useCallback(() => {
+    const params = new URLSearchParams();
+    const q = search.trim();
+    if (q) params.set("q", q);
+    if (selectedExpoFilter !== "all") params.set("expo", selectedExpoFilter);
+    const qs = params.toString();
+    return qs ? `/catalogue?${qs}` : "/catalogue";
+  }, [search, selectedExpoFilter]);
 
   const openCreateArtwork = () => {
     setEditingArtworkId(null);
@@ -566,7 +531,7 @@ const Catalogue = () => {
         const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
         if (!targetUrl) { errorCount++; continue; }
 
-        const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 1 });
+        const dataUrl = await QRCode.toDataURL(targetUrl, QR_CODE_STORAGE_OPTIONS);
         const blob = await (await fetch(dataUrl)).blob();
         const path = `qrcodes/${artworkId}.png`;
 
@@ -610,7 +575,7 @@ const Catalogue = () => {
     }
   }, [role_id, artworks]);
 
-  const handleGeneratePDF = async (aw: ArtworkRow) => {
+  const handleGeneratePDF = async (aw: ArtworkRow, formatId: CartelFormatId) => {
     const artworkId = aw.artwork_id?.trim();
     if (!artworkId) {
       toast.error(t("pdf_error_no_id"));
@@ -625,24 +590,6 @@ const Catalogue = () => {
         .trim() || t("artist_unknown");
 
     try {
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: [105, 148], // 105 mm x 148 mm (A6 portrait)
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      const titleText = (aw.artwork_title ?? t("artwork_untitled")).trim();
-      const artistText = artistLabel;
-      const explorationLines = [t("pdf_explore_line1"), t("pdf_explore_line2")];
-
-      const margin = 10;
-      const bottomSafe = pageHeight - margin;
-      const maxTextWidth = pageWidth - 2 * margin;
-
-      // QR = URL publique canonique : .../artwork/<uuid>?expo_id=... si exposition liée
       const originOverride = await fetchQrPublicSiteOriginFromSettings();
       const expoForQr = ((aw.expo_id ?? aw.artwork_expo_id) ?? "").trim() || null;
       const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
@@ -650,88 +597,37 @@ const Catalogue = () => {
         toast.error(t("pdf_error_no_qr_url"));
         return;
       }
-      const qrDataUrl = await QRCode.toDataURL(targetUrl, {
-        errorCorrectionLevel: "H",
-        margin: 0,
-        width: 1024,
+
+      const blobUrl = await generateCartelPdf({
+        formatId,
+        titleText: (aw.artwork_title ?? t("artwork_untitled")).trim(),
+        artistText: artistLabel,
+        explorationLines: cartelExplorationLines(œuvresNavigationType, t),
+        qrTargetUrl: targetUrl,
       });
 
-      // Bandeau identique au bloc Logo du Header (carré rouge + cœur + textes), en haut à gauche
-      const headerLogo = createAimediaHeaderLogoBlockPng();
-      const [logoImg, qrImg] = await Promise.all([loadImage(headerLogo.dataUrl), loadImage(qrDataUrl)]);
-      const logoMarginY = -1; // 2 mm - 3 mm => logo remonté de 3 mm
-      const logoMarginX = -1 + 5; // +5 mm vers la droite
-      const logoMarginRight = -1;
-      const logoWidth = pageWidth - logoMarginX - logoMarginRight;
-      const logoHeight = (logoWidth * headerLogo.heightPx) / headerLogo.widthPx;
-      pdf.addImage(logoImg, "PNG", logoMarginX, logoMarginY, logoWidth, logoHeight, undefined, "NONE");
+      navigate(catalogueFiltersPath(), { replace: true });
 
-      const artistLineHeight = 5.2;
+      const pdfLink = document.createElement("a");
+      pdfLink.href = blobUrl;
+      pdfLink.target = "_blank";
+      pdfLink.rel = "noopener noreferrer";
+      document.body.appendChild(pdfLink);
+      pdfLink.click();
+      document.body.removeChild(pdfLink);
+      window.focus();
 
-      const { lines: titleLines, fontSize: titleFontSize, lineHeight: titleLineHeight } = computePdfTitleUpToTwoLines(
-        pdf,
-        titleText,
-        maxTextWidth,
-      );
-
-      pdf.setFont("helvetica", "italic");
-      pdf.setFontSize(16);
-      const artistLines = pdf.splitTextToSize(artistText, maxTextWidth) as string[];
-
-      const gapQrToTitleMm = 4 + 10 - 5; // +1 cm demandé puis remontée de 5 mm
-      const belowTextBlockHeight =
-        gapQrToTitleMm +
-        titleLines.length * titleLineHeight +
-        1 +
-        artistLines.length * artistLineHeight;
-
-      const contentTop = logoMarginY + logoHeight + 4;
-      const contentBottom = bottomSafe - belowTextBlockHeight - 2;
-      const maxQrByWidth = pageWidth - 2 * margin;
-      const availableHeight = Math.max(0, contentBottom - contentTop);
-      /** Taille du QR : 70 % de la largeur utile, avec garde-fou hauteur */
-      const qrSize = Math.min(maxQrByWidth * 0.7, availableHeight);
-      const explorationFontSize = 14;
-      const explorationLineHeight = 5.5;
-      const explorationGap = 2;
-
-      const qrX = (pageWidth - qrSize) / 2;
-      const qrY = contentTop + (availableHeight - qrSize) / 2;
-
-      // Texte d'exploration centré verticalement entre le bas du logo et le haut du QR
-      const textZoneTop = contentTop;
-      const textZoneBottom = qrY - explorationGap;
-      const midY = textZoneTop + (textZoneBottom - textZoneTop) / 2;
-      let explorationStartY = midY - ((explorationLines.length - 1) * explorationLineHeight) / 2;
-      const minStart = textZoneTop + 1;
-      const maxStart =
-        textZoneBottom - (explorationLines.length - 1) * explorationLineHeight - 0.5;
-      const safeMax = Math.max(maxStart, minStart);
-      explorationStartY = Math.min(Math.max(explorationStartY, minStart), safeMax);
-
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFont("helvetica", "bolditalic");
-      pdf.setFontSize(explorationFontSize);
-      pdf.text(explorationLines, pageWidth / 2, explorationStartY, { align: "center" });
-
-      // QR net
-      pdf.addImage(qrImg, "PNG", qrX, qrY, qrSize, qrSize, undefined, "NONE");
-
-      let textY = qrY + qrSize + gapQrToTitleMm;
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(titleFontSize);
-      pdf.text(titleLines, pageWidth / 2, textY, { align: "center" });
-      textY += titleLines.length * titleLineHeight + 2;
-
-      pdf.setFont("helvetica", "italic");
-      pdf.setFontSize(16);
-      pdf.text(artistLines, pageWidth / 2, textY, { align: "center" });
-
-      const blobUrl = pdf.output("bloburl");
-      window.open(blobUrl, "_blank");
+      if (getCartelFormat(formatId).landscapeDuplex) {
+        toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("pdf_error_generate"));
     }
+  };
+
+  const openCartelFormatDialog = (aw: ArtworkRow) => {
+    setCartelArtwork(aw);
+    setCartelFormatDialogOpen(true);
   };
 
   return (
@@ -884,7 +780,7 @@ const Catalogue = () => {
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
           const statusLabel = currentStatusRaw || t("status_empty");
           const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
-          const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description);
+          const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description_i18n);
           const hasGeneratedMediation = generatedTextsCount > 0;
 
           return (
@@ -998,7 +894,7 @@ const Catalogue = () => {
                       className="w-full justify-center"
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleGeneratePDF(aw);
+                        openCartelFormatDialog(aw);
                       }}
                       disabled={!aw.artwork_qrcode_image && !aw.artwork_qr_code_url}
                     >
@@ -1079,6 +975,15 @@ const Catalogue = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CartelFormatDialog
+        open={cartelFormatDialogOpen}
+        onOpenChange={setCartelFormatDialogOpen}
+        artworkTitle={cartelArtwork?.artwork_title}
+        onConfirm={(formatId) => {
+          if (cartelArtwork) void handleGeneratePDF(cartelArtwork, formatId);
+        }}
+      />
 
       <ArtworkModal
         open={artworkModalOpen}

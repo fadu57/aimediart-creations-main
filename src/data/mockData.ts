@@ -12,7 +12,7 @@ export interface Artist {
 export interface Artwork {
   artwork_id: string;
   artwork_title: string;
-  artwork_description: string;
+  artwork_description_i18n: string;
   artwork_photo_url: string;
   artwork_qr_code_url?: string;
   artwork_qrcode_image?: string;
@@ -89,7 +89,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w1",
     artwork_title: "L'Éclat du Crépuscule",
-    artwork_description: "Cette œuvre capture la lumière dorée d'un coucher de soleil. Les couleurs chaudes créent une atmosphère paisible et contemplative.",
+    artwork_description_i18n: "Cette œuvre capture la lumière dorée d'un coucher de soleil. Les couleurs chaudes créent une atmosphère paisible et contemplative.",
     artwork_photo_url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&h=400&fit=crop",
     artwork_total_visites: 17,
     artwork_moyenne_coeurs: 4.0,
@@ -100,7 +100,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w2",
     artwork_title: "Fragments d'Infini",
-    artwork_description: "Cette œuvre est abstraite. Elle montre des formes bleues. Les formes semblent flotter dans l'espace.",
+    artwork_description_i18n: "Cette œuvre est abstraite. Elle montre des formes bleues. Les formes semblent flotter dans l'espace.",
     artwork_photo_url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&h=400&fit=crop",
     artwork_total_visites: 75,
     artwork_moyenne_coeurs: 3.8,
@@ -111,7 +111,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w3",
     artwork_title: "La Mémoire des Pierres",
-    artwork_description: "Des pierres anciennes racontent une histoire. Chaque pierre porte la marque du temps. L'artiste nous invite à écouter leur silence.",
+    artwork_description_i18n: "Des pierres anciennes racontent une histoire. Chaque pierre porte la marque du temps. L'artiste nous invite à écouter leur silence.",
     artwork_photo_url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=600&h=400&fit=crop",
     artwork_total_visites: 52,
     artwork_moyenne_coeurs: 3.5,
@@ -122,7 +122,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w4",
     artwork_title: "Voix du Silence",
-    artwork_description: "Une installation qui joue avec la lumière et l'ombre. Le silence devient visible. Les formes apparaissent et disparaissent doucement.",
+    artwork_description_i18n: "Une installation qui joue avec la lumière et l'ombre. Le silence devient visible. Les formes apparaissent et disparaissent doucement.",
     artwork_photo_url: "https://images.unsplash.com/photo-1482245294234-b3f2f8d5f1a4?w=600&h=400&fit=crop",
     artwork_total_visites: 43,
     artwork_moyenne_coeurs: 4.2,
@@ -133,7 +133,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w5",
     artwork_title: "Entre Deux Rives",
-    artwork_description: "Un paysage entre terre et eau. La rivière sépare deux mondes. L'artiste nous montre la beauté de ce passage.",
+    artwork_description_i18n: "Un paysage entre terre et eau. La rivière sépare deux mondes. L'artiste nous montre la beauté de ce passage.",
     artwork_photo_url: "https://images.unsplash.com/photo-1440342359743-84fcb8c21c7c?w=600&h=400&fit=crop",
     artwork_total_visites: 38,
     artwork_moyenne_coeurs: 3.9,
@@ -144,7 +144,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w6",
     artwork_title: "Amitié",
-    artwork_description: "Une photographie célébrant les liens invisibles entre les êtres. La forêt devient métaphore de la connexion humaine.",
+    artwork_description_i18n: "Une photographie célébrant les liens invisibles entre les êtres. La forêt devient métaphore de la connexion humaine.",
     artwork_photo_url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop",
     artwork_total_visites: 95,
     artwork_moyenne_coeurs: 4.5,
@@ -155,7 +155,7 @@ export const artworks: Artwork[] = [
   {
     artwork_id: "w7",
     artwork_title: "Le Jardin Suspendu",
-    artwork_description: "Des plantes luxuriantes défient la gravité. Ce jardin imaginaire pousse vers le ciel. La nature reprend ses droits.",
+    artwork_description_i18n: "Des plantes luxuriantes défient la gravité. Ce jardin imaginaire pousse vers le ciel. La nature reprend ses droits.",
     artwork_photo_url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=600&h=400&fit=crop",
     artwork_total_visites: 60,
     artwork_moyenne_coeurs: 3.6,

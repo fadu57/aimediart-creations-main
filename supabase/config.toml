@@ -1,0 +1,24 @@
+[functions.generate-mediation]
+verify_jwt = true
+
+[functions.ai-worker]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ai-worker/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/ai-worker/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/ai-worker/*.html" ]
+
+[functions.ai-create-job]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ai-create-job/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/ai-create-job/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/ai-create-job/*.html" ]

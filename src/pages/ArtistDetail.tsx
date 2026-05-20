@@ -2,6 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { type Artwork, getArtistById, getArtworksByArtist, getExpoById } from "@/data/mockData";
+import { teaserFromArtworkDescription } from "@/lib/artworkDescriptionI18n";
 import { ArrowLeft, Heart, Eye, Mail } from "lucide-react";
 
 const ArtistDetail = () => {
@@ -69,7 +70,9 @@ const ArtistDetail = () => {
                 </div>
                 <CardContent className="p-4">
                   <h4 className="font-serif font-bold text-lg">{aw.artwork_title}</h4>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{aw.artwork_description}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    {teaserFromArtworkDescription(aw.artwork_description_i18n).trim() || "—"}
+                  </p>
                   <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1"><Eye className="h-3 w-3" />{aw.artwork_total_visites} visites</div>
                     <span className="bg-muted px-2 py-0.5 rounded-full">{expo?.expo_name}</span>

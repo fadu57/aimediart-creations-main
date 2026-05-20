@@ -6,10 +6,23 @@ export const SETTINGS_KEYS = {
   generalLinksQr: "settings_general_links_qr",
   generalLimits: "settings_general_limits",
   generalMaintenance: "settings_general_maintenance",
+  /** Mode de génération des médiations IA (1 langue + optionnelle vs toutes les langues). */
+  mediationGeneration: "settings_mediation_generation",
   visitorsBehavior: "settings_visitors_behavior",
   notifications: "settings_notifications",
   securityMatrix: "settings_security_matrix",
 } as const;
+
+/** `single_plus_optional` : langue UI (+ 1 langue optionnelle en fiche). `all_languages` : FR, EN, DE, ES, IT. */
+export type SettingsMediationGenerationMode = "single_plus_optional" | "all_languages";
+
+export type SettingsMediationGeneration = {
+  mode: SettingsMediationGenerationMode;
+};
+
+export const DEFAULT_MEDIATION_GENERATION: SettingsMediationGeneration = {
+  mode: "single_plus_optional",
+};
 
 export type SettingsGeneralIdentity = {
   organization_name: string;
@@ -118,3 +131,33 @@ export function stringifySetting(obj: unknown): string {
 
 /** Clés encore lues/écrites dans `app_settings` (la matrice de sécurité est dans `matrice_securite`). */
 export const ALL_SETTINGS_PAGE_KEYS = Object.values(SETTINGS_KEYS).filter((k) => k !== SETTINGS_KEYS.securityMatrix);
+
+/** Pilotage global du modèle IA (page Configurations — section « Contrôle IA »). */
+export const AI_APP_SETTINGS_KEYS = {
+  selectedModel: "selected_ai_model",
+  modelsCache: "available_models_cache",
+} as const;
+
+export type AiAppSettingsKey = (typeof AI_APP_SETTINGS_KEYS)[keyof typeof AI_APP_SETTINGS_KEYS];
+
+export const AI_APP_SETTINGS_KEY_LIST = Object.values(AI_APP_SETTINGS_KEYS);
+
+/** Clés chargées au premier fetch (config JSON + pilotage IA). */
+export const APP_SETTINGS_INITIAL_FETCH_KEYS = [...ALL_SETTINGS_PAGE_KEYS, ...AI_APP_SETTINGS_KEY_LIST];
+
+export type CachedAiModel = {
+  id: string;
+  provider: "gemini" | "groq";
+  name: string;
+  tpm_limit: number;
+  /** Indice de qualité / 10. */
+  quality_score: number;
+  /** Indice de vitesse perçue / 10 (UX latence). */
+  speed_score: number;
+  /** Résilience production / risque rate-limit (0–10). */
+  tpm_resilience_score: number;
+  /** Compromis global (Q + V + résilience TPM). */
+  balance_score: number;
+  /** URL du playground officiel (remplie par discover-free-models selon le fournisseur). */
+  playground_url: string;
+};

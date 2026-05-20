@@ -1,5 +1,52 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { GoogleGenAI } from "https://esm.sh/@google/genai@0.14.1";
+import {
+  extractGeminiUsageMetadataFromResponse,
+  insertAiUsageLog,
+  tokensFromAnyGeminiUsageLike,
+  tokensFromGroqOpenAiUsage,
+} from "../_shared/ai_usage_log.ts";
+
+const SELECTED_MODEL_KEY = "selected_ai_model";
+
+/** Même clé que le tableau de bord IA (`AiModelControlPanel`). */
+async function resolveSelectedModelId(
+  admin: ReturnType<typeof createClient>,
+): Promise<string> {
+  const { data } = await admin
+    .from("app_settings")
+    .select("value")
+    .eq("key", SELECTED_MODEL_KEY)
+    .maybeSingle();
+  const raw = (data as { value?: unknown } | null)?.value;
+  const fromDb = typeof raw === "string" ? raw.trim() : raw != null ? String(raw).trim() : "";
+  if (fromDb) return fromDb;
+  return Deno.env.get("GROQ_DEFAULT_BIO_MODEL")?.trim() || "llama-3.3-70b-versatile";
+}
+
+/** Routage Gemini (Google Gen AI) vs Groq selon l’identifiant en base. */
+function shouldUseGemini(modelId: string): boolean {
+  const id = modelId.trim().toLowerCase();
+  if (!id) return false;
+  if (id.startsWith("gemini")) return true;
+  const relaxed = id.replace(/[-_]/g, " ");
+  if (relaxed.includes("deep research")) return true;
+  if (id.includes("deep-research")) return true;
+  return false;
+}
+
+function extractGeminiText(geminiJson: unknown): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g = geminiJson as any;
+  const t = g?.text?.trim?.();
+  if (typeof t === "string" && t) return t;
+  const parts = g?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    return parts.map((p: { text?: string }) => (typeof p?.text === "string" ? p.text : "")).join("").trim();
+  }
+  return "";
+}
 
 type RequestBody = {
   prenom?: string;
@@ -88,11 +135,6 @@ serve(async (req: Request) => {
     return jsonResponse(405, { error: "Méthode non autorisée." });
   }
 
-  const groqApiKey = Deno.env.get("GROQ_API_KEY");
-  if (!groqApiKey) {
-    return jsonResponse(500, { error: "Variable d'environnement GROQ_API_KEY manquante." });
-  }
-
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;
@@ -107,6 +149,20 @@ serve(async (req: Request) => {
     return jsonResponse(400, { error: "prenom, nom et art_types sont requis." });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse(500, {
+      error: "Configuration Supabase incomplète (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) pour lire selected_ai_model.",
+    });
+  }
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const modelId = await resolveSelectedModelId(admin);
+
   const promptTemplate = await loadPromptTemplate();
   const renderedPrompt = renderTemplate(promptTemplate, {
     prenom,
@@ -117,14 +173,67 @@ serve(async (req: Request) => {
   const langName = body.lang ? (LANG_NAMES[body.lang.toLowerCase().slice(0, 2)] ?? null) : null;
   const langInstruction = buildLangInstruction(body.lang);
 
-  // Remplacer toute mention "en français" dans le template rendu pour éviter un conflit explicite avec la consigne de langue.
-  // Cela couvre à la fois le DEFAULT_PROMPT_TEMPLATE et les templates éditables stockés en DB.
   const adjustedPrompt = langName
     ? renderedPrompt.replace(/\ben\s+fran[çc]ais\b/gi, `en ${langName}`)
     : renderedPrompt;
 
-  // Ajouter l'instruction de langue en fin de prompt (renforcement explicite dans le user message).
   const prompt = langInstruction ? `${adjustedPrompt}\n${langInstruction}` : adjustedPrompt;
+
+  if (shouldUseGemini(modelId)) {
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
+    if (!geminiApiKey) {
+      return jsonResponse(500, {
+        error: "GEMINI_API_KEY manquante : le modèle configuré nécessite Google Gen AI.",
+        model_configured: modelId,
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+    let geminiJson: unknown;
+    try {
+      geminiJson = await ai.models.generateContent({
+        model: modelId,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          maxOutputTokens: 640,
+          temperature: 0.5,
+        },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return jsonResponse(502, {
+        error: "Erreur d'appel Gemini (generate-artist-bio).",
+        details: msg,
+        model_used: modelId,
+      });
+    }
+
+    const bio = extractGeminiText(geminiJson);
+    if (!bio) {
+      return jsonResponse(502, { error: "Réponse vide de Gemini.", model_used: modelId });
+    }
+
+    const usageMetadata = extractGeminiUsageMetadataFromResponse(geminiJson);
+    const tok = tokensFromAnyGeminiUsageLike(usageMetadata);
+    await insertAiUsageLog(admin, {
+      model_id: modelId,
+      provider: "gemini",
+      prompt_tokens: tok.prompt_tokens,
+      completion_tokens: tok.completion_tokens,
+      total_tokens: tok.total_tokens,
+      artwork_id: null,
+    });
+
+    return jsonResponse(200, { bio });
+  }
+
+  const groqApiKey = Deno.env.get("GROQ_API_KEY")?.trim();
+  if (!groqApiKey) {
+    return jsonResponse(500, {
+      error: "GROQ_API_KEY manquante : le modèle configuré nécessite Groq.",
+      model_configured: modelId,
+    });
+  }
 
   const groqResp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -133,7 +242,7 @@ serve(async (req: Request) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: modelId,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
       max_tokens: 320,
@@ -142,17 +251,31 @@ serve(async (req: Request) => {
 
   if (!groqResp.ok) {
     const details = await groqResp.text();
-    return jsonResponse(502, { error: "Erreur Groq.", details });
+    return jsonResponse(502, {
+      error: "Erreur Groq (generate-artist-bio).",
+      details,
+      model_used: modelId,
+    });
   }
 
   const groqJson = (await groqResp.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: unknown;
   };
   const bio = groqJson.choices?.[0]?.message?.content?.trim() ?? "";
   if (!bio) {
-    return jsonResponse(502, { error: "Réponse vide de Groq." });
+    return jsonResponse(502, { error: "Réponse vide de Groq.", model_used: modelId });
   }
+
+  const groqTok = tokensFromGroqOpenAiUsage(groqJson.usage);
+  await insertAiUsageLog(admin, {
+    model_id: modelId,
+    provider: "groq",
+    prompt_tokens: groqTok.prompt_tokens,
+    completion_tokens: groqTok.completion_tokens,
+    total_tokens: groqTok.total_tokens,
+    artwork_id: null,
+  });
 
   return jsonResponse(200, { bio });
 });
-

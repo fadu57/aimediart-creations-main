@@ -1,14 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Heart, Lightbulb, QrCode, Zap } from "lucide-react";
-import { Html5Qrcode } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
 
 import { Button } from "@/components/ui/button";
-import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
+import { resolveScanTargetFromQr } from "@/lib/oeuvrePublicUrl";
+import {
+  buildQrScannerCameraConfig,
+  createHtml5QrcodeReader,
+  safeStopQrScanner,
+  scanQrFromImageFile,
+  startQrWebcamScanner,
+} from "@/lib/qrCodeScanFriendly";
+import {
+  isNativeQrScanSupported,
+  startNativeCameraQrScanner,
+  type NativeCameraQrSession,
+} from "@/lib/qrNativeCameraScanner";
 import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 
 const SCAN_ACCENT = "#d9a441";
 const QR_READER_ELEMENT_ID = "qr-reader";
+const QR_FILE_READER_ID = "qr-file-reader";
 const CAMERA_AUTOSTART_KEY = "aimediart-camera-autostart";
 
 const WorkScanner = () => {
@@ -18,19 +32,18 @@ const WorkScanner = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
-  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(() => {
-    try {
-      return localStorage.getItem(CAMERA_AUTOSTART_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(true);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [showAssistHint, setShowAssistHint] = useState(false);
   const hasScannedRef = useRef(false);
   const qrRef = useRef<Html5Qrcode | null>(null);
   const assistTimeoutRef = useRef<number | null>(null);
+  const startingCameraRef = useRef(false);
+  const autostartAttemptedRef = useRef(false);
+  const lastInvalidScanToastRef = useRef(0);
+  const cameraSessionRef = useRef<NativeCameraQrSession | null>(null);
+  const qrImageInputRef = useRef<HTMLInputElement>(null);
 
   const exitTarget = useMemo(
     () => (expoId ? `/scan?expo_id=${encodeURIComponent(expoId)}` : "/scan"),
@@ -42,51 +55,85 @@ const WorkScanner = () => {
     navigate("/home");
   };
 
+  const handleQrDecoded = useCallback(
+    (decodedText: string) => {
+      if (hasScannedRef.current) return;
+      hasScannedRef.current = true;
+      if (assistTimeoutRef.current !== null) {
+        window.clearTimeout(assistTimeoutRef.current);
+        assistTimeoutRef.current = null;
+      }
+
+      const scanTarget = resolveScanTargetFromQr(decodedText);
+      if (import.meta.env.DEV) {
+        console.debug("[scanner] code détecté", { decodedText, scanTarget });
+      }
+
+      if (!scanTarget) {
+        hasScannedRef.current = false;
+        const now = Date.now();
+        if (now - lastInvalidScanToastRef.current > 2800) {
+          lastInvalidScanToastRef.current = now;
+          toast.message("QR non reconnu", {
+            description: "Utilisez le QR d’une œuvre (cartel ou catalogue), bien centré et éclairé.",
+          });
+        }
+        return;
+      }
+
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(35);
+      }
+
+      cameraSessionRef.current?.stop();
+      cameraSessionRef.current = null;
+
+      if (scanTarget.kind === "expo") {
+        navigate(`/scan?expo_id=${encodeURIComponent(scanTarget.expoId)}`);
+        return;
+      }
+
+      const target = expoId
+        ? `/artwork/${encodeURIComponent(scanTarget.artworkId)}?expo_id=${encodeURIComponent(expoId)}`
+        : `/artwork/${encodeURIComponent(scanTarget.artworkId)}`;
+      navigate(target);
+    },
+    [expoId, navigate],
+  );
+
+  const getOrCreateFileQrReader = useCallback(() => {
+    if (!document.getElementById(QR_FILE_READER_ID)) {
+      throw new Error("Zone scanner fichier introuvable.");
+    }
+    if (!qrRef.current) {
+      qrRef.current = createHtml5QrcodeReader(QR_FILE_READER_ID);
+    }
+    return qrRef.current;
+  }, []);
+
   const startCamera = useCallback(async () => {
-    const qr = qrRef.current;
-    if (!qr || cameraReady || startingCamera) return;
+    if (cameraReady || startingCameraRef.current) return;
+    startingCameraRef.current = true;
     setStartingCamera(true);
     try {
       hasScannedRef.current = false;
-      const scannerConfig = {
-        fps: 18,
-        qrbox: { width: 220, height: 220 },
-        aspectRatio: 1,
-        disableFlip: false,
-      } as const;
+      cameraSessionRef.current?.stop();
+      cameraSessionRef.current = null;
 
-      const onSuccess = (decodedText: string) => {
-        if (hasScannedRef.current) return;
-        hasScannedRef.current = true;
-        if (assistTimeoutRef.current !== null) {
-          window.clearTimeout(assistTimeoutRef.current);
-          assistTimeoutRef.current = null;
+      if (isNativeQrScanSupported()) {
+        const session = await startNativeCameraQrScanner(QR_READER_ELEMENT_ID, handleQrDecoded);
+        cameraSessionRef.current = session;
+        setTorchSupported(session.torchSupported);
+      } else {
+        const qr = getOrCreateFileQrReader();
+        await safeStopQrScanner(qr);
+        await startQrWebcamScanner(qr, QR_READER_ELEMENT_ID, buildQrScannerCameraConfig(), handleQrDecoded);
+        try {
+          const capabilities = qr.getRunningTrackCapabilities();
+          setTorchSupported(Boolean(capabilities?.torch));
+        } catch {
+          setTorchSupported(false);
         }
-        const artworkId = parseArtworkIdFromInput(decodedText);
-        if (import.meta.env.DEV) {
-          console.debug("[scanner] code détecté", { decodedText, artworkId });
-        }
-        if (!artworkId) {
-          hasScannedRef.current = false;
-          return;
-        }
-        if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-          navigator.vibrate(35);
-        }
-        const target = expoId
-          ? `/artwork/${encodeURIComponent(artworkId)}?expo_id=${encodeURIComponent(expoId)}`
-          : `/artwork/${encodeURIComponent(artworkId)}`;
-        navigate(target);
-      };
-
-      const onError = () => {
-        // erreurs de frame ignorées volontairement
-      };
-
-      try {
-        await qr.start({ facingMode: "environment" }, scannerConfig, onSuccess, onError);
-      } catch {
-        await qr.start({ facingMode: "user" }, scannerConfig, onSuccess, onError);
       }
 
       setCameraReady(true);
@@ -99,19 +146,6 @@ const WorkScanner = () => {
       }
       setCameraAutoStartEnabled(true);
 
-      const capabilities = qr.getRunningTrackCapabilities();
-      setTorchSupported(Boolean(capabilities?.torch));
-
-      await qr
-        .applyVideoConstraints({
-          advanced: [
-            { focusMode: "continuous" } as MediaTrackConstraintSet,
-            { sharpness: 1 } as MediaTrackConstraintSet,
-            { contrast: 1 } as MediaTrackConstraintSet,
-          ],
-        })
-        .catch(() => undefined);
-
       assistTimeoutRef.current = window.setTimeout(() => {
         if (!hasScannedRef.current) {
           setShowAssistHint(true);
@@ -120,46 +154,88 @@ const WorkScanner = () => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Accès caméra impossible.";
       const isInsecureContext = typeof window !== "undefined" && !window.isSecureContext;
+      if (import.meta.env.DEV) {
+        console.error("[scanner] démarrage caméra", e);
+      }
       setCameraError(
         isInsecureContext
           ? "Caméra bloquée: ouvrez cette page en HTTPS (ex: URL ngrok) puis réessayez."
           : /permission|denied|notallowed|not allowed/i.test(msg)
             ? "Accès caméra refusé. Autorisez la caméra pour scanner les œuvres."
-            : "Caméra indisponible pour le moment. Réessayez dans un instant.",
+            : /notfound|no camera|device not found|requested device not found/i.test(msg)
+              ? "Aucune caméra détectée sur cet appareil."
+              : /notreadable|in use|busy|track start/i.test(msg)
+                ? "La webcam est utilisée par une autre application. Fermez-la puis réessayez."
+                : import.meta.env.DEV && msg.trim()
+                  ? msg
+                  : "Caméra indisponible pour le moment. Réessayez dans un instant.",
       );
       setCameraReady(false);
       setTorchSupported(false);
       setTorchOn(false);
       setShowAssistHint(false);
+      setCameraAutoStartEnabled(false);
     } finally {
+      startingCameraRef.current = false;
       setStartingCamera(false);
     }
-  }, [cameraReady, expoId, navigate, startingCamera]);
+  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded]);
+
+  const handleQrImageFile = useCallback(
+    async (file: File | undefined) => {
+      if (!file) return;
+      let qr: Html5Qrcode;
+      try {
+        qr = getOrCreateFileQrReader();
+      } catch {
+        toast.error("Scanner fichier indisponible.");
+        return;
+      }
+      try {
+        const text = await scanQrFromImageFile(qr, file);
+        handleQrDecoded(text);
+      } catch {
+        toast.error("QR illisible sur cette image. Essayez une photo plus nette ou plus proche.");
+      }
+    },
+    [getOrCreateFileQrReader, handleQrDecoded],
+  );
 
   useEffect(() => {
-    const qr = new Html5Qrcode(QR_READER_ELEMENT_ID, { verbose: false });
-    qrRef.current = qr;
     return () => {
+      cameraSessionRef.current?.stop();
+      cameraSessionRef.current = null;
       if (assistTimeoutRef.current !== null) {
         window.clearTimeout(assistTimeoutRef.current);
         assistTimeoutRef.current = null;
       }
-      void Promise.resolve(qr.stop())
-        .catch(() => undefined)
-        .then(() => qr.clear().catch(() => undefined));
+      const qr = qrRef.current;
       qrRef.current = null;
+      if (qr) void safeStopQrScanner(qr);
     };
   }, []);
 
   useEffect(() => {
     if (!cameraAutoStartEnabled) return;
-    if (cameraReady || startingCamera) return;
-    void startCamera();
-  }, [cameraAutoStartEnabled, cameraReady, startingCamera, startCamera]);
+    if (cameraReady || startingCameraRef.current) return;
+    if (autostartAttemptedRef.current) return;
+    autostartAttemptedRef.current = true;
+    const frameId = requestAnimationFrame(() => {
+      void startCamera();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [cameraAutoStartEnabled, cameraReady, startCamera]);
 
   const toggleTorch = async () => {
-    if (!torchSupported || !qrRef.current) return;
+    if (!torchSupported) return;
     const nextTorchValue = !torchOn;
+    if (cameraSessionRef.current) {
+      const ok = await cameraSessionRef.current.setTorch(nextTorchValue);
+      if (ok) setTorchOn(nextTorchValue);
+      else setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+      return;
+    }
+    if (!qrRef.current) return;
     try {
       await qrRef.current.applyVideoConstraints({
         advanced: [{ torch: nextTorchValue } as MediaTrackConstraintSet],
@@ -188,24 +264,27 @@ const WorkScanner = () => {
         </div>
         <div className="mx-auto mt-3 flex min-h-[calc(100vh-7.5rem)] flex-col items-center justify-start gap-5 pt-0 text-center">
           <div
-            className={`relative mx-auto h-[260px] w-[260px] overflow-hidden rounded-2xl border border-border shadow-xl ${
+            className={`relative mx-auto h-[300px] w-[300px] overflow-hidden rounded-2xl border border-border shadow-xl ${
               cameraReady ? "bg-transparent" : "bg-[#1A1A1A]"
             }`}
           >
-            <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl shadow-[0_0_0_100vmax_rgba(0,0,0,0.6)]" />
+            {!cameraReady && (
+              <div className="pointer-events-none absolute inset-0 z-[1] rounded-2xl bg-[#1A1A1A]" aria-hidden />
+            )}
 
-            <div className="absolute left-3 top-3 h-8 w-8 border-l-2 border-t-2" style={{ borderColor: SCAN_ACCENT }} />
-            <div className="absolute right-3 top-3 h-8 w-8 border-r-2 border-t-2" style={{ borderColor: SCAN_ACCENT }} />
+            <div className="absolute left-3 top-3 z-[3] h-8 w-8 border-l-2 border-t-2" style={{ borderColor: SCAN_ACCENT }} />
+            <div className="absolute right-3 top-3 z-[3] h-8 w-8 border-r-2 border-t-2" style={{ borderColor: SCAN_ACCENT }} />
             <div
-              className="absolute bottom-3 left-3 h-8 w-8 border-b-2 border-l-2"
+              className="absolute bottom-3 left-3 z-[3] h-8 w-8 border-b-2 border-l-2"
               style={{ borderColor: SCAN_ACCENT }}
             />
             <div
-              className="absolute bottom-3 right-3 h-8 w-8 border-b-2 border-r-2"
+              className="absolute bottom-3 right-3 z-[3] h-8 w-8 border-b-2 border-r-2"
               style={{ borderColor: SCAN_ACCENT }}
             />
 
-            <div id={QR_READER_ELEMENT_ID} className="absolute inset-0" />
+            <div id={QR_READER_ELEMENT_ID} className="absolute inset-0 z-[2]" />
+            <div id={QR_FILE_READER_ID} className="sr-only" aria-hidden />
 
             {cameraReady && torchSupported && (
               <button
@@ -242,11 +321,41 @@ const WorkScanner = () => {
             <Button
               type="button"
               className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={() => void startCamera()}
+              onClick={() => {
+                setCameraError(null);
+                void startCamera();
+              }}
               disabled={startingCamera}
             >
               {startingCamera ? "Démarrage de la caméra..." : "Démarrer la caméra"}
             </Button>
+          )}
+
+          <input
+            ref={qrImageInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              void handleQrImageFile(file);
+            }}
+          />
+
+          {cameraReady && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-border bg-white text-sm"
+              onClick={() => qrImageInputRef.current?.click()}
+            >
+              Importer une photo du QR
+            </Button>
+          )}
+
+          {cameraReady && isNativeQrScanSupported() && (
+            <p className="text-[10px] text-muted-foreground">Lecture QR native (comme l’app Caméra Windows)</p>
           )}
 
           <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">

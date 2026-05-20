@@ -53,9 +53,7 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
 
   if (UUID_RE.test(t)) return t;
 
-  if (/^https?:\/\//i.test(t)) {
-    try {
-      const u = new URL(t);
+  const parseFromUrl = (u: URL): string => {
       const fromQuery =
         u.searchParams.get("artwork_id")?.trim() ||
         u.searchParams.get("artworkId")?.trim() ||
@@ -73,6 +71,27 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
       }
       const last = parts[parts.length - 1];
       if (last && UUID_RE.test(decodeURIComponent(last))) return decodeURIComponent(last);
+      return "";
+  };
+
+  if (t.startsWith("/")) {
+    try {
+      const base =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "https://local.invalid";
+      const fromPath = parseFromUrl(new URL(t, base));
+      if (fromPath) return fromPath;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t);
+      const fromUrl = parseFromUrl(u);
+      if (fromUrl) return fromUrl;
     } catch {
       /* ignore */
     }
@@ -80,6 +99,46 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
 
   const m = t.match(UUID_IN_TEXT_RE);
   return m ? m[0] : "";
+}
+
+export type QrScanTarget =
+  | { kind: "artwork"; artworkId: string }
+  | { kind: "expo"; expoId: string };
+
+/** Interprète le contenu d'un QR (œuvre, expo, UUID seul, URL absolue ou relative). */
+export function resolveScanTargetFromQr(raw: string | null | undefined): QrScanTarget | null {
+  const artworkId = parseArtworkIdFromInput(raw);
+  if (artworkId) return { kind: "artwork", artworkId };
+
+  let t = (raw ?? "").trim();
+  if (!t) return null;
+
+  let href = t;
+  if (t.startsWith("/")) {
+    try {
+      const base =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "https://local.invalid";
+      href = new URL(t, base).href;
+    } catch {
+      return null;
+    }
+  }
+
+  if (!/^https?:\/\//i.test(href)) return null;
+
+  try {
+    const u = new URL(href);
+    if (/\/scan(-work\d*)?(\/|$)/i.test(u.pathname)) {
+      const ex = u.searchParams.get("expo_id")?.trim() || "";
+      if (ex && UUID_RE.test(ex)) return { kind: "expo", expoId: ex };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 /**

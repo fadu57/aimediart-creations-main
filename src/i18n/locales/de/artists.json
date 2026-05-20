@@ -31,6 +31,12 @@
   "duplicate_desc": "Dieses Künstlerprofil existiert bereits. Bearbeiten?",
   "btn_duplicate_no": "Nein",
   "btn_duplicate_yes": "Ja",
+  "duplicate_modal_aria": "Bereits vorhandener Künstler",
+  "duplicate_modal_title": "Dieser Künstler existiert bereits",
+  "duplicate_modal_desc": "Ein Künstler mit gleichem Vor- und Nachnamen und mindestens einer identischen Kunstgattung ist bereits erfasst. Wie möchten Sie fortfahren?",
+  "duplicate_existing_types": "Kunstgattungen",
+  "btn_use_existing_fiche": "Dieses Profil verwenden",
+  "btn_create_new_anyway": "Trotzdem neues Profil anlegen",
 
   "agency_label": "Zugehörige Agentur",
   "agency_hint": "Ihr Konto ist nicht mit einer Agentur verknüpft: Wählen Sie die für dieses Profil zuständige Agentur (Agentur-Bio).",

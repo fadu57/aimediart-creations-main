@@ -35,6 +35,33 @@ function withExtension(filename: string, extension: string): string {
   return `${base || `img-${crypto.randomUUID()}`}.${extension}`;
 }
 
+async function readImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    if (typeof createImageBitmap === "function") {
+      const bitmap = await createImageBitmap(file);
+      const dims = { width: bitmap.width, height: bitmap.height };
+      bitmap.close();
+      return dims;
+    }
+  } catch {
+    // fallback ci-dessous
+  }
+
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    img.src = url;
+  });
+}
+
 async function compressImage(
   file: File,
   maxBytes: number,
@@ -43,7 +70,8 @@ async function compressImage(
   const options: ImageCompressionOptions = {
     maxSizeMB: maxBytes / (1024 * 1024),
     maxWidthOrHeight: compressionOptions?.maxEdgePx ?? MAX_IMAGE_UPLOAD_EDGE_PX,
-    useWebWorker: true,
+    /** Worker utile sur grosses images ; coûteux pour les petits fichiers (< ~300 Ko). */
+    useWebWorker: file.size > 300 * 1024,
     initialQuality: compressionOptions?.initialQuality ?? 0.85,
     ...(compressionOptions?.fileType ? { fileType: compressionOptions.fileType } : {}),
   };
@@ -63,6 +91,14 @@ export async function prepareImageForSupabaseUpload(
 ): Promise<File> {
   assertImageFileAllowed(file);
   const maxBytes = options?.maxBytes ?? MAX_IMAGE_UPLOAD_BYTES;
+  const maxEdgePx = options?.maxEdgePx ?? MAX_IMAGE_UPLOAD_EDGE_PX;
+
+  if (!options?.forceFileType && file.size <= maxBytes) {
+    const dims = await readImageDimensions(file);
+    if (!dims || (dims.width <= maxEdgePx && dims.height <= maxEdgePx)) {
+      return file;
+    }
+  }
 
   let compressed: File;
   try {

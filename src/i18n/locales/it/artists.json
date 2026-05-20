@@ -31,6 +31,12 @@
   "duplicate_desc": "Il profilo dell'artista esiste già. Modificarlo?",
   "btn_duplicate_no": "No",
   "btn_duplicate_yes": "Sì",
+  "duplicate_modal_aria": "Artista già esistente",
+  "duplicate_modal_title": "Questo artista esiste già",
+  "duplicate_modal_desc": "Esiste già un artista con lo stesso nome, lo stesso cognome e almeno un tipo di arte identico. Come vuoi procedere?",
+  "duplicate_existing_types": "Tipi di arte",
+  "btn_use_existing_fiche": "Usa questa scheda",
+  "btn_create_new_anyway": "Crea comunque una nuova scheda",
 
   "agency_label": "Agenzia interessata",
   "agency_hint": "Il tuo account non è collegato a nessuna agenzia: seleziona quella interessata da questo profilo (bio per agenzia).",

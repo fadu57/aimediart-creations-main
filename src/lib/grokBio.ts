@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { dispatchAiUsageRefresh } from "@/lib/aiUsageRefresh";
 import type { Language } from "@/hooks/useArtistBios";
 
 type GenerateBiographyArgs = {
@@ -27,6 +28,8 @@ export async function generateMultilingualBiographyWithGrok(
   }
 
   const bios = data as Partial<Record<Language, string>> | null;
+
+  dispatchAiUsageRefresh();
 
   return {
     fr: bios?.fr?.trim() || "",

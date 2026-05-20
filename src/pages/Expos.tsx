@@ -29,6 +29,7 @@ import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
+import { QR_CODE_STORAGE_OPTIONS, qrCodePrintOptions } from "@/lib/qrCodeScanFriendly";
 
 const EXPO_QR_CACHE_KEY = "aimediart-expo-qr-cache-v1";
 
@@ -411,10 +412,10 @@ const Expos = () => {
       (typeof window !== "undefined" && window.location?.origin?.trim()) ||
       "https://www.aimediart.com";
     const targetUrl = `${origin}/scan?expo_id=${encodeURIComponent(expo.id)}`;
-    const qrDataUrl = await QRCode.toDataURL(targetUrl, {
-      width: format === "a3" ? 1400 : 1000,
-      margin: 1,
-    });
+    const qrDataUrl = await QRCode.toDataURL(
+      targetUrl,
+      qrCodePrintOptions(format === "a3" ? 1400 : 1000),
+    );
     // Synchronise la vignette QR de la carte expo avec le QR du panneau généré.
     const keys = expoQrKeys(expo);
     setExpoQrImages((prev) => {
@@ -463,7 +464,7 @@ const Expos = () => {
     const scale = format === "a3" ? 1 : 0.707; // ~210/297
     const margin = 14 * scale;
     const contentWidth = pageWidth - margin * 2;
-    const headerLogo = createAimediaHeaderLogoBlockPng();
+    const headerLogo = await createAimediaHeaderLogoBlockPng();
     const aimediaImg = await loadImage(headerLogo.dataUrl);
     const aimediaW = Math.min(pageWidth * 0.505, contentWidth); // même proportion qu'en A3
     const aimediaH = (aimediaW * headerLogo.heightPx) / headerLogo.widthPx;

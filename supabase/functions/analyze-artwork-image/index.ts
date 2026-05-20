@@ -2,12 +2,20 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "https://esm.sh/@google/genai@0.14.1";
+import {
+  extractGeminiUsageMetadataFromResponse,
+  insertAiUsageLog,
+  tokensFromAnyGeminiUsageLike,
+} from "../_shared/ai_usage_log.ts";
 
 type RequestBody = {
   image_url?: string | null;
   image_base64?: string | null;
   image_mime_type?: string | null;
   artist_name?: string;
+  artwork_name?: string;
+  /** Optionnel — pour lier la consommation à une œuvre dans ai_usage_logs */
+  artwork_id?: string | null;
 };
 
 const CORS_HEADERS = {
@@ -43,72 +51,89 @@ const DEFAULT_ANALYSIS_PROMPT = [
   "- Ne fais pas d'hypothèses gratuites : si incertain, indique-le.",
 ].join("\n");
 
-function renderPrompt(template: string, vars: { artist_name: string }): string {
-  return template.replaceAll("{{artist_name}}", vars.artist_name || "inconnu");
+function renderPrompt(
+  template: string,
+  vars: { artist_name: string; artwork_name: string },
+): string {
+  return template
+    .replaceAll("{{artist_name}}", vars.artist_name || "inconnu")
+    .replaceAll("{{artwork_name}}", vars.artwork_name || "sans titre");
 }
 
-function normalizePromptStyleName(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
+/** Extrait le texte visible (hors blocs « thought » internes Gemini 2.5). */
+function extractGeminiText(geminiJson: unknown): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g = geminiJson as any;
+  const t = g?.text?.trim?.();
+  if (typeof t === "string" && t) return t;
+  const parts = g?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    return parts
+      .filter((p: { thought?: boolean }) => !p?.thought)
+      .map((p: { text?: string }) => (typeof p?.text === "string" ? p.text : ""))
+      .join("")
+      .trim();
+  }
+  return "";
 }
-
-/** Même logique que `isImageAnalysisPromptStyleName` côté app (ligne Prompts IA « Analyse de l'image »). */
-function isImageAnalysisPromptStyleName(name: string | null | undefined): boolean {
-  const n = normalizePromptStyleName(name ?? "");
-  if (!n) return false;
-  if (n === "analyse de l'image" || n === "analyse de l image") return true;
-  if (n.includes("analyse") && n.includes("image")) return true;
-  if (n.includes("analysis") && n.includes("image")) return true;
-  return false;
-}
-
-type PromptStyleLabelCols = {
-  name?: string | null;
-  name_fr?: string | null;
-  name_en?: string | null;
-  name_de?: string | null;
-  name_es?: string | null;
-  name_it?: string | null;
-};
-
-function isImageAnalysisPromptStyleRow(r: PromptStyleLabelCols): boolean {
-  return [r.name, r.name_fr, r.name_en, r.name_de, r.name_es, r.name_it].some((v) =>
-    isImageAnalysisPromptStyleName(v),
-  );
-}
-
-type PromptStyleAnalysisHit = PromptStyleLabelCols & {
-  style_rules?: string | null;
-  system_instruction?: string | null;
-  max_tokens?: number | null;
-};
 
 function clampGeminiMaxOutputTokens(n: number | null | undefined): number {
-  if (n == null || !Number.isFinite(n) || n <= 0) return 2200;
+  if (n == null || !Number.isFinite(n) || n <= 0) return 1600;
   return Math.min(4096, Math.max(256, Math.round(n)));
 }
 
-type LoadAnalysisPromptResult = { template: string; maxOutputTokens: number };
+type LoadAnalysisPromptResult = {
+  template: string;
+  maxOutputTokens: number;
+  source: string;
+};
+
+/** Ajouté à tout prompt `app_settings` : fiche courte pour alimenter les médiations (pas une dissertation). */
+const MEDIATION_SOURCE_OUTPUT_SUFFIX = [
+  "",
+  "---",
+  "FORMAT DE SORTIE — FICHE MÉDIATION (obligatoire) :",
+  "Ce texte sert UNIQUEMENT de matière première pour générer ensuite des médiations IA (plusieurs personas).",
+  "Rédige une FICHE SOURCE DENSE en français (Markdown léger : titres courts, puces ou paragraphes brefs).",
+  "Longueur cible : 700 à 1000 mots maximum. Pas de dissertation, pas de paragraphes encyclopédiques.",
+  "Pour chaque section demandée ci-dessus : 2 à 4 phrases percutantes OU puces courtes (faits visuels, symboles, émotions).",
+  "N'utilise pas de JSON, pas de crochets [] ni d'accolades {}. Pas de préambule « En tant que… ».",
+].join("\n");
+
+const OUTPUT_FORMAT_MARKERS = [
+  "FORMAT DE SORTIE — FICHE MÉDIATION",
+  "FORMAT DE SORTIE (obligatoire)",
+  "FORMAT DE SORTIE :",
+] as const;
+
+function buildAnalysisPromptText(template: string): string {
+  let base = template.trim();
+  if (!base) return base;
+  for (const marker of OUTPUT_FORMAT_MARKERS) {
+    const i = base.indexOf(marker);
+    if (i !== -1) {
+      base = base.slice(0, i).trim();
+      break;
+    }
+  }
+  if (base.includes("FORMAT DE SORTIE — FICHE MÉDIATION")) return base;
+  return `${base}\n${MEDIATION_SOURCE_OUTPUT_SUFFIX}`;
+}
 
 /**
- * Ordre de résolution du texte envoyé à Gemini (première source non vide gagne) :
- * 1. `app_settings.key` = "Analyse de l'image" (libellé métier, valeur = texte du prompt brut)
- * 2. `app_settings.key` = "analysis_prompt" (clé historique / page Paramètres dédiée)
- * 3. Ligne `prompt_style` dont un libellé multilingue (`name_*`) correspond à « Analyse de l'image »
- *    (`style_rules` + `system_instruction` concaténés)
- * 4. Constante DEFAULT_ANALYSIS_PROMPT dans ce fichier
+ * Source unique : `app_settings` (clé « Analyse de l'image » puis legacy `analysis_prompt`).
+ * `prompt_style` sert aux médiations (personas), pas à ce bouton.
  */
 async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const fallback: LoadAnalysisPromptResult = {
-    template: DEFAULT_ANALYSIS_PROMPT,
+    template: buildAnalysisPromptText(DEFAULT_ANALYSIS_PROMPT),
     maxOutputTokens: 1200,
+    source: "default_constant",
   };
   if (!supabaseUrl || !serviceRoleKey) {
+    console.warn("[analyze-artwork-image] loadAnalysisPrompt: no service role, using default");
     return fallback;
   }
   const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -137,35 +162,251 @@ async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
         typeof mt === "number" && Number.isFinite(mt) && mt > 0
           ? clampGeminiMaxOutputTokens(mt)
           : 1200;
-      return { template: trimmed, maxOutputTokens: tokens };
+      const result = {
+        template: buildAnalysisPromptText(trimmed),
+        maxOutputTokens: tokens,
+        source: `app_settings:${k}`,
+      };
+      console.log(
+        `[analyze-artwork-image] prompt from ${result.source}, ${result.template.length} chars, max_tokens=${result.maxOutputTokens}`,
+      );
+      return result;
     }
+  } else if (appErr) {
+    console.warn("[analyze-artwork-image] app_settings select failed:", appErr.message);
   }
 
-  const { data: psRows, error: psErr } = await admin
-    .from("prompt_style")
-    .select("name_fr, name_en, name_de, name_es, name_it, style_rules, system_instruction, max_tokens");
-
-  if (!psErr && Array.isArray(psRows)) {
-    const hit = (psRows as PromptStyleAnalysisHit[]).find((r) => isImageAnalysisPromptStyleRow(r));
-    if (hit) {
-      const parts = [hit.style_rules, hit.system_instruction]
-        .map((s) => (typeof s === "string" ? s.trim() : ""))
-        .filter(Boolean);
-      const combined = parts.join("\n\n");
-      if (combined) {
-        return {
-          template: combined,
-          maxOutputTokens: clampGeminiMaxOutputTokens(hit.max_tokens ?? null),
-        };
-      }
-    }
-  }
-
+  console.log("[analyze-artwork-image] prompt from default_constant");
   return fallback;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Persona renvoyée à l’app — alignée sur le structured output Gemini (title, description, tone optionnel). */
+type ImageAnalysisPersona = {
+  title: string;
+  description: string;
+  tone?: string;
+};
+
+/**
+ * Schéma Structured Output (Gemini) : tableau d’objets { title, description, tone? }.
+ * @see https://ai.google.dev/gemini-api/docs/json-mode
+ */
+const IMAGE_ANALYSIS_PERSONAS_RESPONSE_SCHEMA = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: {
+      title: { type: "STRING" },
+      description: { type: "STRING" },
+      tone: { type: "STRING" },
+    },
+    required: ["title", "description"],
+  },
+};
+
+function stringField(v: unknown): string {
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return "";
+}
+
+/**
+ * Correspondance universelle — Groq, anciens prompts ou clés alternatives → { title, description, tone? }.
+ */
+function canonicalizePersonaEntry(raw: unknown): ImageAnalysisPersona | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const d = raw.trim();
+    return d ? { title: "—", description: d } : null;
+  }
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const title =
+    stringField(o.title) ||
+    stringField(o.name) ||
+    stringField(o.label) ||
+    stringField(o.persona) ||
+    stringField(o.id);
+  const description =
+    stringField(o.description) ||
+    stringField(o.biography) ||
+    stringField(o.text) ||
+    stringField(o.content) ||
+    stringField(o.summary) ||
+    stringField(o.mediation);
+  const toneRaw = stringField(o.tone) || stringField(o.voix) || stringField(o.mood);
+  const tone = toneRaw || undefined;
+  if (!title && !description) return null;
+  return {
+    title: title || "—",
+    description: description || "",
+    ...(tone ? { tone } : {}),
+  };
+}
+
+function personasToNotes(personas: ImageAnalysisPersona[]): string {
+  return personas
+    .map((p) => {
+      const toneLine = p.tone ? `*Ton : ${p.tone}*\n\n` : "";
+      return `### ${p.title}\n\n${toneLine}${p.description}`.trim();
+    })
+    .join("\n\n---\n\n");
+}
+
+/** Dernière passe avant la réponse HTTP (alias résiduels, forme stable). */
+function finalizePersonasForResponse(personas: ImageAnalysisPersona[]): ImageAnalysisPersona[] {
+  return personas
+    .map((p) => canonicalizePersonaEntry(p as unknown))
+    .filter((x): x is ImageAnalysisPersona => x != null);
+}
+
+/** Si `parsed` est un tableau d’objets persona, renvoie notes + personas canoniques. */
+function applyParsedPersonasArray(parsed: unknown, logLabel: string): {
+  personas: ImageAnalysisPersona[];
+  notes: string;
+} | null {
+  if (!Array.isArray(parsed)) return null;
+  const rawList = parsed.map(canonicalizePersonaEntry).filter((x): x is ImageAnalysisPersona => x != null);
+  if (rawList.length === 0) return null;
+  const personas = finalizePersonasForResponse(rawList);
+  console.log(`Données parsées avec succès (${logLabel}) :`, parsed);
+  return { personas, notes: personasToNotes(personas) };
+}
+
+/**
+ * Retire les blocs markdown ```json ... ``` puis extrait le premier objet `{...}` ou tableau `[...]` JSON
+ * équilibré (respecte les guillemets et échappements).
+ */
+function extractBalancedJsonString(raw: string): string | null {
+  let unwrapped = raw.trim().replace(/^[\s\uFEFF]+/, "");
+  const fenceIdx = unwrapped.search(/```(?:json|JSON)?\s*\n?/);
+  if (fenceIdx !== -1) {
+    unwrapped = unwrapped.slice(fenceIdx).replace(/^```(?:json|JSON)?\s*\n?/, "");
+    unwrapped = unwrapped.replace(/\n?```[\s]*$/m, "").trim();
+  }
+
+  const startObj = unwrapped.indexOf("{");
+  const startArr = unwrapped.indexOf("[");
+  if (startObj === -1 && startArr === -1) return null;
+
+  const useArray = startArr !== -1 && (startObj === -1 || startArr < startObj);
+  const start = useArray ? startArr : startObj;
+  const open = useArray ? "[" : "{";
+  const close = useArray ? "]" : "}";
+
+  let depth = 0;
+  let inString = false;
+  let esc = false;
+
+  for (let i = start; i < unwrapped.length; i++) {
+    const c = unwrapped[i]!;
+    if (esc) {
+      esc = false;
+      continue;
+    }
+    if (c === "\\" && inString) {
+      esc = true;
+      continue;
+    }
+    if (c === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (c === open) depth++;
+    else if (c === close) {
+      depth--;
+      if (depth === 0) return unwrapped.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/** Construit une liste de personas + un texte « notes » pour le champ matériau source (formats legacy / enveloppés). */
+function normalizePersonasPayload(parsed: unknown): {
+  personas: ImageAnalysisPersona[];
+  notes: string;
+} | null {
+  const fromEntry = (key: string, body: unknown): ImageAnalysisPersona | null => {
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const o = body as Record<string, unknown>;
+      return canonicalizePersonaEntry({
+        ...o,
+        title: stringField(o.title) || key,
+      });
+    }
+    if (typeof body === "string") return canonicalizePersonaEntry({ title: key, description: body });
+    return canonicalizePersonaEntry({ title: key, description: stringField(body) });
+  };
+
+  const list: ImageAnalysisPersona[] = [];
+
+  if (Array.isArray(parsed)) {
+    for (let i = 0; i < parsed.length; i++) {
+      const item = parsed[i];
+      const c = canonicalizePersonaEntry(item);
+      if (c) {
+        list.push(c);
+        continue;
+      }
+      if (typeof item === "string" && item.trim()) {
+        list.push({ title: `Point ${i + 1}`, description: item.trim() });
+      }
+    }
+  } else if (parsed && typeof parsed === "object") {
+    const root = parsed as Record<string, unknown>;
+
+    const arr =
+      root.personas ??
+      root.items ??
+      root.results ??
+      (Array.isArray(root.data) ? root.data : null);
+    if (Array.isArray(arr)) {
+      const nested = normalizePersonasPayload(arr);
+      if (nested?.personas.length) return nested;
+    }
+
+    const box = root.mediations_par_style ?? root.styles ?? root.personas_by_id;
+    if (box && typeof box === "object" && !Array.isArray(box)) {
+      for (const [k, v] of Object.entries(box as Record<string, unknown>)) {
+        const p = fromEntry(k, v);
+        if (p) list.push(p);
+      }
+    }
+
+    const titles = root.titles;
+    const descriptions = root.descriptions;
+    if (Array.isArray(titles) && Array.isArray(descriptions)) {
+      const n = Math.min(titles.length, descriptions.length);
+      for (let i = 0; i < n; i++) {
+        const p = canonicalizePersonaEntry({
+          title: titles[i],
+          description: descriptions[i],
+        });
+        if (p) list.push(p);
+      }
+    }
+
+    if (
+      list.length === 0 &&
+      (typeof root.analyse_et_reflexion === "string" || typeof root.analyse_globale === "string") &&
+      root.mediations_par_style &&
+      typeof root.mediations_par_style === "object"
+    ) {
+      return normalizePersonasPayload({
+        mediations_par_style: root.mediations_par_style,
+      });
+    }
+  }
+
+  if (list.length === 0) return null;
+
+  const finalized = finalizePersonasForResponse(list);
+  return { personas: finalized, notes: personasToNotes(finalized) };
 }
 
 serve(async (req: Request) => {
@@ -193,6 +434,9 @@ serve(async (req: Request) => {
   const inlineBase64 = body.image_base64?.trim() ?? "";
   const inlineMime = body.image_mime_type?.trim() ?? "";
   const artistName = body.artist_name?.trim() ?? "";
+  const artworkName = body.artwork_name?.trim() ?? "";
+  const artworkId =
+    typeof body.artwork_id === "string" && body.artwork_id.trim() ? body.artwork_id.trim() : null;
   if (!imageUrl && !inlineBase64) return jsonResponse(400, { error: "image_url ou image_base64 est requis." });
 
   // Garde-fou payload: évite de saturer l'Edge Function avec un base64 trop volumineux.
@@ -229,28 +473,43 @@ serve(async (req: Request) => {
     }
   }
 
-  const { template: promptTemplate, maxOutputTokens } = await loadAnalysisPrompt();
-  const prompt = renderPrompt(promptTemplate, { artist_name: artistName || "inconnu" });
+  const { template: promptTemplate, maxOutputTokens, source: promptSource } = await loadAnalysisPrompt();
+  const prompt = renderPrompt(promptTemplate, {
+    artist_name: artistName || "inconnu",
+    artwork_name: artworkName,
+  });
+  console.log(
+    "[analyze-artwork-image] prompt:",
+    promptSource,
+    "maxOutputTokens:",
+    maxOutputTokens,
+    "artist:",
+    artistName || "inconnu",
+    "artwork:",
+    artworkName || "sans titre",
+  );
 
-  const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType,
-              data: b64,
-            },
+  const contents = [
+    {
+      role: "user",
+      parts: [
+        { text: prompt },
+        {
+          inlineData: {
+            mimeType,
+            data: b64,
           },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens,
+        },
+      ],
     },
+  ];
+
+  // Gemini 2.5 : les tokens de réflexion comptent dans maxOutputTokens par défaut → texte tronqué.
+  // thinkingBudget: 0 consacre tout le plafond au texte visible.
+  const generationConfig = {
+    temperature: 0.3,
+    maxOutputTokens,
+    thinkingConfig: { thinkingBudget: 0 },
   };
 
   const ai = new GoogleGenAI({ apiKey: geminiApiKey });
@@ -284,8 +543,8 @@ serve(async (req: Request) => {
       try {
         const response = await ai.models.generateContent({
           model,
-          contents: requestBody.contents,
-          config: requestBody.generationConfig,
+          contents,
+          config: generationConfig,
           // @ts-expect-error - certains builds du SDK exposent signal, d'autres non.
           signal: ctrl.signal,
         });
@@ -323,17 +582,24 @@ serve(async (req: Request) => {
     });
   }
 
-  const text =
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (geminiJson as any)?.text?.trim?.() ||
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (geminiJson as any)?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text ?? "").join("")?.trim() ||
-    "";
+  const text = extractGeminiText(geminiJson);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const finishReason = (geminiJson as any)?.candidates?.[0]?.finishReason ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const usageMetadata = (geminiJson as any)?.usageMetadata ?? null;
+  const usageMetadata = extractGeminiUsageMetadataFromResponse(geminiJson);
   const truncated = finishReason === "MAX_TOKENS";
+  const tok = tokensFromAnyGeminiUsageLike(usageMetadata);
+  console.log(
+    "[analyze-artwork-image] finish:",
+    finishReason,
+    "truncated:",
+    truncated,
+    "chars:",
+    text.length,
+    "completion_tokens:",
+    tok.completion_tokens,
+    "maxOutputTokens:",
+    maxOutputTokens,
+  );
 
   if (!text) {
     return jsonResponse(502, {
@@ -344,12 +610,32 @@ serve(async (req: Request) => {
     });
   }
 
+  const notesOut = text.trim();
+  console.log("[analyze-artwork-image] réponse texte brut, longueur:", notesOut.length);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (supabaseUrl && serviceRoleKey) {
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await insertAiUsageLog(admin, {
+      model_id: modelUsed,
+      provider: "gemini",
+      prompt_tokens: tok.prompt_tokens,
+      completion_tokens: tok.completion_tokens,
+      total_tokens: tok.total_tokens,
+      artwork_id: artworkId,
+    });
+  }
+
   return jsonResponse(200, {
-    notes: text,
+    notes: notesOut,
     model_used: modelUsed,
     finish_reason: finishReason,
     usage_metadata: usageMetadata,
     truncated,
+    max_output_tokens: maxOutputTokens,
   });
 });
 

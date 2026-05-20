@@ -14,7 +14,7 @@
 
   "dialog_title_edit": "Fiche de {{name}}",
   "dialog_title_artist_fallback": "l'artiste",
-  "dialog_title_create": "Création de la biographie de l'artiste",
+  "dialog_title_create": "Création de la fiche de l'artiste",
   "btn_modify": "Modifier",
   "btn_generating_bio": "Génération…",
   "btn_generate_bio": "Générer la bio avec l'IA",
@@ -31,6 +31,12 @@
   "duplicate_desc": "La fiche artiste existe déjà. La modifier ?",
   "btn_duplicate_no": "Non",
   "btn_duplicate_yes": "Oui",
+  "duplicate_modal_aria": "Artiste déjà existant",
+  "duplicate_modal_title": "Cet artiste existe déjà",
+  "duplicate_modal_desc": "Un artiste avec le même prénom, le même nom et au moins un type d'art identique est déjà enregistré. Que souhaitez-vous faire ?",
+  "duplicate_existing_types": "Types d'art",
+  "btn_use_existing_fiche": "Utiliser cette fiche",
+  "btn_create_new_anyway": "Créer une nouvelle fiche",
 
   "agency_label": "Agence concernée",
   "agency_hint": "Votre compte n'est pas rattaché à une agence : sélectionnez celle concernée par cette fiche (bio par agence).",

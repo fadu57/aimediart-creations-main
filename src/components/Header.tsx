@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Building2, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Settings, UserPlus, Users, X } from "lucide-react";
+import { BarChart3, Building2, GalleryVerticalEnd, House, Loader2, LogIn, LogOut, Menu, Settings, UserPlus, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -9,8 +9,13 @@ import { supabase } from "@/lib/supabase";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
+import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 
-const LOGO_RED = "hsl(0 65% 48%)";
+/** Effet verre sur les pastilles du menu desktop (aperçu navigateur). */
+const HEADER_NAV_PILL_BLUR = "backdrop-blur-[12px]";
+/** Ombre portée + inset pour le bouton de déconnexion. */
+const HEADER_LOGOUT_SHADOW =
+  "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.15),inset_0px_4px_12px_0px_rgba(0,0,0,0.15)]";
 
 /** Mapping label français HEADER_NAV_ITEMS → clé i18next namespace "header". */
 const NAV_LABEL_TO_KEY: Record<string, string> = {
@@ -63,38 +68,8 @@ function Logo({
   const homeTo = session ? (isAgencyHome ? "/artistes" : "/dashboard") : "/home";
 
   return (
-    <Link to={homeTo} className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-      <div
-        className={`flex shrink-0 items-center justify-center rounded-[15%] shadow-sm ${compact ? "h-8 w-8" : "h-10 w-10"}`}
-        style={{ backgroundColor: LOGO_RED }}
-        aria-hidden
-      >
-        <span className="inline-flex animate-logo-heart">
-          <Heart
-            className={`text-white ${compact ? "h-4 w-4" : "h-6 w-6"}`}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.25}
-            aria-hidden
-          />
-        </span>
-      </div>
-      <div
-        className={`min-w-0 flex flex-col items-start justify-center leading-tight ${compact ? "flex" : "hidden sm:flex"}`}
-      >
-        <span
-          className={`block font-sans font-bold tracking-tight whitespace-nowrap ${compact ? "text-[0.7rem] sm:text-[0.75rem]" : "text-[0.9rem] sm:text-[1rem]"}`}
-          style={{ color: LOGO_RED }}
-        >
-          AIMEDIArt.com
-        </span>
-        <span
-          className={`block w-full font-sans font-bold italic leading-snug ${compact ? "mt-px text-[8px] sm:text-[10px]" : "text-[9px] sm:text-[10px]"}`}
-          style={{ color: LOGO_RED }}
-        >
-          Art-mediation with AI
-        </span>
-      </div>
+    <Link to={homeTo} className="flex min-w-0 items-center">
+      <AimediartBrandLogoBlock compact={compact} hideTextBelowSm={!compact} animateHeart />
     </Link>
   );
 }
@@ -293,7 +268,7 @@ export default function Header() {
                 <NavLink
                   to={homePath}
                   className={({ isActive }) =>
-                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
                       isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                     }`
                   }
@@ -311,7 +286,7 @@ export default function Header() {
                       key={`desktop-nav-${item.key}`}
                       to={item.to}
                       className={({ isActive }) =>
-                        `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                        `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
                           isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                         }`
                       }
@@ -324,7 +299,7 @@ export default function Header() {
                 <NavLink
                   to="/settings"
                   className={({ isActive }) =>
-                    `inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                    `inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
                       isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                     }`
                   }
@@ -337,7 +312,7 @@ export default function Header() {
               {session && !isAuthFormPage ? (
                 <button
                   type="button"
-                  className="rounded-md px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  className={`rounded-md px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-muted ${HEADER_NAV_PILL_BLUR} ${HEADER_LOGOUT_SHADOW}`}
                   onClick={() => {
                     void handleLogout();
                   }}
@@ -348,7 +323,7 @@ export default function Header() {
                 <NavLink
                   to="/login"
                   className={({ isActive }) =>
-                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${
+                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
                       isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                     }`
                   }

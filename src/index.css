@@ -481,6 +481,35 @@
     right: 0;
     bottom: auto;
     transform: translateY(-12px);
+    gap: 6px;
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .fab-container.œuvre-navi .fab-item {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .fab-container.œuvre-navi .fab-item svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+  }
+
+  .fab-container.œuvre-navi .fab-language-selector-wrap {
+    gap: 6px;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+  }
+
+  .fab-container.œuvre-navi .fab-language-selector {
+    height: 1.75rem;
+    min-height: 1.75rem;
+    font-size: 0.6875rem;
   }
 
   .fab-container.active .fab-links {
