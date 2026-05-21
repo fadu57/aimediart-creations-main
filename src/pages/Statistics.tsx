@@ -18,6 +18,10 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { supabase } from "@/lib/supabase";
 import { PDF_FORMAT_OPTIONS, type PdfPaperFormat } from "@/lib/statisticsPrintExport";
+import {
+  generateStatisticsBrowserPdf,
+  printStatisticsInBrowser,
+} from "@/lib/statisticsBrowserPdf";
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
 import { StatisticsReportView } from "@/components/statistics/StatisticsReportView";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
@@ -1083,9 +1087,61 @@ const Statistics = () => {
           ? selectedAgencyLabel
           : "—";
 
+  const prepareStatisticsExportData = async (): Promise<void> => {
+    try {
+      await Promise.race([
+        loadTemporalSeriesForPdf(),
+        new Promise<void>((_, rej) => setTimeout(() => rej(new Error("timeout")), 25_000)),
+      ]);
+    } catch {
+      /* données déjà présentes ou délai */
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  };
+
+  /** PDF navigateur (jsPDF + capture DOM) — même logique que le panneau expo. */
+  const handleBrowserPdfStatistics = async (paperFormat: PdfPaperFormat) => {
+    if (printExportBusy) return;
+    setPrintExportBusy(true);
+    setPaperFormatDialogOpen(false);
+
+    try {
+      await prepareStatisticsExportData();
+      const root = statisticsPrintAreaRef.current;
+      if (!root) throw new Error("missing-print-area");
+      await generateStatisticsBrowserPdf(root, paperFormat);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err);
+      if (code === "popup-blocked") {
+        window.alert(t("preview.popupBlocked"));
+      } else if (code === "timeout-ready") {
+        window.alert(t("preview.browserPdfNotReady"));
+      } else {
+        window.alert(t("preview.browserPdfError"));
+      }
+    }
+
+    setPrintExportBusy(false);
+  };
+
+  /** Impression système (Ctrl+P → Enregistrer en PDF). */
+  const handleBrowserPrintStatistics = async (paperFormat: PdfPaperFormat) => {
+    if (printExportBusy) return;
+    setPrintExportBusy(true);
+    setPaperFormatDialogOpen(false);
+    try {
+      await prepareStatisticsExportData();
+      printStatisticsInBrowser(paperFormat);
+    } finally {
+      setPrintExportBusy(false);
+    }
+  };
+
+  /** PDF serveur Chromium (Playwright) — conservé, option avancée. */
   const handlePrintStatistics = async (paperFormat: PdfPaperFormat) => {
     if (printExportBusy) return;
     setPrintExportBusy(true);
+    setPaperFormatDialogOpen(false);
 
     try {
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
@@ -1095,15 +1151,7 @@ const Statistics = () => {
         return;
       }
 
-      try {
-        await Promise.race([
-          loadTemporalSeriesForPdf(),
-          new Promise<void>((_, rej) => setTimeout(() => rej(new Error("timeout")), 25_000)),
-        ]);
-      } catch {
-        /* données déjà présentes ou délai */
-      }
-      await new Promise((r) => setTimeout(r, 400));
+      await prepareStatisticsExportData();
 
       const res = await fetch(getStatisticsPdfExportUrl(), {
         method: "POST",
@@ -1140,16 +1188,15 @@ const Statistics = () => {
       setTimeout(() => URL.revokeObjectURL(url), 600_000);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
-      if (import.meta.env.PROD && printPreviewOpen) {
-        const useBrowserPrint = window.confirm(`${t("preview.pdfExportServerError")}\n\n${detail}\n\n${t("preview.pdfExportBrowserPrintFallback")}`);
-        if (useBrowserPrint) {
-          window.print();
-          setPrintExportBusy(false);
-          return;
-        }
-      } else {
-        window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
+      const useBrowser = window.confirm(
+        `${t("preview.pdfExportServerError")}\n\n${detail}\n\n${t("preview.pdfExportBrowserFallback")}`,
+      );
+      if (useBrowser) {
+        setPrintExportBusy(false);
+        await handleBrowserPdfStatistics(paperFormat);
+        return;
       }
+      window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
     }
 
     setPrintExportBusy(false);
@@ -1600,7 +1647,9 @@ const Statistics = () => {
         <DialogContent className="max-w-md border-border bg-white text-neutral-900 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-serif text-lg">{t("preview.paperFormatTitle")}</DialogTitle>
-            <DialogDescription className="text-sm text-neutral-600">{t("preview.paperFormatHint")}</DialogDescription>
+            <DialogDescription className="text-sm text-neutral-600">
+              {t("preview.paperFormatHintBrowser")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-1">
             <label htmlFor="stats-pdf-paper" className="text-sm font-medium text-neutral-800">
@@ -1620,20 +1669,40 @@ const Statistics = () => {
               ))}
             </select>
           </div>
-          <DialogFooter className="gap-2 sm:justify-end">
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setPaperFormatDialogOpen(false)}>
               {t("preview.close")}
             </Button>
             <Button
               type="button"
+              variant="outline"
+              disabled={printExportBusy}
+              onClick={() => void handleBrowserPrintStatistics(selectedPdfPaper)}
+            >
+              {t("preview.browserPrint")}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={printExportBusy}
+              onClick={() => void handlePrintStatistics(selectedPdfPaper)}
+            >
+              {t("preview.serverPdf")}
+            </Button>
+            <Button
+              type="button"
               className="bg-[#E63946] hover:bg-[#c62f3a]"
               disabled={printExportBusy}
-              onClick={() => {
-                setPaperFormatDialogOpen(false);
-                void handlePrintStatistics(selectedPdfPaper);
-              }}
+              onClick={() => void handleBrowserPdfStatistics(selectedPdfPaper)}
             >
-              {t("preview.paperFormatConfirm")}
+              {printExportBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  {t("preview.printPreparing")}
+                </>
+              ) : (
+                t("preview.browserPdf")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
