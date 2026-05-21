@@ -1,31 +1,15 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/export/statistics-pdf.ts",
-      "use": "@vercel/node"
+      "source": "/pdf-export/export/statistics-pdf",
+      "destination": "/api/export/statistics-pdf"
     },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/pdf-export/export/statistics-pdf",
-      "dest": "/api/export/statistics-pdf"
-    },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/export/statistics-pdf.ts": {
       "maxDuration": 120,
-      "memory": 3008,
-      "includeFiles": "node_modules/@sparticuz/chromium/**"
+      "memory": 3008
     }
   }
 }

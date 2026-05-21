@@ -10,7 +10,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient<Database>(supabaseUrl ?? "", supabaseAnonKey ?? "");
+/** Évite le crash « supabaseUrl is required » si les variables manquent au build. */
+export const supabase =
+  supabaseUrl && supabaseAnonKey
+    ? createClient<Database>(supabaseUrl, supabaseAnonKey)
+    : (null as unknown as ReturnType<typeof createClient<Database>>);
 
 /** URL du projet uniquement (pas de clé) — utile pour vérifier qu’on ne pointe pas sur le mauvais projet. */
 if (import.meta.env.DEV) {
