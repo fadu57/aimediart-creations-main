@@ -1,0 +1,2 @@
+-- Migration 38 : nouveaux buckets logos + photos (PRUDENT — ne supprime rien)
+-- Exécuter le fichier complet : supabase/sql/storage_buckets_logos_photos.sql

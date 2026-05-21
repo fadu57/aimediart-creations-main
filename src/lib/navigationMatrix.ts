@@ -30,7 +30,7 @@ export type HeaderNavEntry = {
 
 /** Menus affichés dans le header (inclut Accueil, Organisation, Expos, etc.). */
 export const HEADER_NAV_ITEMS: HeaderNavEntry[] = [
-  { key: "menu_home", to: "/dashboard", label: "Accueil", icon: "house" },
+  { key: "menu_home", to: "/dashboard", label: "Votre profil", icon: "house" },
   { key: "menu_agence", to: "/agencies", label: "Organisation" },
   { key: "menu_user", to: "/user", label: "User" },
   { key: "menu_expos", to: "/expos", label: "Expos" },

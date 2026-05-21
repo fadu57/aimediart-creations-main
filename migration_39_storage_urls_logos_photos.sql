@@ -1,0 +1,2 @@
+-- Migration 39 : URLs en base après copie storage
+-- Exécuter le fichier complet : supabase/sql/storage_urls_logos_photos.sql

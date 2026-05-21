@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import imageCompression from "browser-image-compression";
 
+import { uploadBackofficeUserPhoto } from "@/lib/storagePaths";
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { Button } from "@/components/ui/button";
@@ -406,20 +407,11 @@ const RegisterSaaS = () => {
       // Upload avatar after account creation (needs user.id)
       if (avatarBlob && user) {
         try {
-          const path = `${user.id}/avatar.webp`;
-          const { error: uploadErr } = await supabase.storage
-            .from("selfies")
-            .upload(path, avatarBlob, { contentType: "image/webp", upsert: true });
-
-          if (!uploadErr) {
-            const { data: { publicUrl } } = supabase.storage.from("selfies").getPublicUrl(path);
-            await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
-          } else {
-            console.warn("[RegisterSaaS] avatar upload:", uploadErr.message);
-            toast.error(t("register_saas.toast_avatar_later"));
-          }
-        } catch {
-          // Non-blocking — account is already created
+          const publicUrl = await uploadBackofficeUserPhoto(user.id, avatarBlob, "avatar.webp");
+          await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user.id);
+        } catch (uploadErr) {
+          console.warn("[RegisterSaaS] avatar upload:", uploadErr);
+          toast.error(t("register_saas.toast_avatar_later"));
         }
       }
 

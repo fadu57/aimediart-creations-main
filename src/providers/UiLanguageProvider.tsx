@@ -12,6 +12,7 @@ const FALLBACK_TRANSLATIONS: Record<UiLanguage, Record<string, string>> = {
     Bonjour: "Hello",
     "Langue de l'interface": "Interface language",
     Accueil: "Home",
+    "Votre profil": "Your profile",
     Configuration: "Settings",
     Connexion: "Log in",
     "Déconnexion": "Log out",
@@ -25,6 +26,7 @@ const FALLBACK_TRANSLATIONS: Record<UiLanguage, Record<string, string>> = {
     Bonjour: "Hola",
     "Langue de l'interface": "Idioma de la interfaz",
     Accueil: "Inicio",
+    "Votre profil": "Tu perfil",
     Configuration: "Configuración",
     Connexion: "Iniciar sesión",
     "Déconnexion": "Cerrar sesión",
@@ -38,6 +40,7 @@ const FALLBACK_TRANSLATIONS: Record<UiLanguage, Record<string, string>> = {
     Bonjour: "Hallo",
     "Langue de l'interface": "Oberflächensprache",
     Accueil: "Startseite",
+    "Votre profil": "Ihr Profil",
     Configuration: "Einstellungen",
     Connexion: "Anmelden",
     "Déconnexion": "Abmelden",
@@ -51,6 +54,7 @@ const FALLBACK_TRANSLATIONS: Record<UiLanguage, Record<string, string>> = {
     Bonjour: "Ciao",
     "Langue de l'interface": "Lingua dell'interfaccia",
     Accueil: "Home",
+    "Votre profil": "Il tuo profilo",
     Configuration: "Impostazioni",
     Connexion: "Accedi",
     "Déconnexion": "Disconnetti",
@@ -193,6 +197,14 @@ export function UiLanguageProvider({ children }: { children: React.ReactNode }) 
 export function useUiLanguage() {
   const ctx = useContext(UiLanguageContext);
   if (!ctx) {
+    // Tolérance HMR (Vite) : le Header peut se remonter avant le Provider après un hot reload.
+    if (import.meta.env.DEV) {
+      return {
+        language: DEFAULT_UI_LANGUAGE,
+        setLanguage: () => {},
+        t: (frenchText: string) => frenchText,
+      };
+    }
     throw new Error("useUiLanguage doit être utilisé dans UiLanguageProvider");
   }
   return ctx;

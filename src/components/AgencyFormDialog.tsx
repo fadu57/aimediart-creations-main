@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import { uploadAgencyLogo } from "@/lib/storagePaths";
 import {
   fieldLabel,
   isAgencyLogoField,
@@ -54,30 +55,26 @@ function getErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-async function uploadAgencyLogoToStorage(file: File): Promise<string> {
+async function uploadAgencyLogoToStorage(file: File, agencyId: string): Promise<string> {
   const prepared = await prepareImageForSupabaseUpload(file);
-  const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
-  const objectPath = `agencies/logos/${crypto.randomUUID()}.${ext}`;
-  const preferredBucket = "images";
-  const fallbackBucket = import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
-
-  const tryUpload = async (bucket: string) => {
-    const { error } = await supabase.storage.from(bucket).upload(objectPath, prepared, {
+  const id = agencyId.trim();
+  if (!id) throw new Error("Identifiant organisation requis pour le logo.");
+  try {
+    return await uploadAgencyLogo(id, prepared, prepared.name);
+  } catch (primaryErr) {
+    const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
+    const legacyPath = `agencies/logos/${crypto.randomUUID()}.${ext}`;
+    const legacyBucket = import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
+    const { error } = await supabase.storage.from(legacyBucket).upload(legacyPath, prepared, {
       cacheControl: "3600",
       upsert: false,
     });
-    if (error) return { ok: false as const, error, bucket };
-    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-    return { ok: true as const, publicUrl: pub.publicUrl };
-  };
-
-  const first = await tryUpload(preferredBucket);
-  if (first.ok) return first.publicUrl;
-  const second = await tryUpload(fallbackBucket);
-  if (second.ok) return second.publicUrl;
-  throw new Error(
-    `Envoi du logo : ${first.error.message} (bucket « ${preferredBucket} ») / ${second.error.message} (bucket « ${fallbackBucket} »).`,
-  );
+    if (error) {
+      throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
+    }
+    const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(legacyPath);
+    return pub.publicUrl;
+  }
 }
 
 function revokeLogoPreviews(urls: Record<string, string>) {
@@ -177,14 +174,17 @@ export function AgencyFormDialog({
     setSaving(true);
     try {
       const mergedValues = { ...values };
+      const targetAgencyId =
+        mode === "edit" ? agencyId?.trim() || "" : String(mergedValues.id ?? "").trim() || crypto.randomUUID();
+
       if (isAgencyLogoField("logo_agency") && logoFileByKey.logo_agency) {
-        const url = await uploadAgencyLogoToStorage(logoFileByKey.logo_agency);
+        const url = await uploadAgencyLogoToStorage(logoFileByKey.logo_agency, targetAgencyId);
         mergedValues.logo_agency = url;
       }
 
       if (mode === "create") {
         const payload: Record<string, unknown> = {};
-        payload.id = crypto.randomUUID();
+        payload.id = targetAgencyId;
 
         for (const k of sortedKeys) {
           if (k === "id") continue;

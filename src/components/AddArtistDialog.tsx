@@ -21,6 +21,7 @@ import { generateMultilingualBiographyWithGrok } from "@/lib/grokBio";
 import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { removeSupabaseStorageObjectByPublicUrl } from "@/lib/supabaseStorage";
+import { uploadCatalogArtistPhoto } from "@/lib/storagePaths";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
 import {
   ARTIST_BIO_LANGUAGES,
@@ -795,10 +796,6 @@ export function AddArtistDialog({
       throw new Error("Aucun fichier à envoyer.");
     }
 
-    const primaryBucket =
-      import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
-    const fallbackBucket = "images";
-
     const ext =
       pendingPhotoFile.type === "image/webp" || /\.webp$/i.test(pendingPhotoFile.name)
         ? "webp"
@@ -807,44 +804,28 @@ export function AddArtistDialog({
           : "jpg";
 
     const artistKey = editingArtistId?.trim() || crypto.randomUUID();
-    const objectPath = `artists/${artistKey}.${ext}`;
     const previousPhotoUrl = (form.getValues("artist_photo_url") ?? "").trim();
 
     if (previousPhotoUrl && editingArtistId) {
       await removeSupabaseStorageObjectByPublicUrl(previousPhotoUrl);
     }
 
-    const tryUpload = async (bucket: string) => {
-      const { error } = await supabase.storage.from(bucket).upload(objectPath, pendingPhotoFile, {
+    try {
+      return await uploadCatalogArtistPhoto(artistKey, pendingPhotoFile, pendingPhotoFile.name);
+    } catch (primaryErr) {
+      const objectPath = `artists/${artistKey}.${ext}`;
+      const legacyBucket =
+        import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
+      const { error } = await supabase.storage.from(legacyBucket).upload(objectPath, pendingPhotoFile, {
         cacheControl: "3600",
         upsert: Boolean(editingArtistId),
       });
-      if (error) return { ok: false as const, error, bucket };
-      const { data: pub } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-      return { ok: true as const, publicUrl: pub.publicUrl, bucket };
-    };
-
-    const first = await tryUpload(primaryBucket);
-    if (first.ok) return first.publicUrl;
-
-    const isRls =
-      /row-level security|rls|policy/i.test(first.error.message) &&
-      primaryBucket !== fallbackBucket;
-    if (isRls) {
-      const second = await tryUpload(fallbackBucket);
-      if (second.ok) return second.publicUrl;
-      throw new Error(
-        `Envoi photo refusé (RLS). Exécutez migration_33_artist_photos_storage_rls.sql dans Supabase, ` +
-          `ou vérifiez les policies du bucket « ${primaryBucket} ». Détail : ${first.error.message}`,
-      );
+      if (error) {
+        throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
+      }
+      const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(objectPath);
+      return pub.publicUrl;
     }
-
-    if (primaryBucket !== fallbackBucket) {
-      const second = await tryUpload(fallbackBucket);
-      if (second.ok) return second.publicUrl;
-    }
-
-    throw new Error(`Envoi photo (bucket « ${primaryBucket} ») : ${first.error.message}`);
   };
 
   const persistSocialLinks = async (artistId: string) => {

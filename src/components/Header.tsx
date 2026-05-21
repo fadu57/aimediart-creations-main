@@ -19,7 +19,7 @@ const HEADER_LOGOUT_SHADOW =
 
 /** Mapping label français HEADER_NAV_ITEMS → clé i18next namespace "header". */
 const NAV_LABEL_TO_KEY: Record<string, string> = {
-  Accueil: "nav_home",
+  "Votre profil": "nav_home",
   Organisation: "nav_organisation",
   User: "nav_users",
   Expos: "nav_expos",

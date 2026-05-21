@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { UserRound, X } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { ProfileAvatarImage } from "@/components/ProfileAvatarImage";
 import { Button } from "@/components/ui/button";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
@@ -22,19 +24,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources } from "@/lib/birthProfile";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
-import { USER_AGE_OPTIONS } from "@/lib/userAgeOptions";
+import { uploadBackofficeUserPhoto } from "@/lib/storagePaths";
+import { toPublicStorageUrl, resolveAvatarDisplayUrl, readAvatarFromMeta } from "@/lib/supabaseStorage";
+import { fetchUserEditDetails } from "@/lib/userEditDetails";
+import { resolveUserAvatarUrl, readAvatarFromRpcRow } from "@/lib/userAvatar";
+import { isRoleAssignableBy, parseNumericRoleId } from "@/lib/roleHierarchy";
 
 // ---------------------------------------------------------------------------
 // Nouveau modèle :
 //   - profiles       : données profil (first_name, last_name, username, avatar_url, phone)
 //   - agency_users   : rattachement agence + role_id
 //   - expo_user_role : rattachement expo
-//   - auth.users     : email + métadonnées auth (non accessible côté client)
-//
-// ⚠️  email : non pré-chargé depuis la DB (auth.users non accessible client-side).
-//     Le champ est éditable manuellement par l'admin et utilisé par les edge functions.
+//   - auth.users     : email + métadonnées auth (email lu via session ou RPC admin)
 // ---------------------------------------------------------------------------
 type UserRow = {
   id: string;
@@ -44,10 +48,11 @@ type UserRow = {
   first_name?: string | null;
   last_name?: string | null;
   username?: string | null;
-  birth_year?: string | null;   // tranche d'âge UI (non mappée vers profiles.birth_year integer)
-  email?: string | null;        // saisie admin seulement — non pré-chargé
+  birth_month?: string | null;
+  birth_year?: string | null;
+  email?: string | null;
   phone?: string | null;
-  expo_id?: string | null;      // depuis expo_user_role
+  expo_id?: string | null;
 };
 
 type ExpoOption = {
@@ -137,10 +142,31 @@ function roleIdFromValue(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function toPublicStorageUrl(url: string | null | undefined): string {
-  const raw = (url ?? "").trim();
-  if (!raw) return "";
-  return raw.replace("/storage/v1/object/images/", "/storage/v1/object/public/images/");
+/** Rôles 1–4 : peuvent affecter une expo aux membres curateur / équipe expo. */
+function callerCanAssignExpo(callerRoleId: number | null | undefined): boolean {
+  return typeof callerRoleId === "number" && Number.isFinite(callerRoleId) && callerRoleId >= 1 && callerRoleId < 5;
+}
+
+function targetRoleUsesExpo(targetRoleId: number | null | undefined): boolean {
+  return targetRoleId === 5 || targetRoleId === 6;
+}
+
+function applyRoleChangeToUserRow(
+  prev: UserRow,
+  roleId: number | null,
+  connectedAgencyId: string | null | undefined,
+): UserRow {
+  if (roleId != null && roleId >= 1 && roleId <= 3) {
+    return { ...prev, role_id: roleId, agency_id: null, expo_id: null };
+  }
+  const agencyFallback = prev.agency_id?.trim() || connectedAgencyId?.trim() || null;
+  if (roleId === 4) {
+    return { ...prev, role_id: roleId, agency_id: agencyFallback || null, expo_id: null };
+  }
+  if (roleId === 5 || roleId === 6) {
+    return { ...prev, role_id: roleId, agency_id: agencyFallback || null };
+  }
+  return { ...prev, role_id: roleId };
 }
 
 function buildTestEmailAlias(email: string, userId: string): string {
@@ -155,37 +181,294 @@ function buildTestEmailAlias(email: string, userId: string): string {
   return `test-${token}@example.local`;
 }
 
-async function uploadUserPhoto(file: File): Promise<string> {
+async function uploadUserPhoto(file: File, userId?: string | null): Promise<string> {
+  const uid = userId?.trim();
+  if (!uid) {
+    throw new Error("Identifiant utilisateur requis pour enregistrer la photo.");
+  }
   const prepared = await prepareImageForSupabaseUpload(file);
-  const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
-  const objectPath = `users/photos/${crypto.randomUUID()}.${ext}`;
-  const preferredBucket = import.meta.env.VITE_SUPABASE_USER_PHOTOS_BUCKET?.trim() || "selfies";
-
-  const tryUpload = async (bucket: string) => {
-    const { error } = await supabase.storage.from(bucket).upload(objectPath, prepared, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-    if (error) return { ok: false as const, error, bucket };
-    const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-    return { ok: true as const, publicUrl: data.publicUrl };
-  };
-
-  const first = await tryUpload(preferredBucket);
-  if (first.ok) return first.publicUrl;
-  throw new Error(`Envoi photo impossible sur le bucket "${preferredBucket}" : ${first.error.message}`);
+  return uploadBackofficeUserPhoto(uid, prepared, prepared.name);
 }
 
-// Lecture d'un utilisateur unique depuis les 3 tables du nouveau modèle.
-async function fetchUserById(targetId: string): Promise<UserRow | null> {
+type RpcUserWithRolesRow = {
+  id?: string | null;
+  user_id?: string | null;
+  role_id?: unknown;
+  agency_id?: string | null;
+  expo_id?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+  user_photo_url?: string | null;
+  photo_url?: string | null;
+  picture?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  birth_year?: number | string | null;
+  birth_month?: string | number | null;
+};
+
+function rpcRowUserId(row: RpcUserWithRolesRow): string {
+  const raw = row.id ?? row.user_id;
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function fillMissingProfileFields(target: UserRow, source: Partial<UserRow>): UserRow {
+  const next = { ...target };
+  const keys: Array<keyof UserRow> = [
+    "first_name",
+    "last_name",
+    "username",
+    "avatar_url",
+    "phone",
+    "email",
+    "birth_year",
+    "birth_month",
+  ];
+  for (const key of keys) {
+    const current = next[key];
+    const incoming = source[key];
+    if ((current == null || (typeof current === "string" && !current.trim())) && incoming != null) {
+      if (typeof incoming === "string") {
+        if (incoming.trim()) next[key] = incoming.trim();
+      } else {
+        next[key] = incoming;
+      }
+    }
+  }
+  return next;
+}
+
+/** Complète photo, email et naissance avant affichage du formulaire. */
+async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Promise<UserRow> {
+  let enriched = { ...row };
+  const isSelf = sessionUser?.id === row.id;
+
+  const details = await fetchUserEditDetails(row.id);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url, birth_year, first_name, last_name, username, phone")
+    .eq("id", row.id)
+    .maybeSingle();
+
+  const p = profile as {
+    avatar_url?: string | null;
+    birth_year?: number | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    username?: string | null;
+    phone?: string | null;
+  } | null;
+
+  enriched = fillMissingProfileFields(enriched, {
+    first_name: p?.first_name ?? null,
+    last_name: p?.last_name ?? null,
+    username: p?.username ?? null,
+    avatar_url: p?.avatar_url ?? null,
+    phone: p?.phone ?? null,
+    birth_year:
+      typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
+  });
+
+  if (details) {
+    enriched = fillMissingProfileFields(enriched, {
+      email: typeof details.email === "string" ? details.email : null,
+      avatar_url: typeof details.avatar_url === "string" ? details.avatar_url : null,
+      birth_year: typeof details.birth_year === "number" ? String(details.birth_year) : null,
+      birth_month:
+        details.birth_month != null
+          ? readBirthMonthFromMeta({ birth_month: details.birth_month })
+          : null,
+    });
+  }
+
+  if (isSelf && sessionUser) {
+    if (sessionUser.email?.trim()) enriched.email = sessionUser.email.trim();
+    const meta = (sessionUser.user_metadata as Record<string, unknown> | undefined) ?? {};
+    const metaAvatar = readAvatarFromMeta(meta);
+    if (metaAvatar) enriched.avatar_url = enriched.avatar_url?.trim() || metaAvatar;
+    enriched.birth_month = readBirthMonthFromMeta(meta) || enriched.birth_month || null;
+    if (!enriched.birth_year?.trim()) {
+      enriched.birth_year = readBirthYearFromSources(p?.birth_year, meta) || null;
+    }
+  }
+
+  const needsRpc = !enriched.email?.trim() || !enriched.avatar_url?.trim() || !enriched.birth_year?.trim();
+  if (needsRpc) {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
+    if (!rpcErr && Array.isArray(rpcData)) {
+      const rpcRow = (rpcData as RpcUserWithRolesRow[]).find((r) => rpcRowUserId(r) === row.id);
+      if (rpcRow) {
+        enriched = fillMissingProfileFields(enriched, {
+          avatar_url: readAvatarFromRpcRow(rpcRow) ?? (typeof rpcRow.avatar_url === "string" ? rpcRow.avatar_url : null),
+          email: typeof rpcRow.email === "string" ? rpcRow.email : null,
+          first_name: rpcRow.first_name ?? null,
+          last_name: rpcRow.last_name ?? null,
+          username: rpcRow.username ?? null,
+          phone: rpcRow.phone ?? null,
+          birth_year:
+            rpcRow.birth_year != null && String(rpcRow.birth_year).trim()
+              ? String(rpcRow.birth_year).trim()
+              : null,
+          birth_month:
+            rpcRow.birth_month != null
+              ? readBirthMonthFromMeta({ birth_month: rpcRow.birth_month })
+              : null,
+        });
+      }
+    }
+  }
+
+  const resolvedAvatar = await resolveUserAvatarUrl(row.id, sessionUser, {
+    seedAvatarUrl: enriched.avatar_url,
+    profileAvatarUrl: p?.avatar_url,
+  });
+  if (resolvedAvatar) {
+    enriched.avatar_url = resolvedAvatar;
+  }
+
+  return enriched;
+}
+
+function normalizeEmail(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+async function persistUserEmailChange(params: {
+  userId: string;
+  previousEmail: string;
+  nextEmail: string;
+  isSelf: boolean;
+}): Promise<{ changed: boolean; message?: string }> {
+  const prev = normalizeEmail(params.previousEmail);
+  const next = normalizeEmail(params.nextEmail);
+  if (!next) {
+    throw new Error("L'e-mail est requis.");
+  }
+  if (next === prev) {
+    return { changed: false };
+  }
+  if (!/\S+@\S+\.\S+/.test(next)) {
+    throw new Error("Adresse e-mail invalide.");
+  }
+
+  if (params.isSelf) {
+    const { error } = await supabase.auth.updateUser({ email: next });
+    if (error) throw error;
+    return {
+      changed: true,
+      message:
+        "Un e-mail de confirmation a été envoyé à la nouvelle adresse. Validez le lien pour finaliser le changement.",
+    };
+  }
+
+  const { data, error } = await supabase.functions.invoke<{
+    ok?: boolean;
+    error?: string;
+    email?: string;
+    unchanged?: boolean;
+  }>("admin-update-user-email", {
+    body: { user_id: params.userId, email: next },
+  });
+  if (error) throw error;
+  if (!data?.ok) {
+    throw new Error(data?.error || "Mise à jour e-mail impossible.");
+  }
+  if (data.unchanged) {
+    return { changed: false };
+  }
+  return {
+    changed: true,
+    message: `E-mail de connexion mis à jour : ${data.email || next}`,
+  };
+}
+
+type UserPhotoFieldProps = {
+  avatarUrl: string | null | undefined;
+  photoPreview: string;
+  saving: boolean;
+  inputId: string;
+  onFileSelected: (file: File) => void;
+};
+
+function UserPhotoField({ avatarUrl, photoPreview, saving, inputId, onFileSelected }: UserPhotoFieldProps) {
+  return (
+    <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
+      <ProfileAvatarImage
+        src={avatarUrl}
+        previewUrl={photoPreview}
+        className="h-full w-full object-cover"
+        iconClassName="h-14 w-14"
+      />
+      <label
+        htmlFor={inputId}
+        className="absolute inset-x-0 top-0 z-10 cursor-pointer bg-black/30 px-3 py-2 text-center text-xs font-medium text-white backdrop-blur-[1px] transition hover:bg-black/45"
+      >
+        Changer la photo
+      </label>
+      <Input
+        id={inputId}
+        type="file"
+        accept="image/*"
+        disabled={saving}
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (!file) return;
+          try {
+            assertImageFileAllowed(file);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Image invalide.");
+            return;
+          }
+          onFileSelected(file);
+        }}
+      />
+    </div>
+  );
+}
+
+/** Données pré-chargées pour ouvrir la fiche sans requête (ex. depuis le dashboard). */
+export type UsersEditSeed = UserRow;
+
+function mapRpcRowToUserRow(row: RpcUserWithRolesRow): UserRow | null {
+  const id = rpcRowUserId(row);
+  if (!id) return null;
+  const birthYearRaw = row.birth_year;
+  const birthYear =
+    birthYearRaw != null && String(birthYearRaw).trim() ? String(birthYearRaw).trim() : null;
+  return {
+    id,
+    first_name: row.first_name ?? null,
+    last_name: row.last_name ?? null,
+    username: row.username ?? null,
+    avatar_url: readAvatarFromRpcRow(row) ?? row.avatar_url ?? null,
+    phone: row.phone ?? null,
+    email: typeof row.email === "string" ? row.email.trim() || null : null,
+    birth_month:
+      row.birth_month != null ? readBirthMonthFromMeta({ birth_month: row.birth_month }) || null : null,
+    birth_year: birthYear,
+    role_id: parseNumericRoleId(row.role_id),
+    agency_id: row.agency_id ?? null,
+    expo_id: row.expo_id ?? null,
+  };
+}
+
+async function fetchUserProfileFallback(
+  targetId: string,
+  connectedAgencyId?: string | null,
+): Promise<UserRow | null> {
   const [
     { data: profile, error: profileErr },
     { data: agencyRow },
-    { data: expoRow },
+    { data: expoRows },
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, username, avatar_url, phone")
+      .select("id, first_name, last_name, username, avatar_url, phone, birth_year")
       .eq("id", targetId)
       .maybeSingle(),
     supabase
@@ -199,12 +482,8 @@ async function fetchUserById(targetId: string): Promise<UserRow | null> {
       .from("expo_user_role")
       .select("expo_id")
       .eq("user_id", targetId)
-      .order("assigned_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order("assigned_at", { ascending: false }),
   ]);
-
-  if (profileErr || !profile) return null;
 
   const p = profile as {
     id?: string | null;
@@ -213,37 +492,71 @@ async function fetchUserById(targetId: string): Promise<UserRow | null> {
     username?: string | null;
     avatar_url?: string | null;
     phone?: string | null;
-  };
-  const a = agencyRow as { agency_id?: string | null; role_id?: number | null } | null;
-  const e = expoRow as { expo_id?: string | null } | null;
+    birth_year?: number | null;
+  } | null;
+  const a = agencyRow as { agency_id?: string | null; role_id?: unknown } | null;
+
+  if (profileErr && import.meta.env.DEV) {
+    console.warn("[Users] lecture profiles fallback :", profileErr.message);
+  }
+
+  if (!p?.id && !a?.agency_id && !a?.role_id) return null;
+
+  const expoList = (expoRows as Array<{ expo_id?: string | null }> | null) ?? [];
+  const firstExpo = expoList.find((row) => typeof row.expo_id === "string" && row.expo_id.trim())?.expo_id?.trim();
 
   return {
-    id: String(p.id),
-    first_name: p.first_name ?? null,
-    last_name: p.last_name ?? null,
-    username: p.username ?? null,
-    avatar_url: p.avatar_url ?? null,
-    phone: p.phone ?? null,
-    email: null, // email vit dans auth.users — non accessible côté client
-    birth_year: null,
-    role_id: typeof a?.role_id === "number" ? a.role_id : null,
-    agency_id: a?.agency_id ?? null,
-    expo_id: e?.expo_id ?? null,
+    id: targetId,
+    first_name: p?.first_name ?? null,
+    last_name: p?.last_name ?? null,
+    username: p?.username ?? null,
+    avatar_url: p?.avatar_url ?? null,
+    phone: p?.phone ?? null,
+    email: null,
+    birth_month: null,
+    birth_year:
+      typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
+    role_id: parseNumericRoleId(a?.role_id),
+    agency_id: a?.agency_id ?? connectedAgencyId ?? null,
+    expo_id: firstExpo ?? null,
   };
+}
+
+// Lecture d'un utilisateur (auth.users.id = profiles.id) via RPC admin, repli profiles si RLS.
+async function fetchUserById(targetId: string, connectedAgencyId?: string | null): Promise<UserRow | null> {
+  const trimmed = targetId.trim();
+  if (!trimmed) return null;
+
+  const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
+  if (!rpcErr && Array.isArray(rpcData)) {
+    const row = (rpcData as RpcUserWithRolesRow[]).find((r) => rpcRowUserId(r) === trimmed);
+    if (row) return mapRpcRowToUserRow({ ...row, id: rpcRowUserId(row) });
+  }
+
+  return fetchUserProfileFallback(trimmed, connectedAgencyId);
 }
 
 type UsersProps = {
   embeddedDialogOnly?: boolean;
   forcedEditUserId?: string | null;
+  /** Données déjà connues côté appelant (évite « utilisateur introuvable » avant le RPC). */
+  forcedEditUserSeed?: UsersEditSeed | null;
+  /** Ouvre directement le dialog de création (mode embedded). */
+  forceCreateDialog?: boolean;
   onDialogClosed?: () => void;
   onUserSaved?: () => void;
+  /** Remonte l'URL avatar résolue (sync dashboard ↔ fiche utilisateur). */
+  onAvatarResolved?: (url: string | null) => void;
 };
 
 const Users = ({
   embeddedDialogOnly = false,
   forcedEditUserId = null,
+  forcedEditUserSeed = null,
+  forceCreateDialog = false,
   onDialogClosed,
   onUserSaved,
+  onAvatarResolved,
 }: UsersProps = {}) => {
   const DEBUG_FORCE_DIALOG_OPEN = false;
   const location = useLocation();
@@ -251,8 +564,9 @@ const Users = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const fromUtilisateurs = (searchParams.get("from") || "").trim().toLowerCase() === "utilisateurs";
   const handledForcedEditUserIdRef = useRef<string | null>(null);
+  const handledForceCreateRef = useRef(false);
   const handledEditUserIdRef = useRef<string | null>(null);
-  const { agency_id: connectedAgencyId, role_id: currentRoleId, refresh: refreshAuthUser } = useAuthUser();
+  const { agency_id: connectedAgencyId, role_id: currentRoleId, user: authUser, refresh: refreshAuthUser } = useAuthUser();
   const canRepairAuthAccess = Number(currentRoleId) >= 1 && Number(currentRoleId) <= 3;
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -285,11 +599,37 @@ const Users = ({
   );
 
   // -------------------------------------------------------------------------
-  // Chargement de la liste : profiles + agency_users + expo_user_role
+  // Chargement liste : RPC get_all_users_with_roles (auth.users + profiles + rattachements)
+  // Repli profiles si le RPC est indisponible (souvent limité par RLS au profil courant).
   // -------------------------------------------------------------------------
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
+    if (!rpcErr && Array.isArray(rpcData)) {
+      let merged = (rpcData as RpcUserWithRolesRow[])
+        .map(mapRpcRowToUserRow)
+        .filter((row): row is UserRow => row != null);
+
+      if (currentRoleId === 2) {
+        merged = merged.filter((r) => r.role_id !== 1);
+      } else if (typeof currentRoleId === "number" && currentRoleId >= 4 && currentRoleId <= 6) {
+        merged = merged.filter((r) => {
+          const rid = r.role_id;
+          return rid != null && rid >= currentRoleId && rid <= 6;
+        });
+      }
+
+      const agencyFilter = connectedAgencyId?.trim();
+      if (agencyFilter && currentRoleId === 4) {
+        merged = merged.filter((r) => r.agency_id?.trim() === agencyFilter);
+      }
+
+      setRows(merged);
+      setLoading(false);
+      return;
+    }
 
     const [
       { data: profileData, error: profileErr },
@@ -309,7 +649,7 @@ const Users = ({
 
     if (profileErr) {
       setRows([]);
-      setError(profileErr.message);
+      setError(rpcErr?.message || profileErr.message);
       setLoading(false);
       return;
     }
@@ -319,13 +659,13 @@ const Users = ({
     for (const a of (agencyData ?? []) as Array<{
       user_id?: string | null;
       agency_id?: string | null;
-      role_id?: number | null;
+      role_id?: unknown;
     }>) {
       const uid = typeof a.user_id === "string" ? a.user_id : "";
       if (uid && !agencyByUser.has(uid)) {
         agencyByUser.set(uid, {
           agency_id: a.agency_id ?? null,
-          role_id: typeof a.role_id === "number" ? a.role_id : null,
+          role_id: parseNumericRoleId(a.role_id),
         });
       }
     }
@@ -362,6 +702,7 @@ const Users = ({
           avatar_url: p.avatar_url ?? null,
           phone: p.phone ?? null,
           email: null,
+          birth_month: null,
           birth_year: null,
           role_id: agRec?.role_id ?? null,
           agency_id: agRec?.agency_id ?? null,
@@ -371,7 +712,7 @@ const Users = ({
 
     setRows(merged);
     setLoading(false);
-  }, []);
+  }, [connectedAgencyId, currentRoleId]);
 
   useEffect(() => {
     void load();
@@ -446,11 +787,9 @@ const Users = ({
     void (async () => {
       const base = supabase.from("roles_user").select("*").order("role_id", { ascending: true });
       const { data, error: qErr } =
-        currentRoleId === 1
-          ? await base
-          : currentRoleId === 2
-            ? await base.gt("role_id", 2)
-            : await base.in("role_id", [4, 5, 6]);
+        typeof currentRoleId === "number" && Number.isFinite(currentRoleId)
+          ? await base.gte("role_id", currentRoleId).lte("role_id", 7)
+          : await base.in("role_id", [4, 5, 6, 7]);
       if (cancelled) return;
       if (qErr) {
         setRoleOptions(FALLBACK_ROLE_OPTIONS);
@@ -703,31 +1042,65 @@ const Users = ({
   const canEditExpo = useMemo(() => {
     const targetRoleId = typeof editing?.role_id === "number" ? editing.role_id : null;
     const targetIsLevel123 = targetRoleId != null && targetRoleId >= 1 && targetRoleId <= 3;
-    const targetIsOrgAdmin = targetRoleId === 4;
-    if (saving || targetIsLevel123 || targetIsOrgAdmin) return false;
+    if (saving || targetIsLevel123) return false;
+    if (!callerCanAssignExpo(currentRoleId)) return false;
+    if (!targetRoleUsesExpo(targetRoleId)) return false;
     return Boolean(resolvedAgencyId);
-  }, [editing?.role_id, saving, resolvedAgencyId]);
+  }, [editing?.role_id, saving, resolvedAgencyId, currentRoleId]);
+
+  const canEditEmailField = useMemo(() => {
+    if (saving) return false;
+    if (mode === "create") return true;
+    if (!editing?.id) return false;
+    if (authUser?.id === editing.id) return true;
+    if (typeof currentRoleId === "number" && currentRoleId >= 1 && currentRoleId <= 3) return true;
+    if (currentRoleId === 4) {
+      const targetRoleId = typeof editing.role_id === "number" ? editing.role_id : null;
+      return targetRoleId === 5 || targetRoleId === 6;
+    }
+    return false;
+  }, [saving, mode, editing?.id, editing?.role_id, authUser?.id, currentRoleId]);
+
+  const emailFieldHint = useMemo(() => {
+    if (!canEditEmailField || mode !== "edit" || !editing?.id) return null;
+    if (authUser?.id === editing.id) {
+      return "La modification envoie un e-mail de confirmation Supabase à la nouvelle adresse.";
+    }
+    return "Met à jour l'e-mail de connexion (auth.users) pour cet utilisateur.";
+  }, [canEditEmailField, mode, editing?.id, authUser?.id]);
 
   const openEdit = (row: UserRow) => {
-    console.log("Tentative d'ouverture du modal pour l'user:", row.id);
     const rawAgencyId = safeTrim(row.agency_id);
     const resolvedAgencyId = rawAgencyId || connectedAgencyId || "";
+    const baseRow: UserRow = {
+      ...row,
+      agency_id: resolvedAgencyId || null,
+    };
 
     setMode("edit");
-    setEditing({
-      ...row,
-      agency_id: resolvedAgencyId || null,
-    });
-    setInitialEditing({
-      ...row,
-      agency_id: resolvedAgencyId || null,
-    });
+    setEditing(baseRow);
+    setInitialEditing(baseRow);
     setPhotoFile(null);
     if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoPreview("");
     setTemporaryPassword("");
     setPhoneValid(true);
     setDialogOpen(true);
+
+    void (async () => {
+      try {
+        const enriched = await enrichUserRowForEdit(baseRow, authUser);
+        setEditing((prev) => (prev?.id === enriched.id ? { ...enriched, agency_id: prev.agency_id ?? enriched.agency_id } : prev));
+        setInitialEditing((prev) =>
+          prev?.id === enriched.id ? { ...enriched, agency_id: prev.agency_id ?? enriched.agency_id } : prev,
+        );
+        onAvatarResolved?.(enriched.avatar_url?.trim() || null);
+      } catch (e) {
+        if (import.meta.env.DEV) {
+          console.warn("[Users] enrichissement fiche utilisateur :", e);
+        }
+      }
+    })();
   };
 
   // Ouverture en edit via URL param ?edit_user_id=
@@ -758,7 +1131,7 @@ const Users = ({
 
     let cancelled = false;
     void (async () => {
-      const user = await fetchUserById(targetId);
+      const user = await fetchUserById(targetId, connectedAgencyId);
       if (cancelled) return;
       if (!user) {
         const next = new URLSearchParams(searchParams);
@@ -786,29 +1159,84 @@ const Users = ({
       return;
     }
     if (handledForcedEditUserIdRef.current === targetId) return;
-    handledForcedEditUserIdRef.current = targetId;
+
+    const seedId = forcedEditUserSeed?.id?.trim();
+    if (seedId && seedId === targetId) {
+      handledForcedEditUserIdRef.current = targetId;
+      openEdit(forcedEditUserSeed);
+      return;
+    }
 
     const existing = rows.find((r) => r.id === targetId);
     if (existing) {
+      handledForcedEditUserIdRef.current = targetId;
       openEdit(existing);
       return;
     }
 
+    if (loading) return;
+
     let cancelled = false;
     void (async () => {
-      const user = await fetchUserById(targetId);
+      const user = await fetchUserById(targetId, connectedAgencyId);
       if (cancelled) return;
       if (!user) {
         toast.error("Utilisateur introuvable.");
         onDialogClosed?.();
         return;
       }
+      handledForcedEditUserIdRef.current = targetId;
       openEdit(user);
     })();
     return () => {
       cancelled = true;
     };
-  }, [embeddedDialogOnly, forcedEditUserId, rows]);
+  }, [embeddedDialogOnly, forcedEditUserId, forcedEditUserSeed, rows, loading, connectedAgencyId]);
+
+  // Seed dashboard : complète la fiche si le profil arrive après l'ouverture du dialog
+  useEffect(() => {
+    if (!embeddedDialogOnly || !dialogOpen || mode !== "edit" || !editing?.id) return;
+    const targetId = (forcedEditUserId || editing.id).trim();
+    if (!targetId || forcedEditUserSeed?.id !== targetId) return;
+
+    setEditing((prev) => (prev?.id === targetId ? fillMissingProfileFields(prev, forcedEditUserSeed) : prev));
+    setInitialEditing((prev) =>
+      prev?.id === targetId ? fillMissingProfileFields(prev, forcedEditUserSeed) : prev,
+    );
+  }, [embeddedDialogOnly, dialogOpen, mode, forcedEditUserId, forcedEditUserSeed, editing?.id]);
+
+  // Session prête : email auth.users + photo metadata
+  useEffect(() => {
+    if (!dialogOpen || mode !== "edit" || !editing?.id || !authUser?.id) return;
+
+    let cancelled = false;
+    void enrichUserRowForEdit(editing, authUser).then((enriched) => {
+      if (cancelled) return;
+      setEditing((prev) =>
+        prev?.id === enriched.id
+          ? { ...fillMissingProfileFields(prev, enriched), agency_id: prev.agency_id ?? enriched.agency_id }
+          : prev,
+      );
+      setInitialEditing((prev) =>
+        prev?.id === enriched.id
+          ? { ...fillMissingProfileFields(prev, enriched), agency_id: prev?.agency_id ?? enriched.agency_id }
+          : prev,
+      );
+      onAvatarResolved?.(enriched.avatar_url?.trim() || null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dialogOpen, mode, editing?.id, authUser?.id, authUser?.email]);
+
+  const handlePhotoFileSelected = useCallback(
+    (file: File) => {
+      setPhotoFile(file);
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+      setPhotoPreview(URL.createObjectURL(file));
+    },
+    [photoPreview],
+  );
 
   const openCreate = () => {
     setMode("create");
@@ -819,6 +1247,7 @@ const Users = ({
       first_name: "",
       last_name: "",
       username: "",
+      birth_month: "",
       birth_year: "",
       email: "",
       phone: "",
@@ -833,6 +1262,17 @@ const Users = ({
     setPhoneValid(true);
     setDialogOpen(true);
   };
+
+  // Ouverture forcée en mode création (embedded depuis le dashboard)
+  useEffect(() => {
+    if (!embeddedDialogOnly || !forceCreateDialog) {
+      handledForceCreateRef.current = false;
+      return;
+    }
+    if (handledForceCreateRef.current) return;
+    handledForceCreateRef.current = true;
+    openCreate();
+  }, [embeddedDialogOnly, forceCreateDialog]);
 
   const closeDialog = (open: boolean) => {
     if (!open) {
@@ -900,9 +1340,9 @@ const Users = ({
     if (!editing) return;
     setSaving(true);
     try {
-      let nextPhoto = toPublicStorageUrl(editing.avatar_url);
+      let nextPhoto = resolveAvatarDisplayUrl(editing.avatar_url) || toPublicStorageUrl(editing.avatar_url);
       if (photoFile) {
-        nextPhoto = await uploadUserPhoto(photoFile);
+        nextPhoto = await uploadUserPhoto(photoFile, editing.id);
       }
 
       const nextRoleId =
@@ -915,12 +1355,15 @@ const Users = ({
       const effectiveExpoId =
         isLevel123 || isAdminOrganisation ? null : editing.expo_id?.trim() || null;
 
+      const birthYearNum = editing.birth_year?.trim() ? Number.parseInt(editing.birth_year.trim(), 10) : null;
+
       const profilePayload = {
         first_name: editing.first_name?.trim() || null,
         last_name: editing.last_name?.trim() || null,
         username: editing.username?.trim() || null,
         avatar_url: nextPhoto || null,
         phone: editing.phone?.trim() || null,
+        birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
       };
 
       if (mode === "create") {
@@ -933,6 +1376,15 @@ const Users = ({
         }
         if (!nextRoleId) {
           toast.error("Le rôle est requis pour créer l'utilisateur.");
+          setSaving(false);
+          return;
+        }
+        if (
+          typeof currentRoleId === "number" &&
+          Number.isFinite(currentRoleId) &&
+          !isRoleAssignableBy(currentRoleId, nextRoleId)
+        ) {
+          toast.error("Vous ne pouvez pas attribuer un rôle supérieur au vôtre.");
           setSaving(false);
           return;
         }
@@ -1009,6 +1461,27 @@ const Users = ({
           .eq("id", editing.id);
         if (profileErr) throw profileErr;
 
+        let emailToast: string | null = null;
+        const emailResult = await persistUserEmailChange({
+          userId: editing.id,
+          previousEmail: initialEditing?.email ?? "",
+          nextEmail: editing.email ?? "",
+          isSelf: authUser?.id === editing.id,
+        });
+        if (emailResult.message) emailToast = emailResult.message;
+
+        if (authUser?.id === editing.id) {
+          const { error: authErr } = await supabase.auth.updateUser({
+            data: {
+              avatar_url: nextPhoto || null,
+              user_photo_url: nextPhoto || null,
+              birth_month: editing.birth_month?.trim() || null,
+              birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
+            },
+          });
+          if (authErr) throw authErr;
+        }
+
         // Remplace le rattachement agence (delete + insert pour gérer les changements d'agence)
         await supabase.from("agency_users").delete().eq("user_id", editing.id);
         if (effectiveAgencyId && nextRoleId) {
@@ -1027,7 +1500,8 @@ const Users = ({
           if (expoErr) throw expoErr;
         }
 
-        toast.success("Utilisateur mis à jour.");
+        toast.success(emailToast || "Utilisateur mis à jour.");
+        onAvatarResolved?.(nextPhoto || editing.avatar_url?.trim() || null);
       }
 
       closeDialog(false);
@@ -1136,6 +1610,7 @@ const Users = ({
       "first_name",
       "last_name",
       "username",
+      "birth_month",
       "birth_year",
       "email",
       "phone",
@@ -1218,46 +1693,13 @@ const Users = ({
             >
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
                 <div className="space-y-2">
-                  <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                    {photoPreview || toPublicStorageUrl(editing.avatar_url) ? (
-                      <img
-                        src={photoPreview || toPublicStorageUrl(editing.avatar_url)}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <UserRound className="h-14 w-14 text-muted-foreground" aria-hidden />
-                    )}
-                    <label
-                      htmlFor="user-photo-upload-overlay"
-                      className="absolute inset-x-0 top-0 z-10 cursor-pointer bg-black/30 px-3 py-2 text-center text-xs font-medium text-white backdrop-blur-[1px] transition hover:bg-black/45"
-                    >
-                      Changer la photo
-                    </label>
-                    <Input
-                      id="user-photo-upload-overlay"
-                      type="file"
-                      accept="image/*"
-                      disabled={saving}
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        if (!file) return;
-                        try {
-                          assertImageFileAllowed(file);
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Image invalide.");
-                          return;
-                        }
-                        setPhotoFile(file);
-                        if (photoPreview) URL.revokeObjectURL(photoPreview);
-                        setPhotoPreview(URL.createObjectURL(file));
-                      }}
-                    />
-                  </div>
+                  <UserPhotoField
+                    avatarUrl={editing.avatar_url}
+                    photoPreview={photoPreview}
+                    saving={saving}
+                    inputId="user-photo-upload-overlay"
+                    onFileSelected={handlePhotoFileSelected}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1299,22 +1741,42 @@ const Users = ({
                       className="h-9 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="user-age" className="w-[70px] shrink-0 text-xs">
-                      Tranche d'âge
-                    </Label>
-                    <Select value={editing.birth_year ?? ""} onValueChange={(v) => setField("birth_year", v)} disabled={saving}>
-                      <SelectTrigger id="user-age" className="h-9 flex-1">
-                        <SelectValue placeholder="Choisir une tranche d'âge" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {USER_AGE_OPTIONS.map((age) => (
-                          <SelectItem key={age} value={age}>
-                            {age}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-start gap-2">
+                    <Label className="w-[70px] shrink-0 text-xs pt-2">Naissance</Label>
+                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={editing.birth_month ?? ""}
+                        onValueChange={(v) => setField("birth_month", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger id="user-birth-month" className="h-9 flex-1">
+                          <SelectValue placeholder="Mois" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {birthMonthOptions().map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={editing.birth_year ?? ""}
+                        onValueChange={(v) => setField("birth_year", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger id="user-birth-year" className="h-9 flex-1">
+                          <SelectValue placeholder="Année" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BIRTH_YEARS.map((year) => (
+                            <SelectItem key={year} value={year}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-phone" className="w-[70px] shrink-0 text-xs">
@@ -1341,8 +1803,17 @@ const Users = ({
                     autoComplete="email"
                     value={editing.email ?? ""}
                     onChange={(e) => setField("email", e.target.value)}
-                    disabled={saving || currentRoleId === 4}
+                    disabled={saving || !canEditEmailField}
+                    readOnly={!canEditEmailField}
+                    className={!canEditEmailField ? "bg-muted/50" : undefined}
                   />
+                  {emailFieldHint ? (
+                    <p className="text-xs text-muted-foreground">{emailFieldHint}</p>
+                  ) : !canEditEmailField && mode === "edit" ? (
+                    <p className="text-xs text-muted-foreground">
+                      L&apos;e-mail ne peut pas être modifié pour ce profil.
+                    </p>
+                  ) : null}
                 </div>
                 {(mode === "create" || mode === "edit") && (
                   <div className="space-y-1.5">
@@ -1367,11 +1838,9 @@ const Users = ({
                   value={editing.role_id != null ? String(editing.role_id) : ""}
                   onValueChange={(v) => {
                     const roleId = roleIdFromValue(v);
-                    setEditing((prev) => (prev ? { ...prev, role_id: roleId } : prev));
-                    if (roleId != null && roleId >= 1 && roleId <= 4) {
-                      setField("agency_id", "");
-                      setField("expo_id", "");
-                    }
+                    setEditing((prev) =>
+                      prev ? applyRoleChangeToUserRow(prev, roleId, connectedAgencyId) : prev,
+                    );
                   }}
                   disabled={saving}
                 >
@@ -1683,46 +2152,13 @@ const Users = ({
             >
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
                 <div className="space-y-2">
-                  <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
-                    {photoPreview || toPublicStorageUrl(editing.avatar_url) ? (
-                      <img
-                        src={photoPreview || toPublicStorageUrl(editing.avatar_url)}
-                        alt=""
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <UserRound className="h-14 w-14 text-muted-foreground" aria-hidden />
-                    )}
-                    <label
-                      htmlFor="user-photo-upload-main"
-                      className="absolute inset-x-0 top-0 z-10 cursor-pointer bg-black/30 px-3 py-2 text-center text-xs font-medium text-white backdrop-blur-[1px] transition hover:bg-black/45"
-                    >
-                      Changer la photo
-                    </label>
-                    <Input
-                      id="user-photo-upload-main"
-                      type="file"
-                      accept="image/*"
-                      disabled={saving}
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        if (!file) return;
-                        try {
-                          assertImageFileAllowed(file);
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Image invalide.");
-                          return;
-                        }
-                        setPhotoFile(file);
-                        if (photoPreview) URL.revokeObjectURL(photoPreview);
-                        setPhotoPreview(URL.createObjectURL(file));
-                      }}
-                    />
-                  </div>
+                  <UserPhotoField
+                    avatarUrl={editing.avatar_url}
+                    photoPreview={photoPreview}
+                    saving={saving}
+                    inputId="user-photo-upload-main"
+                    onFileSelected={handlePhotoFileSelected}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1764,22 +2200,42 @@ const Users = ({
                       className="h-9 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="user-age-main" className="w-[70px] shrink-0 text-xs">
-                      Tranche d'âge
-                    </Label>
-                    <Select value={editing.birth_year ?? ""} onValueChange={(v) => setField("birth_year", v)} disabled={saving}>
-                      <SelectTrigger id="user-age-main" className="h-9 flex-1">
-                        <SelectValue placeholder="Choisir une tranche d'âge" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {USER_AGE_OPTIONS.map((age) => (
-                          <SelectItem key={age} value={age}>
-                            {age}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-start gap-2">
+                    <Label className="w-[70px] shrink-0 text-xs pt-2">Naissance</Label>
+                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                      <Select
+                        value={editing.birth_month ?? ""}
+                        onValueChange={(v) => setField("birth_month", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger id="user-birth-month-main" className="h-9 flex-1">
+                          <SelectValue placeholder="Mois" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {birthMonthOptions().map((month) => (
+                            <SelectItem key={month.value} value={month.value}>
+                              {month.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={editing.birth_year ?? ""}
+                        onValueChange={(v) => setField("birth_year", v)}
+                        disabled={saving}
+                      >
+                        <SelectTrigger id="user-birth-year-main" className="h-9 flex-1">
+                          <SelectValue placeholder="Année" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BIRTH_YEARS.map((year) => (
+                            <SelectItem key={year} value={year}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-phone-main" className="w-[70px] shrink-0 text-xs">
@@ -1806,8 +2262,17 @@ const Users = ({
                     autoComplete="email"
                     value={editing.email ?? ""}
                     onChange={(e) => setField("email", e.target.value)}
-                    disabled={saving || currentRoleId === 4}
+                    disabled={saving || !canEditEmailField}
+                    readOnly={!canEditEmailField}
+                    className={!canEditEmailField ? "bg-muted/50" : undefined}
                   />
+                  {emailFieldHint ? (
+                    <p className="text-xs text-muted-foreground">{emailFieldHint}</p>
+                  ) : !canEditEmailField && mode === "edit" ? (
+                    <p className="text-xs text-muted-foreground">
+                      L&apos;e-mail ne peut pas être modifié pour ce profil.
+                    </p>
+                  ) : null}
                 </div>
                 {(mode === "create" || mode === "edit") && (
                   <div className="space-y-1.5">
@@ -1832,11 +2297,9 @@ const Users = ({
                   value={editing.role_id != null ? String(editing.role_id) : ""}
                   onValueChange={(v) => {
                     const roleId = roleIdFromValue(v);
-                    setEditing((prev) => (prev ? { ...prev, role_id: roleId } : prev));
-                    if (roleId != null && roleId >= 1 && roleId <= 4) {
-                      setField("agency_id", "");
-                      setField("expo_id", "");
-                    }
+                    setEditing((prev) =>
+                      prev ? applyRoleChangeToUserRow(prev, roleId, connectedAgencyId) : prev,
+                    );
                   }}
                   disabled={saving}
                 >

@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { isVisitorRole } from "@/lib/authUser";
@@ -123,6 +124,7 @@ const Register = () => {
   const [userPhone, setUserPhone] = useState("");
   const [userPhoneValid, setUserPhoneValid] = useState(true);
   const [userPhotoUrl, setUserPhotoUrl] = useState("");
+  const [visitorPhotoFile, setVisitorPhotoFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -187,39 +189,9 @@ const Register = () => {
         forceFileType: "image/jpeg",
         initialQuality: 0.72,
       });
-      const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
-      const objectPath = `selfies/${crypto.randomUUID()}.${ext}`;
-      const preferredBucket = "selfies";
-      const fallbackBucket = "images";
-
-      const tryUpload = async (bucket: string) => {
-        const { error } = await supabase.storage.from(bucket).upload(objectPath, prepared, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-        if (error) return { ok: false as const, error };
-        const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-        return { ok: true as const, publicUrl: data.publicUrl };
-      };
-
-      const first = await tryUpload(preferredBucket);
-      if (first.ok) {
-        setUserPhotoUrl(first.publicUrl);
-        toast.success(t("register_visitor.toast_photo_saved"));
-        return;
-      }
-      const second = await tryUpload(fallbackBucket);
-      if (second.ok) {
-        setUserPhotoUrl(second.publicUrl);
-        toast.success(t("register_visitor.toast_photo_saved"));
-        return;
-      }
-      toast.error(
-        t("register_visitor.toast_photo_upload_failed", {
-          first: first.error.message,
-          second: second.error.message,
-        }),
-      );
+      setVisitorPhotoFile(prepared);
+      setUserPhotoUrl(URL.createObjectURL(prepared));
+      toast.success(t("register_visitor.toast_photo_saved"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("register_visitor.toast_photo_failed");
       toast.error(msg);
@@ -281,7 +253,7 @@ const Register = () => {
         agency_id: agencyIdFromUrl || null,
         user_age: birthIso || null,
         user_phone: trimmedPhone || null,
-        user_photo_url: userPhotoUrl.trim() || null,
+        user_photo_url: null,
         user_expo_id: expoIdFromUrl || null,
         visitor_uuid: getStoredVisitorUuid(),
         device_fingerprint: deviceFingerprint,
@@ -315,6 +287,17 @@ const Register = () => {
       if (signInError) {
         toast.error(signInError.message || t("register_visitor.toast_auto_sign_in_failed"));
         return;
+      }
+
+      if (visitorPhotoFile && createData.user_id) {
+        try {
+          const publicUrl = await uploadVisitorSelfiePhoto(createData.user_id, visitorPhotoFile, visitorPhotoFile.name);
+          await supabase.auth.updateUser({ data: { user_photo_url: publicUrl } });
+        } catch (photoErr) {
+          if (import.meta.env.DEV) {
+            console.warn("[Register] selfie upload:", photoErr);
+          }
+        }
       }
 
       if (typeof window !== "undefined") {

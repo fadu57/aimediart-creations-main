@@ -1,0 +1,13 @@
+-- Migration 37 : AUDIT STORAGE (lecture seule)
+-- Ne modifie aucune donnée.
+--
+-- Exécuter le contenu complet de :
+--   supabase/sql/storage_audit_person_buckets.sql
+-- dans Supabase → SQL Editor (rôle postgres).
+--
+-- Sections clés pour le grand nettoyage :
+--   §2  sous-buckets niveau 1
+--   §3  sous-buckets niveau 2
+--   §5  classification automatique (photo / selfie / avatar / logo / artiste)
+--   §7  anomalies (double selfies/, users/ dans selfies, legacy artist/)
+--   §9  croisement storage ↔ profiles / auth.users / orphelins

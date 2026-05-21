@@ -2,7 +2,7 @@
   "greeting": "Bonjour",
   "greeting_agency_suffix": " / {{agency}}",
   "language_label": "Langue de l'interface",
-  "nav_home": "Accueil",
+  "nav_home": "Votre profil",
   "nav_organisation": "Organisation",
   "nav_users": "Utilisateurs",
   "nav_expos": "Expos",

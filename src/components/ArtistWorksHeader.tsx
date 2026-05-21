@@ -45,9 +45,9 @@ const ArtistWorksHeader = ({ artistName, onPrev, onNext, onToggleMenu, onCloseMe
               {isMenuOpen ? <X className="h-5 w-5 text-white" aria-hidden /> : <Menu className="h-5 w-5 text-white" aria-hidden />}
             </button>
             <div className="fab-links">
-              <Link to="/dashboard" className="fab-item fab-nav-link" aria-label="Accueil" onClick={onCloseMenu}>
+              <Link to="/dashboard" className="fab-item fab-nav-link" aria-label="Votre profil" onClick={onCloseMenu}>
                 <Home className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">Accueil</span>
+                <span className="fab-item-label">Votre profil</span>
               </Link>
               <Link to="/artistes" className="fab-item fab-nav-link" aria-label="Artistes" onClick={onCloseMenu}>
                 <Palette className="h-5 w-5 text-[#121212]" aria-hidden />

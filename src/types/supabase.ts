@@ -50,6 +50,37 @@ export interface Database {
         };
         Relationships: [];
       };
+      agency_subscriptions: {
+        Row: {
+          id: string;
+          agency_id: string;
+          pricing_plan: string | null;
+          billing_cycle: string | null;
+          started_at: string | null;
+          expires_at: string | null;
+          is_active: boolean | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          agency_id: string;
+          pricing_plan?: string | null;
+          billing_cycle?: string | null;
+          started_at?: string | null;
+          expires_at?: string | null;
+          is_active?: boolean | null;
+        };
+        Update: {
+          agency_id?: string;
+          pricing_plan?: string | null;
+          billing_cycle?: string | null;
+          started_at?: string | null;
+          expires_at?: string | null;
+          is_active?: boolean | null;
+        };
+        Relationships: [];
+      };
       roles_user: {
         Row: {
           role_id: number;

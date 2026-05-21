@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import { uploadExpoLogo } from "@/lib/storagePaths";
 import {
   fieldLabel,
   filterExpoFormKeys,
@@ -54,30 +55,26 @@ function getErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-async function uploadExpoLogoToStorage(file: File): Promise<string> {
+async function uploadExpoLogoToStorage(file: File, expoId: string): Promise<string> {
   const prepared = await prepareImageForSupabaseUpload(file);
-  const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
-  const objectPath = `expos/logos/${crypto.randomUUID()}.${ext}`;
-  const preferredBucket = "images";
-  const fallbackBucket = import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
-
-  const tryUpload = async (bucket: string) => {
-    const { error } = await supabase.storage.from(bucket).upload(objectPath, prepared, {
+  const id = expoId.trim();
+  if (!id) throw new Error("Identifiant exposition requis pour le logo.");
+  try {
+    return await uploadExpoLogo(id, prepared, prepared.name);
+  } catch (primaryErr) {
+    const ext = prepared.name.split(".").pop()?.toLowerCase() || "webp";
+    const legacyPath = `expos/logos/${crypto.randomUUID()}.${ext}`;
+    const legacyBucket = import.meta.env.VITE_SUPABASE_ARTIST_PHOTOS_BUCKET?.trim() || "artist-photos";
+    const { error } = await supabase.storage.from(legacyBucket).upload(legacyPath, prepared, {
       cacheControl: "3600",
       upsert: false,
     });
-    if (error) return { ok: false as const, error, bucket };
-    const { data: pub } = supabase.storage.from(bucket).getPublicUrl(objectPath);
-    return { ok: true as const, publicUrl: pub.publicUrl };
-  };
-
-  const first = await tryUpload(preferredBucket);
-  if (first.ok) return first.publicUrl;
-  const second = await tryUpload(fallbackBucket);
-  if (second.ok) return second.publicUrl;
-  throw new Error(
-    `Envoi du logo : ${first.error.message} (bucket « ${preferredBucket} ») / ${second.error.message} (bucket « ${fallbackBucket} »).`,
-  );
+    if (error) {
+      throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
+    }
+    const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(legacyPath);
+    return pub.publicUrl;
+  }
 }
 
 function revokeLogoPreviews(urls: Record<string, string>) {
@@ -174,20 +171,23 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
     setSaving(true);
     try {
       const mergedValues = { ...values };
+      const targetExpoId =
+        mode === "edit"
+          ? expoId?.trim() || ""
+          : mergedValues.id?.trim() || crypto.randomUUID();
+
       for (const k of sortedKeys) {
         if (!isExpoLogoField(k)) continue;
         const file = logoFileByKey[k];
         if (file) {
-          const url = await uploadExpoLogoToStorage(file);
+          const url = await uploadExpoLogoToStorage(file, targetExpoId);
           mergedValues[k] = url;
         }
       }
 
       if (mode === "create") {
         const payload: Record<string, unknown> = {};
-        let idVal = mergedValues.id?.trim() || "";
-        if (!idVal) idVal = crypto.randomUUID();
-        payload.id = idVal;
+        payload.id = targetExpoId;
 
         for (const k of sortedKeys) {
           if (k === "id") continue;
