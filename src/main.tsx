@@ -1,9 +1,7 @@
-// i18next doit être initialisé avant le premier rendu React
-import "./i18n/config";
-import { createRoot } from "react-dom/client";
-import "flag-icons/css/flag-icons.min.css";
-import "./index.css";
-
+/**
+ * Entrée minimale : vérifie la config Supabase AVANT tout import applicatif
+ * (évite le crash createClient au chargement du bundle).
+ */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 const rootEl = document.getElementById("root");
@@ -25,7 +23,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
       </p>
     </div>`;
 } else {
-  void import("./App.tsx").then(({ default: App }) => {
-    createRoot(rootEl).render(<App />);
-  });
+  void import("./bootstrap.tsx");
 }

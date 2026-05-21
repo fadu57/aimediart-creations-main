@@ -27,6 +27,10 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+  define: {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl ?? ""),
+    "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabaseAnonKey ?? ""),
+  },
   server: {
     host: "::",
     port: 8080,
