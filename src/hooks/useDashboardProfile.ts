@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { parseNumericRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
 import { readAvatarFromRpcRow } from "@/lib/userAvatar";
+import { filterActiveProfileUserIds } from "@/lib/userSoftDelete";
 
 /** Évite de rappeler Supabase si la table n'existe pas encore (404 / PGRST205). */
 const AGENCY_SUBSCRIPTIONS_CACHE_KEY = "aimediart.agency_subscriptions_unavailable";
@@ -380,6 +381,9 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
       return (a.first_name ?? "").localeCompare(b.first_name ?? "", "fr", { sensitivity: "base" });
     });
 
+    const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
+    members = members.filter((m) => activeIds.has(m.user_id));
+
     return { members, agencyExpos };
   }
 
@@ -468,7 +472,10 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     return (a.first_name ?? "").localeCompare(b.first_name ?? "", "fr", { sensitivity: "base" });
   });
 
-  return { members, agencyExpos };
+  const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
+  const activeMembers = members.filter((m) => activeIds.has(m.user_id));
+
+  return { members: activeMembers, agencyExpos };
 }
 
 async function fetchTeamStats(agencyId: string | null): Promise<DashboardTeamStats> {

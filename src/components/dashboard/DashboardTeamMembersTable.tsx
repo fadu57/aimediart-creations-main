@@ -219,7 +219,10 @@ export function DashboardTeamMembersTable({
                             variant="outline"
                             size="icon"
                             className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                            onClick={() => onDeleteMember?.(member)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteMember?.(member);
+                            }}
                             aria-label="Corbeille"
                             title="Corbeille"
                           >

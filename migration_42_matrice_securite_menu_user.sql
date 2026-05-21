@@ -1,0 +1,2 @@
+-- Migration 42 : menu_user dans matrice_securite (contrainte CHECK)
+-- Exécuter : supabase/sql/matrice_securite_add_menu_user.sql

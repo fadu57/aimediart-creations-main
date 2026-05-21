@@ -10,6 +10,7 @@ import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
+import { SettingsMenuDropdown } from "@/components/SettingsMenuDropdown";
 
 /** Effet verre sur les pastilles du menu desktop (aperçu navigateur). */
 const HEADER_NAV_PILL_BLUR = "backdrop-blur-[12px]";
@@ -296,18 +297,7 @@ export default function Header() {
                   );
                 })}
               {hasFullHeader && canSeeSettings && (
-                <NavLink
-                  to="/settings"
-                  className={({ isActive }) =>
-                    `inline-flex items-center justify-center rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
-                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                    }`
-                  }
-                  aria-label={t("settings")}
-                  title={t("settings")}
-                >
-                  <Settings className="h-5 w-5" aria-hidden />
-                </NavLink>
+                <SettingsMenuDropdown triggerClassName={HEADER_NAV_PILL_BLUR} />
               )}
               {session && !isAuthFormPage ? (
                 <button
@@ -401,10 +391,7 @@ export default function Header() {
                 );
               })}
             {hasFullHeader && canSeeSettings && (
-              <NavLink to="/settings" className="fab-item" title={t("settings")} onClick={() => setIsFabOpen(false)}>
-                <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("settings")}</span>
-              </NavLink>
+              <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
             )}
             <div className="fab-item px-2" title={t("language_label")}>
               <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">

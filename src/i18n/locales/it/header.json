@@ -10,6 +10,13 @@
   "nav_catalogue": "Catalogo",
   "nav_stats": "Statistiche",
   "settings": "Impostazioni",
+  "settings_submenu_params": "Impostazioni generali",
+  "settings_submenu_trash": "Cestino",
+  "settings_submenu_trash_users": "Utenti",
+  "settings_submenu_trash_agencies": "Organizzazioni",
+  "settings_submenu_trash_artists": "Artisti",
+  "settings_submenu_trash_catalogue": "Catalogo",
+  "settings_submenu_trash_expos": "Esposizioni",
   "logout": "Disconnetti",
   "login": "Accedi"
 }

@@ -1681,6 +1681,10 @@ const Users = ({
   // JSX — dialog embedded (utilisé depuis d'autres pages)
   // =========================================================================
   if (embeddedDialogOnly) {
+    if (!dialogOpen && !forceCreateDialog) {
+      return null;
+    }
+
     return (
       <Dialog open={DEBUG_FORCE_DIALOG_OPEN ? true : dialogOpen} onOpenChange={(nextOpen) => closeDialog(nextOpen)}>
         <DialogContent

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.matrice_securite (
         'prompt_style'::text,
         'menu_home'::text,
         'menu_agence'::text,
+        'menu_user'::text,
         'menu_expos'::text,
         'menu_artiste'::text,
         'menu_catalogue'::text,
@@ -68,6 +69,7 @@ ALTER TABLE public.matrice_securite ADD CONSTRAINT matrice_securite_ressource_ch
       'prompt_style'::text,
       'menu_home'::text,
       'menu_agence'::text,
+      'menu_user'::text,
       'menu_expos'::text,
       'menu_artiste'::text,
       'menu_catalogue'::text,
@@ -118,19 +120,19 @@ ON CONFLICT (role_id, ressource) DO UPDATE SET
 -- =============================================================================
 
 INSERT INTO public.matrice_securite (role_id, ressource, lecture, ecriture) VALUES
-  (1, 'menu_home', true, false), (1, 'menu_agence', true, false), (1, 'menu_expos', true, false),
+  (1, 'menu_home', true, false), (1, 'menu_agence', true, false), (1, 'menu_user', true, false), (1, 'menu_expos', true, false),
   (1, 'menu_artiste', true, false), (1, 'menu_catalogue', true, false), (1, 'menu_stats', true, false), (1, 'page_œuvre', true, false),
-  (2, 'menu_home', true, false), (2, 'menu_agence', true, false), (2, 'menu_expos', true, false),
+  (2, 'menu_home', true, false), (2, 'menu_agence', true, false), (2, 'menu_user', true, false), (2, 'menu_expos', true, false),
   (2, 'menu_artiste', true, false), (2, 'menu_catalogue', true, false), (2, 'menu_stats', true, false), (2, 'page_œuvre', true, false),
-  (3, 'menu_home', true, false), (3, 'menu_agence', true, false), (3, 'menu_expos', true, false),
+  (3, 'menu_home', true, false), (3, 'menu_agence', true, false), (3, 'menu_user', true, false), (3, 'menu_expos', true, false),
   (3, 'menu_artiste', true, false), (3, 'menu_catalogue', true, false), (3, 'menu_stats', true, false), (3, 'page_œuvre', true, false),
-  (4, 'menu_home', true, false), (4, 'menu_agence', true, false), (4, 'menu_expos', true, false),
+  (4, 'menu_home', true, false), (4, 'menu_agence', true, false), (4, 'menu_user', true, false), (4, 'menu_expos', true, false),
   (4, 'menu_artiste', true, false), (4, 'menu_catalogue', true, false), (4, 'menu_stats', true, false), (4, 'page_œuvre', true, false),
-  (5, 'menu_home', true, false), (5, 'menu_agence', true, false), (5, 'menu_expos', true, false),
+  (5, 'menu_home', true, false), (5, 'menu_agence', true, false), (5, 'menu_user', true, false), (5, 'menu_expos', true, false),
   (5, 'menu_artiste', true, false), (5, 'menu_catalogue', true, false), (5, 'menu_stats', true, false), (5, 'page_œuvre', true, false),
-  (6, 'menu_home', true, false), (6, 'menu_agence', true, false), (6, 'menu_expos', true, false),
+  (6, 'menu_home', true, false), (6, 'menu_agence', true, false), (6, 'menu_user', true, false), (6, 'menu_expos', true, false),
   (6, 'menu_artiste', true, false), (6, 'menu_catalogue', true, false), (6, 'menu_stats', true, false), (6, 'page_œuvre', true, false),
-  (7, 'menu_home', false, false), (7, 'menu_agence', false, false), (7, 'menu_expos', false, false),
+  (7, 'menu_home', false, false), (7, 'menu_agence', false, false), (7, 'menu_user', false, false), (7, 'menu_expos', false, false),
   (7, 'menu_artiste', false, false), (7, 'menu_catalogue', false, false), (7, 'menu_stats', false, false), (7, 'page_œuvre', true, false)
 ON CONFLICT (role_id, ressource) DO UPDATE SET
   lecture = EXCLUDED.lecture,

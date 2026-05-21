@@ -30,9 +30,8 @@ import Users from "@/pages/Users";
 //   auth.users      → email (non accessible côté client — non affiché ici)
 //
 // Soft-delete : profiles.deleted_at — colonne unifiée pour toutes les corbeilles.
-// La suppression retire les rattachements agence + expo (agency_users, expo_user_role).
-// Le profil (profiles) est conservé pour préserver l'historique auth.
 // ---------------------------------------------------------------------------
+import { softDeleteUserProfile } from "@/lib/userSoftDelete";
 type AdminUserRow = {
   id: string;
   role_id: number | null;
@@ -388,12 +387,8 @@ export default function Utilisateurs() {
     setDeleting(true);
     try {
       const uid = deleteTarget.id;
-
-      const { error: softErr } = await supabase
-        .from("profiles")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", uid);
-      if (softErr) throw softErr;
+      const result = await softDeleteUserProfile(uid);
+      if (!result.ok) throw new Error(result.message);
 
       toast.success("Utilisateur envoyé en corbeille.");
       setDeleteTarget(null);

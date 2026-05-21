@@ -10,6 +10,13 @@
   "nav_catalogue": "Catalogue",
   "nav_stats": "Statistiques",
   "settings": "Configuration",
+  "settings_submenu_params": "Paramètres généraux",
+  "settings_submenu_trash": "Corbeilles",
+  "settings_submenu_trash_users": "Utilisateurs",
+  "settings_submenu_trash_agencies": "Organisations",
+  "settings_submenu_trash_artists": "Artistes",
+  "settings_submenu_trash_catalogue": "Catalogue",
+  "settings_submenu_trash_expos": "Expos",
   "logout": "Déconnexion",
   "login": "Connexion"
 }

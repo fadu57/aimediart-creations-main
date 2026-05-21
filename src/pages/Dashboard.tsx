@@ -53,6 +53,7 @@ import {
   roleLevelHint,
 } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
+import { softDeleteUserProfile } from "@/lib/userSoftDelete";
 import Users from "@/pages/Users";
 
 function textOrDash(v: string | null | undefined): string {
@@ -250,11 +251,8 @@ const Dashboard = () => {
 
     setDeletingMember(true);
     try {
-      const { error: softErr } = await supabase
-        .from("profiles")
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", deleteMemberTarget.user_id);
-      if (softErr) throw softErr;
+      const result = await softDeleteUserProfile(deleteMemberTarget.user_id);
+      if (!result.ok) throw new Error(result.message);
 
       toast.success("Utilisateur envoyé en corbeille.");
       setDeleteMemberTarget(null);
@@ -625,20 +623,22 @@ const Dashboard = () => {
         </>
       )}
 
-      <Users
-        embeddedDialogOnly
-        forcedEditUserId={editUserId}
-        forceCreateDialog={createUserOpen && !editUserId}
-        onDialogClosed={() => {
-          setEditUserId(null);
-          setCreateUserOpen(false);
-          refresh();
-        }}
-        onUserSaved={() => refresh()}
-      />
+      {(createUserOpen || editUserId) && (
+        <Users
+          embeddedDialogOnly
+          forcedEditUserId={editUserId}
+          forceCreateDialog={createUserOpen && !editUserId}
+          onDialogClosed={() => {
+            setEditUserId(null);
+            setCreateUserOpen(false);
+            refresh();
+          }}
+          onUserSaved={() => refresh()}
+        />
+      )}
 
       <AlertDialog open={Boolean(deleteMemberTarget)} onOpenChange={(open) => !open && setDeleteMemberTarget(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="z-[100]">
           <AlertDialogHeader>
             <AlertDialogTitle>Envoyer en corbeille ?</AlertDialogTitle>
             <AlertDialogDescription asChild>
