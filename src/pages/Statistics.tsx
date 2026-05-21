@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -74,13 +73,6 @@ function asTrimmedString(value: unknown): string {
   return "";
 }
 
-/** URL d’export PDF : proxy Vite `/pdf-export` → serveur Playwright, ou URL absolue si `VITE_PDF_EXPORT_URL`. */
-function getStatisticsPdfExportUrl(): string {
-  const base = import.meta.env.VITE_PDF_EXPORT_URL?.replace(/\/$/, "");
-  if (base) return `${base}/export/statistics-pdf`;
-  return "/pdf-export/export/statistics-pdf";
-}
-
 function startOfWeekMonday(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -118,9 +110,6 @@ function artworkExpoId(aw: unknown): string | null {
 }
 
 const Statistics = () => {
-  const [searchParams] = useSearchParams();
-  const chromiumPdfAutoOpen = searchParams.get("chromiumPdf") === "1";
-
   const { t } = useTranslation("statistiques");
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name } = useAuthUser();
@@ -156,18 +145,9 @@ const Statistics = () => {
   const [printExportBusy, setPrintExportBusy] = useState(false);
   const statisticsPrintAreaRef = useRef<HTMLDivElement>(null);
 
+  /** Marqueur : rapport monté + temps pour Recharts / polices avant export PDF navigateur. */
   useEffect(() => {
-    if (chromiumPdfAutoOpen) {
-      document.documentElement.dataset.statisticsChromiumPdf = "1";
-    } else {
-      delete document.documentElement.dataset.statisticsChromiumPdf;
-    }
-  }, [chromiumPdfAutoOpen]);
-
-  /** Marqueur lu par Playwright : rapport monté + temps pour Recharts / polices. */
-  useEffect(() => {
-    const exportUiActive = printPreviewOpen || chromiumPdfAutoOpen;
-    if (!exportUiActive) return;
+    if (!printPreviewOpen) return;
     let cancelled = false;
     let pollId: number | undefined;
     let readyId: number | undefined;
@@ -202,7 +182,7 @@ const Statistics = () => {
       if (readyId !== undefined) window.clearTimeout(readyId);
       statisticsPrintAreaRef.current?.removeAttribute("data-statistics-export-ready");
     };
-  }, [printPreviewOpen, chromiumPdfAutoOpen, temporalSeriesForPdf, hourlySeries]);
+  }, [printPreviewOpen, temporalSeriesForPdf, hourlySeries]);
 
   useEffect(() => {
     let cancelled = false;
@@ -643,9 +623,9 @@ const Statistics = () => {
   }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
 
   useEffect(() => {
-    if (!printPreviewOpen && !chromiumPdfAutoOpen) return;
+    if (!printPreviewOpen) return;
     void loadTemporalSeriesForPdf();
-  }, [printPreviewOpen, chromiumPdfAutoOpen, loadTemporalSeriesForPdf]);
+  }, [printPreviewOpen, loadTemporalSeriesForPdf]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1137,101 +1117,6 @@ const Statistics = () => {
     }
   };
 
-  /** PDF serveur Chromium (Playwright) — conservé, option avancée. */
-  const handlePrintStatistics = async (paperFormat: PdfPaperFormat) => {
-    if (printExportBusy) return;
-    setPrintExportBusy(true);
-    setPaperFormatDialogOpen(false);
-
-    try {
-      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-      if (sessionErr || !sessionData.session) {
-        window.alert(t("preview.pdfExportNeedLogin"));
-        setPrintExportBusy(false);
-        return;
-      }
-
-      await prepareStatisticsExportData();
-
-      const res = await fetch(getStatisticsPdfExportUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session: sessionData.session,
-          paperFormat,
-        }),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(errText.slice(0, 500));
-      }
-
-      const contentType = res.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/pdf")) {
-        throw new Error(
-          import.meta.env.PROD
-            ? "Réponse invalide (HTML au lieu de PDF). Redéployez l’app avec la route API /pdf-export."
-            : "Réponse invalide — le serveur PDF est-il démarré ?",
-        );
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const tab = window.open(url, "aimediart_statistics_pdf");
-      if (!tab) {
-        window.alert(t("preview.popupBlocked"));
-        URL.revokeObjectURL(url);
-        setPrintExportBusy(false);
-        return;
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 600_000);
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      const useBrowser = window.confirm(
-        `${t("preview.pdfExportServerError")}\n\n${detail}\n\n${t("preview.pdfExportBrowserFallback")}`,
-      );
-      if (useBrowser) {
-        setPrintExportBusy(false);
-        await handleBrowserPdfStatistics(paperFormat);
-        return;
-      }
-      window.alert(`${t("preview.pdfExportServerError")}\n\n${detail}`);
-    }
-
-    setPrintExportBusy(false);
-  };
-
-  if (chromiumPdfAutoOpen) {
-    return (
-      <div
-        id="statistics-print-area"
-        ref={statisticsPrintAreaRef}
-        data-expected-chart-surfaces={expectedChartSurfaces}
-        className="min-h-screen bg-white px-5 py-6 text-neutral-900"
-      >
-        <StatisticsReportView
-          orgLabel={orgLabel}
-          previewExpoLabel={previewExpoLabel}
-          previewAgencyLogoMeta={previewAgencyLogoMeta}
-          previewExpoLogoMeta={previewExpoLogoMeta}
-          miniKpis={miniKpis}
-          emotionSeries={emotionSeries}
-          feedbackTotal={feedbackTotal}
-          temporalSeriesForPdf={temporalSeriesForPdf}
-          hourlySeries={hourlySeries}
-          timelineTickIntervalPdf={timelineTickIntervalPdf}
-          crossEmotionColumns={crossEmotionColumns}
-          sortedCrossRows={sortedCrossRows}
-          crossError={crossError}
-          sortedTopArtworks={sortedTopArtworks}
-          topArtworksError={topArtworksError}
-          formatFrNumber={formatFrNumber}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start md:justify-between">
@@ -1680,14 +1565,6 @@ const Statistics = () => {
               onClick={() => void handleBrowserPrintStatistics(selectedPdfPaper)}
             >
               {t("preview.browserPrint")}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={printExportBusy}
-              onClick={() => void handlePrintStatistics(selectedPdfPaper)}
-            >
-              {t("preview.serverPdf")}
             </Button>
             <Button
               type="button"

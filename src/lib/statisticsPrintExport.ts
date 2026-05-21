@@ -1,6 +1,5 @@
 /**
- * Formats papier partagés entre l’UI (aperçu CSS @page) et le serveur PDF Playwright.
- * L’export PDF lui-même est géré par `server/statistics-pdf-server.ts` (Chromium page.pdf).
+ * Formats papier partagés entre l’UI (aperçu CSS @page) et l’export PDF navigateur (jsPDF).
  */
 
 /** Formats pris en charge (portrait). */

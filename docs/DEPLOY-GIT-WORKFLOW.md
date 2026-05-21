@@ -135,7 +135,7 @@ git push origin <branche>
 Le site se redéploie en général **automatiquement** si le projet Vercel est lié au repo.
 
 - [ ] Vercel → **Deployments** → dernier build **Ready**  
-- [ ] Variables d’environnement à jour (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `PDF_EXPORT_ORIGIN`, etc.)  
+- [ ] Variables d’environnement à jour (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, etc.)  
 - [ ] **Redeploy** si vous avez seulement changé des variables sans nouveau commit  
 - [ ] Test rapide en prod (ex. statistiques → **Enregistrer le PDF**)
 

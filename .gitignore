@@ -27,3 +27,5 @@ dist-ssr
 *.sw?
 tmp-*
 tmp-legal-pack/
+.vercel
+.env*.local
