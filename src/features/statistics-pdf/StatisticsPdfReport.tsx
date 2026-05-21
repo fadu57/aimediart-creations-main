@@ -18,8 +18,10 @@ export function StatisticsPdfReport(props: Props) {
   const {
     orgLabel,
     previewExpoLabel,
+    previewArtistLabel,
     previewAgencyLogoMeta,
     previewExpoLogoMeta,
+    previewExpoDateRange = null,
     miniKpis,
     emotionSeries,
     feedbackTotal,
@@ -128,6 +130,18 @@ export function StatisticsPdfReport(props: Props) {
             <li>
               <span style={{ fontWeight: 600 }}>{t("filter.exposition")}</span> {previewExpoLabel}
             </li>
+            <li>
+              <span style={{ fontWeight: 600 }}>{t("filter.artist")}</span> {previewArtistLabel}
+            </li>
+            {previewExpoDateRange ? (
+              <li>
+                <span style={{ fontWeight: 600 }}>{t("filter.expoPeriod")}</span>{" "}
+                {t("filter.expoDateRange", {
+                  from: previewExpoDateRange.from,
+                  to: previewExpoDateRange.to,
+                })}
+              </li>
+            ) : null}
           </ul>
         </div>
 
@@ -135,11 +149,11 @@ export function StatisticsPdfReport(props: Props) {
           <h2 className="statistics-pdf-h2">{t("page.title")}</h2>
           <div className="statistics-pdf-kpi-grid" style={{ marginTop: "0.65rem" }}>
             {miniKpis.map((k) => (
-              <div key={k.label} className="statistics-pdf-kpi-cell">
+              <div key={k.id} className="statistics-pdf-kpi-cell">
                 <k.icon style={{ width: 18, height: 18, color: "#E63946", margin: "0 auto 4px" }} aria-hidden />
                 <div className="statistics-pdf-kpi-label">{k.label}</div>
                 <div className="statistics-pdf-kpi-value">
-                  {k.label === "Émotion dominante" && k.value !== "—"
+                  {k.id === "dominantEmotion" && k.value !== "—"
                     ? t(`emotions.names.${normalizeEmotionKey(String(k.value))}`, { defaultValue: String(k.value) })
                     : k.value}
                 </div>

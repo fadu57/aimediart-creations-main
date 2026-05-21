@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -18,11 +20,15 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { supabase } from "@/lib/supabase";
 import { PDF_FORMAT_OPTIONS, type PdfPaperFormat } from "@/lib/statisticsPrintExport";
 import {
+  buildStatisticsPdfFilename,
   generateStatisticsBrowserPdf,
   printStatisticsInBrowser,
+  type StatisticsPdfExportProgress,
+  type StatisticsPdfExportTables,
 } from "@/lib/statisticsBrowserPdf";
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
-import { StatisticsReportView } from "@/components/statistics/StatisticsReportView";
+import { formatBarVisitLabel, sumChartVisits } from "@/lib/statisticsCharts";
+import { StatisticsReportView, type StatisticsArtistCoverLetter, type StatisticsReportViewProps } from "@/components/statistics/StatisticsReportView";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
@@ -38,7 +44,7 @@ import {
   Loader2,
   Smile,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 
 type EmotionCatalogRow = {
   id: string;
@@ -53,7 +59,34 @@ type ExpoOption = {
   agency_id: string | null;
   /** Valeur brute logo (colonnes variables selon le schéma `expos`). */
   logoRaw: string | null;
+  date_expo_du: string | null;
+  date_expo_au: string | null;
+  curatorFirstName: string | null;
+  curatorLastName: string | null;
 };
+
+type ArtistFilterOption = {
+  id: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+};
+
+function curatorNamesFromExpoRow(row: Record<string, unknown>): { firstName: string; lastName: string } {
+  const firstName =
+    asTrimmedString(row.curator_firstname) ||
+    asTrimmedString(row.curator_fistname) ||
+    asTrimmedString(row.curator_prenom) ||
+    asTrimmedString(row.curator_first_name) ||
+    "";
+  const lastName =
+    asTrimmedString(row.curator_name) ||
+    asTrimmedString(row.curator_lastname) ||
+    asTrimmedString(row.curator_nom) ||
+    asTrimmedString(row.curator_last_name) ||
+    "";
+  return { firstName, lastName };
+}
 
 type TopArtworkRow = {
   artworkId: string;
@@ -71,6 +104,20 @@ function asTrimmedString(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value).trim();
   return "";
+}
+
+type FeedbackArtworkRow = { artwork_id?: string | number | null };
+
+function filterFeedbackRowsByArtworkIds<T extends FeedbackArtworkRow>(
+  rows: T[],
+  artworkIds: Set<string> | null,
+): T[] {
+  if (!artworkIds) return rows;
+  if (artworkIds.size === 0) return [];
+  return rows.filter((row) => {
+    const id = asTrimmedString(row.artwork_id);
+    return id.length > 0 && artworkIds.has(id);
+  });
 }
 
 function startOfWeekMonday(d: Date): Date {
@@ -95,9 +142,65 @@ function toFrDayMonth(d: Date): string {
   return `${dd}/${mm}`;
 }
 
+function toFrDateLabel(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 function toFrWeekdayShort(d: Date): string {
   const labels = ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"];
   return labels[d.getDay()] || "";
+}
+
+/** Parse une date ISO `YYYY-MM-DD` (champs expos date_expo_du / date_expo_au). */
+function parseExpoYmdDate(value: unknown): Date | null {
+  const raw = asTrimmedString(value);
+  if (!raw) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!match) return null;
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function buildDailyTemporalSeries(
+  rows: Array<{ submitted_at?: string | null }>,
+  rangeStart: Date,
+  rangeEnd: Date,
+): Array<{ day: string; date: string; weekday: string; dateLabel: string; visites: number }> {
+  const start = new Date(rangeStart);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(rangeEnd);
+  end.setHours(0, 0, 0, 0);
+
+  const byDate = new Map<string, number>();
+  for (let cur = new Date(start); cur.getTime() <= end.getTime(); cur.setDate(cur.getDate() + 1)) {
+    byDate.set(toYmd(cur), 0);
+  }
+
+  for (const row of rows) {
+    const submittedAt = asTrimmedString(row.submitted_at);
+    if (!submittedAt) continue;
+    const d = new Date(submittedAt);
+    if (Number.isNaN(d.getTime())) continue;
+    const key = toYmd(d);
+    if (byDate.has(key)) byDate.set(key, (byDate.get(key) ?? 0) + 1);
+  }
+
+  const series: Array<{ day: string; date: string; weekday: string; dateLabel: string; visites: number }> = [];
+  for (let cur = new Date(start); cur.getTime() <= end.getTime(); cur.setDate(cur.getDate() + 1)) {
+    const key = toYmd(cur);
+    const weekday = toFrWeekdayShort(cur);
+    const dateLabel = toFrDayMonth(cur);
+    series.push({
+      day: `${weekday}|${dateLabel}`,
+      date: key,
+      weekday,
+      dateLabel,
+      visites: byDate.get(key) ?? 0,
+    });
+  }
+  return series;
 }
 
 function formatFrNumber(n: number, opts: Intl.NumberFormatOptions = {}) {
@@ -110,7 +213,7 @@ function artworkExpoId(aw: unknown): string | null {
 }
 
 const Statistics = () => {
-  const { t } = useTranslation("statistiques");
+  const { t, i18n } = useTranslation("statistiques");
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name } = useAuthUser();
   const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; name: string; logoUrl: string | null }>>([]);
@@ -143,11 +246,18 @@ const Statistics = () => {
   const [paperFormatDialogOpen, setPaperFormatDialogOpen] = useState(false);
   const [selectedPdfPaper, setSelectedPdfPaper] = useState<PdfPaperFormat>("a4");
   const [printExportBusy, setPrintExportBusy] = useState(false);
+  const [exportProgress, setExportProgress] = useState<StatisticsPdfExportProgress | null>(null);
+  const [reportExportSnapshot, setReportExportSnapshot] = useState<StatisticsReportViewProps | null>(null);
   const statisticsPrintAreaRef = useRef<HTMLDivElement>(null);
+  const exportProgressThrottleRef = useRef(0);
+  const exportProgressLatestRef = useRef<StatisticsPdfExportProgress | null>(null);
+  const previewFiltersSnapshotRef = useRef<{ agencyId: string; expoId: string | "all"; artistId: string } | null>(null);
+  const shouldRestorePreviewFiltersRef = useRef(false);
+  const userScopeKeyRef = useRef("");
 
   /** Marqueur : rapport monté + temps pour Recharts / polices avant export PDF navigateur. */
   useEffect(() => {
-    if (!printPreviewOpen) return;
+    if (!printPreviewOpen || printExportBusy) return;
     let cancelled = false;
     let pollId: number | undefined;
     let readyId: number | undefined;
@@ -182,7 +292,7 @@ const Statistics = () => {
       if (readyId !== undefined) window.clearTimeout(readyId);
       statisticsPrintAreaRef.current?.removeAttribute("data-statistics-export-ready");
     };
-  }, [printPreviewOpen, temporalSeriesForPdf, hourlySeries]);
+  }, [printPreviewOpen, temporalSeriesForPdf, hourlySeries, printExportBusy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,12 +334,19 @@ const Statistics = () => {
         return;
       }
       const options = (data as Record<string, unknown>[])
-        .map((row) => ({
-          id: asTrimmedString(row.id),
-          expo_name: asTrimmedString(row.expo_name),
-          agency_id: asTrimmedString(row.agency_id) || null,
-          logoRaw: expoLogoRawFromRow(row),
-        }))
+        .map((row) => {
+          const curator = curatorNamesFromExpoRow(row);
+          return {
+            id: asTrimmedString(row.id),
+            expo_name: asTrimmedString(row.expo_name),
+            agency_id: asTrimmedString(row.agency_id) || null,
+            logoRaw: expoLogoRawFromRow(row),
+            date_expo_du: asTrimmedString(row.date_expo_du) || null,
+            date_expo_au: asTrimmedString(row.date_expo_au) || null,
+            curatorFirstName: curator.firstName || null,
+            curatorLastName: curator.lastName || null,
+          };
+        })
         .filter((row) => row.id.length > 0)
         .map((row) => ({ ...row, expo_name: row.expo_name || row.id }));
       setExpoOptions(options);
@@ -347,6 +464,10 @@ const Statistics = () => {
   const canDrillExpo = (scope.mode === "all" || scope.mode === "agency") && expoOptionsForSelect.length > 1;
 
   const [drillExpoId, setDrillExpoId] = useState<string | "all">("all");
+  const [selectedArtistId, setSelectedArtistId] = useState<string>("all");
+  const [artistOptions, setArtistOptions] = useState<ArtistFilterOption[]>([]);
+  const [artworkIdsByArtistId, setArtworkIdsByArtistId] = useState<Map<string, Set<string>>>(() => new Map());
+  const [artistCoverLetter, setArtistCoverLetter] = useState<StatisticsArtistCoverLetter | null>(null);
 
   useEffect(() => {
     if (!showOrganizationFilter) {
@@ -369,20 +490,241 @@ const Statistics = () => {
   }, [scope.mode, scope.agencyId, showOrganizationFilter, agencyOptions]);
 
   useEffect(() => {
-    // Reset expo uniquement quand le périmètre réel change,
-    // pas à chaque rendu (évite d'annuler la sélection utilisateur).
-    setDrillExpoId("all");
-  }, [scope.mode, scope.agencyId, scope.expoId, selectedAgencyId]);
+    const key = `${scope.mode}|${scope.agencyId ?? ""}|${scope.expoId ?? ""}`;
+    if (userScopeKeyRef.current && userScopeKeyRef.current !== key) {
+      setDrillExpoId("all");
+    }
+    userScopeKeyRef.current = key;
+  }, [scope.mode, scope.agencyId, scope.expoId]);
 
   useEffect(() => {
     if (drillExpoId === "all") return;
+    if (expoOptionsForSelect.length === 0) return;
     const exists = expoOptionsForSelect.some((ex) => ex.id === drillExpoId);
     if (!exists) setDrillExpoId("all");
   }, [drillExpoId, expoOptionsForSelect]);
 
+  /** Restaure org/expo après fermeture de l’aperçu (évite les resets intempestifs). */
+  useEffect(() => {
+    if (printPreviewOpen || !shouldRestorePreviewFiltersRef.current) return;
+    shouldRestorePreviewFiltersRef.current = false;
+    const snap = previewFiltersSnapshotRef.current;
+    if (!snap) return;
+    setSelectedAgencyId(snap.agencyId);
+    setDrillExpoId(snap.expoId);
+    setSelectedArtistId(snap.artistId);
+    previewFiltersSnapshotRef.current = null;
+  }, [printPreviewOpen]);
+
+  /** Expo précisément filtrée (pas « toutes les expos »). */
+  const selectedFilteredExpoId = useMemo((): string | null => {
+    if (!canDrillExpo) {
+      const only = expoOptionsForSelect[0];
+      return only?.id ?? (scope.mode === "expo" ? scope.expoId : null);
+    }
+    if (drillExpoId === "all") return null;
+    return drillExpoId;
+  }, [canDrillExpo, drillExpoId, expoOptionsForSelect, scope.mode, scope.expoId]);
+
+  const selectedFilteredExpo = useMemo(() => {
+    if (!selectedFilteredExpoId) return null;
+    return expoOptions.find((e) => e.id === selectedFilteredExpoId) ?? null;
+  }, [selectedFilteredExpoId, expoOptions]);
+
+  const showArtistFilter = selectedFilteredExpoId !== null;
+
+  const artistArtworkIds = useMemo((): Set<string> | null => {
+    if (selectedArtistId === "all") return null;
+    return artworkIdsByArtistId.get(selectedArtistId) ?? new Set();
+  }, [selectedArtistId, artworkIdsByArtistId]);
+
+  useEffect(() => {
+    setSelectedArtistId("all");
+  }, [selectedFilteredExpoId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!selectedFilteredExpoId) {
+        setArtistOptions([]);
+        setArtworkIdsByArtistId(new Map());
+        return;
+      }
+
+      const targetAgencyId =
+        effectiveAgencyFilter ??
+        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+
+      let query = supabase
+        .from("artworks")
+        .select("artwork_id, artwork_artist_id, artists!left(artist_firstname, artist_lastname)")
+        .eq("artwork_expo_id", selectedFilteredExpoId);
+      if (targetAgencyId) query = query.eq("artwork_agency_id", targetAgencyId);
+
+      const { data, error } = await query;
+      if (cancelled) return;
+      if (error || !Array.isArray(data)) {
+        setArtistOptions([]);
+        setArtworkIdsByArtistId(new Map());
+        return;
+      }
+
+      const byArtist = new Map<string, { name: string; firstName: string; lastName: string; artworkIds: Set<string> }>();
+      for (const row of data as Array<{
+        artwork_id?: string | null;
+        artwork_artist_id?: string | null;
+        artists?:
+          | { artist_firstname?: string | null; artist_lastname?: string | null }
+          | Array<{ artist_firstname?: string | null; artist_lastname?: string | null }>;
+      }>) {
+        const artistId = asTrimmedString(row.artwork_artist_id);
+        const artworkId = asTrimmedString(row.artwork_id);
+        if (!artistId || !artworkId) continue;
+        const artistJoin = Array.isArray(row.artists) ? row.artists[0] : row.artists;
+        const firstName = asTrimmedString(artistJoin?.artist_firstname);
+        const lastName = asTrimmedString(artistJoin?.artist_lastname);
+        const label = `${firstName} ${lastName}`.trim() || artistId;
+        const slot = byArtist.get(artistId) ?? {
+          name: label,
+          firstName,
+          lastName,
+          artworkIds: new Set<string>(),
+        };
+        slot.name = label;
+        slot.firstName = firstName || slot.firstName;
+        slot.lastName = lastName || slot.lastName;
+        slot.artworkIds.add(artworkId);
+        byArtist.set(artistId, slot);
+      }
+
+      const options = Array.from(byArtist.entries())
+        .map(([id, { name, firstName, lastName }]) => ({ id, name, firstName, lastName }))
+        .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+      setArtistOptions(options);
+      setArtworkIdsByArtistId(new Map(Array.from(byArtist.entries()).map(([id, { artworkIds }]) => [id, artworkIds])));
+      setSelectedArtistId((prev) => (prev === "all" || byArtist.has(prev) ? prev : "all"));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedFilteredExpoId, effectiveAgencyFilter, scope.mode, scope.agencyId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (selectedArtistId === "all" || !selectedFilteredExpoId) {
+        setArtistCoverLetter(null);
+        return;
+      }
+
+      const artist = artistOptions.find((option) => option.id === selectedArtistId);
+      if (!artist) {
+        setArtistCoverLetter(null);
+        return;
+      }
+
+      const expo = selectedFilteredExpo;
+      if (!expo) {
+        setArtistCoverLetter(null);
+        return;
+      }
+
+      const agencyId =
+        expo.agency_id ??
+        effectiveAgencyFilter ??
+        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+      const agencyName =
+        (agencyId ? agencyOptions.find((option) => option.id === agencyId)?.name : null) ||
+        (selectedAgencyId !== "all" ? agencyOptions.find((option) => option.id === selectedAgencyId)?.name : null) ||
+        "—";
+
+      let signatoryFirstName = asTrimmedString(expo.curatorFirstName);
+      let signatoryLastName = asTrimmedString(expo.curatorLastName);
+
+      if (!signatoryFirstName && !signatoryLastName && agencyId) {
+        const { data: managerLink, error: linkError } = await supabase
+          .from("agency_users")
+          .select("user_id")
+          .eq("agency_id", agencyId)
+          .eq("role_id", 4)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled) return;
+        const managerUserId = asTrimmedString(
+          (managerLink as { user_id?: string | null } | null)?.user_id,
+        );
+        if (!linkError && managerUserId) {
+          const { data: profileRow, error: profileError } = await supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", managerUserId)
+            .maybeSingle();
+          if (!profileError && profileRow) {
+            signatoryFirstName = asTrimmedString(
+              (profileRow as { first_name?: string | null }).first_name,
+            );
+            signatoryLastName = asTrimmedString(
+              (profileRow as { last_name?: string | null }).last_name,
+            );
+          }
+        }
+      }
+
+      if (cancelled) return;
+      setArtistCoverLetter({
+        artistFirstName: artist.firstName,
+        artistLastName: artist.lastName,
+        agencyName,
+        expoName: expo.expo_name,
+        signatoryFirstName,
+        signatoryLastName,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedArtistId,
+    selectedFilteredExpoId,
+    selectedFilteredExpo,
+    artistOptions,
+    agencyOptions,
+    effectiveAgencyFilter,
+    selectedAgencyId,
+    scope.mode,
+    scope.agencyId,
+  ]);
+
+  const expoDateRange = useMemo(() => {
+    if (!selectedFilteredExpo) return null;
+    const start = parseExpoYmdDate(selectedFilteredExpo.date_expo_du);
+    const end = parseExpoYmdDate(selectedFilteredExpo.date_expo_au);
+    if (!start || !end || start.getTime() > end.getTime()) return null;
+    return { start, end };
+  }, [selectedFilteredExpo]);
+
+  const stickyExpoLogoMeta = useMemo(() => {
+    if (!selectedFilteredExpo) return { logoUrl: null as string | null, name: null as string | null };
+    const raw = selectedFilteredExpo.logoRaw?.trim();
+    if (!raw) return { logoUrl: null, name: selectedFilteredExpo.expo_name };
+    return {
+      logoUrl: resolveExpoLogoImgSrc(raw),
+      name: selectedFilteredExpo.expo_name,
+    };
+  }, [selectedFilteredExpo]);
+
+  const previewExpoDateRange = useMemo(() => {
+    if (!expoDateRange) return null;
+    return {
+      from: toFrDateLabel(expoDateRange.start),
+      to: toFrDateLabel(expoDateRange.end),
+    };
+  }, [expoDateRange]);
+
   useEffect(() => {
     setWeekOffset(0);
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.expoId, selectedArtistId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -393,7 +735,15 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      let query = supabase.from("visitor_feedback").select("emotion_id, visitor_id, heart_rating");
+      if (artistArtworkIds && artistArtworkIds.size === 0) {
+        setFeedbackCountsByEmotionId({});
+        setFeedbackTotal(0);
+        setUniqueVisitorsTotal(0);
+        setAverageHearts(null);
+        return;
+      }
+
+      let query = supabase.from("visitor_feedback").select("emotion_id, visitor_id, heart_rating, artwork_id");
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
       if (targetExpoId) query = query.eq("expo_id", targetExpoId);
       const { data, error } = await query;
@@ -405,11 +755,15 @@ const Statistics = () => {
         setAverageHearts(null);
         return;
       }
-      const rows = data as Array<{
-        emotion_id?: string | number | null;
-        visitor_id?: string | number | null;
-        heart_rating?: string | number | null;
-      }>;
+      const rows = filterFeedbackRowsByArtworkIds(
+        data as Array<{
+          emotion_id?: string | number | null;
+          visitor_id?: string | number | null;
+          heart_rating?: string | number | null;
+          artwork_id?: string | number | null;
+        }>,
+        artistArtworkIds,
+      );
       const counts: Record<string, number> = {};
       const uniqueVisitorIds = new Set<string>();
       let heartsSum = 0;
@@ -440,7 +794,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -453,7 +807,7 @@ const Statistics = () => {
 
       const { data, error } = await supabase
         .from("artworks")
-        .select("artwork_status, artwork_agency_id, artwork_expo_id");
+        .select("artwork_status, artwork_agency_id, artwork_expo_id, artwork_artist_id");
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
         setActiveArtworksCount(0);
@@ -464,11 +818,13 @@ const Statistics = () => {
         artwork_status?: string | null;
         artwork_agency_id?: string | null;
         artwork_expo_id?: string | null;
+        artwork_artist_id?: string | null;
       }>).filter((row) => {
         const rowAgencyId = asTrimmedString(row.artwork_agency_id);
         const rowExpoId = asTrimmedString(row.artwork_expo_id);
         if (targetAgencyId && rowAgencyId !== targetAgencyId) return false;
         if (targetExpoId && rowExpoId !== targetExpoId) return false;
+        if (selectedArtistId !== "all" && asTrimmedString(row.artwork_artist_id) !== selectedArtistId) return false;
         return true;
       });
       const normalizedStatuses = rows.map((r) => asTrimmedString(r.artwork_status).toLowerCase()).filter(Boolean);
@@ -478,7 +834,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -489,6 +845,39 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
+      if (artistArtworkIds && artistArtworkIds.size === 0) {
+        setTemporalSeries([]);
+        return;
+      }
+
+      if (expoDateRange) {
+        const rangeStart = new Date(expoDateRange.start);
+        rangeStart.setHours(0, 0, 0, 0);
+        const rangeEnd = new Date(expoDateRange.end);
+        rangeEnd.setHours(23, 59, 59, 999);
+
+        let query = supabase
+          .from("visitor_feedback")
+          .select("submitted_at, artwork_id")
+          .gte("submitted_at", rangeStart.toISOString())
+          .lte("submitted_at", rangeEnd.toISOString());
+        if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
+        if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+
+        const { data, error } = await query;
+        if (cancelled) return;
+        if (error || !Array.isArray(data)) {
+          setTemporalSeries([]);
+          return;
+        }
+        const rows = filterFeedbackRowsByArtworkIds(
+          data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+          artistArtworkIds,
+        );
+        setTemporalSeries(buildDailyTemporalSeries(rows, expoDateRange.start, expoDateRange.end));
+        return;
+      }
+
       const weekStart = startOfWeekMonday(new Date());
       weekStart.setDate(weekStart.getDate() + weekOffset * 7);
       const weekEnd = new Date(weekStart);
@@ -497,7 +886,7 @@ const Statistics = () => {
 
       let query = supabase
         .from("visitor_feedback")
-        .select("submitted_at")
+        .select("submitted_at, artwork_id")
         .gte("submitted_at", weekStart.toISOString())
         .lte("submitted_at", weekEnd.toISOString());
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
@@ -517,7 +906,10 @@ const Statistics = () => {
       });
       const byDate = new Map(init.map((x) => [x.date, x]));
 
-      for (const row of data as Array<{ submitted_at?: string | null }>) {
+      for (const row of filterFeedbackRowsByArtworkIds(
+        data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+        artistArtworkIds,
+      )) {
         const submittedAt = asTrimmedString(row.submitted_at);
         if (!submittedAt) continue;
         const d = new Date(submittedAt);
@@ -546,7 +938,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, weekOffset]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, weekOffset, expoDateRange, artistArtworkIds]);
 
   const loadTemporalSeriesForPdf = useCallback(async () => {
     const targetAgencyId =
@@ -555,7 +947,39 @@ const Statistics = () => {
     const targetExpoId =
       drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-    let query = supabase.from("visitor_feedback").select("submitted_at");
+    if (artistArtworkIds && artistArtworkIds.size === 0) {
+      setTemporalSeriesForPdf([]);
+      return;
+    }
+
+    if (expoDateRange) {
+      const rangeStart = new Date(expoDateRange.start);
+      rangeStart.setHours(0, 0, 0, 0);
+      const rangeEnd = new Date(expoDateRange.end);
+      rangeEnd.setHours(23, 59, 59, 999);
+
+      let query = supabase
+        .from("visitor_feedback")
+        .select("submitted_at, artwork_id")
+        .gte("submitted_at", rangeStart.toISOString())
+        .lte("submitted_at", rangeEnd.toISOString());
+      if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
+      if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+
+      const { data, error } = await query;
+      if (error || !Array.isArray(data)) {
+        setTemporalSeriesForPdf([]);
+        return;
+      }
+      const rows = filterFeedbackRowsByArtworkIds(
+        data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+        artistArtworkIds,
+      );
+      setTemporalSeriesForPdf(buildDailyTemporalSeries(rows, expoDateRange.start, expoDateRange.end));
+      return;
+    }
+
+    let query = supabase.from("visitor_feedback").select("submitted_at, artwork_id");
     if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
     if (targetExpoId) query = query.eq("expo_id", targetExpoId);
 
@@ -567,8 +991,15 @@ const Statistics = () => {
 
     let minMs = Infinity;
     let maxMs = -Infinity;
-    const rows = data as Array<{ submitted_at?: string | null }>;
-    for (const row of rows) {
+    const filteredRows = filterFeedbackRowsByArtworkIds(
+      data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+      artistArtworkIds,
+    );
+    if (filteredRows.length === 0) {
+      setTemporalSeriesForPdf([]);
+      return;
+    }
+    for (const row of filteredRows) {
       const submittedAt = asTrimmedString(row.submitted_at);
       if (!submittedAt) continue;
       const d = new Date(submittedAt);
@@ -591,7 +1022,7 @@ const Statistics = () => {
     for (let cur = new Date(d0); cur.getTime() <= d1.getTime(); cur.setDate(cur.getDate() + 1)) {
       byDate.set(toYmd(cur), 0);
     }
-    for (const row of rows) {
+    for (const row of filteredRows) {
       const submittedAt = asTrimmedString(row.submitted_at);
       if (!submittedAt) continue;
       const d = new Date(submittedAt);
@@ -620,7 +1051,7 @@ const Statistics = () => {
       });
     }
     setTemporalSeriesForPdf(series);
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, expoDateRange, artistArtworkIds]);
 
   useEffect(() => {
     if (!printPreviewOpen) return;
@@ -636,7 +1067,12 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      let query = supabase.from("visitor_feedback").select("submitted_at");
+      if (artistArtworkIds && artistArtworkIds.size === 0) {
+        setHourlySeries([]);
+        return;
+      }
+
+      let query = supabase.from("visitor_feedback").select("submitted_at, artwork_id");
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
       if (targetExpoId) query = query.eq("expo_id", targetExpoId);
       const { data, error } = await query;
@@ -647,7 +1083,10 @@ const Statistics = () => {
       }
 
       const counts = Array.from({ length: 24 }, () => 0);
-      for (const row of data as Array<{ submitted_at?: string | null }>) {
+      for (const row of filterFeedbackRowsByArtworkIds(
+        data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+        artistArtworkIds,
+      )) {
         const raw = asTrimmedString(row.submitted_at);
         if (!raw) continue;
         const d = new Date(raw);
@@ -664,7 +1103,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -681,6 +1120,7 @@ const Statistics = () => {
         .select("artwork_id, artwork_title, artwork_artist_id, artwork_image_url, artwork_photo_url, artists!left(artist_firstname, artist_lastname)");
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
+      if (selectedArtistId !== "all") artworksQuery = artworksQuery.eq("artwork_artist_id", selectedArtistId);
       const { data: artworkRows, error: artworksError } = await artworksQuery;
       if (cancelled) return;
       if (artworksError || !Array.isArray(artworkRows)) {
@@ -805,7 +1245,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId]);
 
   const emotionCatalog = useMemo(() => emotionCatalogFromDb, [emotionCatalogFromDb]);
 
@@ -834,6 +1274,7 @@ const Statistics = () => {
       let artworksQuery = supabase.from("artworks").select("artwork_id, artwork_title");
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
+      if (selectedArtistId !== "all") artworksQuery = artworksQuery.eq("artwork_artist_id", selectedArtistId);
       const { data: artworksData, error: artworksError } = await artworksQuery;
       if (cancelled) return;
       if (artworksError || !Array.isArray(artworksData)) {
@@ -899,35 +1340,45 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId]);
 
   const miniKpis = useMemo(() => {
+    const kpi = (
+      id: "uniqueVisitors" | "avgHearts" | "dominantEmotion" | "activeArtworks",
+      icon: typeof Eye,
+      value: string,
+    ) => ({
+      id,
+      icon,
+      value,
+      label: t(`kpis.${id}.label`),
+      hint: t(`kpis.${id}.hint`),
+    });
+
     if (feedbackTotal === 0) {
       return [
-        { label: "Visiteurs uniques", icon: Eye, value: formatFrNumber(uniqueVisitorsTotal), hint: "Toutes les œuvres de votre périmètre" },
-        { label: "Moyenne des cœurs", icon: Heart, value: "—", hint: "Note moyenne sur 5 cœurs" },
-        { label: "Émotion dominante", icon: Smile, value: "—", hint: "Ressenti le plus exprimé" },
-        { label: "Œuvres actives", icon: Image, value: formatFrNumber(activeArtworksCount), hint: "Dans le catalogue de l'expo" },
+        kpi("uniqueVisitors", Eye, formatFrNumber(uniqueVisitorsTotal)),
+        kpi("avgHearts", Heart, "—"),
+        kpi("dominantEmotion", Smile, "—"),
+        kpi("activeArtworks", Image, formatFrNumber(activeArtworksCount)),
       ];
     }
     const dominant = feedbackTotal > 0 && emotionSeries.length
       ? emotionSeries.reduce((best, e) => (e.percentage > best.percentage ? e : best), emotionSeries[0])
       : null;
     return [
-      { label: "Visiteurs uniques", icon: Eye, value: formatFrNumber(uniqueVisitorsTotal), hint: "Toutes les œuvres de votre périmètre" },
-      {
-        label: "Moyenne des cœurs",
-        icon: Heart,
-        value:
-          averageHearts == null
-            ? "—"
-            : formatFrNumber(averageHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
-        hint: "Note moyenne sur 5 cœurs",
-      },
-      { label: "Émotion dominante", icon: Smile, value: dominant?.name || "—", hint: "Ressenti le plus exprimé" },
-      { label: "Œuvres actives", icon: Image, value: formatFrNumber(activeArtworksCount), hint: "Dans le catalogue de l'expo" },
+      kpi("uniqueVisitors", Eye, formatFrNumber(uniqueVisitorsTotal)),
+      kpi(
+        "avgHearts",
+        Heart,
+        averageHearts == null
+          ? "—"
+          : formatFrNumber(averageHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+      ),
+      kpi("dominantEmotion", Smile, dominant?.name || "—"),
+      kpi("activeArtworks", Image, formatFrNumber(activeArtworksCount)),
     ];
-  }, [emotionSeries, uniqueVisitorsTotal, feedbackTotal, averageHearts, activeArtworksCount]);
+  }, [emotionSeries, uniqueVisitorsTotal, feedbackTotal, averageHearts, activeArtworksCount, t]);
 
   const showScopeHint =
     !authLoading &&
@@ -988,6 +1439,11 @@ const Statistics = () => {
   const timelineTickIntervalPdf =
     temporalSeriesForPdf.length > 18 ? Math.max(1, Math.floor(temporalSeriesForPdf.length / 14)) : 0;
 
+  const timelineTickInterval =
+    temporalSeries.length > 18 ? Math.max(1, Math.floor(temporalSeries.length / 14)) : 0;
+
+  const filteredVisitsTotal = useMemo(() => sumChartVisits(hourlySeries), [hourlySeries]);
+
   const expectedChartSurfaces = useMemo(() => {
     let n = 0;
     if (temporalSeriesForPdf.length > 0) n++;
@@ -1016,8 +1472,14 @@ const Statistics = () => {
     return expoOptionsForSelect.find((e) => e.id === drillExpoId)?.expo_name ?? drillExpoId;
   }, [canDrillExpo, drillExpoId, expoOptionsForSelect, t]);
 
+  const previewArtistLabel = useMemo(() => {
+    if (!showArtistFilter || selectedArtistId === "all") return t("filter.allArtists");
+    return artistOptions.find((artist) => artist.id === selectedArtistId)?.name ?? selectedArtistId;
+  }, [showArtistFilter, selectedArtistId, artistOptions, t]);
+
   /** Expo pour le logo du bloc « filtres » : expo choisie, ou 1ʳᵉ expo du périmètre si « toutes les expos ». */
   const previewExpoIdForLogo = useMemo(() => {
+    if (selectedFilteredExpoId) return selectedFilteredExpoId;
     if (!canDrillExpo) {
       const only = expoOptionsForSelect[0];
       return only?.id ?? null;
@@ -1027,7 +1489,7 @@ const Statistics = () => {
       return first?.id ?? null;
     }
     return drillExpoId;
-  }, [canDrillExpo, drillExpoId, expoOptionsForSelect]);
+  }, [selectedFilteredExpoId, canDrillExpo, drillExpoId, expoOptionsForSelect]);
 
   const previewExpoLogoMeta = useMemo(() => {
     if (!previewExpoIdForLogo) return { logoUrl: null as string | null, name: null as string | null };
@@ -1041,12 +1503,14 @@ const Statistics = () => {
     };
   }, [previewExpoIdForLogo, expoOptions]);
 
-  /** Organisation dont on affiche le logo dans l'aperçu / PDF (pas de logo en vue globale « all »). */
+  /** Organisation dont on affiche le logo dans l'aperçu / PDF. */
   const previewAgencyIdForLogo = useMemo(() => {
     if (selectedAgencyId !== "all") return selectedAgencyId;
     if (scope.mode === "agency" || scope.mode === "expo") return scope.agencyId ?? null;
+    if (selectedFilteredExpo?.agency_id) return selectedFilteredExpo.agency_id;
+    if (effectiveAgencyFilter) return effectiveAgencyFilter;
     return null;
-  }, [selectedAgencyId, scope.mode, scope.agencyId]);
+  }, [selectedAgencyId, scope.mode, scope.agencyId, selectedFilteredExpo, effectiveAgencyFilter]);
 
   const previewAgencyLogoMeta = useMemo(() => {
     if (!previewAgencyIdForLogo) return { logoUrl: null as string | null, name: null as string | null };
@@ -1067,7 +1531,18 @@ const Statistics = () => {
           ? selectedAgencyLabel
           : "—";
 
+  const exportProgressLabel = useMemo(() => {
+    if (!exportProgress) return "";
+    const { phase, current, total, percent } = exportProgress;
+    return t(`preview.exportProgress.${phase}`, {
+      percent: Math.round(percent),
+      current: current ?? 0,
+      total: total ?? 0,
+    });
+  }, [exportProgress, t]);
+
   const prepareStatisticsExportData = async (): Promise<void> => {
+    setExportProgress({ percent: 4, phase: "prepare" });
     try {
       await Promise.race([
         loadTemporalSeriesForPdf(),
@@ -1076,50 +1551,257 @@ const Statistics = () => {
     } catch {
       /* données déjà présentes ou délai */
     }
+    setExportProgress({ percent: 10, phase: "prepare" });
     await new Promise((r) => setTimeout(r, 400));
   };
+
+  const buildReportExportSnapshot = useCallback((): StatisticsReportViewProps => {
+    return {
+      orgLabel,
+      previewExpoLabel,
+      previewArtistLabel,
+      previewArtistCoverLetter: artistCoverLetter,
+      previewAgencyLogoMeta,
+      previewExpoLogoMeta,
+      previewExpoDateRange,
+      miniKpis,
+      emotionSeries,
+      feedbackTotal,
+      temporalSeriesForPdf,
+      hourlySeries,
+      timelineTickIntervalPdf,
+      crossEmotionColumns,
+      sortedCrossRows,
+      crossError,
+      sortedTopArtworks,
+      topArtworksError,
+      formatFrNumber,
+    };
+  }, [
+    orgLabel,
+    previewExpoLabel,
+    previewArtistLabel,
+    artistCoverLetter,
+    previewAgencyLogoMeta,
+    previewExpoLogoMeta,
+    previewExpoDateRange,
+    miniKpis,
+    emotionSeries,
+    feedbackTotal,
+    temporalSeriesForPdf,
+    hourlySeries,
+    timelineTickIntervalPdf,
+    crossEmotionColumns,
+    sortedCrossRows,
+    crossError,
+    sortedTopArtworks,
+    topArtworksError,
+  ]);
+
+  const buildPdfExportTables = useCallback((): StatisticsPdfExportTables => {
+    return {
+      cross: {
+        title: t("cross.title"),
+        subtitle: t("cross.subtitle"),
+        errorText: crossError,
+        emptyText: t("cross.empty"),
+        artworkHeader: t("cross.colArtwork"),
+        columns: crossEmotionColumns.map((emotion) => ({
+          id: emotion.id,
+          emoji: emotionEmojiForPreview(emotion.name, emotion.icon),
+          label: t(`emotions.names.${normalizeEmotionKey(emotion.name)}`, {
+            defaultValue: emotion.name,
+          }),
+        })),
+        rows: sortedCrossRows.map((row) => ({
+          name: row.name,
+          counts: row.counts,
+        })),
+      },
+      top: {
+        title: t("top.title"),
+        subtitle: t("top.subtitle"),
+        errorText: topArtworksError,
+        emptyText: t("top.empty"),
+        rankHeader: t("top.colRank"),
+        artworkHeader: t("top.colArtwork"),
+        visitsHeader: t("top.colVisits"),
+        avgHeartsHeader: t("top.colAvgHearts"),
+        rows: sortedTopArtworks.slice(0, 40).map((row, index) => ({
+          rank: index + 1,
+          title: row.title,
+          artist: row.artist,
+          imageUrl: row.imageUrl,
+          visits: `${formatFrNumber(row.visits)} visite(s)`,
+          avgHearts:
+            row.avgHearts == null
+              ? "—"
+              : formatFrNumber(row.avgHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+        })),
+      },
+    };
+  }, [
+    t,
+    crossError,
+    crossEmotionColumns,
+    sortedCrossRows,
+    topArtworksError,
+    sortedTopArtworks,
+  ]);
+
+  const handleExportProgress = useCallback((progress: StatisticsPdfExportProgress) => {
+    exportProgressLatestRef.current = progress;
+    const now = Date.now();
+    if (
+      progress.percent >= 100 ||
+      progress.phase === "finish" ||
+      now - exportProgressThrottleRef.current >= 80
+    ) {
+      exportProgressThrottleRef.current = now;
+      setExportProgress(progress);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!printExportBusy) return;
+    const id = window.setInterval(() => {
+      const latest = exportProgressLatestRef.current;
+      if (latest) setExportProgress(latest);
+    }, 200);
+    return () => window.clearInterval(id);
+  }, [printExportBusy]);
+
+  const handlePrintPreviewOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && printExportBusy) return;
+      if (open) {
+        previewFiltersSnapshotRef.current = {
+          agencyId: selectedAgencyId,
+          expoId: drillExpoId,
+          artistId: selectedArtistId,
+        };
+        setPrintPreviewOpen(true);
+        return;
+      }
+      shouldRestorePreviewFiltersRef.current = true;
+      setPrintPreviewOpen(false);
+    },
+    [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy],
+  );
+
+  const liveReportViewProps = buildReportExportSnapshot();
+  const reportViewProps = reportExportSnapshot ?? liveReportViewProps;
 
   /** PDF navigateur (jsPDF + capture DOM) — même logique que le panneau expo. */
   const handleBrowserPdfStatistics = async (paperFormat: PdfPaperFormat) => {
     if (printExportBusy) return;
     setPrintExportBusy(true);
+    setExportProgress({ percent: 0, phase: "waiting" });
     setPaperFormatDialogOpen(false);
 
     try {
       await prepareStatisticsExportData();
+      const exportSnapshot = buildReportExportSnapshot();
+      setReportExportSnapshot(exportSnapshot);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      await new Promise((r) => window.setTimeout(r, 350));
+
       const root = statisticsPrintAreaRef.current;
       if (!root) throw new Error("missing-print-area");
-      await generateStatisticsBrowserPdf(root, paperFormat);
+      root.setAttribute("data-statistics-export-ready", "true");
+
+      const artistFiltered = selectedArtistId !== "all";
+      const filteredArtist = artistFiltered
+        ? artistOptions.find((option) => option.id === selectedArtistId)
+        : null;
+      const suggestedFilename = buildStatisticsPdfFilename({
+        language: i18n.language,
+        expoName: selectedFilteredExpo?.expo_name ?? exportSnapshot.previewExpoLabel,
+        artistFirstName: artistFiltered
+          ? filteredArtist?.firstName ?? exportSnapshot.previewArtistCoverLetter?.artistFirstName
+          : undefined,
+        artistLastName: artistFiltered
+          ? filteredArtist?.lastName ?? exportSnapshot.previewArtistCoverLetter?.artistLastName
+          : undefined,
+      });
+
+      await generateStatisticsBrowserPdf(
+        root,
+        paperFormat,
+        suggestedFilename,
+        handleExportProgress,
+        buildPdfExportTables(),
+      );
     } catch (err) {
+      console.error("[statistics-pdf]", err);
       const code = err instanceof Error ? err.message : String(err);
-      if (code === "popup-blocked") {
-        window.alert(t("preview.popupBlocked"));
+      if (code === "save-aborted") {
+        return;
       } else if (code === "timeout-ready") {
         window.alert(t("preview.browserPdfNotReady"));
       } else {
         window.alert(t("preview.browserPdfError"));
       }
+    } finally {
+      setPrintExportBusy(false);
+      setExportProgress(null);
+      exportProgressLatestRef.current = null;
+      setReportExportSnapshot(null);
     }
-
-    setPrintExportBusy(false);
   };
 
   /** Impression système (Ctrl+P → Enregistrer en PDF). */
   const handleBrowserPrintStatistics = async (paperFormat: PdfPaperFormat) => {
     if (printExportBusy) return;
     setPrintExportBusy(true);
+    setExportProgress({ percent: 0, phase: "prepare" });
     setPaperFormatDialogOpen(false);
     try {
       await prepareStatisticsExportData();
+      setReportExportSnapshot(buildReportExportSnapshot());
+      setExportProgress({ percent: 85, phase: "finish" });
       printStatisticsInBrowser(paperFormat);
+      setExportProgress({ percent: 100, phase: "finish" });
     } finally {
       setPrintExportBusy(false);
+      setExportProgress(null);
+      exportProgressLatestRef.current = null;
+      setReportExportSnapshot(null);
     }
   };
 
+  const exportProgressOverlay =
+    printExportBusy && exportProgress
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={exportProgressLabel || t("preview.printPreparing")}
+          >
+            <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-2xl">
+              <p className="mb-1 text-center font-serif text-lg font-bold text-neutral-900">
+                {t("preview.pdfTabLoading")}
+              </p>
+              <p className="mb-4 text-center text-sm text-neutral-600">{exportProgressLabel}</p>
+              <Progress
+                value={exportProgress.percent}
+                aria-label={exportProgressLabel}
+                className="h-3 bg-neutral-200 [&>div]:bg-[#E63946]"
+              />
+              <p className="mt-2 text-center text-xs font-medium tabular-nums text-neutral-500">
+                {Math.round(exportProgress.percent)} %
+              </p>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start md:justify-between">
+      {exportProgressOverlay}
+      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 max-w-full md:max-w-md shrink-0">
           <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           <p className="text-muted-foreground">{t("page.subtitle")}</p>
@@ -1127,12 +1809,28 @@ const Statistics = () => {
             type="button"
             variant="outline"
             className="mt-3"
-            onClick={() => setPrintPreviewOpen(true)}
+            onClick={() => handlePrintPreviewOpenChange(true)}
           >
             {t("page.preview")}
           </Button>
         </div>
-        <BackofficeStickyAgencyLogoSlot />
+        <div className="flex min-h-[60px] flex-1 flex-col items-center justify-center px-2 md:min-w-0">
+          {selectedFilteredExpoId && stickyExpoLogoMeta.logoUrl ? (
+            <img
+              src={stickyExpoLogoMeta.logoUrl}
+              alt={
+                stickyExpoLogoMeta.name
+                  ? `${t("filter.exposition")} — ${stickyExpoLogoMeta.name}`
+                  : t("filter.exposition")
+              }
+              className="max-h-16 max-w-[200px] object-contain object-center"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
+            <BackofficeStickyAgencyLogoSlot />
+          )}
+        </div>
         <div className="flex flex-col gap-2 text-sm min-w-[220px] shrink-0 md:ml-auto">
           {showOrganizationFilter && (
             <div>
@@ -1149,9 +1847,13 @@ const Statistics = () => {
                   const v = e.target.value;
                   if (scope.mode === "all" && role_id === 1 && v === "all") {
                     setSelectedAgencyId("all");
+                    setDrillExpoId("all");
+                    setSelectedArtistId("all");
                     return;
                   }
                   setSelectedAgencyId(v);
+                  setDrillExpoId("all");
+                  setSelectedArtistId("all");
                 }}
               >
                 {scope.mode === "all" && role_id === 1 && <option value="all">— (vue globale)</option>}
@@ -1180,6 +1882,7 @@ const Statistics = () => {
               onChange={(e) => {
                 const v = e.target.value;
                 setDrillExpoId(v === "all" ? "all" : v);
+                setSelectedArtistId("all");
               }}
             >
               {canDrillExpo && <option value="all">{t("filter.allExpos")}</option>}
@@ -1190,6 +1893,28 @@ const Statistics = () => {
               ))}
             </select>
           </div>
+          {showArtistFilter ? (
+            <div>
+              <label htmlFor="statistics-scope-artist" className="text-xs text-muted-foreground font-medium">
+                {t("filter.artist")}
+              </label>
+              <select
+                id="statistics-scope-artist"
+                name="statistics_scope_artist"
+                className="block w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                disabled={artistOptions.length === 0}
+                value={selectedArtistId}
+                onChange={(e) => setSelectedArtistId(e.target.value)}
+              >
+                <option value="all">{t("filter.allArtists")}</option>
+                {artistOptions.map((artist) => (
+                  <option key={artist.id} value={artist.id}>
+                    {artist.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1206,11 +1931,15 @@ const Statistics = () => {
       {/* Mini KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {miniKpis.map((k) => (
-          <Card key={k.label} className="glass-card">
+          <Card key={k.id} className="glass-card">
             <CardContent className="p-5 text-center">
               <k.icon className="h-6 w-6 text-primary mx-auto mb-2" />
               <p className="text-xs text-muted-foreground font-medium">{k.label}</p>
-              <p className="text-2xl font-serif font-bold mt-1">{k.value}</p>
+              <p className="text-2xl font-serif font-bold mt-1">
+                {k.id === "dominantEmotion" && k.value !== "—"
+                  ? t(`emotions.names.${normalizeEmotionKey(String(k.value))}`, { defaultValue: String(k.value) })
+                  : k.value}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">{k.hint}</p>
             </CardContent>
           </Card>
@@ -1224,7 +1953,7 @@ const Statistics = () => {
             <CardTitle className="text-lg">{t("emotions.title")}</CardTitle>
             <p className="text-xs text-muted-foreground">{t("emotions.subtitle")}</p>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-1.5">
             {emotionCatalog.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 {emotionCatalogError || "Impossible d'afficher les émotions de la table emotions."}
@@ -1233,16 +1962,16 @@ const Statistics = () => {
               <p className="text-sm text-muted-foreground text-center py-8">{t("emotions.empty")}</p>
             ) : (
               emotionSeries.map((emo) => (
-                <div key={emo.id} className="flex items-center gap-3">
-                  <span className="text-sm w-24 shrink-0">{t(`emotions.names.${normalizeEmotionKey(emo.name)}`, { defaultValue: emo.name })}</span>
-                  <div className="flex-1 h-3 rounded-full bg-muted overflow-hidden">
+                <div key={emo.id} className="flex items-center gap-2 py-0.5">
+                  <span className="text-sm w-24 shrink-0 leading-tight">{t(`emotions.names.${normalizeEmotionKey(emo.name)}`, { defaultValue: emo.name })}</span>
+                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${emo.percentage}%`, backgroundColor: emo.color }} />
                   </div>
-                  <span className="text-sm font-bold w-10 text-right">{emo.percentage}%</span>
+                  <span className="text-sm font-bold w-10 text-right leading-tight">{emo.percentage}%</span>
                 </div>
               ))
             )}
-            <p className="pt-1 text-[11px] text-muted-foreground">Total feedbacks filtrés : {feedbackTotal}</p>
+            <p className="pt-0.5 text-[11px] text-muted-foreground leading-tight">Total feedbacks filtrés : {feedbackTotal}</p>
           </CardContent>
         </Card>
 
@@ -1251,38 +1980,47 @@ const Statistics = () => {
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-lg">{t("timeline.title")}</CardTitle>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label={t("timeline.prevWeek")}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
-                  onClick={() => setWeekOffset((v) => v - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={t("timeline.nextWeek")}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
-                  onClick={() => setWeekOffset((v) => Math.min(0, v + 1))}
-                  disabled={weekOffset >= 0}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              {!expoDateRange ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-label={t("timeline.prevWeek")}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
+                    onClick={() => setWeekOffset((v) => v - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("timeline.nextWeek")}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-muted"
+                    onClick={() => setWeekOffset((v) => Math.min(0, v + 1))}
+                    disabled={weekOffset >= 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
             </div>
-            <p className="text-xs text-muted-foreground">{t("timeline.subtitle")}</p>
+            <p className="text-xs text-muted-foreground">
+              {expoDateRange
+                ? t("timeline.subtitleExpoRange", {
+                    from: toFrDayMonth(expoDateRange.start),
+                    to: toFrDayMonth(expoDateRange.end),
+                  })
+                : t("timeline.subtitle")}
+            </p>
           </CardHeader>
           <CardContent>
             {temporalSeries.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={temporalSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart data={temporalSeries} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(30, 15%, 88%)" />
                   <XAxis
                     dataKey="day"
-                    interval={0}
+                    interval={timelineTickInterval}
                     tick={({ x, y, payload }) => {
                       const raw = String(payload?.value ?? "");
                       const [weekday, dayMonth] = raw.split("|");
@@ -1299,10 +2037,25 @@ const Statistics = () => {
                   />
                   <YAxis tick={{ fontSize: 12 }} width={30} />
                   <Tooltip />
-                  <Bar dataKey="visites" name="Visites" fill="#3399CC" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="visites" name="Visites" fill="#3399CC" radius={[4, 4, 0, 0]}>
+                    <LabelList
+                      dataKey="visites"
+                      position="top"
+                      formatter={formatBarVisitLabel}
+                      className="fill-foreground"
+                      fontSize={10}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
+            {temporalSeries.length > 0 ? (
+              <p className="mt-2 text-center text-sm font-medium text-muted-foreground">
+                {expoDateRange
+                  ? t("timeline.totalVisitsExpo", { count: formatFrNumber(filteredVisitsTotal) })
+                  : t("timeline.totalVisitsFiltered", { count: formatFrNumber(filteredVisitsTotal) })}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -1317,12 +2070,20 @@ const Statistics = () => {
               <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={hourlySeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart data={hourlySeries} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(30, 15%, 88%)" />
                   <XAxis dataKey="hour" tick={{ fontSize: 11 }} interval={2} />
                   <YAxis tick={{ fontSize: 12 }} width={30} />
                   <Tooltip />
-                  <Bar dataKey="visites" name="Visites" fill="hsl(38, 70%, 50%)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="visites" name="Visites" fill="hsl(38, 70%, 50%)" radius={[4, 4, 0, 0]}>
+                    <LabelList
+                      dataKey="visites"
+                      position="top"
+                      formatter={formatBarVisitLabel}
+                      className="fill-foreground"
+                      fontSize={10}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -1472,10 +2233,16 @@ const Statistics = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={printPreviewOpen} onOpenChange={setPrintPreviewOpen}>
+      <Dialog open={printPreviewOpen} onOpenChange={handlePrintPreviewOpenChange}>
         <DialogContent
           aria-describedby={undefined}
           className="max-w-5xl gap-0 border-border bg-white p-0 text-neutral-900 sm:max-w-5xl max-h-[92vh] overflow-hidden print:!left-0 print:!top-0 print:!max-h-none print:!h-auto print:!w-full print:!max-w-none print:!translate-x-0 print:!translate-y-0 print:!overflow-visible print:border-0 print:!shadow-none"
+          onInteractOutside={(event) => {
+            if (printExportBusy) event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (printExportBusy) event.preventDefault();
+          }}
         >
           <DialogHeader className="border-b border-neutral-200 bg-white px-6 py-4 text-left print:hidden">
             <DialogTitle className="font-serif text-xl font-bold text-neutral-900">{t("preview.title")}</DialogTitle>
@@ -1484,34 +2251,36 @@ const Statistics = () => {
             id="statistics-print-area"
             ref={statisticsPrintAreaRef}
             data-expected-chart-surfaces={expectedChartSurfaces}
-            className="bg-white px-5 py-6 text-neutral-900 max-h-[min(68vh,720px)] overflow-y-auto print:max-h-none print:!overflow-visible print:px-6 print:py-4"
+            data-statistics-artist-report={reportViewProps.previewArtistCoverLetter ? "true" : undefined}
+            className="bg-white px-5 py-6 text-neutral-900 max-h-[min(68vh,720px)] overflow-y-auto print:max-h-none print:!overflow-visible print:px-6 print:py-4 data-[statistics-artist-report=true]:rounded-xl data-[statistics-artist-report=true]:border-2 data-[statistics-artist-report=true]:border-neutral-200 data-[statistics-artist-report=true]:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
           >
-            <StatisticsReportView
-              orgLabel={orgLabel}
-              previewExpoLabel={previewExpoLabel}
-              previewAgencyLogoMeta={previewAgencyLogoMeta}
-              previewExpoLogoMeta={previewExpoLogoMeta}
-              miniKpis={miniKpis}
-              emotionSeries={emotionSeries}
-              feedbackTotal={feedbackTotal}
-              temporalSeriesForPdf={temporalSeriesForPdf}
-              hourlySeries={hourlySeries}
-              timelineTickIntervalPdf={timelineTickIntervalPdf}
-              crossEmotionColumns={crossEmotionColumns}
-              sortedCrossRows={sortedCrossRows}
-              crossError={crossError}
-              sortedTopArtworks={sortedTopArtworks}
-              topArtworksError={topArtworksError}
-              formatFrNumber={formatFrNumber}
-            />
+            <StatisticsReportView {...reportViewProps} />
           </div>
-          <DialogFooter className="border-t border-neutral-200 bg-neutral-50/80 px-6 py-4 sm:justify-between print:hidden">
-            <Button type="button" variant="outline" onClick={() => setPrintPreviewOpen(false)}>
-              {t("preview.close")}
-            </Button>
+          <DialogFooter className="flex-row items-center gap-3 border-t border-neutral-200 bg-neutral-50/80 px-6 py-4 print:hidden sm:justify-between">
             <Button
               type="button"
-              className="inline-flex items-center justify-center bg-[#E63946] hover:bg-[#c62f3a] disabled:opacity-70"
+              variant="outline"
+              className="shrink-0"
+              disabled={printExportBusy}
+              onClick={() => handlePrintPreviewOpenChange(false)}
+            >
+              {t("preview.close")}
+            </Button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1 px-1">
+              {printExportBusy && exportProgress ? (
+                <>
+                  <Progress
+                    value={exportProgress.percent}
+                    aria-label={exportProgressLabel}
+                    className="h-2 bg-neutral-200 [&>div]:bg-[#E63946]"
+                  />
+                  <p className="truncate text-center text-xs text-neutral-600">{exportProgressLabel}</p>
+                </>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              className="inline-flex shrink-0 items-center justify-center bg-[#E63946] hover:bg-[#c62f3a] disabled:opacity-70"
               disabled={printExportBusy}
               onClick={() => setPaperFormatDialogOpen(true)}
             >

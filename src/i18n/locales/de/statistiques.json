@@ -7,7 +7,7 @@
   },
   "preview": {
     "title": "Druckvorschau",
-    "hint": "„PDF öffnen“ erzeugt die Datei und öffnet sie in einem neuen Tab. „Drucken…“ öffnet den Systemdialog (Als PDF speichern).",
+    "hint": "„PDF speichern“ erzeugt die Datei und öffnet den Speichern-Dialog (Name änderbar). „Drucken…“ öffnet den Systemdialog (Als PDF speichern).",
     "generatedAt": "Erstellt am {{date}}",
     "filtersTitle": "Bereich",
     "close": "Schließen",
@@ -16,13 +16,22 @@
     "colHearts": "Herzen",
     "totalFeedbacks": "Rückmeldungen gesamt: {{count}}",
     "printPreparing": "Wird vorbereitet…",
+    "exportProgress": {
+      "waiting": "Bericht wird vorbereitet… {{percent}} %",
+      "prepare": "Daten werden geladen… {{percent}} %",
+      "capture_header": "Kopfzeile wird erfasst… {{percent}} %",
+      "capture_sections": "Abschnitte werden erfasst ({{current}}/{{total}})… {{percent}} %",
+      "capture_tables": "Tabellen werden erfasst (Zeile {{current}}/{{total}})… {{percent}} %",
+      "build_pdf": "PDF wird zusammengestellt… {{percent}} %",
+      "finish": "Abschluss… {{percent}} %"
+    },
     "pdfTabLoading": "PDF wird erstellt…",
     "printTabLoading": "Druckseite wird vorbereitet…",
     "pdfGenerationTimeout": "Zeitüberschreitung bei der PDF-Erstellung (3 Min.).",
     "pdfGenerationTimeoutHint": "Die Erfassung hat zu lange gedauert. Schließen Sie andere Registerkarten und versuchen Sie es erneut.",
     "pdfError": "PDF konnte nicht erstellt werden. Externe Bilder prüfen oder erneut versuchen.",
-    "paperFormatHintBrowser": "Format wählen, dann „PDF öffnen“ oder „Drucken…“.",
-    "browserPdf": "PDF öffnen",
+    "paperFormatHintBrowser": "Format wählen, dann „PDF speichern“ oder „Drucken…“.",
+    "browserPdf": "PDF speichern",
     "browserPrint": "Drucken…",
     "browserPdfError": "PDF im Browser nicht möglich. Erneut versuchen oder „Drucken…“ nutzen.",
     "browserPdfNotReady": "Diagramme noch nicht bereit. Vollständige Vorschau abwarten.",
@@ -44,7 +53,38 @@
   "filter": {
     "organisation": "Organisation",
     "exposition": "Ausstellung",
-    "allExpos": "Alle Ausstellungen im Bereich"
+    "expoPeriod": "Daten",
+    "expoDateRange": "{{from}} – {{to}}",
+    "allExpos": "Alle Ausstellungen im Bereich",
+    "artist": "Künstler",
+    "allArtists": "Alle Künstler der Ausstellung"
+  },
+  "artistCoverLetter": {
+    "greeting": "Guten Tag {{firstName}} {{lastName}},",
+    "introPrefix": "Es ist uns eine große Freude für",
+    "introConnector": "und",
+    "introMain": "Ihnen dieses vollständige Feedback zu den Emotionen zu teilen, die Ihre Werke bei den Besuchern von",
+    "congrats": "Herzlichen Glückwunsch zu all den schönen Reaktionen, die Ihre Arbeit ausgelöst hat!",
+    "closingHope": "Wir hoffen, Sie sehr bald wieder bei einer unserer nächsten Ausstellungen begrüßen zu dürfen.",
+    "salutation": "Freundliche Grüße,"
+  },
+  "kpis": {
+    "uniqueVisitors": {
+      "label": "Eindeutige Besucher",
+      "hint": "Alle Werke in Ihrem Bereich"
+    },
+    "avgHearts": {
+      "label": "Durchschnitt Herzen",
+      "hint": "Durchschnittliche Bewertung von 5 Herzen"
+    },
+    "dominantEmotion": {
+      "label": "Dominante Emotion",
+      "hint": "Am häufigsten geäußertes Gefühl"
+    },
+    "activeArtworks": {
+      "label": "Aktive Werke",
+      "hint": "Im Ausstellungskatalog"
+    }
   },
   "emotions": {
     "title": "Emotionsverteilung",
@@ -62,9 +102,12 @@
   "timeline": {
     "title": "Zeitlicher Verlauf",
     "subtitle": "Besucher im Tagesverlauf",
+    "subtitleExpoRange": "Besucher vom {{from}} bis {{to}} (Ausstellungsdaten)",
     "subtitlePdf": "Vom ersten bis zum letzten Tag mit Rückmeldungen (Vorschau und PDF — volle Spanne)",
     "prevWeek": "Vorherige Woche",
-    "nextWeek": "Nächste Woche"
+    "nextWeek": "Nächste Woche",
+    "totalVisitsExpo": "Kumulierte Besuche der Ausstellung: {{count}} Besuch(e)",
+    "totalVisitsFiltered": "Kumulierte Besuche im gefilterten Zeitraum: {{count}} Besuch(e)"
   },
   "hourly": {
     "title": "Stündliche Besucherzahlen",

@@ -7,7 +7,7 @@
   },
   "preview": {
     "title": "Aperçu avant impression",
-    "hint": "« Ouvrir le PDF » génère le fichier et l’ouvre dans un nouvel onglet. « Imprimer… » ouvre la boîte de dialogue système (Enregistrer en PDF).",
+    "hint": "« Sauvegarder le PDF » génère le fichier et ouvre la boîte d’enregistrement (nom modifiable). « Imprimer… » ouvre la boîte de dialogue système (Enregistrer en PDF).",
     "generatedAt": "Généré le {{date}}",
     "filtersTitle": "Périmètre",
     "close": "Fermer",
@@ -16,13 +16,22 @@
     "colHearts": "Cœurs",
     "totalFeedbacks": "Total des retours : {{count}}",
     "printPreparing": "Préparation…",
+    "exportProgress": {
+      "waiting": "Préparation du rapport… {{percent}} %",
+      "prepare": "Chargement des données… {{percent}} %",
+      "capture_header": "Capture de l'en-tête… {{percent}} %",
+      "capture_sections": "Capture des sections ({{current}}/{{total}})… {{percent}} %",
+      "capture_tables": "Capture des tableaux (ligne {{current}}/{{total}})… {{percent}} %",
+      "build_pdf": "Assemblage du PDF… {{percent}} %",
+      "finish": "Finalisation… {{percent}} %"
+    },
     "pdfTabLoading": "Génération du PDF…",
     "printTabLoading": "Préparation de la page d’impression…",
     "pdfGenerationTimeout": "Délai dépassé pour la génération du PDF (3 min).",
     "pdfGenerationTimeoutHint": "La capture a pris trop de temps. Fermez d’autres onglets lourds et réessayez, ou réduisez la quantité de données affichée.",
     "pdfError": "Impossible de générer le PDF. Vérifiez les images externes ou réessayez.",
-    "paperFormatHintBrowser": "Choisissez le format, puis « Ouvrir le PDF » ou « Imprimer… ».",
-    "browserPdf": "Ouvrir le PDF",
+    "paperFormatHintBrowser": "Choisissez le format, puis « Sauvegarder le PDF » ou « Imprimer… ».",
+    "browserPdf": "Sauvegarder le PDF",
     "browserPrint": "Imprimer…",
     "browserPdfError": "Impossible de générer le PDF dans le navigateur. Réessayez ou utilisez « Imprimer… ».",
     "browserPdfNotReady": "Les graphiques ne sont pas encore prêts. Attendez l’aperçu complet puis réessayez.",
@@ -44,7 +53,38 @@
   "filter": {
     "organisation": "Organisation",
     "exposition": "Exposition",
-    "allExpos": "Toutes les expos du périmètre"
+    "expoPeriod": "Dates",
+    "expoDateRange": "du {{from}} au {{to}}",
+    "allExpos": "Toutes les expos du périmètre",
+    "artist": "Artiste",
+    "allArtists": "Tous les artistes de l'exposition"
+  },
+  "artistCoverLetter": {
+    "greeting": "Bonjour {{firstName}} {{lastName}},",
+    "introPrefix": "C'est un réel plaisir pour",
+    "introConnector": "et",
+    "introMain": "de vous partager ce retour complet sur les émotions que vos œuvres ont éveillées chez les visiteurs de",
+    "congrats": "Félicitations pour toutes ces belles réactions que votre travail a déclenchées !",
+    "closingHope": "En espérant avoir la joie de vous revoir très bientôt dans nos prochaines expositions.",
+    "salutation": "Bien amicalement,"
+  },
+  "kpis": {
+    "uniqueVisitors": {
+      "label": "Visiteurs uniques",
+      "hint": "Toutes les œuvres de votre périmètre"
+    },
+    "avgHearts": {
+      "label": "Moyenne des cœurs",
+      "hint": "Note moyenne sur 5 cœurs"
+    },
+    "dominantEmotion": {
+      "label": "Émotion dominante",
+      "hint": "Ressenti le plus exprimé"
+    },
+    "activeArtworks": {
+      "label": "Œuvres actives",
+      "hint": "Dans le catalogue de l'expo"
+    }
   },
   "emotions": {
     "title": "Distribution des émotions",
@@ -62,9 +102,12 @@
   "timeline": {
     "title": "Évolution temporelle",
     "subtitle": "Visiteurs au fil des jours",
+    "subtitleExpoRange": "Visiteurs du {{from}} au {{to}} (dates de l'exposition)",
     "subtitlePdf": "Du premier au dernier jour avec retours (aperçu et PDF — plage complète)",
     "prevWeek": "Semaine précédente",
-    "nextWeek": "Semaine suivante"
+    "nextWeek": "Semaine suivante",
+    "totalVisitsExpo": "Total cumulé de l'exposition : {{count}} visite(s)",
+    "totalVisitsFiltered": "Total cumulé sur la période filtrée : {{count}} visite(s)"
   },
   "hourly": {
     "title": "Fréquentation horaire",

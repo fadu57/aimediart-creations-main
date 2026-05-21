@@ -837,6 +837,20 @@
     page-break-before: always;
   }
 
+  #statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page1-columns {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 0.65rem !important;
+  }
+
+  #statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page1-card {
+    max-width: 48% !important;
+    flex: 1 1 48% !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  }
+
   .statistics-report-chart-host {
     position: relative;
     overflow: hidden;
@@ -846,4 +860,149 @@
   #statistics-print-area .recharts-tooltip-wrapper {
     display: none !important;
   }
+}
+
+/* Rapport artiste — page 1 en deux colonnes (aperçu + export PDF) */
+#statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page1-columns,
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-page1-columns {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: space-between !important;
+  gap: 0.65rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+#statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page1-card,
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-page1-card {
+  max-width: 48% !important;
+  flex: 1 1 48% !important;
+  min-width: 0 !important;
+  border: none !important;
+  background: #fff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  padding: 0.55rem 0.7rem !important;
+}
+
+#statistics-print-area[data-statistics-artist-report="true"] .statistics-report-artist-letter,
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-artist-letter {
+  margin-bottom: 0 !important;
+}
+
+#statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page--with-artist .statistics-report-generated-at,
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"]
+  .statistics-report-page--with-artist
+  .statistics-report-generated-at {
+  margin-bottom: 0.35rem !important;
+}
+
+#statistics-print-area[data-statistics-artist-report="true"] .statistics-report-page--with-artist .statistics-report-brand,
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"]
+  .statistics-report-page--with-artist
+  .statistics-report-brand {
+  margin-bottom: 0.35rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-artist-letter {
+  font-size: 9pt !important;
+  line-height: 1.45 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-artist-letter.space-y-4 > * + * {
+  margin-top: 0.35rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-section--scope {
+  font-size: 8.5pt !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export][data-statistics-artist-report="true"] .statistics-report-section--scope h3 {
+  font-size: 10pt !important;
+}
+
+/* Export PDF jsPDF — mise en page compacte A4 portrait */
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-artist-letter:not(.statistics-report-page1-card) {
+  margin-bottom: 0.75rem !important;
+  font-size: 10.5pt !important;
+  line-height: 1.55 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-artist-letter.statistics-report-page1-card {
+  margin-bottom: 0 !important;
+  font-size: 9pt !important;
+  line-height: 1.45 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-artist-letter .font-semibold.text-\[\#E63946\] {
+  color: #e63946 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-brand,
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-generated-at {
+  display: none !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-page {
+  break-before: auto !important;
+  page-break-before: auto !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-section,
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-table-panel {
+  padding: 0.65rem 0.85rem !important;
+  margin-bottom: 0.45rem !important;
+  box-shadow: none !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-section--kpis .statistics-report-kpi-grid > div {
+  padding: 0.35rem 0.45rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-section--kpis .statistics-report-kpi-grid svg {
+  width: 1rem !important;
+  height: 1rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-section--kpis .font-serif.text-lg {
+  font-size: 0.95rem !important;
+  line-height: 1.2 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-chart-host {
+  height: 155px !important;
+  min-height: 155px !important;
+  max-height: 155px !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-empty-state {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-table-intro h3 {
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-table-intro p {
+  margin-bottom: 0.35rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-data-table th,
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-data-table td {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-data-table .h-11.w-11 {
+  height: 2rem !important;
+  width: 2rem !important;
+}
+
+#statistics-print-area[data-statistics-pdf-export] .statistics-report-data-table .h-8.w-8 {
+  height: 1.5rem !important;
+  width: 1.5rem !important;
+  font-size: 0.7rem !important;
 }

@@ -7,7 +7,7 @@
   },
   "preview": {
     "title": "Print preview",
-    "hint": "“Open PDF” generates the file and opens it in a new tab. “Print…” opens the system dialog (Save as PDF).",
+    "hint": "“Save PDF” generates the file and opens the save dialog (editable name). “Print…” opens the system dialog (Save as PDF).",
     "generatedAt": "Generated on {{date}}",
     "filtersTitle": "Scope",
     "close": "Close",
@@ -16,13 +16,22 @@
     "colHearts": "Hearts",
     "totalFeedbacks": "Total feedback: {{count}}",
     "printPreparing": "Preparing…",
+    "exportProgress": {
+      "waiting": "Preparing report… {{percent}}%",
+      "prepare": "Loading data… {{percent}}%",
+      "capture_header": "Capturing header… {{percent}}%",
+      "capture_sections": "Capturing sections ({{current}}/{{total}})… {{percent}}%",
+      "capture_tables": "Capturing tables (row {{current}}/{{total}})… {{percent}}%",
+      "build_pdf": "Assembling PDF… {{percent}}%",
+      "finish": "Finalizing… {{percent}}%"
+    },
     "pdfTabLoading": "Generating PDF…",
     "printTabLoading": "Preparing print page…",
     "pdfGenerationTimeout": "PDF generation timed out (3 min).",
     "pdfGenerationTimeoutHint": "Capture took too long. Close other heavy tabs and try again, or reduce the amount of data shown.",
     "pdfError": "Could not generate the PDF. Check external images or try again.",
-    "paperFormatHintBrowser": "Pick a format, then “Open PDF” or “Print…”.",
-    "browserPdf": "Open PDF",
+    "paperFormatHintBrowser": "Pick a format, then “Save PDF” or “Print…”.",
+    "browserPdf": "Save PDF",
     "browserPrint": "Print…",
     "browserPdfError": "Could not generate the PDF in the browser. Retry or use “Print…”.",
     "browserPdfNotReady": "Charts are not ready yet. Wait for the full preview, then try again.",
@@ -44,7 +53,38 @@
   "filter": {
     "organisation": "Organisation",
     "exposition": "Exhibition",
-    "allExpos": "All exhibitions in scope"
+    "expoPeriod": "Dates",
+    "expoDateRange": "{{from}} – {{to}}",
+    "allExpos": "All exhibitions in scope",
+    "artist": "Artist",
+    "allArtists": "All artists in the exhibition"
+  },
+  "artistCoverLetter": {
+    "greeting": "Hello {{firstName}} {{lastName}},",
+    "introPrefix": "It is a real pleasure for",
+    "introConnector": "and",
+    "introMain": "to share with you this complete feedback on the emotions your works awakened among visitors to",
+    "congrats": "Congratulations on all the wonderful reactions your work has sparked!",
+    "closingHope": "We hope to have the joy of seeing you again very soon at our upcoming exhibitions.",
+    "salutation": "Warm regards,"
+  },
+  "kpis": {
+    "uniqueVisitors": {
+      "label": "Unique visitors",
+      "hint": "All artworks in your scope"
+    },
+    "avgHearts": {
+      "label": "Average hearts",
+      "hint": "Average rating out of 5 hearts"
+    },
+    "dominantEmotion": {
+      "label": "Dominant emotion",
+      "hint": "Most expressed feeling"
+    },
+    "activeArtworks": {
+      "label": "Active artworks",
+      "hint": "In the exhibition catalogue"
+    }
   },
   "emotions": {
     "title": "Emotion distribution",
@@ -62,9 +102,12 @@
   "timeline": {
     "title": "Timeline",
     "subtitle": "Visitors day by day",
+    "subtitleExpoRange": "Visitors from {{from}} to {{to}} (exhibition dates)",
     "subtitlePdf": "From the first to the last day with feedback (preview and PDF — full range)",
     "prevWeek": "Previous week",
-    "nextWeek": "Next week"
+    "nextWeek": "Next week",
+    "totalVisitsExpo": "Exhibition cumulative total: {{count}} visit(s)",
+    "totalVisitsFiltered": "Cumulative total for filtered period: {{count}} visit(s)"
   },
   "hourly": {
     "title": "Hourly attendance",

@@ -491,6 +491,8 @@ export function StatisticsPdfDocument(props: StatisticsPdfDocumentProps) {
     previewExpoLogoMeta,
     orgLabel,
     previewExpoLabel,
+    previewArtistLabel,
+    previewExpoDateRange = null,
     drillExpoId,
     miniKpis,
     emotionSeries,
@@ -537,6 +539,19 @@ export function StatisticsPdfDocument(props: StatisticsPdfDocumentProps) {
             <Text style={{ fontFamily: "Helvetica-Bold" }}>{t("filter.exposition")} </Text>
             {previewExpoLabel}
           </Text>
+          <Text style={styles.listItem}>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>{t("filter.artist")} </Text>
+            {previewArtistLabel}
+          </Text>
+          {previewExpoDateRange ? (
+            <Text style={styles.listItem}>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{t("filter.expoPeriod")} </Text>
+              {t("filter.expoDateRange", {
+                from: previewExpoDateRange.from,
+                to: previewExpoDateRange.to,
+              })}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -544,11 +559,11 @@ export function StatisticsPdfDocument(props: StatisticsPdfDocumentProps) {
           <View style={styles.kpiGrid}>
             {miniKpis.map((k) => {
               const displayValue =
-                k.label === "Émotion dominante" && k.value !== "—"
+                k.id === "dominantEmotion" && k.value !== "—"
                   ? t(`emotions.names.${normalizeEmotionKey(String(k.value))}`, { defaultValue: String(k.value) })
                   : k.value;
               return (
-                <View key={k.label} style={styles.kpiCell}>
+                <View key={k.id} style={styles.kpiCell}>
                   <Text style={styles.kpiLabel}>{k.label}</Text>
                   <Text style={styles.kpiValue}>{displayValue}</Text>
                   <Text style={styles.kpiHint}>{k.hint}</Text>

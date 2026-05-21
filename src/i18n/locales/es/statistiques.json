@@ -7,7 +7,7 @@
   },
   "preview": {
     "title": "Vista previa de impresión",
-    "hint": "«Abrir PDF» genera el archivo y lo abre en una pestaña nueva. «Imprimir…» abre el diálogo del sistema (Guardar como PDF).",
+    "hint": "«Guardar PDF» genera el archivo y abre el cuadro de guardado (nombre editable). «Imprimir…» abre el diálogo del sistema (Guardar como PDF).",
     "generatedAt": "Generado el {{date}}",
     "filtersTitle": "Ámbito",
     "close": "Cerrar",
@@ -16,13 +16,22 @@
     "colHearts": "Corazones",
     "totalFeedbacks": "Total de respuestas: {{count}}",
     "printPreparing": "Preparando…",
+    "exportProgress": {
+      "waiting": "Preparando el informe… {{percent}} %",
+      "prepare": "Cargando datos… {{percent}} %",
+      "capture_header": "Capturando encabezado… {{percent}} %",
+      "capture_sections": "Capturando secciones ({{current}}/{{total}})… {{percent}} %",
+      "capture_tables": "Capturando tablas (fila {{current}}/{{total}})… {{percent}} %",
+      "build_pdf": "Ensamblando PDF… {{percent}} %",
+      "finish": "Finalizando… {{percent}} %"
+    },
     "pdfTabLoading": "Generando PDF…",
     "printTabLoading": "Preparando la página de impresión…",
     "pdfGenerationTimeout": "Tiempo agotado al generar el PDF (3 min).",
     "pdfGenerationTimeoutHint": "La captura tardó demasiado. Cierre otras pestañas e inténtelo de nuevo.",
     "pdfError": "No se pudo generar el PDF. Revise imágenes externas o reintente.",
-    "paperFormatHintBrowser": "Elija el formato y «Abrir PDF» o «Imprimir…».",
-    "browserPdf": "Abrir PDF",
+    "paperFormatHintBrowser": "Elija el formato y «Guardar PDF» o «Imprimir…».",
+    "browserPdf": "Guardar PDF",
     "browserPrint": "Imprimir…",
     "browserPdfError": "No se pudo generar el PDF en el navegador. Reintente o use «Imprimir…».",
     "browserPdfNotReady": "Los gráficos aún no están listos. Espere la vista previa completa.",
@@ -44,7 +53,38 @@
   "filter": {
     "organisation": "Organización",
     "exposition": "Exposición",
-    "allExpos": "Todas las exposiciones del ámbito"
+    "expoPeriod": "Fechas",
+    "expoDateRange": "del {{from}} al {{to}}",
+    "allExpos": "Todas las exposiciones del ámbito",
+    "artist": "Artista",
+    "allArtists": "Todos los artistas de la exposición"
+  },
+  "artistCoverLetter": {
+    "greeting": "Hola {{firstName}} {{lastName}},",
+    "introPrefix": "Es un auténtico placer para",
+    "introConnector": "y",
+    "introMain": "compartir con usted este informe completo sobre las emociones que sus obras han despertado entre los visitantes de",
+    "congrats": "¡Enhorabuena por todas estas bellas reacciones que su trabajo ha suscitado!",
+    "closingHope": "Esperamos tener la alegría de volver a verle muy pronto en nuestras próximas exposiciones.",
+    "salutation": "Un cordial saludo,"
+  },
+  "kpis": {
+    "uniqueVisitors": {
+      "label": "Visitantes únicos",
+      "hint": "Todas las obras de su ámbito"
+    },
+    "avgHearts": {
+      "label": "Media de corazones",
+      "hint": "Nota media sobre 5 corazones"
+    },
+    "dominantEmotion": {
+      "label": "Emoción dominante",
+      "hint": "Sentimiento más expresado"
+    },
+    "activeArtworks": {
+      "label": "Obras activas",
+      "hint": "En el catálogo de la exposición"
+    }
   },
   "emotions": {
     "title": "Distribución de emociones",
@@ -62,9 +102,12 @@
   "timeline": {
     "title": "Evolución temporal",
     "subtitle": "Visitantes a lo largo de los días",
+    "subtitleExpoRange": "Visitantes del {{from}} al {{to}} (fechas de la exposición)",
     "subtitlePdf": "Desde el primer hasta el último día con respuestas (vista previa y PDF — rango completo)",
     "prevWeek": "Semana anterior",
-    "nextWeek": "Semana siguiente"
+    "nextWeek": "Semana siguiente",
+    "totalVisitsExpo": "Total acumulado de la exposición: {{count}} visita(s)",
+    "totalVisitsFiltered": "Total acumulado del período filtrado: {{count}} visita(s)"
   },
   "hourly": {
     "title": "Asistencia por horas",

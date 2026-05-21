@@ -141,7 +141,29 @@ Le site se redéploie en général **automatiquement** si le projet Vercel est l
 
 ---
 
-## 8. Récap une ligne (copier-coller)
+## 8. Une seule action (recommandé)
+
+Choisissez **une** de ces options (même script `scripts/deploy-prod.ps1`) :
+
+| Méthode | Action |
+|--------|--------|
+| **Terminal** | `npm run deploy:prod` |
+| **Double-clic Windows** | `deploy-prod.bat` à la racine du projet |
+| **Cursor / VS Code** | `Ctrl+Shift+P` → **Tasks: Run Task** → **Déployer en production** |
+
+Le script enchaîne : `npm run build` → commit si fichiers modifiés (message demandé) → `git pull --rebase origin main` → `git push origin main` → Vercel redéploie.
+
+**Avec message de commit d’emblée :**
+
+```powershell
+npm run deploy:prod -- -Message "feat(statistiques): export PDF"
+```
+
+**Options :** `-SkipBuild`, `-SkipCommit`, `-DryRun`
+
+---
+
+## 9. Récap une ligne (copier-coller)
 
 ```powershell
 cd "c:\Users\Fab\Downloads\aimediart-creations-main\aimediart-creations-main"
