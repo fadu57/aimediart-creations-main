@@ -413,6 +413,7 @@ const Dashboard = () => {
                       variant="outline"
                       size="sm"
                       className="shrink-0"
+                      disabled={loading || dataLoading}
                       onClick={() => {
                         setCreateUserOpen(false);
                         setEditMemberUserId(userId);

@@ -17,6 +17,10 @@ DECLARE
   v_avatar text;
   v_birth_year integer;
   v_birth_month text;
+  v_first_name text;
+  v_last_name text;
+  v_username text;
+  v_phone text;
 BEGIN
   IF v_caller IS NULL THEN
     RAISE EXCEPTION 'Non authentifié';
@@ -53,8 +57,8 @@ BEGIN
     RAISE EXCEPTION 'Utilisateur introuvable';
   END IF;
 
-  SELECT p.avatar_url, p.birth_year
-  INTO v_avatar, v_birth_year
+  SELECT p.avatar_url, p.birth_year, p.first_name, p.last_name, p.username, p.phone
+  INTO v_avatar, v_birth_year, v_first_name, v_last_name, v_username, v_phone
   FROM public.profiles p
   WHERE p.id = p_user_id;
 
@@ -62,6 +66,10 @@ BEGIN
 
   RETURN jsonb_build_object(
     'email', v_email,
+    'first_name', NULLIF(trim(v_first_name), ''),
+    'last_name', NULLIF(trim(v_last_name), ''),
+    'username', NULLIF(trim(v_username), ''),
+    'phone', NULLIF(trim(v_phone), ''),
     'avatar_url', COALESCE(
       NULLIF(trim(v_avatar), ''),
       NULLIF(trim(v_meta->>'avatar_url'), ''),

@@ -2,6 +2,10 @@ import { supabase } from "@/lib/supabase";
 
 export type UserEditDetails = {
   email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  username?: string | null;
+  phone?: string | null;
   avatar_url?: string | null;
   birth_year?: number | null;
   birth_month?: string | null;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { UserRound, X } from "lucide-react";
+import { UserRound, X, Loader2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -283,6 +283,22 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     phone?: string | null;
   } | null;
 
+  if (details) {
+    enriched = fillMissingProfileFields(enriched, {
+      email: typeof details.email === "string" ? details.email : null,
+      first_name: typeof details.first_name === "string" ? details.first_name : null,
+      last_name: typeof details.last_name === "string" ? details.last_name : null,
+      username: typeof details.username === "string" ? details.username : null,
+      phone: typeof details.phone === "string" ? details.phone : null,
+      avatar_url: typeof details.avatar_url === "string" ? details.avatar_url : null,
+      birth_year: typeof details.birth_year === "number" ? String(details.birth_year) : null,
+      birth_month:
+        details.birth_month != null
+          ? readBirthMonthFromMeta({ birth_month: details.birth_month })
+          : null,
+    });
+  }
+
   enriched = fillMissingProfileFields(enriched, {
     first_name: p?.first_name ?? null,
     last_name: p?.last_name ?? null,
@@ -292,18 +308,6 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     birth_year:
       typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
   });
-
-  if (details) {
-    enriched = fillMissingProfileFields(enriched, {
-      email: typeof details.email === "string" ? details.email : null,
-      avatar_url: typeof details.avatar_url === "string" ? details.avatar_url : null,
-      birth_year: typeof details.birth_year === "number" ? String(details.birth_year) : null,
-      birth_month:
-        details.birth_month != null
-          ? readBirthMonthFromMeta({ birth_month: details.birth_month })
-          : null,
-    });
-  }
 
   if (isSelf && sessionUser) {
     if (sessionUser.email?.trim()) enriched.email = sessionUser.email.trim();
@@ -616,6 +620,7 @@ const Users = ({
   const [repairingAuth, setRepairingAuth] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [enrichingEdit, setEnrichingEdit] = useState(false);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [initialEditing, setInitialEditing] = useState<UserRow | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("edit");
@@ -1118,19 +1123,26 @@ const Users = ({
     setTemporaryPassword("");
     setPhoneValid(true);
     setDialogOpen(true);
+    setEnrichingEdit(true);
 
     void (async () => {
       try {
         const enriched = await enrichUserRowForEdit(baseRow, authUser);
-        setEditing((prev) => (prev?.id === enriched.id ? { ...enriched, agency_id: prev.agency_id ?? enriched.agency_id } : prev));
+        setEditing((prev) =>
+          prev?.id === enriched.id ? { ...enriched, agency_id: prev.agency_id ?? enriched.agency_id } : enriched,
+        );
         setInitialEditing((prev) =>
-          prev?.id === enriched.id ? { ...enriched, agency_id: prev.agency_id ?? enriched.agency_id } : prev,
+          prev?.id === enriched.id
+            ? { ...enriched, agency_id: prev?.agency_id ?? enriched.agency_id }
+            : enriched,
         );
         onAvatarResolved?.(enriched.avatar_url?.trim() || null);
       } catch (e) {
         if (import.meta.env.DEV) {
           console.warn("[Users] enrichissement fiche utilisateur :", e);
         }
+      } finally {
+        setEnrichingEdit(false);
       }
     })();
   };
@@ -1198,15 +1210,9 @@ const Users = ({
     const seed = forcedEditUserSeed?.id?.trim() === targetId ? forcedEditUserSeed : null;
     const existing = rows.find((r) => r.id === targetId);
 
-    if (existing && seed) {
-      handledForcedEditUserIdRef.current = targetId;
-      openEdit(mergeEmbeddedEditRow(existing, seed));
-      return;
-    }
-
     if (existing) {
       handledForcedEditUserIdRef.current = targetId;
-      openEdit(existing);
+      openEdit(seed ? mergeEmbeddedEditRow(existing, seed) : existing);
       return;
     }
 
@@ -1264,39 +1270,16 @@ const Users = ({
 
   // Seed dashboard : complète la fiche si le profil arrive après l'ouverture du dialog
   useEffect(() => {
-    if (!embeddedDialogOnly || !dialogOpen || mode !== "edit" || !editing?.id) return;
+    if (!embeddedDialogOnly || !dialogOpen || mode !== "edit" || !editing?.id || enrichingEdit) return;
     const targetId = (forcedEditUserId || editing.id).trim();
     if (!targetId || forcedEditUserSeed?.id !== targetId) return;
 
-    setEditing((prev) => (prev?.id === targetId ? fillMissingProfileFields(prev, forcedEditUserSeed) : prev));
+    const patch = forcedEditUserSeed;
+    setEditing((prev) => (prev?.id === targetId ? fillMissingProfileFields(prev, patch) : prev));
     setInitialEditing((prev) =>
-      prev?.id === targetId ? fillMissingProfileFields(prev, forcedEditUserSeed) : prev,
+      prev?.id === targetId ? fillMissingProfileFields(prev, patch) : prev,
     );
-  }, [embeddedDialogOnly, dialogOpen, mode, forcedEditUserId, forcedEditUserSeed, editing?.id]);
-
-  // Session prête : email auth.users + photo metadata
-  useEffect(() => {
-    if (!dialogOpen || mode !== "edit" || !editing?.id || !authUser?.id) return;
-
-    let cancelled = false;
-    void enrichUserRowForEdit(editing, authUser).then((enriched) => {
-      if (cancelled) return;
-      setEditing((prev) =>
-        prev?.id === enriched.id
-          ? { ...fillMissingProfileFields(prev, enriched), agency_id: prev.agency_id ?? enriched.agency_id }
-          : prev,
-      );
-      setInitialEditing((prev) =>
-        prev?.id === enriched.id
-          ? { ...fillMissingProfileFields(prev, enriched), agency_id: prev?.agency_id ?? enriched.agency_id }
-          : prev,
-      );
-      onAvatarResolved?.(enriched.avatar_url?.trim() || null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [dialogOpen, mode, editing?.id, authUser?.id, authUser?.email]);
+  }, [embeddedDialogOnly, dialogOpen, mode, forcedEditUserId, forcedEditUserSeed, editing?.id, enrichingEdit]);
 
   const handlePhotoFileSelected = useCallback(
     (file: File) => {
@@ -1347,9 +1330,13 @@ const Users = ({
     if (!open) {
       setPhotoFile(null);
       setInitialEditing(null);
+      setEnrichingEdit(false);
       if (photoPreview) URL.revokeObjectURL(photoPreview);
       setPhotoPreview("");
       setTemporaryPassword("");
+      if (embeddedDialogOnly) {
+        handledForcedEditUserIdRef.current = null;
+      }
     }
     setDialogOpen(open);
     if (!open && embeddedDialogOnly) {
@@ -1752,7 +1739,12 @@ const Users = ({
             </div>
           </div>
 
-          {!editing ? null : (
+          {!editing ? null : enrichingEdit ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-16 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              Chargement de la fiche…
+            </div>
+          ) : (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
