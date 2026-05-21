@@ -44,7 +44,6 @@ import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { ProfileAvatarImage, resolveProfileAvatarSource } from "@/components/ProfileAvatarImage";
-import { toPublicStorageUrl } from "@/lib/supabaseStorage";
 import {
   canAssignExpoToMember,
   canCreateUsers,
@@ -113,6 +112,14 @@ function subscriptionStatusLabel(
   }
 }
 
+function coalesceAvatarUrl(...candidates: Array<string | null | undefined>): string | null {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
 function buildUsersEditSeed(params: {
   userId: string;
   profile: DashboardProfile | null;
@@ -128,11 +135,23 @@ function buildUsersEditSeed(params: {
   const isSelf = Boolean(sessionUserId && userId === sessionUserId);
   return {
     id: userId,
-    first_name: member?.first_name ?? profile?.first_name ?? null,
-    last_name: member?.last_name ?? profile?.last_name ?? null,
-    username: member?.username ?? profile?.username ?? null,
-    avatar_url: avatarUrl ?? profile?.avatar_url ?? null,
-    phone: member?.phone ?? profile?.phone ?? null,
+    first_name:
+      member?.first_name ??
+      profile?.first_name ??
+      (isSelf ? mergedProfile?.firstName || null : null),
+    last_name:
+      member?.last_name ??
+      profile?.last_name ??
+      (isSelf ? mergedProfile?.lastName || null : null),
+    username:
+      member?.username ??
+      profile?.username ??
+      (isSelf ? mergedProfile?.username || null : null),
+    avatar_url: coalesceAvatarUrl(profile?.avatar_url, member?.avatar_url, avatarUrl),
+    phone:
+      member?.phone ??
+      profile?.phone ??
+      (isSelf ? mergedProfile?.phone || null : null),
     email: isSelf ? sessionEmail : null,
     birth_year: isSelf ? mergedProfile?.birthYear || null : null,
     birth_month: isSelf ? mergedProfile?.birthMonth || null : null,
@@ -178,7 +197,6 @@ const Dashboard = () => {
     [profile?.avatar_url, user?.user_metadata],
   );
   const avatarSource = syncedAvatarUrl || resolvedAvatarUrl || profileAvatarSync;
-  const avatarDisplayUrl = useMemo(() => toPublicStorageUrl(avatarSource), [avatarSource]);
 
   useEffect(() => {
     if (!userId?.trim() || !user) return;
@@ -408,11 +426,12 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-start gap-4">
-                  {avatarDisplayUrl ? (
+                  {userId ? (
                     <div className="relative flex h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
                       <ProfileAvatarImage
-                        src={avatarSource}
+                        src={avatarSource ?? profile?.avatar_url}
                         className="h-full w-full object-cover"
+                        iconClassName="h-10 w-10"
                       />
                     </div>
                   ) : null}

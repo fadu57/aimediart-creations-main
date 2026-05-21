@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { parseNumericRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
+import { readAvatarFromRpcRow } from "@/lib/userAvatar";
 
 /** Évite de rappeler Supabase si la table n'existe pas encore (404 / PGRST205). */
 const AGENCY_SUBSCRIPTIONS_CACHE_KEY = "aimediart.agency_subscriptions_unavailable";
@@ -78,6 +79,7 @@ export type DashboardTeamMember = {
   first_name: string | null;
   last_name: string | null;
   username: string | null;
+  avatar_url: string | null;
   phone: string | null;
   role_id: number | null;
   role_label: string | null;
@@ -325,6 +327,10 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     first_name?: string | null;
     last_name?: string | null;
     username?: string | null;
+    avatar_url?: string | null;
+    user_photo_url?: string | null;
+    photo_url?: string | null;
+    picture?: string | null;
     phone?: string | null;
   };
 
@@ -339,6 +345,7 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
           first_name: r.first_name ?? null,
           last_name: r.last_name ?? null,
           username: r.username ?? null,
+          avatar_url: readAvatarFromRpcRow(r) ?? r.avatar_url ?? null,
           phone: r.phone ?? null,
           role_id: roleId,
           role_label: roleId != null ? roleLabelById.get(roleId) ?? `Rôle ${roleId}` : null,
@@ -399,7 +406,7 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
   if (userIds.length === 0) return { members: [], agencyExpos };
 
   const [{ data: profileRows }, { data: expoAssignRows }] = await Promise.all([
-    supabase.from("profiles").select("id, first_name, last_name, username, phone").in("id", userIds),
+    supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone").in("id", userIds),
     supabase
       .from("expo_user_role")
       .select("user_id, expo_id")
@@ -419,9 +426,15 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
 
   const profileById = new Map<
     string,
-    { first_name?: string | null; last_name?: string | null; username?: string | null; phone?: string | null }
+    {
+      first_name?: string | null;
+      last_name?: string | null;
+      username?: string | null;
+      avatar_url?: string | null;
+      phone?: string | null;
+    }
   >();
-  for (const row of (profileRows as RpcUserRow[] | null) ?? []) {
+  for (const row of (profileRows as Array<{ id?: string | null; avatar_url?: string | null }> | null) ?? []) {
     const id = typeof row.id === "string" ? row.id.trim() : "";
     if (id) profileById.set(id, row);
   }
@@ -441,6 +454,7 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
       first_name: p?.first_name ?? null,
       last_name: p?.last_name ?? null,
       username: p?.username ?? null,
+      avatar_url: p?.avatar_url ?? null,
       phone: p?.phone ?? null,
       role_id: roleId,
       role_label: roleId != null ? roleLabelById.get(roleId) ?? `Rôle ${roleId}` : null,

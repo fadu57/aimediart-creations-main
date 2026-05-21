@@ -35,3 +35,13 @@ export function readBirthYearFromSources(
   if (typeof raw === "string" && raw.trim()) return raw.trim();
   return "";
 }
+
+/** Lit une chaîne non vide dans user_metadata (plusieurs clés possibles). */
+export function readMetaString(meta: Record<string, unknown> | undefined | null, ...keys: string[]): string {
+  if (!meta) return "";
+  for (const key of keys) {
+    const raw = meta[key];
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+  }
+  return "";
+}

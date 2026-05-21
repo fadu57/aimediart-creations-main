@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources } from "@/lib/birthProfile";
+import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources, readMetaString } from "@/lib/birthProfile";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadBackofficeUserPhoto } from "@/lib/storagePaths";
@@ -240,6 +240,27 @@ function fillMissingProfileFields(target: UserRow, source: Partial<UserRow>): Us
   return next;
 }
 
+function coalesceAvatarUrl(...candidates: Array<string | null | undefined>): string | null {
+  for (const candidate of candidates) {
+    const trimmed = candidate?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+/** Fusionne la ligne RPC et le seed dashboard (noms profil + photo RPC). */
+function mergeEmbeddedEditRow(existing: UserRow, seed: Partial<UserRow>): UserRow {
+  const merged = fillMissingProfileFields(existing, seed);
+  return {
+    ...merged,
+    avatar_url: coalesceAvatarUrl(existing.avatar_url, seed.avatar_url),
+    email: existing.email?.trim() || seed.email?.trim() || null,
+    role_id: existing.role_id ?? seed.role_id ?? null,
+    agency_id: existing.agency_id ?? seed.agency_id ?? null,
+    expo_id: existing.expo_id ?? seed.expo_id ?? null,
+  };
+}
+
 /** Complète photo, email et naissance avant affichage du formulaire. */
 async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Promise<UserRow> {
   let enriched = { ...row };
@@ -287,6 +308,12 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
   if (isSelf && sessionUser) {
     if (sessionUser.email?.trim()) enriched.email = sessionUser.email.trim();
     const meta = (sessionUser.user_metadata as Record<string, unknown> | undefined) ?? {};
+    enriched = fillMissingProfileFields(enriched, {
+      first_name: readMetaString(meta, "first_name", "firstname", "prenom") || null,
+      last_name: readMetaString(meta, "last_name", "lastname", "nom") || null,
+      username: readMetaString(meta, "username") || null,
+      phone: readMetaString(meta, "phone") || null,
+    });
     const metaAvatar = readAvatarFromMeta(meta);
     if (metaAvatar) enriched.avatar_url = enriched.avatar_url?.trim() || metaAvatar;
     enriched.birth_month = readBirthMonthFromMeta(meta) || enriched.birth_month || null;
@@ -295,7 +322,12 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     }
   }
 
-  const needsRpc = !enriched.email?.trim() || !enriched.avatar_url?.trim() || !enriched.birth_year?.trim();
+  const needsRpc =
+    !enriched.email?.trim() ||
+    !enriched.avatar_url?.trim() ||
+    !enriched.birth_year?.trim() ||
+    !enriched.first_name?.trim() ||
+    !enriched.last_name?.trim();
   if (needsRpc) {
     const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
     if (!rpcErr && Array.isArray(rpcData)) {
@@ -1160,21 +1192,29 @@ const Users = ({
     }
     if (handledForcedEditUserIdRef.current === targetId) return;
 
-    const seedId = forcedEditUserSeed?.id?.trim();
-    if (seedId && seedId === targetId) {
+    // Même source que la page Utilisateurs : attendre la liste RPC avant d'ouvrir.
+    if (loading) return;
+
+    const seed = forcedEditUserSeed?.id?.trim() === targetId ? forcedEditUserSeed : null;
+    const existing = rows.find((r) => r.id === targetId);
+
+    if (existing && seed) {
       handledForcedEditUserIdRef.current = targetId;
-      openEdit(forcedEditUserSeed);
+      openEdit(mergeEmbeddedEditRow(existing, seed));
       return;
     }
 
-    const existing = rows.find((r) => r.id === targetId);
     if (existing) {
       handledForcedEditUserIdRef.current = targetId;
       openEdit(existing);
       return;
     }
 
-    if (loading) return;
+    if (seed) {
+      handledForcedEditUserIdRef.current = targetId;
+      openEdit(seed);
+      return;
+    }
 
     let cancelled = false;
     void (async () => {
@@ -1192,6 +1232,35 @@ const Users = ({
       cancelled = true;
     };
   }, [embeddedDialogOnly, forcedEditUserId, forcedEditUserSeed, rows, loading, connectedAgencyId]);
+
+  // Embedded : complète la fiche quand la liste RPC ou le seed dashboard se met à jour
+  useEffect(() => {
+    if (!embeddedDialogOnly || !dialogOpen || mode !== "edit" || loading || !editing?.id) return;
+    const targetId = editing.id.trim();
+    const seed = forcedEditUserSeed?.id?.trim() === targetId ? forcedEditUserSeed : null;
+    const existing = rows.find((r) => r.id === targetId);
+
+    let patch: Partial<UserRow> | null = null;
+    if (existing && seed) {
+      patch = mergeEmbeddedEditRow(existing, seed);
+    } else if (existing) {
+      patch = existing;
+    } else if (seed) {
+      patch = seed;
+    }
+    if (!patch) return;
+
+    setEditing((prev) =>
+      prev?.id === targetId
+        ? { ...fillMissingProfileFields(prev, patch), agency_id: prev.agency_id ?? patch.agency_id ?? null }
+        : prev,
+    );
+    setInitialEditing((prev) =>
+      prev?.id === targetId
+        ? { ...fillMissingProfileFields(prev, patch), agency_id: prev?.agency_id ?? patch.agency_id ?? null }
+        : prev,
+    );
+  }, [embeddedDialogOnly, dialogOpen, mode, loading, editing?.id, rows, forcedEditUserSeed]);
 
   // Seed dashboard : complète la fiche si le profil arrive après l'ouverture du dialog
   useEffect(() => {
