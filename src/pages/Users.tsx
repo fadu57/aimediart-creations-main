@@ -600,6 +600,7 @@ const Users = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const fromUtilisateurs = (searchParams.get("from") || "").trim().toLowerCase() === "utilisateurs";
   const handledForcedEditUserIdRef = useRef<string | null>(null);
+  const forcedEditFetchRef = useRef<string | null>(null);
   const handledForceCreateRef = useRef(false);
   const handledEditUserIdRef = useRef<string | null>(null);
   const { agency_id: connectedAgencyId, role_id: currentRoleId, user: authUser, refresh: refreshAuthUser } = useAuthUser();
@@ -1147,8 +1148,9 @@ const Users = ({
     })();
   };
 
-  // Ouverture en edit via URL param ?edit_user_id=
+  // Ouverture en edit via URL param ?edit_user_id= (page /user uniquement, pas embedded)
   useEffect(() => {
+    if (embeddedDialogOnly) return;
     const prefillUser = (location.state as { prefillUser?: UserRow } | null)?.prefillUser;
     if (prefillUser?.id) {
       openEdit(prefillUser);
@@ -1194,38 +1196,33 @@ const Users = ({
     };
   }, [rows, searchParams, setSearchParams, location.state, location.pathname, location.search, navigate]);
 
-  // Ouverture forcée en mode embedded (prop forcedEditUserId)
+  // Ouverture forcée en mode embedded (prop forcedEditUserId) — même logique que Utilisateurs.tsx
   useEffect(() => {
     if (!embeddedDialogOnly) return;
     const targetId = (forcedEditUserId || "").trim();
     if (!targetId) {
       handledForcedEditUserIdRef.current = null;
+      forcedEditFetchRef.current = null;
       return;
     }
-    if (handledForcedEditUserIdRef.current === targetId) return;
+    if (handledForcedEditUserIdRef.current === targetId && dialogOpen) return;
 
-    // Même source que la page Utilisateurs : attendre la liste RPC avant d'ouvrir.
-    if (loading) return;
-
-    const seed = forcedEditUserSeed?.id?.trim() === targetId ? forcedEditUserSeed : null;
     const existing = rows.find((r) => r.id === targetId);
-
     if (existing) {
       handledForcedEditUserIdRef.current = targetId;
-      openEdit(seed ? mergeEmbeddedEditRow(existing, seed) : existing);
+      forcedEditFetchRef.current = null;
+      openEdit(existing);
       return;
     }
 
-    if (seed) {
-      handledForcedEditUserIdRef.current = targetId;
-      openEdit(seed);
-      return;
-    }
+    if (forcedEditFetchRef.current === targetId) return;
+    forcedEditFetchRef.current = targetId;
 
     let cancelled = false;
     void (async () => {
       const user = await fetchUserById(targetId, connectedAgencyId);
       if (cancelled) return;
+      forcedEditFetchRef.current = null;
       if (!user) {
         toast.error("Utilisateur introuvable.");
         onDialogClosed?.();
@@ -1236,8 +1233,11 @@ const Users = ({
     })();
     return () => {
       cancelled = true;
+      if (forcedEditFetchRef.current === targetId) {
+        forcedEditFetchRef.current = null;
+      }
     };
-  }, [embeddedDialogOnly, forcedEditUserId, forcedEditUserSeed, rows, loading, connectedAgencyId]);
+  }, [embeddedDialogOnly, forcedEditUserId, rows, connectedAgencyId, dialogOpen]);
 
   // Embedded : complète la fiche quand la liste RPC ou le seed dashboard se met à jour
   useEffect(() => {
@@ -1336,6 +1336,7 @@ const Users = ({
       setTemporaryPassword("");
       if (embeddedDialogOnly) {
         handledForcedEditUserIdRef.current = null;
+        forcedEditFetchRef.current = null;
       }
     }
     setDialogOpen(open);
@@ -1739,12 +1740,7 @@ const Users = ({
             </div>
           </div>
 
-          {!editing ? null : enrichingEdit ? (
-            <div className="flex items-center justify-center gap-2 px-4 py-16 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-              Chargement de la fiche…
-            </div>
-          ) : (
+          {!editing ? null : (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1752,6 +1748,12 @@ const Users = ({
               }}
               className="space-y-5 pt-2 px-4 sm:px-5 pb-4"
             >
+              {enrichingEdit && (
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  Mise à jour des données…
+                </p>
+              )}
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
                 <div className="space-y-2">
                   <UserPhotoField

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArchiveRestore, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -97,6 +97,7 @@ function getVisibleRoleIds(currentRoleId: number | null): number[] | null {
 export default function Utilisateurs() {
   const { t } = useTranslation("utilisateurs");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { loading: authLoading, role_id: currentRoleId, user } = useAuthUser();
   const { can, loading: navLoading } = useNavigationMatrix();
   const currentUserId = user?.id ?? "";
@@ -350,6 +351,20 @@ export default function Utilisateurs() {
 
   const openUserCard = (row: AdminUserRow) => {
     setDialogUserId(row.id);
+  };
+
+  useEffect(() => {
+    const fromUrl = searchParams.get("edit_user_id")?.trim();
+    if (fromUrl) setDialogUserId(fromUrl);
+  }, [searchParams]);
+
+  const closeUserDialog = () => {
+    setDialogUserId(null);
+    if (searchParams.get("edit_user_id")?.trim()) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("edit_user_id");
+      setSearchParams(next, { replace: true });
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -654,7 +669,7 @@ export default function Utilisateurs() {
       <Users
         embeddedDialogOnly
         forcedEditUserId={dialogUserId}
-        onDialogClosed={() => setDialogUserId(null)}
+        onDialogClosed={closeUserDialog}
         onUserSaved={() => {
           void loadUsers();
         }}

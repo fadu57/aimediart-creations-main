@@ -3,6 +3,11 @@ import type { User } from "@supabase/supabase-js";
 import { readAvatarFromMeta } from "@/lib/supabaseStorage";
 import { supabase } from "@/lib/supabase";
 import { fetchUserEditDetails } from "@/lib/userEditDetails";
+import {
+  findCanonicalUserPhotoPublicUrl,
+  isArtistCatalogPhotoUrl,
+  isCanonicalUserPhotoUrl,
+} from "@/lib/userPhotoUrl";
 
 export type ResolveUserAvatarHints = {
   /** Valeur déjà connue (ex. profiles.avatar_url chargé par le dashboard). */
@@ -27,7 +32,20 @@ function rpcRowUserId(row: RpcAvatarRow): string {
 
 function normalizeAvatarCandidate(value: string | null | undefined): string | null {
   const trimmed = (value ?? "").trim();
-  return trimmed || null;
+  if (!trimmed || isArtistCatalogPhotoUrl(trimmed)) return null;
+  return trimmed;
+}
+
+/** Préfère une URL canonique photos/users/{userId}.* quand plusieurs candidats existent. */
+function pickUserAvatarUrl(userId: string, ...candidates: Array<string | null | undefined>): string | null {
+  const uid = userId.trim();
+  const normalized = candidates
+    .map((candidate) => normalizeAvatarCandidate(candidate))
+    .filter((candidate): candidate is string => Boolean(candidate));
+
+  const canonical = normalized.find((candidate) => isCanonicalUserPhotoUrl(uid, candidate));
+  if (canonical) return canonical;
+  return normalized[0] ?? null;
 }
 
 /** Extrait une URL photo depuis une ligne RPC (noms de colonnes hétérogènes). */
@@ -58,13 +76,14 @@ export async function resolveUserAvatarUrl(
   const uid = userId.trim();
   if (!uid) return null;
 
-  const hintCandidates = [hints?.seedAvatarUrl, hints?.profileAvatarUrl];
-  for (const hint of hintCandidates) {
-    const fromHint = normalizeAvatarCandidate(hint);
-    if (fromHint) {
-      await maybePersistAvatarToProfile(uid, fromHint, null);
-      return fromHint;
-    }
+  const canonicalExisting = await findCanonicalUserPhotoPublicUrl(uid);
+  if (canonicalExisting) {
+    return canonicalExisting;
+  }
+
+  const fromHint = pickUserAvatarUrl(uid, hints?.seedAvatarUrl, hints?.profileAvatarUrl);
+  if (fromHint) {
+    return fromHint;
   }
 
   const { data: profile, error: profileErr } = await supabase
@@ -80,53 +99,36 @@ export async function resolveUserAvatarUrl(
   const fromProfile = normalizeAvatarCandidate(
     (profile as { avatar_url?: string | null } | null)?.avatar_url,
   );
-  if (fromProfile) return fromProfile;
+  if (fromProfile) {
+    if (import.meta.env.DEV && !isCanonicalUserPhotoUrl(uid, fromProfile)) {
+      console.warn(
+        "[userAvatar] avatar_url non canonique (legacy user/artiste mélangé ?) :",
+        uid,
+        fromProfile,
+      );
+    }
+    return fromProfile;
+  }
 
   const details = await fetchUserEditDetails(uid);
   const fromDetails = normalizeAvatarCandidate(details?.avatar_url);
-  if (fromDetails) {
-    await maybePersistAvatarToProfile(uid, fromDetails, fromProfile);
-    return fromDetails;
-  }
+  if (fromDetails) return fromDetails;
 
   const isSelf = sessionUser?.id === uid;
   if (isSelf) {
     const fromFreshAuth = await readFreshAuthAvatar(uid);
-    if (fromFreshAuth) {
-      await maybePersistAvatarToProfile(uid, fromFreshAuth, fromProfile);
-      return fromFreshAuth;
-    }
+    if (fromFreshAuth) return fromFreshAuth;
 
     const fromMeta = readAvatarFromMeta(sessionUser?.user_metadata as Record<string, unknown> | undefined);
-    if (fromMeta) {
-      await maybePersistAvatarToProfile(uid, fromMeta, fromProfile);
-      return fromMeta;
-    }
+    if (fromMeta) return fromMeta;
   }
 
   const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
   if (!rpcErr && Array.isArray(rpcData)) {
     const row = (rpcData as RpcAvatarRow[]).find((entry) => rpcRowUserId(entry) === uid);
     const fromTeamRpc = readAvatarFromRpcRow(row);
-    if (fromTeamRpc) {
-      await maybePersistAvatarToProfile(uid, fromTeamRpc, fromProfile);
-      return fromTeamRpc;
-    }
+    if (fromTeamRpc) return fromTeamRpc;
   }
 
   return null;
-}
-
-/** Copie l'URL trouvée ailleurs dans profiles.avatar_url pour les prochains chargements. */
-async function maybePersistAvatarToProfile(
-  userId: string,
-  avatarUrl: string,
-  existingProfileUrl: string | null,
-): Promise<void> {
-  const next = avatarUrl.trim();
-  if (!next || existingProfileUrl?.trim()) return;
-  const { error } = await supabase.from("profiles").update({ avatar_url: next }).eq("id", userId);
-  if (error && import.meta.env.DEV) {
-    console.warn("[userAvatar] sync profiles.avatar_url :", error.message);
-  }
 }

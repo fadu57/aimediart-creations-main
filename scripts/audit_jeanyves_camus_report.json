@@ -1,0 +1,288 @@
+{
+  "audit_at": "local",
+  "ids_requested": {
+    "user_org_responsable": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+    "artist_catalogue": "015a3ef3-fb82-4391-90f5-df557a6bf073",
+    "user_previously_investigated": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a"
+  },
+  "all_profiles_lastname_camus": [
+    {
+      "id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+      "first_name": "Jean-Yves",
+      "last_name": "Camus",
+      "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.png"
+    },
+    {
+      "id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+      "first_name": "Jean-Yves",
+      "last_name": "Camus",
+      "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.png"
+    }
+  ],
+  "all_artists_lastname_camus": [
+    {
+      "artist_id": "015a3ef3-fb82-4391-90f5-df557a6bf073",
+      "artist_firstname": "Jean-Yves",
+      "artist_lastname": "Camus",
+      "artist_photo_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/artists/015a3ef3-fb82-4391-90f5-df557a6bf073.jpg",
+      "artist_email": null
+    }
+  ],
+  "users": [
+    {
+      "label": "Jean-Yves responsable org (ID fourni)",
+      "user_id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+      "auth": {
+        "id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+        "email": "jeanyves@exemple.com",
+        "created_at": "2026-04-26T14:41:21.047491Z",
+        "app_metadata": {
+          "provider": "email",
+          "providers": [
+            "email"
+          ],
+          "role_id": 4
+        },
+        "user_metadata_keys": [
+          "birth_month",
+          "birth_year",
+          "email_verified",
+          "first_name",
+          "full_name",
+          "last_name",
+          "nom",
+          "prenom",
+          "user_prenom"
+        ],
+        "user_metadata_photo": {
+          "avatar_url": null,
+          "user_photo_url": null,
+          "picture": null,
+          "photo_url": null,
+          "first_name": "Jean-Yves",
+          "last_name": "Camus"
+        }
+      },
+      "profile": {
+        "id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+        "first_name": "Jean-Yves",
+        "last_name": "Camus",
+        "username": null,
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.png",
+        "phone": null,
+        "zip_code": "54130 ",
+        "city": "SAINT-MAX",
+        "country_code": "FR",
+        "timezone": null,
+        "language": "fr",
+        "created_at": "2026-05-21T17:15:38.349941+00:00",
+        "birth_year": null,
+        "updated_at": "2026-05-21T17:15:38.349941+00:00",
+        "deleted_at": null,
+        "preferred_locale": "fr",
+        "birth_month": null
+      },
+      "agency_users": [
+        {
+          "agency_id": "311e21e1-e865-4996-95c3-187cee26b4a6",
+          "role_id": 4,
+          "created_at": "2026-05-09T20:23:05.637242+00:00"
+        }
+      ],
+      "rpc_get_all_users_with_roles": {
+        "id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+        "first_name": "Jean-Yves",
+        "last_name": "Camus",
+        "username": null,
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.png",
+        "phone": null,
+        "birth_year": null,
+        "role_id": 4,
+        "agency_id": "311e21e1-e865-4996-95c3-187cee26b4a6",
+        "expo_id": null
+      },
+      "avatar_analysis": {
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.png",
+        "path_uuid_in_url": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+        "canonical_match": true,
+        "http": {
+          "status": 200,
+          "ok": true,
+          "type": "application/octet-stream"
+        }
+      },
+      "storage_canonical_users": {
+        "users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.webp": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        },
+        "users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.png": {
+          "exists": true,
+          "bytes": 465841
+        },
+        "users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.jpg": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        },
+        "users/4f28cdac-5a34-4e32-ae35-2ba1d5f79a99.jpeg": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        }
+      }
+    },
+    {
+      "label": "Jean-Yves Camus (ID investigation precedente)",
+      "user_id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+      "auth": {
+        "id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+        "email": "jean-yves.camus@nopgrandest.org",
+        "created_at": "2026-04-12T09:48:33.965766Z",
+        "app_metadata": {
+          "provider": "email",
+          "providers": [
+            "email"
+          ]
+        },
+        "user_metadata_keys": [
+          "email_verified"
+        ],
+        "user_metadata_photo": {
+          "avatar_url": null,
+          "user_photo_url": null,
+          "picture": null,
+          "photo_url": null,
+          "first_name": null,
+          "last_name": null
+        }
+      },
+      "profile": {
+        "id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+        "first_name": "Jean-Yves",
+        "last_name": "Camus",
+        "username": null,
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.png",
+        "phone": null,
+        "zip_code": "54130 ",
+        "city": "SAINT-MAX",
+        "country_code": "FR",
+        "timezone": null,
+        "language": "fr",
+        "created_at": "2026-04-26T08:51:01.489981+00:00",
+        "birth_year": null,
+        "updated_at": "2026-05-21T17:07:59.906008+00:00",
+        "deleted_at": null,
+        "preferred_locale": "fr",
+        "birth_month": null
+      },
+      "agency_users": [
+        {
+          "agency_id": "311e21e1-e865-4996-95c3-187cee26b4a6",
+          "role_id": 4,
+          "created_at": "2026-04-26T08:51:01.489981+00:00"
+        }
+      ],
+      "rpc_get_all_users_with_roles": {
+        "id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+        "first_name": "Jean-Yves",
+        "last_name": "Camus",
+        "username": null,
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.png",
+        "phone": null,
+        "birth_year": null,
+        "role_id": 4,
+        "agency_id": "311e21e1-e865-4996-95c3-187cee26b4a6",
+        "expo_id": null
+      },
+      "avatar_analysis": {
+        "avatar_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.png",
+        "path_uuid_in_url": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+        "canonical_match": true,
+        "http": {
+          "status": 200,
+          "ok": true,
+          "type": "application/octet-stream"
+        }
+      },
+      "storage_canonical_users": {
+        "users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.webp": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        },
+        "users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.png": {
+          "exists": true,
+          "bytes": 465841
+        },
+        "users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.jpg": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        },
+        "users/4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a.jpeg": {
+          "exists": false,
+          "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+        }
+      }
+    }
+  ],
+  "artist": {
+    "artist_id": "015a3ef3-fb82-4391-90f5-df557a6bf073",
+    "artist_row": {
+      "artist_id": "015a3ef3-fb82-4391-90f5-df557a6bf073",
+      "artist_lastname": "Camus",
+      "artist_firstname": "Jean-Yves",
+      "artist_nickname": null,
+      "artist_bio": "Jean-Yves Camus est un photographe talentueux qui capte la beauté du monde à travers ses objectifs. Son travail explore divers thèmes et sujets, offrant une perspective unique sur la réalité. Avec une approche créative et une maîtrise technique, il crée des images émouvantes et évocatrices. Son œuvre photographique reflète son regard personnel et sa sensibilité artistique. Il continue de partager son art avec le public, inspirant ainsi les amateurs de photographie.",
+      "artist_email": null,
+      "artist_phone": null,
+      "artist_photo_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/artists/015a3ef3-fb82-4391-90f5-df557a6bf073.jpg",
+      "artist_birth_date": null,
+      "artist_initiale_artist": null,
+      "artist_control": "jeanyvescamusphotographe",
+      "artist_created_at": "2026-04-16T14:43:32.688557+00:00",
+      "artist_typ": "Photographe",
+      "artist_pays": "France",
+      "artist_zipcode": null,
+      "artist_ville": null,
+      "artist_adresse": null,
+      "artist_address": null,
+      "artist_city": null,
+      "deleted_at": null,
+      "artist_adresse2": null
+    },
+    "photo_analysis": {
+      "artist_photo_url": "https://ladhkvghtnzpnqolxybb.supabase.co/storage/v1/object/public/photos/artists/015a3ef3-fb82-4391-90f5-df557a6bf073.jpg",
+      "http": {
+        "status": 200,
+        "ok": true,
+        "type": "application/octet-stream"
+      },
+      "storage_path": "015a3ef3-fb82-4391-90f5-df557a6bf073.jpg",
+      "storage": {
+        "exists": false,
+        "error": "{'statusCode': 404, 'error': not_found, 'message': Object not found}"
+      }
+    },
+    "artist_agency_links": "table_absent"
+  },
+  "cross_analysis": {
+    "cross_links": [
+      {
+        "type": "same_name_user_and_artist",
+        "user_id": "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+        "artist_id": "015a3ef3-fb82-4391-90f5-df557a6bf073"
+      },
+      {
+        "type": "same_name_user_and_artist",
+        "user_id": "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a",
+        "artist_id": "015a3ef3-fb82-4391-90f5-df557a6bf073"
+      }
+    ],
+    "distinct_user_ids_for_camus": [
+      "4f28cdac-5a34-4e32-ae35-2ba1d5f79a99",
+      "4e96dc9d-c3f7-40a7-8b2f-946197cc2d3a"
+    ]
+  },
+  "verdict": [
+    "DEUX comptes user distincts nommes Camus: 4f28cdac (org) vs 4e96dc9d (investigation). Confusion probable si l'app melange les sessions.",
+    "Artiste catalogue: photo separee dans artists.artist_photo_url (normal, table distincte)."
+  ]
+}

@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { useDashboardProfile, type DashboardProfile, type DashboardTeamMember } from "@/hooks/useDashboardProfile";
+import { useDashboardProfile, type DashboardTeamMember } from "@/hooks/useDashboardProfile";
 import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -53,8 +53,7 @@ import {
   roleLevelHint,
 } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
-import { resolveUserAvatarUrl } from "@/lib/userAvatar";
-import Users, { type UsersEditSeed } from "@/pages/Users";
+import Users from "@/pages/Users";
 
 function textOrDash(v: string | null | undefined): string {
   return v?.trim() || "—";
@@ -112,65 +111,22 @@ function subscriptionStatusLabel(
   }
 }
 
-function coalesceAvatarUrl(...candidates: Array<string | null | undefined>): string | null {
-  for (const candidate of candidates) {
-    const trimmed = candidate?.trim();
-    if (trimmed) return trimmed;
-  }
-  return null;
-}
-
-function buildUsersEditSeed(params: {
-  userId: string;
-  profile: DashboardProfile | null;
-  agencyId: string | null;
-  roleId: number | null;
-  member: DashboardTeamMember | null;
-  sessionUserId: string | null;
-  sessionEmail: string | null;
-  mergedProfile: ReturnType<typeof mergeProfileValues> | null;
-  avatarUrl?: string | null;
-}): UsersEditSeed {
-  const { userId, profile, agencyId, roleId, member, sessionUserId, sessionEmail, mergedProfile, avatarUrl } = params;
-  const isSelf = Boolean(sessionUserId && userId === sessionUserId);
-  return {
-    id: userId,
-    first_name:
-      member?.first_name ??
-      profile?.first_name ??
-      (isSelf ? mergedProfile?.firstName || null : null),
-    last_name:
-      member?.last_name ??
-      profile?.last_name ??
-      (isSelf ? mergedProfile?.lastName || null : null),
-    username:
-      member?.username ??
-      profile?.username ??
-      (isSelf ? mergedProfile?.username || null : null),
-    avatar_url: coalesceAvatarUrl(profile?.avatar_url, member?.avatar_url, avatarUrl),
-    phone:
-      member?.phone ??
-      profile?.phone ??
-      (isSelf ? mergedProfile?.phone || null : null),
-    email: isSelf ? sessionEmail : null,
-    birth_year: isSelf ? mergedProfile?.birthYear || null : null,
-    birth_month: isSelf ? mergedProfile?.birthMonth || null : null,
-    role_id: member?.role_id ?? roleId,
-    agency_id: agencyId,
-    expo_id: member?.expo_ids[0] ?? null,
-  };
-}
-
 const Dashboard = () => {
-  const { user, role_id, role_label, role_name, agency_id, expo_id, loading: authLoading, refresh: refreshAuthUser } = useAuthUser();
+  const { user, role_id, role_label, role_name, agency_id, expo_id, loading: authLoading } = useAuthUser();
   const { can } = useNavigationMatrix();
   const [createUserOpen, setCreateUserOpen] = useState(false);
-  const [editMemberUserId, setEditMemberUserId] = useState<string | null>(null);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
   const [deleteMemberTarget, setDeleteMemberTarget] = useState<DashboardTeamMember | null>(null);
   const [deletingMember, setDeletingMember] = useState(false);
   const [deleteLastRole4InOrg, setDeleteLastRole4InOrg] = useState(false);
   const [savingExpoUserId, setSavingExpoUserId] = useState<string | null>(null);
-  const [syncedAvatarUrl, setSyncedAvatarUrl] = useState<string | null>(null);
+
+  const openUserFiche = (targetUserId: string) => {
+    const trimmed = targetUserId.trim();
+    if (!trimmed) return;
+    setCreateUserOpen(false);
+    setEditUserId(trimmed);
+  };
 
   const userId = user?.id ?? null;
   const email = user?.email ?? null;
@@ -196,18 +152,7 @@ const Dashboard = () => {
     () => resolveProfileAvatarSource(profile?.avatar_url, user?.user_metadata),
     [profile?.avatar_url, user?.user_metadata],
   );
-  const avatarSource = syncedAvatarUrl || resolvedAvatarUrl || profileAvatarSync;
-
-  useEffect(() => {
-    if (!userId?.trim() || !user) return;
-    let cancelled = false;
-    void resolveUserAvatarUrl(userId, user, { profileAvatarUrl: profile?.avatar_url }).then((url) => {
-      if (!cancelled && url) setSyncedAvatarUrl(url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, user, profile?.avatar_url, refreshKey]);
+  const avatarSource = resolvedAvatarUrl || profileAvatarSync;
 
   const loading = authLoading || dataLoading;
   const displayName = profileFullName(
@@ -329,23 +274,6 @@ const Dashboard = () => {
     return full || deleteMemberTarget.username || "cet utilisateur";
   }, [deleteMemberTarget]);
 
-  const editMemberSeed = useMemo((): UsersEditSeed | null => {
-    if (!editMemberUserId?.trim()) return null;
-    const targetId = editMemberUserId.trim();
-    const fromTeam = teamMembers.find((m) => m.user_id === targetId);
-    return buildUsersEditSeed({
-      userId: targetId,
-      profile: targetId === userId ? profile : null,
-      agencyId: agency_id,
-      roleId: fromTeam?.role_id ?? (targetId === userId ? effectiveRoleId : null),
-      member: fromTeam ?? null,
-      sessionUserId: userId,
-      sessionEmail: email,
-      mergedProfile: targetId === userId ? mergedProfile : null,
-      avatarUrl: targetId === userId ? avatarSource : null,
-    });
-  }, [editMemberUserId, teamMembers, userId, profile, agency_id, effectiveRoleId, email, mergedProfile, avatarSource]);
-
   const subscriptionProgress = useMemo(() => {
     if (!subscription?.expires_at || !subscription.started_at) return null;
     const start = new Date(subscription.started_at).getTime();
@@ -413,11 +341,7 @@ const Dashboard = () => {
                       variant="outline"
                       size="sm"
                       className="shrink-0"
-                      disabled={loading || dataLoading}
-                      onClick={() => {
-                        setCreateUserOpen(false);
-                        setEditMemberUserId(userId);
-                      }}
+                      onClick={() => openUserFiche(userId)}
                     >
                       <Pencil className="h-3.5 w-3.5 mr-1.5" />
                       Modifier
@@ -637,10 +561,7 @@ const Dashboard = () => {
                   canDeleteMember={canDeleteTeamMemberRow}
                   canEditMemberExpos={canEditMemberExpos}
                   savingExpoUserId={savingExpoUserId}
-                  onEditMember={(member) => {
-                    setCreateUserOpen(false);
-                    setEditMemberUserId(member.user_id);
-                  }}
+                  onEditMember={(member) => openUserFiche(member.user_id)}
                   onDeleteMember={setDeleteMemberTarget}
                   onMemberExposChange={(member, expoIds) => {
                     void handleMemberExposChange(member, expoIds);
@@ -704,39 +625,17 @@ const Dashboard = () => {
         </>
       )}
 
-      {createUserOpen && !editMemberUserId && (
-        <Users
-          embeddedDialogOnly
-          forceCreateDialog
-          onDialogClosed={() => {
-            setCreateUserOpen(false);
-            refresh();
-          }}
-          onUserSaved={() => refresh()}
-        />
-      )}
-
-      {editMemberUserId && (
-        <Users
-          embeddedDialogOnly
-          forcedEditUserId={editMemberUserId}
-          forcedEditUserSeed={editMemberSeed}
-          onAvatarResolved={(url) => {
-            if (editMemberUserId === userId && url) {
-              setSyncedAvatarUrl(url);
-              refresh();
-            }
-          }}
-          onDialogClosed={() => {
-            setEditMemberUserId(null);
-            refresh();
-          }}
-          onUserSaved={() => {
-            refresh();
-            if (editMemberUserId === userId) void refreshAuthUser();
-          }}
-        />
-      )}
+      <Users
+        embeddedDialogOnly
+        forcedEditUserId={editUserId}
+        forceCreateDialog={createUserOpen && !editUserId}
+        onDialogClosed={() => {
+          setEditUserId(null);
+          setCreateUserOpen(false);
+          refresh();
+        }}
+        onUserSaved={() => refresh()}
+      />
 
       <AlertDialog open={Boolean(deleteMemberTarget)} onOpenChange={(open) => !open && setDeleteMemberTarget(null)}>
         <AlertDialogContent>

@@ -573,7 +573,36 @@ export function useDashboardProfile(
         } else if (profileRes.data) {
           setProfile(profileRes.data as DashboardProfile);
         } else {
-          setProfile(null);
+          // Compte auth sans ligne profiles (trigger manquant / migration legacy)
+          const { data: authSession } = await supabase.auth.getUser();
+          const authUser = authSession.user;
+          if (authUser?.id === uid) {
+            const meta = (authUser.user_metadata as Record<string, unknown> | undefined) ?? {};
+            const readMeta = (...keys: string[]): string | null => {
+              for (const key of keys) {
+                const value = meta[key];
+                if (typeof value === "string" && value.trim()) return value.trim();
+              }
+              return null;
+            };
+            setProfile({
+              id: uid,
+              first_name: readMeta("first_name", "prenom", "user_prenom"),
+              last_name: readMeta("last_name", "nom"),
+              username: readMeta("username"),
+              avatar_url: readMeta("avatar_url", "user_photo_url", "picture", "photo_url"),
+              phone: readMeta("phone"),
+              zip_code: null,
+              city: null,
+              country_code: "FR",
+              timezone: readMeta("timezone"),
+              language: readMeta("language") ?? "fr",
+              birth_year: null,
+              created_at: authUser.created_at ?? null,
+            });
+          } else {
+            setProfile(null);
+          }
         }
 
         if (agencyRes.data) {
