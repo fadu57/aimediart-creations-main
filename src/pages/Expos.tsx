@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Images, Loader2, Plus, QrCode, X } from "lucide-react";
+import { Building2, Images, Plus, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ExpoFormDialog } from "@/components/ExpoFormDialog";
+import { SponsorDialog } from "@/components/SponsorDialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -47,6 +49,8 @@ type ExpoRow = {
   /** Alias historique éventuel. */
   expo_logo?: string | null;
   deleted_at?: string | null;
+  /** Description multilingue : texte brut ou JSON {"fr":"…","en":"…"}. */
+  expo_descript_i18n?: string | Record<string, string> | null;
 };
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -132,6 +136,32 @@ function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | nul
   );
 }
 
+/** Carousel compact de logos sponsors (auto-rotation si plusieurs). */
+function SponsorCarousel({ logos }: { logos: string[] }) {
+  const [idx, setIdx] = useState(0);
+  // Reset idx when the logos array changes (new fetch, different expo)
+  useEffect(() => { setIdx(0); }, [logos]);
+  useEffect(() => {
+    if (logos.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % logos.length), 2500);
+    return () => clearInterval(t);
+  }, [logos]);
+  const src = logos[idx];
+  if (!src) return null;
+  return (
+    <div className="pointer-events-none flex h-14 w-28 items-center justify-center overflow-hidden rounded border border-border/40 bg-white/5">
+      <img
+        key={src}
+        src={src}
+        alt=""
+        className="max-h-12 max-w-[104px] object-contain"
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+  );
+}
+
 function expoTitle(row: ExpoRow): string {
   return row.expo_name?.trim() || row.id;
 }
@@ -169,7 +199,7 @@ function formatExpoDate(value: string | null | undefined): string {
 }
 
 const Expos = () => {
-  const { t } = useTranslation("expos");
+  const { t, i18n } = useTranslation("expos");
   const [searchParams] = useSearchParams();
   const agencyFilter = searchParams.get("agency")?.trim() || "";
   const expoPopupId = searchParams.get("expo")?.trim() || "";
@@ -200,7 +230,10 @@ const Expos = () => {
   const [generatingQrForExpoId, setGeneratingQrForExpoId] = useState<string | null>(null);
   const [qrConfirmExpoKey, setQrConfirmExpoKey] = useState<string | null>(null);
   const [panelFormatExpo, setPanelFormatExpo] = useState<ExpoRow | null>(null);
+  const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
+  const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [descriptionPopup, setDescriptionPopup] = useState<string | null>(null);
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useAuthUser();
@@ -322,6 +355,29 @@ const Expos = () => {
     };
   }, [rows]);
 
+  useEffect(() => {
+    if (!rows.length) return;
+    let cancelled = false;
+    void (async () => {
+      const expoIds = rows.map((r) => r.id).filter(Boolean);
+      const { data } = await supabase
+        .from("sponsors")
+        .select("id_expo, url_logo_sponsor")
+        .in("id_expo", expoIds)
+        .not("url_logo_sponsor", "is", null);
+      if (cancelled) return;
+      const map: Record<string, string[]> = {};
+      for (const row of ((data as Array<{ id_expo: string; url_logo_sponsor: string | null }> | null) ?? [])) {
+        if (!row.id_expo || !row.url_logo_sponsor) continue;
+        if (!map[row.id_expo]) map[row.id_expo] = [];
+        map[row.id_expo].push(row.url_logo_sponsor);
+      }
+      console.debug("[Expos] sponsorLogosByExpoId →", map);
+      setSponsorLogosByExpoId(map);
+    })();
+    return () => { cancelled = true; };
+  }, [rows]);
+
   const showScopeHint = !authLoading && scope.mode === "none";
 
   const sorted = useMemo(() => [...rows].sort((a, b) => expoTitle(a).localeCompare(expoTitle(b), "fr")), [rows]);
@@ -389,6 +445,25 @@ const Expos = () => {
     popupOpenedRef.current = true;
     openEdit(expoPopupId);
   }, [expoPopupId, loading, rows, role_id, userAgencyId, userExpoId]);
+
+  const handleDownloadVisitorQr = useCallback(async (expoId: string, expoName: string) => {
+    if (!expoId) return;
+    try {
+      const origin =
+        (await fetchQrPublicSiteOriginFromSettings()) ||
+        (typeof window !== "undefined" && window.location?.origin?.trim()) ||
+        "https://www.aimediart.com";
+      const targetUrl = `${origin}/visitor?expo_id=${encodeURIComponent(expoId)}`;
+      const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 2 });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      const safeName = expoName.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 40) || expoId.slice(0, 8);
+      a.download = `qr-visiteur-${safeName}.png`;
+      a.click();
+    } catch (e) {
+      console.warn("[Expos] QR visiteur download :", e);
+    }
+  }, []);
 
   const handleGenerateQrForExpo = useCallback(async (expoId: string) => {
     if (!expoId || generatingQrForExpoId) return;
@@ -531,7 +606,7 @@ const Expos = () => {
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 md:max-w-[min(100%,42rem)] shrink-0">
+        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 md:max-w-[min(100%,450px)] shrink-0">
         <div>
           <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           {agencyFilter && (
@@ -582,6 +657,18 @@ const Expos = () => {
             <Button type="button" variant="outline" className="gap-2" asChild>
               <Link to="/expos/expos2">{t("page.tableau")}</Link>
             </Button>
+            <Button type="button" variant="outline" className="gap-2" asChild>
+              <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              onClick={() => setSponsorExpo({ id: "", name: "" })}
+            >
+              <Building2 className="h-4 w-4" aria-hidden />
+              {t("page.sponsors", "Sponsors")}
+            </Button>
           </div>
         )}
       </div>
@@ -615,14 +702,15 @@ const Expos = () => {
             (typeof ex.curator_firstname === "string" ? ex.curator_firstname : "") ||
             (typeof exRecord.curator_fistname === "string" ? exRecord.curator_fistname : "") ||
             (typeof exRecord.curator_prenom === "string" ? exRecord.curator_prenom : "") ||
-            (typeof exRecord.curator_first_name === "string" ? exRecord.curator_first_name : "") ||
-            (typeof exRecord.curator === "string" ? exRecord.curator : "");
+            (typeof exRecord.curator_first_name === "string" ? exRecord.curator_first_name : "");
           const curatorLastName =
             (typeof ex.curator_name === "string" ? ex.curator_name : "") ||
             (typeof exRecord.curator_lastname === "string" ? exRecord.curator_lastname : "") ||
             (typeof exRecord.curator_nom === "string" ? exRecord.curator_nom : "") ||
             (typeof exRecord.curator_last_name === "string" ? exRecord.curator_last_name : "");
-          const curatorLabel = `${curatorFirstName} ${curatorLastName}`.trim();
+          const curatorLabel =
+            `${curatorFirstName} ${curatorLastName}`.trim() ||
+            (typeof exRecord.curator === "string" ? exRecord.curator.trim() : "");
           const editable = canEditExpo(ex);
           return (
             <Card key={ex.id} className="glass-card hover:shadow-lg transition-all duration-300">
@@ -642,53 +730,22 @@ const Expos = () => {
                     : undefined
                 }
               >
-                <div className="flex w-[108px] shrink-0 flex-col items-center gap-1.5">
-                  <button
-                    type="button"
-                    className="flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-muted/40 p-0.5 text-center transition-colors hover:border-amber-400/70 hover:bg-amber-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const key = expoQrKeys(ex)[0] || ex.id;
-                      if (qrImage) {
-                        setQrConfirmExpoKey(key);
-                      } else {
-                        void handleGenerateQrForExpo(key);
-                      }
-                    }}
-                    disabled={Boolean(generatingQrForExpoId)}
-                    title={qrImage ? t("card.qrRegenerateTitle") : t("card.qrGenerateTitle")}
-                    aria-label={qrImage ? t("card.qrRegenerateAriaLabel") : t("card.qrGenerateAriaLabel")}
-                  >
-                    {generatingQrForExpoId === ex.id ? (
-                      <Loader2 className="h-8 w-8 animate-spin text-amber-800" aria-hidden />
-                    ) : qrImage ? (
-                      <ImageWithSkeleton
-                        src={qrImage}
-                        alt={`QR code — ${expoTitle(ex)}`}
-                        wrapperClassName="h-20 w-20"
-                        className="h-20 w-20 object-contain"
-                      />
-                    ) : (
-                      <>
-                        <QrCode className="h-9 w-9 text-muted-foreground/80 shrink-0" aria-hidden />
-                        <span className="mt-0.5 text-[10px] leading-tight text-muted-foreground px-0.5">
-                          {t("card.qrGenerate")}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                  <p className="max-w-[130px] text-center text-[10px] leading-tight text-[#E63946]">
-                    <span className="whitespace-nowrap">{t("card.qrClickHint1")}</span>
-                    <br />
-                    <span>{t("card.qrClickHint2")}</span>
-                  </p>
+                <div className="flex shrink-0 flex-col items-center gap-1">
+                  <ExpoLogoThumb
+                    key={`${ex.id}-${logoRaw ?? "no-logo"}`}
+                    logoUrl={logoRaw}
+                    title={expoTitle(ex)}
+                    fallbackIcon={<Images className="h-12 w-12 text-muted-foreground" aria-hidden />}
+                  />
+                  {(sponsorLogosByExpoId[ex.id]?.length ?? 0) > 0 && (
+                    <>
+                      <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                        Sponsors / Mécènes
+                      </span>
+                      <SponsorCarousel logos={sponsorLogosByExpoId[ex.id]} />
+                    </>
+                  )}
                 </div>
-                <ExpoLogoThumb
-                  key={`${ex.id}-${logoRaw ?? "no-logo"}`}
-                  logoUrl={logoRaw}
-                  title={expoTitle(ex)}
-                  fallbackIcon={<Images className="h-12 w-12 text-muted-foreground" aria-hidden />}
-                />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-serif font-bold text-lg">{expoTitle(ex)}</h3>
                   {curatorLabel && (
@@ -709,6 +766,37 @@ const Expos = () => {
                       </Link>
                     </p>
                   )}
+                  {(() => {
+                    const raw = ex.expo_descript_i18n;
+                    if (!raw) return null;
+                    // Même logique que VisitorWelcome.extractExpoDescription (lignes 55-74)
+                    const lang = i18n.language?.slice(0, 2) || "fr";
+                    let text: string | null = null;
+                    if (typeof raw === "object" && raw !== null) {
+                      const obj = raw as Record<string, string>;
+                      text = obj[lang] ?? obj["fr"] ?? Object.values(obj)[0] ?? null;
+                    } else if (typeof raw === "string") {
+                      try {
+                        const obj = JSON.parse(raw) as Record<string, string>;
+                        text = obj[lang] ?? obj["fr"] ?? Object.values(obj)[0] ?? raw;
+                      } catch { text = raw; }
+                    }
+                    if (!text?.trim()) return null;
+                    return (
+                      <div className="mt-2">
+                        <p className="text-sm text-muted-foreground line-clamp-5 h-[120px]">
+                          {text}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-1 text-xs text-primary hover:underline underline-offset-2"
+                          onClick={(e) => { e.stopPropagation(); setDescriptionPopup(text); }}
+                        >
+                          Lire la suite…
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex w-full flex-col gap-2 md:w-[190px] shrink-0">
                   <Button
@@ -725,6 +813,31 @@ const Expos = () => {
                   </Button>
                   <Button
                     type="button"
+                    size="sm"
+                    className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                    asChild
+                  >
+                    <Link
+                      to={`/expos/visitors?expo_id=${encodeURIComponent(ex.id)}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t("card.cardVisitors")}
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDownloadVisitorQr(ex.id, expoTitle(ex));
+                    }}
+                  >
+                    {t("card.downloadQrVisitor")}
+                  </Button>
+                  <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     className="w-full justify-center"
@@ -734,6 +847,18 @@ const Expos = () => {
                     }}
                   >
                     {t("card.printPanel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSponsorExpo({ id: ex.id, name: expoTitle(ex) });
+                    }}
+                  >
+                    {t("card.sponsors", "Sponsors / Mécènes")}
                   </Button>
                   <Button type="button" variant="default" size="sm" className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground" asChild>
                     <Link to={`/catalogue?expo=${encodeURIComponent(ex.id)}`} onClick={(e) => e.stopPropagation()}>
@@ -747,6 +872,14 @@ const Expos = () => {
         })}
       </div>
 
+      {sponsorExpo !== null && (
+        <SponsorDialog
+          open
+          onOpenChange={(o) => { if (!o) setSponsorExpo(null); }}
+          expoId={sponsorExpo.id || null}
+          expoName={sponsorExpo.name}
+        />
+      )}
       <ExpoFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -754,6 +887,7 @@ const Expos = () => {
         expoId={formMode === "edit" ? editingExpoId : null}
         fieldKeys={expoFieldKeys}
         onSuccess={() => void load()}
+        canPickAgency={typeof role_id === "number" && role_id < 4}
       />
       {panelFormatExpo && (
         <div
@@ -836,6 +970,15 @@ const Expos = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Popup description complète */}
+      <Dialog open={!!descriptionPopup} onOpenChange={(o) => { if (!o) setDescriptionPopup(null); }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogTitle className="font-serif text-lg">Description</DialogTitle>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {descriptionPopup}
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

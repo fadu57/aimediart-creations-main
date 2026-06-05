@@ -1,6 +1,6 @@
 /**
  * Capture silencieuse géoloc (ipapi.co, HTTPS) + empreinte navigateur + détails device (JSONB).
- * Clé sessionStorage partagée avec la page /login lorsque `from=home-tarifs`.
+ * Clé sessionStorage partagée avec la page /login lorsque `from=organisation-tarifs`.
  */
 export const SESSION_LOGIN_TRACKER_KEY = "aimediart_login_tracker";
 
@@ -210,13 +210,13 @@ export function clearLoginTrackerSession(): void {
 }
 
 /**
- * Construit l’URL /login avec `from=home-tarifs`, le plan optionnel, et les paramètres geo/fp courts.
+ * Construit l’URL /login avec `from=organisation-tarifs`, le plan optionnel, et les paramètres geo/fp courts.
  */
 export function buildLoginHrefFromVisitor(
   extra: Record<string, string>,
   visitor: VisitorCaptureResult | null,
 ): string {
-  const p = new URLSearchParams({ from: "home-tarifs", ...extra });
+  const p = new URLSearchParams({ from: "organisation-tarifs", ...extra });
   const lang = (visitor?.browserLanguage || DEFAULT_LANG).slice(0, 48);
   p.set("lang", lang);
   if (visitor) {

@@ -6,11 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, Building2, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { Swiper as SwiperInstance } from "swiper";
-import { Thumbs } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
-import "swiper/css/free-mode";
-import "swiper/css/thumbs";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -21,7 +18,7 @@ import {
   resolveVisitorMediationText,
   rowCanonicalMediationStyle,
 } from "@/lib/mediationVisitorStyles";
-import { normalizeMediationStyleKeyForLookup } from "@/lib/artworkDescriptionI18n";
+import { getMediationFilledUiLangs, normalizeMediationStyleKeyForLookup } from "@/lib/artworkDescriptionI18n";
 import {
   expandSlidesForInfiniteCarousel,
   mediationCarouselLogicalIndex,
@@ -208,7 +205,6 @@ const VisitorView = () => {
   const [pendingCommentText, setPendingCommentText] = useState("");
   const [commentError, setCommentError] = useState<string | null>(null);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
-  const [thumbsSwiper, setThumbsSwiper] = useState<SwiperInstance | null>(null);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [sameArtistArtworkIds, setSameArtistArtworkIds] = useState<string[]>([]);
   const [quickFeedbackMessage, setQuickFeedbackMessage] = useState<string | null>(null);
@@ -530,6 +526,16 @@ const VisitorView = () => {
     [artwork?.artwork_description_i18n],
   );
 
+  const availableMediationLangs = useMemo(
+    () => getMediationFilledUiLangs(artworkDescriptionResolved),
+    [artworkDescriptionResolved],
+  );
+
+  const languageOptionsForArtwork = useMemo(() => {
+    const filtered = UI_LANGUAGE_OPTIONS.filter((o) => availableMediationLangs.includes(o.value));
+    return filtered.length > 0 ? filtered : [UI_LANGUAGE_OPTIONS[0]];
+  }, [availableMediationLangs]);
+
   const aiSlides = useMemo((): MediationAiSlide[] => {
     const ordered = [...promptStylesDb].sort((a, b) => {
       const oa =
@@ -588,21 +594,15 @@ const VisitorView = () => {
     [aiSlides, mediationSlideCount],
   );
 
-  const goToMediationSlide = useCallback(
-    (logicalIndex: number) => {
-      const main = mediationMainSwiperRef.current;
-      const thumbs = thumbsSwiper;
-      if (main && !main.destroyed) {
-        if (mediationSwiperLoop) main.slideToLoop(logicalIndex);
-        else main.slideTo(logicalIndex);
-      }
-      if (thumbs && !thumbs.destroyed) {
-        if (mediationSwiperLoop) thumbs.slideToLoop(logicalIndex);
-        else thumbs.slideTo(logicalIndex);
-      }
-    },
-    [thumbsSwiper, mediationSwiperLoop],
-  );
+  const goMediationPrev = useCallback(() => {
+    const main = mediationMainSwiperRef.current;
+    if (main && !main.destroyed && mediationSlideCount > 1) main.slidePrev();
+  }, [mediationSlideCount]);
+
+  const goMediationNext = useCallback(() => {
+    const main = mediationMainSwiperRef.current;
+    if (main && !main.destroyed && mediationSlideCount > 1) main.slideNext();
+  }, [mediationSlideCount]);
 
   useEffect(() => {
     if (!aiSlides.length) return;
@@ -629,7 +629,7 @@ const VisitorView = () => {
     const updateQuickFeedbackPosition = () => {
       const targetRect = thumbsSectionRef.current?.getBoundingClientRect();
       if (!targetRect) return;
-      // Positionne le popup à la base (bas) du bloc thumbs-swiper.
+      // Positionne le popup à la base (bas) du bloc navigation médiation.
       const nextTop = Math.max(68, Math.round(targetRect.bottom - 106));
       setQuickFeedbackTop(nextTop);
     };
@@ -682,7 +682,8 @@ const VisitorView = () => {
   const isVisitorMenuRestricted = !isAuthenticated || role_id === 7;
   /** Rôles globaux SaaS (1–3) : accès page Configuration, comme le header backoffice. */
   const canSeeSettings = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
-  const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
+  const activeLanguage =
+    languageOptionsForArtwork.find((option) => option.value === language) ?? languageOptionsForArtwork[0];
   const userMeta = (session?.user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const headerFirstName =
     (first_name?.trim() || "") ||
@@ -700,6 +701,13 @@ const VisitorView = () => {
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {
+    if (!artwork || availableMediationLangs.length === 0) return;
+    if (!availableMediationLangs.includes(language)) {
+      setLanguage(availableMediationLangs[0]);
+    }
+  }, [artwork, availableMediationLangs, language, setLanguage]);
+
+  useEffect(() => {
     if (!canSubmitFeedback) return;
     actionBarRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [canSubmitFeedback]);
@@ -708,7 +716,7 @@ const VisitorView = () => {
     if (isAuthenticated) {
       await supabase.auth.signOut({ scope: "local" });
       setIsAuthenticated(false);
-      navigate("/home", { replace: true });
+      navigate("/organisation", { replace: true });
       return;
     }
     if (typeof window !== "undefined") {
@@ -1095,7 +1103,7 @@ const VisitorView = () => {
                     aria-label={t("aria_language")}
                     title={t("aria_language")}
                   >
-                    {UI_LANGUAGE_OPTIONS.map((option) => (
+                    {languageOptionsForArtwork.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -1246,7 +1254,7 @@ const VisitorView = () => {
           )}
         </div>
 
-        {/* Résultats IA — Swiper Thumbs Gallery */}
+        {/* Résultats IA — navigation par flèches */}
         <div className="œuvre-full-width-box mb-[16px] rounded-2xl bg-[rgba(18,18,18,0.65)] px-0 pb-3 pt-2">
           <div className="mb-2 flex items-center gap-2 px-5">
             <span className="text-xl">📖</span>
@@ -1261,50 +1269,33 @@ const VisitorView = () => {
             </div>
           ) : (
             <>
-              <div ref={thumbsSectionRef}>
-                <Swiper
-                  key={`med-thumbs-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
-                  modules={[Thumbs]}
-                  onSwiper={setThumbsSwiper}
-                  loop={mediationSwiperLoop}
-                  loopAdditionalSlides={2}
-                  centeredSlides
-                  slideToClickedSlide={false}
-                  watchSlidesProgress
-                  slidesPerView="auto"
-                  spaceBetween={8}
-                  className="thumbs-swiper mt-0 px-0 pb-1"
+              <div ref={thumbsSectionRef} className="flex items-center justify-center gap-6 px-5 py-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 rounded-full border-white/20 bg-white/5 text-[#F0F0F0] hover:bg-white/10 hover:text-white"
+                  disabled={mediationSlideCount <= 1}
+                  aria-label={t("aria_mediation_prev")}
+                  onClick={goMediationPrev}
                 >
-                  {carouselSlides.map((slide) => {
-                    const isConteur = slide.canonicalCode === "conteur";
-                    const logicalIdx = aiSlides.findIndex((s) => s.sid === slide.sid);
-                    return (
-                      <SwiperSlide key={`thumb-ai-${slide.loopSlideKey}`} className="thumbs-slide">
-                        <button
-                          type="button"
-                          data-mediation-key={slide.jsonLookupKey}
-                          aria-label={`${slide.label} — ${slide.jsonLookupKey}`}
-                          className="persona-card flex snap-center flex-col items-stretch justify-center gap-0.5 p-1 text-xs font-semibold leading-tight text-[#F0F0F0] h-[88px]"
-                          onClick={() => {
-                            if (logicalIdx >= 0) goToMediationSlide(logicalIdx);
-                            setSelectedPromptStyleId(slide.sid);
-                          }}
-                        >
-                          <span className={`text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`} aria-hidden>
-                            {slide.icon}
-                          </span>
-                          <span className="w-full whitespace-normal break-words text-center leading-tight">{slide.label}</span>
-                        </button>
-                      </SwiperSlide>
-                    );
-                  })}
-                </Swiper>
+                  <ChevronLeft className="h-5 w-5" aria-hidden />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 rounded-full border-white/20 bg-white/5 text-[#F0F0F0] hover:bg-white/10 hover:text-white"
+                  disabled={mediationSlideCount <= 1}
+                  aria-label={t("aria_mediation_next")}
+                  onClick={goMediationNext}
+                >
+                  <ChevronRight className="h-5 w-5" aria-hidden />
+                </Button>
               </div>
 
-              {thumbsSwiper && !thumbsSwiper.destroyed ? (
               <Swiper
                 key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
-                modules={[Thumbs]}
                 onSwiper={(swiper) => {
                   mediationMainSwiperRef.current = swiper;
                 }}
@@ -1316,17 +1307,26 @@ const VisitorView = () => {
                 slidesPerView={1}
                 spaceBetween={10}
                 className="mt-2 px-5"
-                thumbs={{ swiper: thumbsSwiper }}
                 onSlideChange={(swiper) => {
                   const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
                   const active = resolveLogicalSlide(raw);
                   if (active) setSelectedPromptStyleId(active.sid);
                 }}
               >
-                {carouselSlides.map((slide) => (
+                {carouselSlides.map((slide) => {
+                  const isConteur = slide.canonicalCode === "conteur";
+                  return (
                   <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
                     <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-sm leading-relaxed text-[#F0F0F0]/90">
-                      <div className="mb-2">
+                      <div className="mb-2 flex items-center gap-1.5">
+                        {slide.icon ? (
+                          <span
+                            className={`shrink-0 text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
+                            aria-hidden
+                          >
+                            {slide.icon}
+                          </span>
+                        ) : null}
                         <span className="inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-relaxed text-white">
                           {slide.label}
                         </span>
@@ -1337,11 +1337,9 @@ const VisitorView = () => {
                       />
                     </article>
                   </SwiperSlide>
-                ))}
+                  );
+                })}
               </Swiper>
-              ) : (
-                <div className="mt-2 min-h-[120px] px-5" aria-hidden />
-              )}
             </>
           )}
         </div>

@@ -18,7 +18,61 @@
     "benefit_artist": "Nachrichten an Künstler",
     "benefit_profile": "Dauerhaftes Profil für weitere Ausstellungen",
     "link_organizer": "Veranstalterbereich",
-    "login_existing": "Bereits registriert? Anmelden"
+    "login_existing": "Bereits registriert? Anmelden",
+    "btn_recover": "Besucherprofil finden (Code)",
+    "quick_avatar": {
+      "title": "Wählen Sie Ihren Avatar",
+      "title_line2": "der Sie während des gesamten Besuchs begleitet",
+      "btn_continue": "Besuch fortsetzen",
+      "btn_back": "Zurück",
+      "btn_loading": "Vorbereitung…",
+      "toast_pick_avatar": "Wählen Sie einen Avatar, um fortzufahren.",
+      "toast_failed": "Schnellbesuch konnte nicht gestartet werden. Bitte erneut versuchen.",
+      "toast_selfie_saved": "Selfie aufgenommen.",
+      "toast_selfie_failed": "Selfie-Aufnahme fehlgeschlagen."
+    },
+    "welcome_back": {
+      "greeting": "Willkommen zurück, <pseudo>{{pseudo}}</pseudo>!",
+      "subtitle": "Schön, Sie bei {{expo_name}} wiederzusehen.",
+      "subtitle_no_expo": "Schön, Sie wiederzusehen.",
+      "greeting_auth": "Willkommen, <pseudo>{{pseudo}}</pseudo>!",
+      "subtitle_auth": "Schön, Sie bei {{expo_name}} wiederzusehen.",
+      "avatar_alt": "Avatar von {{pseudo}}",
+      "selfie_alt": "Selfie von {{pseudo}}",
+      "btn_continue": "Besuch fortsetzen",
+      "btn_change_avatar": "Anderen Avatar wählen",
+      "btn_link_code": "Mein Verknüpfungscode",
+      "btn_not_me": "Das bin ich nicht",
+      "btn_loading": "Vorbereitung…",
+      "toast_failed": "Besuch konnte nicht fortgesetzt werden. Bitte erneut versuchen."
+    },
+    "recover": {
+      "title": "Verknüpfungscode",
+      "subtitle": "anderer Browser oder anderes Gerät",
+      "description": "Geben Sie den 8-stelligen Code von Ihrem ersten Besuch ein (z. B. ABCD-2345).",
+      "placeholder": "ABCD-2345",
+      "input_aria": "Besucher-Verknüpfungscode",
+      "btn_submit": "Profil finden",
+      "btn_loading": "Prüfung…",
+      "errors": {
+        "invalid_format": "Der Code muss 8 Zeichen haben.",
+        "not_found": "Code nicht gefunden. Prüfen Sie die Eingabe oder legen Sie ein neues Profil an.",
+        "incomplete": "Dieses Profil ist noch nicht vollständig.",
+        "generic": "Verknüpfung fehlgeschlagen. Bitte erneut versuchen."
+      }
+    },
+    "recovery_code": {
+      "title": "Ihr Verknüpfungscode",
+      "description": "Notieren oder kopieren Sie diesen Code, um Avatar und Pseudonym in einem anderen Browser wiederzufinden. Er ersetzt die automatische Fingerabdruck-Erkennung.",
+      "code_aria": "Achtstelliger Verknüpfungscode",
+      "unavailable": "Code auf diesem Gerät nicht verfügbar. Generieren Sie einen neuen (der alte Code funktioniert dann nicht mehr).",
+      "btn_copy": "Code kopieren",
+      "btn_regenerate": "Neuen Code erzeugen",
+      "btn_done": "Code notiert",
+      "toast_copied": "Code kopiert.",
+      "toast_copy_failed": "Kopieren fehlgeschlagen.",
+      "toast_regenerated": "Neuer Code erzeugt."
+    }
   },
   "cookie_banner": {
     "aria_label": "Cookie- und Tracking-Wahl",
@@ -27,7 +81,13 @@
     "link_rgpd": "Datenschutz (DSGVO)",
     "accept": "Alle akzeptieren",
     "refuse": "Ablehnen",
-    "privacy_note": "Ihre Wahl wird in einem Cookie und lokal gespeichert. Zum Zurücksetzen: Websitedaten löschen."
+    "privacy_note": "Ihre Wahl wird in einem Cookie und lokal gespeichert. Zum Zurücksetzen: Websitedaten löschen.",
+    "refuse_dialog": {
+      "title": "Schade …",
+      "description": "Ohne Zustimmung zur anonymen technischen Kennung nutzen Sie die personalisierte Vermittlung nur eingeschränkt. Für den Betrieb nötige Cookies werden weiter verwendet.",
+      "confirm_refuse": "Ablehnung bestätigen",
+      "accept_instead": "Doch akzeptieren"
+    }
   },
   "legal_pages": {
     "back": "Zurück",

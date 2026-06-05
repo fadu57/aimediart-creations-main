@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { persistVisitorProfile } from "../_shared/visitorProfile.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -132,8 +133,21 @@ serve(async (req: Request) => {
     user_metadata: {
       prenom,
       nom,
+      first_name: prenom,
+      last_name: nom,
       user_prenom: userPrenom,
       full_name: fullName,
+      role_id: 7,
+      role_name: "visiteur",
+      user_roles: "7",
+      agency_id: resolvedAgencyId,
+      expo_id: resolvedExpoId,
+      user_expo_id: resolvedExpoId,
+      user_age: userAge,
+      user_phone: userPhone,
+      user_photo_url: userPhotoUrl,
+      user_email: email,
+      ...(deviceFingerprint ? { device_fingerprint: deviceFingerprint } : {}),
     },
   });
 
@@ -151,43 +165,23 @@ serve(async (req: Request) => {
     return jsonResponse(500, { ok: false, code: "missing_user_id", error: "ID utilisateur non retourné." });
   }
 
-  if (deviceFingerprint) {
-    const mergedMeta = {
-      ...(typeof created.user?.user_metadata === "object" && created.user?.user_metadata !== null
-        ? created.user.user_metadata
-        : {}),
-      device_fingerprint: deviceFingerprint,
-    };
-    const { error: metaErr } = await admin.auth.admin.updateUserById(userId, { user_metadata: mergedMeta });
-    if (metaErr && Deno.env.get("DENO_DEPLOYMENT_ID")) {
-      /* métadonnée secondaire : ne bloque pas l’inscription */
-    }
-  }
-
-  const payload = {
-    id: userId,
-    role_id: "7",
-    user_prenom: userPrenom || null,
-    agency_id: resolvedAgencyId,
-    user_expo_id: resolvedExpoId,
-  };
-  const payloadUsers = {
-    ...payload,
-    user_nom: nom || null,
-    user_age: userAge,
-    user_phone: userPhone,
-    user_photo_url: userPhotoUrl,
-    user_roles: "7",
-    user_email: email,
-  };
-
-  const firstTry = await admin.from("user").upsert(payload, { onConflict: "id" });
-  const secondTry = await admin.from("users").upsert(payloadUsers, { onConflict: "id" });
-  if (firstTry.error && secondTry.error) {
+  const profileResult = await persistVisitorProfile(admin, {
+    userId,
+    email,
+    prenom,
+    nom,
+    agencyId: resolvedAgencyId,
+    expoId: resolvedExpoId,
+    userAge,
+    userPhone,
+    userPhotoUrl,
+    deviceFingerprint,
+  });
+  if (!profileResult.ok) {
     return jsonResponse(500, {
       ok: false,
       code: "profile_upsert_failed",
-      error: `${firstTry.error.message} | ${secondTry.error.message}`,
+      error: profileResult.error,
     });
   }
 
@@ -199,6 +193,14 @@ serve(async (req: Request) => {
       .is("user_id", null);
     if (reconcileError && reconcileError.message && Deno.env.get("DENO_DEPLOYMENT_ID")) {
       // noop: rattachement des visites non bloquant
+    }
+
+    const { error: linkVisitorError } = await admin.rpc("link_visitor_to_auth_user", {
+      p_visitor_client_id: visitorUuid,
+      p_auth_user_id: userId,
+    });
+    if (linkVisitorError && Deno.env.get("DENO_DEPLOYMENT_ID")) {
+      // noop : liaison profil anonyme non bloquante
     }
   }
 

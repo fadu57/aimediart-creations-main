@@ -121,6 +121,7 @@
     "error_title": "Tarifs indisponibles",
     "error_text": "V\u00e9rifiez la connexion Supabase, la pr\u00e9sence de la table \u003ccode\u003epricing\u003c/code\u003e et les droits RLS en lecture.",
     "empty": "Aucune offre trouvée dans la table pricing.",
+    "empty_hint": "Vérifiez que la table contient des lignes et exécutez la policy SQL <code>pricing_public_anon_select</code> (fichier supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Sélectionner votre option",
     "option_prefix": "Option {{code}}",
     "col_monthly": "Mensuel TTC",

@@ -883,8 +883,8 @@ export default function PublicHome() {
                             <Link
                               to={
                                 isRayonnementCard
-                                  ? "/home/commencer?intent=devis"
-                                  : `/home/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
+                                  ? "/organisation/commencer?intent=devis"
+                                  : `/organisation/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
                               }
                             >
                               <Button

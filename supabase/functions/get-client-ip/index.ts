@@ -3,6 +3,7 @@
 // NOTE RGPD: conserver une base légale et anonymiser si nécessaire.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 
 function firstForwardedIp(headerValue: string | null): string | null {
   if (!headerValue) return null;
@@ -12,13 +13,11 @@ function firstForwardedIp(headerValue: string | null): string | null {
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-      },
-    });
+    return corsPreflightResponse();
+  }
+
+  if (req.method !== "POST" && req.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   const ip =
@@ -26,13 +25,5 @@ serve(async (req: Request) => {
     req.headers.get("x-real-ip")?.trim() ||
     null;
 
-  return new Response(JSON.stringify({ ip_address: ip }), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Cache-Control": "no-store",
-    },
-  });
+  return jsonResponse({ ip_address: ip });
 });
-

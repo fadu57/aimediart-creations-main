@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, Lightbulb, QrCode, Zap } from "lucide-react";
+import { Lightbulb, QrCode, Zap } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
 
 import { Button } from "@/components/ui/button";
+import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { resolveScanTargetFromQr } from "@/lib/oeuvrePublicUrl";
 import {
   buildQrScannerCameraConfig,
@@ -52,7 +53,7 @@ const WorkScanner = () => {
 
   const handleQuit = async () => {
     await supabase.auth.signOut({ scope: "local" });
-    navigate("/home");
+    navigate("/organisation");
   };
 
   const handleQrDecoded = useCallback(
@@ -250,17 +251,7 @@ const WorkScanner = () => {
     <div className="flex flex-1 flex-col items-center px-4 pb-6 pt-3">
       <div className="w-full max-w-[320px]">
         <div className="mb-3 flex w-full items-start justify-start">
-          <div className="flex items-center gap-2 rounded bg-background/80 px-1 py-0.5 backdrop-blur-sm">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[15%] bg-accent shadow-sm">
-              <span className="inline-flex animate-logo-heart">
-                <Heart className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.25} />
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-accent">AIMEDIArt.com</p>
-              <p className="text-[10px] font-semibold italic text-accent">Médiation artistique par IA</p>
-            </div>
-          </div>
+          <AimediartBrandLogoBlock size="sm" animateHeart backdrop />
         </div>
         <div className="mx-auto mt-3 flex min-h-[calc(100vh-7.5rem)] flex-col items-center justify-start gap-5 pt-0 text-center">
           <div

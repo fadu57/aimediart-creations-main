@@ -25,7 +25,8 @@ export function getStoredFingerprintJsId(): string | null {
 
 /**
  * Identifiant FingerprintJS (bibliothèque @fingerprintjs/fingerprintjs), uniquement si consentement explicite.
- * Stocké en local ; aucun appel réseau vers un service tiers autre que le script de la lib côté navigateur.
+ * Stable pour un même navigateur / profil ; un autre navigateur obtient un autre visitorId.
+ * Ne pas confondre avec le hash user_agent de visitorTracking.ts (flux inscription / login).
  */
 export async function loadOrCreateFingerprintJsId(): Promise<string | null> {
   if (typeof window === "undefined") return null;

@@ -53,8 +53,8 @@ function FloatingNav({
 }: {
   isMobileOpen: boolean;
   setIsMobileOpen: (v: boolean) => void;
-  /** "" = ancres sur la page courante ; "/home" = ancres vers la vitrine (pages légales) */
-  vitrinePathPrefix: "" | "/home";
+  /** "" = ancres sur la page courante ; "/organisation" = ancres vers la vitrine (pages légales) */
+  vitrinePathPrefix: "" | "/organisation";
 }) {
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("home");
@@ -241,7 +241,7 @@ function VantaCloudsBackground() {
   return <div ref={vantaRef} className="fixed inset-0 z-0" aria-hidden />;
 }
 
-function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/home" }) {
+function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/organisation" }) {
   const { t } = useTranslation("home");
   const contactHref = vitrinePathPrefix ? `${vitrinePathPrefix}#contact` : "#contact";
 
@@ -289,8 +289,8 @@ function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/
 
 type PublicVitrineShellProps = {
   children: ReactNode;
-  /** "" sur /home ; "/home" sur les pages légales pour que l’ancrage renvoie à la vitrine */
-  vitrinePathPrefix: "" | "/home";
+  /** "" sur /home ; "/organisation" sur les pages légales pour que l’ancrage renvoie à la vitrine */
+  vitrinePathPrefix: "" | "/organisation";
   /**
    * Si true, le shell n’impose pas de fond blanc opaque : le ciel Vanta reste visible
    * (pages CGV / cookies).

@@ -121,6 +121,7 @@
     "error_title": "Preise nicht verfügbar",
     "error_text": "Supabase-Verbindung pr\u00fcfen: Tabelle \u003ccode\u003epricing\u003c/code\u003e vorhanden und RLS-Leserechte korrekt.",
     "empty": "Kein Angebot in der Preistabelle gefunden.",
+    "empty_hint": "Prüfen Sie, ob die Tabelle Daten enthält, und führen Sie die SQL-Policy <code>pricing_public_anon_select</code> aus (Datei supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Option auswählen",
     "option_prefix": "Option {{code}}",
     "col_monthly": "Monatlich (inkl. MwSt.)",

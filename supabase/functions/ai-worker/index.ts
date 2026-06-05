@@ -285,6 +285,45 @@ Deno.serve(async (req: Request): Promise<Response> => {
       `[ai-worker] Groq done job=${job.id} textLen=${text.length}`,
     );
 
+    // Write-back expo_descript_i18n si translate_fiche avec expo_id + targetLang
+    if (
+      job.job_type === 'translate_fiche' &&
+      typeof payload.expo_id === 'string' && payload.expo_id &&
+      typeof payload.targetLang === 'string' && payload.targetLang &&
+      text
+    ) {
+      try {
+        const { data: expoRow } = await supabase
+          .from('expos')
+          .select('expo_descript_i18n')
+          .eq('id', payload.expo_id)
+          .single();
+        let current: Record<string, string> = {};
+        const raw = (expoRow as { expo_descript_i18n?: unknown } | null)?.expo_descript_i18n;
+        if (raw) {
+          try {
+            if (typeof raw === 'object' && !Array.isArray(raw)) {
+              current = raw as Record<string, string>;
+            } else if (typeof raw === 'string') {
+              current = JSON.parse(raw) as Record<string, string>;
+            }
+          } catch { current = {}; }
+        }
+        const updated = { ...current, [payload.targetLang as string]: text };
+        const { error: expoWriteErr } = await supabase
+          .from('expos')
+          .update({ expo_descript_i18n: updated })
+          .eq('id', payload.expo_id as string);
+        if (expoWriteErr) {
+          console.error('[ai-worker] expo_descript_i18n write failed', expoWriteErr.message);
+        } else {
+          console.log(`[ai-worker] expo_descript_i18n[${payload.targetLang}] written for expo ${payload.expo_id}`);
+        }
+      } catch (writeErr) {
+        console.error('[ai-worker] expo write-back unexpected error', writeErr);
+      }
+    }
+
     const { error: updateDoneError } = await supabase
       .from('ai_jobs')
       .update({

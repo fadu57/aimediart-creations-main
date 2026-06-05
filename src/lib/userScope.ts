@@ -53,6 +53,7 @@ export function resolveAgencyExpoFromJwt(user: User | null): {
 
   const expoRaw =
     (typeof meta?.expo_id === "string" && meta.expo_id.trim()) ||
+    (typeof meta?.user_expo_id === "string" && meta.user_expo_id.trim()) ||
     (typeof app?.expo_id === "string" && app.expo_id.trim()) ||
     (import.meta.env.VITE_DEFAULT_EXPO_ID as string | undefined)?.trim() ||
     "";

@@ -5,6 +5,7 @@ import "./i18n/config";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "flag-icons/css/flag-icons.min.css";
+import "leaflet/dist/leaflet.css";
 import "./index.css";
 
 const rootEl = document.getElementById("root");

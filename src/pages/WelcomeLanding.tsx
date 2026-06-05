@@ -15,7 +15,7 @@ const WelcomeLanding = () => {
 
   const choose = (role: AudienceChoice) => {
     setAudienceChoice(role);
-    navigate(role === "organizer" ? "/home" : "/visitor", { replace: true });
+    navigate(role === "organizer" ? "/organisation" : "/visitor", { replace: true });
   };
 
   return (

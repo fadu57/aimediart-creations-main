@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Review avatars — 2 500 combinaisons</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f4f5;
+        --card: #ffffff;
+        --border: #d4d4d8;
+        --text: #18181b;
+        --muted: #71717a;
+        --ok: #16a34a;
+        --missing: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #09090b;
+          --card: #18181b;
+          --border: #3f3f46;
+          --text: #fafafa;
+          --muted: #a1a1aa;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--card);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 1.25rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+      }
+      p.hint {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        font-size: 0.875rem;
+        line-height: 1.4;
+      }
+      .config {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 768px) {
+        .config {
+          grid-template-columns: 1fr 1fr auto;
+          align-items: end;
+        }
+      }
+      label {
+        display: grid;
+        gap: 0.25rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 0.5rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+      }
+      input.mono-secret {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.8125rem;
+        -webkit-text-security: disc;
+        text-security: disc;
+      }
+      button {
+        padding: 0.55rem 1rem;
+        border: none;
+        border-radius: 0.5rem;
+        background: #2563eb;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      .stats {
+        margin-top: 0.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+        font-size: 0.875rem;
+      }
+      .stats span strong {
+        font-variant-numeric: tabular-nums;
+      }
+      .stats .ok {
+        color: var(--ok);
+      }
+      .stats .missing {
+        color: var(--missing);
+      }
+      .live-status {
+        margin-top: 0.5rem;
+        font-size: 0.8125rem;
+        color: var(--muted);
+      }
+      .live-status.is-on {
+        color: var(--ok);
+      }
+      .live-status.is-off {
+        color: var(--missing);
+      }
+      .progress-wrap {
+        flex: 1 1 14rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: min(100%, 14rem);
+      }
+      .progress-row {
+        margin-top: 0.75rem;
+        display: none;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: stretch;
+      }
+      .progress-row.is-visible {
+        display: flex;
+      }
+      .progress-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        font-size: 0.8125rem;
+        color: var(--muted);
+      }
+      .progress-label strong {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+      progress.progress-bar {
+        width: 100%;
+        height: 0.75rem;
+        border: none;
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      progress.progress-bar::-webkit-progress-bar {
+        background: var(--bg);
+        border-radius: 999px;
+      }
+      progress.progress-bar::-webkit-progress-value {
+        background: linear-gradient(90deg, #16a34a, #22c55e);
+        border-radius: 999px;
+      }
+      progress.progress-bar::-moz-progress-bar {
+        background: linear-gradient(90deg, #16a34a, #22c55e);
+        border-radius: 999px;
+      }
+      progress.progress-bar-pause::-webkit-progress-value {
+        background: linear-gradient(90deg, #d97706, #f59e0b);
+        border-radius: 999px;
+      }
+      progress.progress-bar-pause::-moz-progress-bar {
+        background: linear-gradient(90deg, #d97706, #f59e0b);
+        border-radius: 999px;
+      }
+      .progress-wrap-pause:not(.is-active) progress.progress-bar-pause::-webkit-progress-value {
+        background: var(--border);
+      }
+      .progress-wrap-pause:not(.is-active) progress.progress-bar-pause::-moz-progress-bar {
+        background: var(--border);
+      }
+      .progress-wrap-pause:not(.is-active) .progress-label span::after {
+        content: " (entre chaque génération)";
+        font-weight: normal;
+        opacity: 0.85;
+      }
+      .cell.cell-live-flash {
+        animation: live-flash 1.2s ease-out;
+      }
+      @keyframes live-flash {
+        0% {
+          box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.65);
+        }
+        100% {
+          box-shadow: 0 0 0 10px rgba(22, 163, 74, 0);
+        }
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 100px);
+        grid-auto-rows: auto;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        width: 100%;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        width: 100px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 0.35rem;
+        overflow: hidden;
+      }
+      .cell img {
+        width: 100%;
+        height: 72px;
+        min-height: 72px;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 0.35rem;
+        background: #fff;
+        display: block;
+      }
+      .cell img.is-missing {
+        outline: 2px solid var(--missing);
+        outline-offset: -2px;
+        opacity: 0.5;
+        background: repeating-linear-gradient(
+          -45deg,
+          #fee2e2,
+          #fee2e2 6px,
+          #fecaca 6px,
+          #fecaca 12px
+        );
+      }
+      .cell img.is-ungenerated {
+        outline: 1px dashed var(--border);
+        outline-offset: -1px;
+        opacity: 0.35;
+        background: var(--bg);
+      }
+      .cell img.is-loaded {
+        outline: 2px solid var(--ok);
+        outline-offset: -2px;
+      }
+      .cell code {
+        display: block;
+        font-size: 0.5625rem;
+        line-height: 1.2;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .grid-divider {
+        grid-column: 1 / -1;
+        margin: 0.75rem 0 0.25rem;
+        padding: 0.5rem 0.75rem;
+        border-top: 2px dashed var(--border);
+        text-align: center;
+        font-size: 0.8125rem;
+        color: var(--muted);
+      }
+      #status {
+        padding: 1rem 1.25rem;
+        color: var(--muted);
+      }
+        .error {
+        color: var(--missing);
+        white-space: pre-wrap;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Review avatars (pseudo_pool × Storage)</h1>
+      <p class="hint">
+        Collez les valeurs de votre fichier <code>.env</code> (<code>VITE_SUPABASE_URL</code> et
+        <code>VITE_SUPABASE_ANON_KEY</code>). Un navigateur ne peut pas lire <code>.env</code> directement :
+        la config est mémorisée dans <code>localStorage</code> de ce navigateur.
+      </p>
+      <form id="config-form" class="config" autocomplete="off" method="post" action="#" novalidate>
+        <label>
+          URL Supabase
+          <input
+            id="supabase-url"
+            name="supabase_project_url"
+            type="text"
+            inputmode="url"
+            spellcheck="false"
+            placeholder="https://xxxx.supabase.co"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            readonly
+            data-lpignore="true"
+            data-1p-ignore
+            required
+          />
+        </label>
+        <label>
+          Clé anon (publique)
+          <input
+            id="supabase-anon-key"
+            name="supabase_anon_key"
+            type="text"
+            spellcheck="false"
+            placeholder="eyJhbGciOiJIUzI1NiIs..."
+            autocomplete="off"
+            autocapitalize="off"
+            data-lpignore="true"
+            data-1p-ignore
+            class="mono-secret"
+            readonly
+            required
+          />
+        </label>
+        <button type="submit" id="load-btn">Charger la grille</button>
+      </form>
+      <div class="stats" id="stats" hidden>
+        <span>Combinaisons : <strong id="stat-total">0</strong></span>
+        <span>Générées (Storage) : <strong id="stat-known">0</strong></span>
+        <span class="ok">Affichées OK : <strong id="stat-loaded">0</strong></span>
+        <span>Reste à générer : <strong id="stat-remaining">0</strong></span>
+        <span class="missing">Erreurs affichage : <strong id="stat-errors">0</strong></span>
+      </div>
+      <div class="progress-row" id="progress-row">
+        <div class="progress-wrap" id="progress-wrap">
+          <div class="progress-label">
+            <span>Progression globale</span>
+            <strong id="progress-text">0 / 2500 (0 %)</strong>
+          </div>
+          <progress id="progress-bar" class="progress-bar" value="0" max="2500"></progress>
+        </div>
+        <div class="progress-wrap progress-wrap-pause" id="pause-progress-wrap">
+          <div class="progress-label">
+            <span>Pause HF</span>
+            <strong id="pause-progress-text">En attente</strong>
+          </div>
+          <progress id="pause-progress-bar" class="progress-bar progress-bar-pause" value="0" max="100"></progress>
+        </div>
+      </div>
+      <p id="live-status" class="live-status" hidden>Mise à jour en direct inactive.</p>
+    </header>
+
+    <div id="status">Configurez Supabase puis cliquez sur « Charger la grille ».</div>
+    <div id="grid"></div>
+
+    <script type="module">
+      import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+      if (window.location.search) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+
+      const STORAGE_BUCKET = "avatars";
+      const CONFIG_KEY = "review-avatars-config";
+      const REALTIME_REVIEW_CHANNEL = "avatar-review-live";
+      const LIST_PAGE_SIZE = 1000;
+      const PROMOTE_DEBOUNCE_MS = 2000;
+      const STORAGE_POLL_MS = 12_000;
+      const PAUSE_MIN_MS = 5_000;
+      const PAUSE_MAX_MS = 40_000;
+
+      const form = document.getElementById("config-form");
+      const urlInput = document.getElementById("supabase-url");
+      const keyInput = document.getElementById("supabase-anon-key");
+      const loadBtn = document.getElementById("load-btn");
+      const grid = document.getElementById("grid");
+      const statusEl = document.getElementById("status");
+      const statsEl = document.getElementById("stats");
+      const statTotal = document.getElementById("stat-total");
+      const statLoaded = document.getElementById("stat-loaded");
+      const statRemaining = document.getElementById("stat-remaining");
+      const statErrors = document.getElementById("stat-errors");
+      const statKnown = document.getElementById("stat-known");
+      const liveStatusEl = document.getElementById("live-status");
+      const progressRow = document.getElementById("progress-row");
+      const progressWrap = document.getElementById("progress-wrap");
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      const pauseProgressWrap = document.getElementById("pause-progress-wrap");
+      const pauseProgressBar = document.getElementById("pause-progress-bar");
+      const pauseProgressText = document.getElementById("pause-progress-text");
+
+      let loadedCount = 0;
+      let errorCount = 0;
+      let knownExistingCount = 0;
+      let supabaseUrlCached = "";
+      let liveSupabase = null;
+      let liveChannel = null;
+      let knownExisting = new Set();
+      let existingRecencyOrder = [];
+      let promoteTimer = null;
+      let storagePollTimer = null;
+      let pauseTimer = null;
+      let pauseEndsAt = 0;
+      let pauseDurationMs = 0;
+      let combinationsCache = [];
+
+      function getTopCellPath() {
+        return grid.querySelector(".cell")?.dataset.path ?? "";
+      }
+
+      function applyLatestToGrid(latestPath, existingSet) {
+        if (!latestPath) return;
+
+        const previousCount = knownExistingCount;
+
+        existingRecencyOrder = [
+          latestPath,
+          ...existingRecencyOrder.filter((path) => path !== latestPath),
+        ];
+        knownExisting = new Set(existingRecencyOrder);
+        knownExistingCount = knownExisting.size;
+
+        promoteExistingCells(existingSet);
+
+        const cell = refreshLatestCellImage(latestPath);
+        if (cell) {
+          cell.classList.add("cell-known", "cell-live-flash");
+          setTimeout(() => cell.classList.remove("cell-live-flash"), 1300);
+        }
+
+        statusEl.textContent = `Dernier généré : ${latestPath}`;
+        refreshDerivedStats();
+
+        if (knownExistingCount > previousCount) {
+          schedulePauseAfterUpload();
+        }
+      }
+
+      function randomPauseMs() {
+        return PAUSE_MIN_MS + Math.floor(Math.random() * (PAUSE_MAX_MS - PAUSE_MIN_MS + 1));
+      }
+
+      function schedulePauseAfterUpload(durationMs = null, endsAtIso = null) {
+        if (durationMs) {
+          startPauseCountdown(Number(durationMs), endsAtIso ? String(endsAtIso) : null);
+          return;
+        }
+
+        const remaining = pauseEndsAt - Date.now();
+        if (pauseDurationMs && remaining > 1500) return;
+
+        startPauseCountdown(randomPauseMs());
+      }
+
+      function recencyRank(objectPath) {
+        const index = existingRecencyOrder.indexOf(objectPath);
+        return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+      }
+
+      function bumpRecency(objectPath) {
+        existingRecencyOrder = [
+          objectPath,
+          ...existingRecencyOrder.filter((path) => path !== objectPath),
+        ];
+      }
+
+      function insertCellAsNewest(cell) {
+        const divider = grid.querySelector(".grid-divider");
+        if (divider) {
+          grid.insertBefore(cell, divider);
+          return;
+        }
+        const firstCell = grid.querySelector(".cell");
+        if (firstCell && firstCell !== cell) {
+          grid.insertBefore(cell, firstCell);
+        }
+      }
+      function schedulePromoteFromLoadedImages() {
+        if (promoteTimer) clearTimeout(promoteTimer);
+        promoteTimer = setTimeout(() => {
+          promoteTimer = null;
+          const loadedPaths = new Set(knownExisting);
+          for (const cell of grid.querySelectorAll(".cell")) {
+            const path = cell.dataset.path ?? "";
+            const img = cell.querySelector("img");
+            if (path && img?.classList.contains("is-loaded")) {
+              loadedPaths.add(path);
+            }
+          }
+          if (loadedPaths.size > knownExisting.size) {
+            promoteExistingCells(loadedPaths);
+          }
+        }, PROMOTE_DEBOUNCE_MS);
+      }
+
+      function normalizeWord(value) {
+        return String(value ?? "")
+          .trim()
+          .replace(/\s+/g, " ");
+      }
+
+      function buildStoragePath(adjective, noun) {
+        const adj = normalizeWord(adjective).toLowerCase();
+        const nounToken = normalizeWord(noun).toLowerCase();
+        return `${adj}_${nounToken}.jpg`;
+      }
+
+      function buildPublicUrl(supabaseUrl, objectPath) {
+        const base = supabaseUrl.replace(/\/+$/, "");
+        return `${base}/storage/v1/object/public/${STORAGE_BUCKET}/${objectPath}`;
+      }
+
+      function cartesianProduct(adjectives, nouns) {
+        const combinations = [];
+        for (const adjective of adjectives) {
+          for (const noun of nouns) {
+            combinations.push({ adjective, noun });
+          }
+        }
+        return combinations;
+      }
+
+      function loadSavedConfig() {
+        try {
+          const raw = localStorage.getItem(CONFIG_KEY);
+          if (!raw) return;
+          const saved = JSON.parse(raw);
+          if (saved.url && !String(saved.url).includes("@")) {
+            urlInput.value = saved.url;
+          }
+          if (saved.anonKey && String(saved.anonKey).startsWith("eyJ")) {
+            keyInput.value = saved.anonKey;
+          }
+        } catch {
+          localStorage.removeItem(CONFIG_KEY);
+        }
+      }
+
+      function saveConfig(url, anonKey) {
+        localStorage.setItem(CONFIG_KEY, JSON.stringify({ url, anonKey }));
+      }
+
+      function normalizeSupabaseUrl(raw) {
+        const value = String(raw ?? "").trim();
+        if (!value) return "";
+        if (value.includes("@") && !value.startsWith("http")) {
+          throw new Error(
+            "L'URL ressemble à une adresse e-mail (autofill du navigateur ?).\n" +
+              "Collez l'URL du projet Supabase, ex. https://xxxx.supabase.co",
+          );
+        }
+        let url;
+        try {
+          url = new URL(value.includes("://") ? value : `https://${value}`);
+        } catch {
+          throw new Error("URL Supabase invalide. Attendu : https://xxxx.supabase.co");
+        }
+        if (!/^https?:$/i.test(url.protocol)) {
+          throw new Error("L'URL Supabase doit commencer par https://");
+        }
+        if (!url.hostname.endsWith(".supabase.co")) {
+          throw new Error("L'hôte doit se terminer par .supabase.co");
+        }
+        return url.origin;
+      }
+
+      function normalizeAnonKey(raw) {
+        const value = String(raw ?? "").trim();
+        if (!value) return "";
+        if (value.includes("@")) {
+          throw new Error(
+            "La clé anon ressemble à une adresse e-mail. Collez la clé JWT (eyJ…).",
+          );
+        }
+        if (!value.startsWith("eyJ")) {
+          throw new Error("Clé anon invalide : elle doit commencer par eyJ…");
+        }
+        return value;
+      }
+
+      function clearPauseCountdown() {
+        if (pauseTimer != null) {
+          clearInterval(pauseTimer);
+          pauseTimer = null;
+        }
+        pauseEndsAt = 0;
+        pauseDurationMs = 0;
+        pauseProgressWrap.classList.remove("is-active");
+        pauseProgressBar.value = 0;
+        pauseProgressBar.max = 100;
+        pauseProgressText.textContent = "En attente";
+      }
+
+      function tickPauseCountdown() {
+        if (!pauseDurationMs || !pauseEndsAt) return;
+
+        const remaining = Math.max(0, pauseEndsAt - Date.now());
+        const elapsed = Math.min(pauseDurationMs, pauseDurationMs - remaining);
+        pauseProgressBar.value = elapsed;
+
+        if (remaining > 0) {
+          pauseProgressText.textContent = `${Math.ceil(remaining / 1000)} s restantes`;
+          return;
+        }
+
+        pauseProgressText.textContent = "Reprise…";
+        clearPauseCountdown();
+      }
+
+      function startPauseCountdown(durationMs, endsAtIso = null) {
+        clearPauseCountdown();
+        pauseDurationMs = Math.max(1, Number(durationMs) || 0);
+        pauseEndsAt = endsAtIso ? new Date(endsAtIso).getTime() : Date.now() + pauseDurationMs;
+        pauseProgressBar.max = pauseDurationMs;
+        pauseProgressWrap.classList.add("is-active");
+        tickPauseCountdown();
+        pauseTimer = setInterval(tickPauseCountdown, 200);
+      }
+
+      function refreshDerivedStats(total) {
+        const totalCombinations = total ?? (Number.parseInt(statTotal.textContent, 10) || 0);
+        statLoaded.textContent = String(loadedCount);
+        statErrors.textContent = String(errorCount);
+        statKnown.textContent = String(knownExistingCount);
+        statRemaining.textContent = String(Math.max(0, totalCombinations - knownExistingCount));
+
+        if (totalCombinations > 0) {
+          progressRow.classList.add("is-visible");
+          progressBar.max = totalCombinations;
+          progressBar.value = knownExistingCount;
+          const pct = ((knownExistingCount / totalCombinations) * 100).toFixed(1);
+          progressText.textContent = `${knownExistingCount} / ${totalCombinations} (${pct} %)`;
+        }
+      }
+
+      function updateStats(total) {
+        statsEl.hidden = false;
+        statTotal.textContent = String(total);
+        refreshDerivedStats(total);
+      }
+
+      function updateDividerLabel() {
+        const divider = grid.querySelector(".grid-divider");
+        if (!divider) return;
+        const missingRemaining = [...grid.querySelectorAll(".cell")].filter(
+          (cell) => !knownExisting.has(cell.dataset.path ?? ""),
+        ).length;
+        divider.textContent = `— ${missingRemaining} combinaison(s) sans fichier —`;
+      }
+
+      function setLiveStatus(message, active) {
+        liveStatusEl.hidden = false;
+        liveStatusEl.textContent = message;
+        liveStatusEl.classList.toggle("is-on", active);
+        liveStatusEl.classList.toggle("is-off", !active);
+      }
+
+      function stopLiveChannelAndPoll() {
+        clearPauseCountdown();
+        if (storagePollTimer) {
+          clearTimeout(storagePollTimer);
+          storagePollTimer = null;
+        }
+        if (liveChannel && liveSupabase) {
+          liveSupabase.removeChannel(liveChannel);
+        }
+        liveChannel = null;
+      }
+
+      function teardownLiveUpdates() {
+        stopLiveChannelAndPoll();
+        liveSupabase = null;
+        combinationsCache = [];
+      }
+
+      function refreshLatestCellImage(objectPath) {
+        const cell = grid.querySelector(`[data-path="${CSS.escape(objectPath)}"]`);
+        if (!cell) return null;
+        const img = cell.querySelector("img");
+        if (img) {
+          img.classList.remove("is-ungenerated", "is-missing");
+          img.src = `${buildPublicUrl(supabaseUrlCached, objectPath)}?t=${Date.now()}`;
+        }
+        return cell;
+      }
+
+      async function syncStorageFromPoll() {
+        if (!liveSupabase || !combinationsCache.length) return;
+
+        try {
+          const { existingSet, orderNewestFirst } = await resolveExistingFromStorage(
+            liveSupabase,
+            combinationsCache,
+          );
+
+          if (!orderNewestFirst.length) return;
+
+          const latestInStorage = orderNewestFirst[0];
+          const latestOnScreen = getTopCellPath();
+          const syncTime = new Date().toLocaleTimeString("fr-FR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+
+          setLiveStatus(
+            `Sync ${syncTime} — en tête : ${latestOnScreen || "?"} → Storage : ${latestInStorage}`,
+            true,
+          );
+
+          if (latestInStorage !== latestOnScreen) {
+            existingRecencyOrder = [...orderNewestFirst];
+            applyLatestToGrid(latestInStorage, existingSet);
+          }
+        } catch (error) {
+          console.warn("Sync Storage échouée :", error);
+          setLiveStatus(`Sync en erreur : ${error instanceof Error ? error.message : String(error)}`, false);
+        }
+      }
+
+      function scheduleStoragePollLoop() {
+        if (storagePollTimer) clearTimeout(storagePollTimer);
+        storagePollTimer = setTimeout(async () => {
+          await syncStorageFromPoll();
+          scheduleStoragePollLoop();
+        }, STORAGE_POLL_MS);
+      }
+
+      function startStoragePolling(combinations) {
+        if (storagePollTimer) clearTimeout(storagePollTimer);
+        combinationsCache = combinations;
+        void syncStorageFromPoll();
+        scheduleStoragePollLoop();
+      }
+
+      async function loadGrid() {
+        const supabaseUrl = normalizeSupabaseUrl(urlInput.value);
+        const anonKey = normalizeAnonKey(keyInput.value);
+
+        if (!supabaseUrl || !anonKey) {
+          statusEl.innerHTML = '<span class="error">URL et clé anon requises.</span>';
+          return;
+        }
+
+        urlInput.value = supabaseUrl;
+        keyInput.value = anonKey;
+        saveConfig(supabaseUrl, anonKey);
+        loadBtn.disabled = true;
+        grid.replaceChildren();
+        statusEl.textContent = "Chargement de pseudo_pool et construction de la grille…";
+
+        try {
+          const supabase = createClient(supabaseUrl, anonKey);
+          const combinations = await fetchCombinations(supabase);
+
+          statusEl.textContent = "Inventaire Storage (liste rapide)…";
+          const { existingSet, orderNewestFirst } = await resolveExistingFromStorage(
+            supabase,
+            combinations,
+          );
+          existingRecencyOrder = orderNewestFirst;
+          const sorted = sortCombinationsForDisplay(combinations, existingSet, orderNewestFirst);
+
+          statusEl.textContent = `${sorted.length} combinaisons — affichage (${existingSet.size} fichier(s), plus récent en tête)…`;
+          renderGrid(sorted, supabaseUrl, existingSet);
+          setupLiveUpdates(supabase, supabaseUrl, existingSet, orderNewestFirst, combinations);
+
+          if (existingSet.size > 0) {
+            const remaining = combinations.length - existingSet.size;
+            const latest = orderNewestFirst[0] ?? "—";
+            statusEl.textContent =
+              `${existingSet.size}/${combinations.length} avatars — ${remaining} reste(nt) à générer. ` +
+              `Dernier : ${latest}. Mise à jour auto toutes les ~12s.`;
+          } else {
+            statusEl.textContent =
+              `${sorted.length} vignettes affichées. ${storageListHint()} ` +
+              "Mise à jour auto toutes les ~12s.";
+          }
+        } catch (error) {
+          statusEl.innerHTML = `<span class="error">${error instanceof Error ? error.message : String(error)}</span>`;
+        } finally {
+          loadBtn.disabled = false;
+        }
+      }
+
+      function setupLiveUpdates(
+        supabase,
+        supabaseUrl,
+        initialExisting,
+        initialRecencyOrder = [],
+        combinations = [],
+      ) {
+        stopLiveChannelAndPoll();
+        liveSupabase = supabase;
+        supabaseUrlCached = supabaseUrl;
+        knownExisting = new Set(initialExisting);
+        existingRecencyOrder = [...initialRecencyOrder];
+        knownExistingCount = knownExisting.size;
+
+        liveChannel = supabase.channel(REALTIME_REVIEW_CHANNEL, {
+          config: { broadcast: { self: true } },
+        });
+
+        liveChannel.on("broadcast", { event: "avatar-uploaded" }, ({ payload }) => {
+          if (payload?.path) {
+            handleLiveUpload(String(payload.path), payload.at ? String(payload.at) : null);
+          }
+        });
+
+        liveChannel.on("broadcast", { event: "pause-started" }, ({ payload }) => {
+          if (payload?.durationMs) {
+            schedulePauseAfterUpload(
+              Number(payload.durationMs),
+              payload.endsAt ? String(payload.endsAt) : null,
+            );
+          }
+        });
+
+        liveChannel.on("broadcast", { event: "pause-ended" }, () => {
+          clearPauseCountdown();
+        });
+
+        liveChannel.subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            setLiveStatus(
+              "Sync auto ~12s — le dernier généré remonte en tête (sans recliquer).",
+              true,
+            );
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            setLiveStatus("Sync auto ~12s active (Realtime indisponible).", false);
+          }
+        });
+
+        startStoragePolling(combinations);
+      }
+
+      function handleLiveUpload(objectPath, uploadedAt = null) {
+        const cell = grid.querySelector(`[data-path="${CSS.escape(objectPath)}"]`);
+        if (!cell) return;
+
+        if (!knownExisting.has(objectPath)) {
+          knownExisting.add(objectPath);
+          knownExistingCount = knownExisting.size;
+        }
+
+        const img = cell.querySelector("img");
+        if (img?.classList.contains("is-missing") || img?.classList.contains("is-ungenerated")) {
+          errorCount = Math.max(0, errorCount - 1);
+        }
+
+        applyLatestToGrid(objectPath, knownExisting);
+
+        if (uploadedAt) {
+          statusEl.textContent = `Dernier généré : ${objectPath} (${new Date(uploadedAt).toLocaleTimeString("fr-FR")})`;
+        }
+      }
+
+      function createCell(objectPath, supabaseUrl, options = {}) {
+        const { eager = false, known = false } = options;
+        const cell = document.createElement("figure");
+        cell.className = known ? "cell cell-known" : "cell";
+        cell.dataset.path = objectPath;
+
+        const img = document.createElement("img");
+        img.src = buildPublicUrl(supabaseUrl, objectPath);
+        img.alt = objectPath;
+        img.title = objectPath;
+        img.loading = eager ? "eager" : "lazy";
+        img.decoding = "async";
+        img.width = 72;
+        img.height = 72;
+        img.addEventListener("load", () => onImageLoad(img), { once: true });
+        img.addEventListener("error", () => onImageError(img), { once: true });
+
+        const caption = document.createElement("code");
+        caption.textContent = objectPath;
+
+        cell.append(img, caption);
+        return cell;
+      }
+
+      function onImageLoad(img) {
+        loadedCount += 1;
+        img.classList.remove("is-ungenerated", "is-missing");
+        img.classList.add("is-loaded");
+        refreshDerivedStats();
+
+        const cell = img.closest(".cell");
+        const objectPath = cell?.dataset.path ?? "";
+        if (objectPath && !knownExisting.has(objectPath)) {
+          knownExisting.add(objectPath);
+          knownExistingCount = knownExisting.size;
+          cell?.classList.add("cell-known");
+          refreshDerivedStats();
+        }
+      }
+
+      function onImageError(img) {
+        const cell = img.closest(".cell");
+        const objectPath = cell?.dataset.path ?? "";
+        const isKnownInStorage =
+          knownExisting.has(objectPath) || cell?.classList.contains("cell-known");
+
+        if (isKnownInStorage) {
+          errorCount += 1;
+          img.classList.add("is-missing");
+          img.alt = "Erreur chargement";
+        } else {
+          img.classList.add("is-ungenerated");
+          img.alt = "Pas encore générée";
+        }
+
+        refreshDerivedStats();
+      }
+
+      function pickLabel(row) {
+        return normalizeWord(row.label_en) || normalizeWord(row.label_fr);
+      }
+
+      async function fetchCombinations(supabase) {
+        const { data: rows, error } = await supabase
+          .from("pseudo_pool")
+          .select("type, label_en, label_fr");
+
+        if (error) throw new Error(`pseudo_pool : ${error.message}`);
+
+        if (!rows?.length) {
+          throw new Error(
+            "Aucune ligne lue dans pseudo_pool avec la clé anon.\n\n" +
+              "Cause probable : RLS (Row Level Security) bloque la lecture.\n" +
+              "Exécutez le script SQL : supabase/sql/pseudo_pool_public_select.sql\n" +
+              "dans Supabase → SQL Editor, puis rechargez cette page.",
+          );
+        }
+
+        const adjectives = rows
+          .filter((row) => String(row.type ?? "").trim().toLowerCase() === "adjective")
+          .map(pickLabel)
+          .filter(Boolean);
+
+        const nouns = rows
+          .filter((row) => String(row.type ?? "").trim().toLowerCase() === "noun")
+          .map(pickLabel)
+          .filter(Boolean);
+
+        if (!adjectives.length || !nouns.length) {
+          throw new Error(
+            `pseudo_pool illisible : ${rows.length} ligne(s) lues, ` +
+              `mais ${adjectives.length} adjectif(s) et ${nouns.length} nom(s) exploitables ` +
+              `(label_en ou label_fr requis).`,
+          );
+        }
+
+        return cartesianProduct(adjectives, nouns);
+      }
+
+      async function listStorageFilesWithMeta(supabase, folder = "") {
+        const files = [];
+        let offset = 0;
+
+        while (true) {
+          const { data, error } = await supabase.storage.from(STORAGE_BUCKET).list(folder, {
+            limit: LIST_PAGE_SIZE,
+            offset,
+            sortBy: { column: "updated_at", order: "desc" },
+          });
+
+          if (error) {
+            console.warn("Storage list indisponible :", error.message);
+            break;
+          }
+
+          if (!data?.length) break;
+
+          for (const entry of data) {
+            const entryPath = folder ? `${folder}/${entry.name}` : entry.name;
+            if (entry.id == null) {
+              const nested = await listStorageFilesWithMeta(supabase, entryPath);
+              files.push(...nested);
+            } else if (entry.name.endsWith(".jpg")) {
+              files.push({
+                path: entry.name,
+                updatedAt: entry.updated_at ?? entry.created_at ?? "",
+              });
+            }
+          }
+
+          if (data.length < LIST_PAGE_SIZE) break;
+          offset += LIST_PAGE_SIZE;
+        }
+
+        return files;
+      }
+
+      async function resolveExistingFromStorage(supabase, combinations) {
+        const files = await listStorageFilesWithMeta(supabase);
+        const validPaths = new Set(
+          combinations.map(({ adjective, noun }) => buildStoragePath(adjective, noun)),
+        );
+        const latestByPath = new Map();
+
+        for (const file of files) {
+          const baseName = file.path.includes("/") ? file.path.split("/").pop() : file.path;
+          if (!baseName?.endsWith(".jpg") || !validPaths.has(baseName)) continue;
+
+          const previous = latestByPath.get(baseName);
+          if (!previous || file.updatedAt > previous) {
+            latestByPath.set(baseName, file.updatedAt);
+          }
+        }
+
+        const orderNewestFirst = [...latestByPath.entries()]
+          .sort((a, b) => b[1].localeCompare(a[1]))
+          .map(([path]) => path);
+
+        return {
+          existingSet: new Set(orderNewestFirst),
+          orderNewestFirst,
+        };
+      }
+
+      function storageListHint() {
+        return (
+          "Astuce : exécutez supabase/sql/avatars_pool_public_read.sql dans Supabase " +
+          "pour lister le bucket instantanément (sinon les vignettes vertes = détection au chargement)."
+        );
+      }
+
+      function promoteExistingCells(existingFiles) {
+        const cellsByPath = new Map();
+        for (const cell of grid.querySelectorAll(".cell")) {
+          cellsByPath.set(cell.dataset.path ?? "", cell);
+        }
+
+        const existingCells = existingRecencyOrder
+          .filter((path) => existingFiles.has(path))
+          .map((path) => cellsByPath.get(path))
+          .filter(Boolean);
+
+        const missingCells = [...cellsByPath.values()].filter(
+          (cell) => !existingFiles.has(cell.dataset.path ?? ""),
+        );
+
+        grid.replaceChildren();
+        const fragment = document.createDocumentFragment();
+
+        for (const cell of existingCells) {
+          fragment.append(cell);
+        }
+
+        if (missingCells.length > 0 && existingCells.length > 0) {
+          const divider = document.createElement("div");
+          divider.className = "grid-divider";
+          divider.textContent = `— ${missingCells.length} combinaison(s) sans fichier —`;
+          fragment.append(divider);
+        }
+
+        for (const cell of missingCells) {
+          fragment.append(cell);
+        }
+
+        grid.append(fragment);
+        knownExisting = new Set(existingRecencyOrder.filter((path) => existingFiles.has(path)));
+        knownExistingCount = knownExisting.size;
+        refreshDerivedStats();
+        updateDividerLabel();
+      }
+
+      function sortCombinationsForDisplay(combinations, existingSet, orderNewestFirst) {
+        const rank = new Map(orderNewestFirst.map((path, index) => [path, index]));
+        return [...combinations].sort((a, b) => {
+          const pathA = buildStoragePath(a.adjective, a.noun);
+          const pathB = buildStoragePath(b.adjective, b.noun);
+          const existsA = existingSet.has(pathA);
+          const existsB = existingSet.has(pathB);
+          if (existsA !== existsB) return existsA ? -1 : 1;
+          if (existsA && existsB) {
+            return (rank.get(pathA) ?? Number.MAX_SAFE_INTEGER) - (rank.get(pathB) ?? Number.MAX_SAFE_INTEGER);
+          }
+          return pathA.localeCompare(pathB, "en");
+        });
+      }
+
+      function renderGrid(combinations, supabaseUrl, existingFiles) {
+        grid.replaceChildren();
+        loadedCount = 0;
+        errorCount = 0;
+        knownExistingCount = existingFiles.size;
+        updateStats(combinations.length);
+
+        const fragment = document.createDocumentFragment();
+        let dividerInserted = false;
+
+        for (let i = 0; i < combinations.length; i += 1) {
+          const { adjective, noun } = combinations[i];
+          const objectPath = buildStoragePath(adjective, noun);
+          const exists = existingFiles.has(objectPath);
+
+          if (existingFiles.size > 0 && !dividerInserted && !exists) {
+            dividerInserted = true;
+            const divider = document.createElement("div");
+            divider.className = "grid-divider";
+            divider.textContent = `— ${combinations.length - i} combinaison(s) sans fichier —`;
+            fragment.append(divider);
+          }
+
+          fragment.append(
+            createCell(objectPath, supabaseUrl, { eager: i < 120, known: exists }),
+          );
+        }
+
+        grid.append(fragment);
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await loadGrid();
+      });
+
+      loadSavedConfig();
+      for (const input of [urlInput, keyInput]) {
+        input.addEventListener("focus", () => input.removeAttribute("readonly"), { once: true });
+      }
+      if (urlInput.value.trim() && keyInput.value.trim()) {
+        void loadGrid();
+      }
+      window.addEventListener("beforeunload", () => teardownLiveUpdates());
+    </script>
+  </body>
+</html>

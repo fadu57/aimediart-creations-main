@@ -164,10 +164,11 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
   if (inflight) return await inflight;
   try {
     const p = (async (): Promise<UserProfileRow | null> => {
-      // Lecture du prenom depuis profiles (lie 1:1 a auth.users)
+      // Lecture du prenom et du role global depuis profiles (lie 1:1 a auth.users)
+      // role_id dans profiles = admins globaux (1-3) qui n'ont pas de ligne dans agency_users
       const { data: profileData, error: profileErr } = await supabase
         .from("profiles")
-        .select("first_name")
+        .select("first_name, role_id")
         .eq("id", authUserId)
         .maybeSingle();
 
@@ -192,6 +193,18 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
         .limit(1)
         .maybeSingle();
 
+      // Fallback pour les admins globaux (niveaux 1-3) qui n'ont pas de ligne dans agency_users :
+      // leur role_id est dans public.profiles.role_id (colonne à ajouter via migration).
+      const profileRoleId = (profileData as { role_id?: number | string | null } | null)?.role_id ?? null;
+      let globalRoleId: number | null = null;
+      if (!agencyData && profileRoleId != null) {
+        if (typeof profileRoleId === "number" && Number.isFinite(profileRoleId)) globalRoleId = profileRoleId;
+        else if (typeof profileRoleId === "string") {
+          const n = Number((profileRoleId as string).trim());
+          if (Number.isFinite(n)) globalRoleId = n;
+        }
+      }
+
       // Rattachement expo : prend le plus recent
       const { data: expoData } = await supabase
         .from("expo_user_role")
@@ -203,7 +216,7 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
 
       return {
         first_name: profileData?.first_name ?? null,
-        role_id: agencyData?.role_id ?? null,
+        role_id: agencyData?.role_id ?? globalRoleId,
         agency_id: agencyData?.agency_id ?? null,
         expo_id: expoData?.expo_id ?? null,
       };

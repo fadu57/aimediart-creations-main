@@ -78,13 +78,13 @@ export default function PublicHomeCommencer() {
         <header className="border-b border-neutral-200/80 bg-white/90 backdrop-blur-sm">
           <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-3 px-5 py-4 sm:px-6">
             <Link
-              to="/home#tarifs"
+              to="/organisation#tarifs"
               className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
               Retour aux tarifs
             </Link>
-            <Link to="/home" className={cn("font-serif text-lg font-semibold tracking-tight", BRAND_WORD)}>
+            <Link to="/organisation" className={cn("font-serif text-lg font-semibold tracking-tight", BRAND_WORD)}>
               AIMEDIArt
             </Link>
           </div>
@@ -146,7 +146,7 @@ export default function PublicHomeCommencer() {
               </ul>
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
                 <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
-                  <Link to="/home#contact">Aller au formulaire contact</Link>
+                  <Link to="/organisation#contact">Aller au formulaire contact</Link>
                 </Button>
                 <Button asChild variant="outline" className="rounded-xl border-neutral-300">
                   <Link to={loginBase}>
@@ -165,7 +165,7 @@ export default function PublicHomeCommencer() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="rounded-xl border-neutral-300">
-                <Link to="/home#contact">Une question avant de s’engager</Link>
+                <Link to="/organisation#contact">Une question avant de s’engager</Link>
               </Button>
             </div>
           )}

@@ -74,6 +74,25 @@ function artworkArtistFromRow(aw: Pick<ArtworkRow, "artists">): ArtistRow | unde
   return Array.isArray(a) ? a[0] : a;
 }
 
+function artworkExpoRef(aw: Pick<ArtworkRow, "artwork_expo_id" | "expo_id">): string {
+  return (aw.artwork_expo_id ?? aw.expo_id ?? "").trim();
+}
+
+/** Correspondance artwork ↔ expo (id primaire ou legacy expo_id). */
+function artworkMatchesExpoFilter(
+  aw: Pick<ArtworkRow, "artwork_expo_id" | "expo_id">,
+  filterExpoId: string,
+  options: ExpoOption[],
+): boolean {
+  const raw = artworkExpoRef(aw);
+  if (!raw || !filterExpoId.trim()) return false;
+  if (raw === filterExpoId.trim()) return true;
+  const selected = options.find((o) => o.id === filterExpoId);
+  if (!selected) return raw === filterExpoId.trim();
+  const legacy = selected.expo_id?.trim() ?? "";
+  return legacy !== "" && raw === legacy;
+}
+
 const Catalogue = () => {
   const { t } = useTranslation("catalogue");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,16 +153,27 @@ const Catalogue = () => {
     const scopeAgencyId = scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : undefined;
     const scopeExpoId = scope.mode === "expo" ? scope.expoId : undefined;
 
+    const agencyFilterId =
+      role_id === 4 && userAgencyId
+        ? userAgencyId
+        : scope.mode === "agency" && scopeAgencyId
+          ? scopeAgencyId
+          : null;
+
     let query = supabase
       .from("expos")
       .select("*")
-      .order("id", { ascending: true });
+      .is("deleted_at", null)
+      .order("expo_name", { ascending: true, nullsFirst: false });
 
     // Si l'utilisateur est limité à une expo, on n'affiche qu'elle.
     if ((role_id === 5 || role_id === 6) && userExpoId) {
       query = query.eq("id", userExpoId);
     } else if (scope.mode === "expo" && scopeExpoId) {
       query = query.eq("id", scopeExpoId);
+    } else if (agencyFilterId) {
+      // Inclut les expos sans agency_id (legacy) visibles via RLS pour l'organisation.
+      query = query.or(`agency_id.eq.${agencyFilterId},agency_id.is.null`);
     }
 
     const { data, error: exposError } = await query;
@@ -160,20 +190,7 @@ const Catalogue = () => {
         agency_id?: string | null;
       }> | null) ?? []);
 
-    const filteredByAgency =
-      role_id === 4 && userAgencyId
-        ? rows.filter((expo) => {
-            const linkedAgency = expo.agency_id ?? null;
-            return linkedAgency === userAgencyId;
-          })
-        : scope.mode === "agency" && scopeAgencyId
-          ? rows.filter((expo) => {
-              const linkedAgency = expo.agency_id ?? null;
-              return linkedAgency === scopeAgencyId;
-            })
-          : rows;
-
-    let finalRows = filteredByAgency;
+    let finalRows = rows;
 
     // Fallback: si filtrage agence vide, on dérive les expos via artworks de l'agence.
     if (finalRows.length === 0 && ((role_id === 4 && userAgencyId) || (scope.mode === "agency" && scopeAgencyId))) {
@@ -196,12 +213,17 @@ const Catalogue = () => {
       }
     }
 
-    let mapped: ExpoOption[] = finalRows.map((expo) => ({
+    const uniqueExpoRows = Array.from(
+      new Map(finalRows.map((expo) => [expo.id, expo])).values(),
+    );
+
+    let mapped: ExpoOption[] = uniqueExpoRows.map((expo) => ({
       id: expo.id,
       expo_id: expo.expo_id?.trim() || null,
       name: expo.expo_name?.trim() || expo.expo_id?.trim() || expo.id,
       agency_id: expo.agency_id ?? null,
     }));
+    mapped.sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
     // Fallback robuste : si expos est vide (RLS/cache), on dérive depuis artworks.
     if (mapped.length === 0) {
@@ -227,11 +249,13 @@ const Catalogue = () => {
         const { data: exposByIdsById } = await supabase
           .from("expos")
           .select("*")
-          .in("id", expoIds);
+          .in("id", expoIds)
+          .is("deleted_at", null);
         const { data: exposByIdsByExpoId } = await supabase
           .from("expos")
           .select("*")
-          .in("expo_id", expoIds);
+          .in("expo_id", expoIds)
+          .is("deleted_at", null);
 
         const mergedRows = [
           ...(((exposByIdsById as Array<Record<string, unknown>> | null) ?? [])),
@@ -352,8 +376,9 @@ const Catalogue = () => {
   }, [loadCatalogue]);
 
   useEffect(() => {
+    if (authLoading) return;
     void loadExpoOptions();
-  }, [loadExpoOptions]);
+  }, [loadExpoOptions, authLoading]);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -387,14 +412,16 @@ const Catalogue = () => {
 
   const filtered = useMemo(() => {
     return artworks.filter((aw) => {
-      if (selectedExpoFilter !== "all" && aw.expo_id !== selectedExpoFilter) return false;
+      if (selectedExpoFilter !== "all" && !artworkMatchesExpoFilter(aw, selectedExpoFilter, expoOptions)) {
+        return false;
+      }
       const artist = artworkArtistFromRow(aw);
       const q = search.toLowerCase();
       const title = (aw.artwork_title ?? "").toLowerCase();
       const artistLabel = `${artist?.artist_firstname ?? artist?.artist_prenom ?? ""} ${artist?.artist_lastname ?? artist?.artist_name ?? ""}`.trim().toLowerCase();
       return title.includes(q) || artistLabel.includes(q);
     });
-  }, [artworks, search, selectedExpoFilter]);
+  }, [artworks, search, selectedExpoFilter, expoOptions]);
   const searchSuggestions = useMemo(
     () =>
       [
@@ -412,7 +439,10 @@ const Catalogue = () => {
   // Sentinel supprimée : le placeholder n'est plus injecté comme option datalist.
   // La réinitialisation du filtre se fait uniquement via le bouton X ou en vidant le champ.
   const expoFilterSuggestions = useMemo(
-    () => [...new Set(expoOptions.map((expo) => expo.name))],
+    () =>
+      [...new Set(expoOptions.map((expo) => expo.name.trim()).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, "fr"),
+      ),
     [expoOptions],
   );
 
@@ -844,7 +874,8 @@ const Catalogue = () => {
                 </div>
 
                 <div className="relative flex min-h-[156px] min-w-0 flex-1 flex-col self-stretch">
-                  <div className="pointer-events-none absolute left-0 top-0 right-[250px] z-10 flex min-w-0 flex-col">
+                  {/* Titre + artiste — pleine largeur, superposés au-dessus de la colonne boutons */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex min-w-0 w-full flex-col">
                     <h3 className="min-w-0 w-full truncate font-serif font-bold text-lg">
                       {aw.artwork_title ?? t("artwork_untitled")}
                     </h3>
@@ -869,8 +900,8 @@ const Catalogue = () => {
                     </div>
                   </div>
 
-                  <div className="relative z-0 ml-auto flex min-h-[156px] flex-1 w-[250px] min-w-[250px] shrink-0 flex-col justify-start items-start gap-3 p-0">
-                    <div className="ml-auto flex w-[180px] flex-col gap-2 pt-[35px]">
+                  <div className="relative z-0 flex min-h-[156px] w-full min-w-0 flex-1 flex-col justify-start items-stretch gap-3 p-0">
+                    <div className="ml-auto flex w-[180px] max-w-full flex-col gap-2 pt-[35px]">
                     <Button
                       type="button"
                       variant="outline"
@@ -952,11 +983,23 @@ const Catalogue = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("qr_bulk_confirm_title")}</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogDescription asChild>
+              <div>
               <span className="block font-semibold text-destructive mb-2">
                 {t("qr_bulk_confirm_warning")}
               </span>
               {t("qr_bulk_confirm_description", { count: artworks.length })}
+              {(() => {
+                const noExpoCount = artworks.filter(
+                  (a) => !((a.expo_id ?? a.artwork_expo_id) as string | null | undefined)?.trim()
+                ).length;
+                return noExpoCount > 0 ? (
+                  <span className="mt-2 block rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {t("qr_bulk_warn_no_expo", { count: noExpoCount })}
+                  </span>
+                ) : null;
+              })()}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -989,7 +1032,10 @@ const Catalogue = () => {
         open={artworkModalOpen}
         onOpenChange={setArtworkModalOpen}
         artworkId={editingArtworkId}
-        onSuccess={() => void loadCatalogue()}
+        onSuccess={() => {
+          void loadCatalogue();
+          void loadExpoOptions();
+        }}
       />
     </div>
   );

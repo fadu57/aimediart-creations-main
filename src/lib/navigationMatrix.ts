@@ -150,7 +150,7 @@ export function mergeNavAccessFromMatriceSecurite(
  */
 export function pathnameToNavCible(pathname: string): NavMatrixCible | null {
   const p = pathname.toLowerCase();
-  if (p === "/home" || p === "/dashboard") return "menu_home";
+  if (p === "/organisation" || p === "/dashboard") return "menu_home";
   // Configuration : hors matrice navigation — sinon décocher « Organisation » bloque /settings
   // et empêche de corriger la matrice (effet « serpent qui se mord la queue »).
   if (p.startsWith("/settings") || p.startsWith("/setting")) return null;

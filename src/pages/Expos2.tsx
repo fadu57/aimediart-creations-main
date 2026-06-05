@@ -206,11 +206,18 @@ export default function Expos2() {
         <Button type="button" variant="outline" onClick={() => navigate("/expos")}>
           {t("tableau.back")}
         </Button>
-        <Button type="button" variant="outline" asChild>
-          <Link to="/expos-corbeille" className="inline-flex items-center gap-2">
-            <ArchiveRestore className="h-4 w-4" /> {t("tableau.corbeille")}
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" asChild>
+            <Link to="/expos/visitors" className="inline-flex items-center gap-2">
+              Visiteurs inscrits
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <Link to="/expos-corbeille" className="inline-flex items-center gap-2">
+              <ArchiveRestore className="h-4 w-4" /> {t("tableau.corbeille")}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

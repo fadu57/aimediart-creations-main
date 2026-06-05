@@ -13,6 +13,7 @@
   "img_alt": "Photo de l'œuvre",
   "qr_alt": "QR code de l'œuvre",
   "qr_empty": "Pas encore de QR code pour cette œuvre.",
+  "qr_warn_no_expo": "Aucune exposition assignée — le QR fonctionnera mais sans contexte expo pour le visiteur.",
   "btn_change_photo": "Changer la photo",
   "btn_regenerate_qr": "Régénérer le QR",
   "btn_regenerating_qr": "QR en cours…",

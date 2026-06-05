@@ -1,39 +1,657 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
+import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { UiLanguageSelector } from "@/components/UiLanguageSelector";
+import { VisitorLinkCodeDialog } from "@/components/visitor/VisitorLinkCodeDialog";
+import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
+import { useUiLanguage } from "@/providers/UiLanguageProvider";
+import { supabase } from "@/lib/supabase";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
+import {
+  persistAnonymousVisitorIdentity,
+  localizeVisitorAnonymousProfile,
+  resolveReturningAnonymousVisitor,
+} from "@/lib/registerAnonymousVisitorSession";
+import { setVisitorAnonymousProfile, type VisitorAnonymousProfile } from "@/lib/visitorAnonymousProfile";
+import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
+import {
+  formatVisitorRecoveryCodeDisplay,
+  generateVisitorRecoveryCode,
+  linkVisitorProfileByRecoveryCode,
+  normalizeVisitorRecoveryCodeInput,
+} from "@/lib/visitorRecoveryLink";
 
 function buildQuery(expoId: string): string {
   if (!expoId) return "";
   return `?expo_id=${encodeURIComponent(expoId)}`;
 }
 
+type ExpoInfo = {
+  expo_name: string;
+  logo_expo: string | null;
+  date_expo_du: string | null;
+  date_expo_au: string | null;
+  expo_descript_i18n: string | Record<string, string> | null;
+};
+
+function formatExpoDates(du: string | null, au: string | null, locale: string): string {
+  const fmt = (d: string) =>
+    new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(
+      new Date(d),
+    );
+  if (du && au) return `${fmt(du)} – ${fmt(au)}`;
+  if (du) return `${fmt(du)} →`;
+  if (au) return `→ ${fmt(au)}`;
+  return "";
+}
+
+function extractExpoDescription(
+  raw: string | Record<string, string> | null | undefined,
+  lang: string,
+  maxChars = 1000,
+): string | null {
+  if (!raw) return null;
+  let text: string | null = null;
+  if (typeof raw === "object") {
+    text = raw[lang] ?? raw["fr"] ?? Object.values(raw)[0] ?? null;
+  } else {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      text = parsed[lang] ?? parsed["fr"] ?? Object.values(parsed)[0] ?? raw;
+    } catch {
+      text = raw;
+    }
+  }
+  if (!text) return null;
+  return text.length > maxChars ? text.slice(0, maxChars) + "…" : text;
+}
+
+type GateStep = "gate" | "avatar" | "welcome_back" | "recover";
+
+const RECOVERY_ERROR_KEYS: Record<string, string> = {
+  invalid_code_format: "visitor_gate.recover.errors.invalid_format",
+  code_not_found: "visitor_gate.recover.errors.not_found",
+  profile_incomplete: "visitor_gate.recover.errors.incomplete",
+  missing_client_id: "visitor_gate.recover.errors.generic",
+};
+
 const VisitorWelcome = () => {
   const { t } = useTranslation("landing");
+  const { language: uiLanguage } = useUiLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expoId = useMemo(() => searchParams.get("expo_id")?.trim() ?? "", [searchParams]);
   const qs = buildQuery(expoId);
 
+  const [autoDetecting, setAutoDetecting] = useState(true);
+  const [step, setStep] = useState<GateStep>("gate");
+  const [selectedAvatar, setSelectedAvatar] = useState<VisitorPoolAvatar | null>(null);
+  const [returningProfile, setReturningProfile] = useState<VisitorAnonymousProfile | null>(null);
+  const [returningIsAuth, setReturningIsAuth] = useState(false);
+  const [returningDisplayPseudo, setReturningDisplayPseudo] = useState("");
+  const [quickVisitBusy, setQuickVisitBusy] = useState(false);
+  const [visitorPhotoFile, setVisitorPhotoFile] = useState<File | null>(null);
+  const [userPhotoUrl, setUserPhotoUrl] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  /** Profil connu quand l’utilisateur choisit « un autre avatar » depuis l’écran de retour. */
+  const [avatarChangeFromProfile, setAvatarChangeFromProfile] = useState<VisitorAnonymousProfile | null>(null);
+  const [recoveryCodeInput, setRecoveryCodeInput] = useState("");
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [linkCodeDialogOpen, setLinkCodeDialogOpen] = useState(false);
+  const [freshLinkCode, setFreshLinkCode] = useState<{ code: string; display: string } | null>(null);
+  const [pendingScanNavigate, setPendingScanNavigate] = useState(false);
+  const [expoInfo, setExpoInfo] = useState<ExpoInfo | null>(null);
+
+  const expoDescription = useMemo(
+    () => extractExpoDescription(expoInfo?.expo_descript_i18n, uiLanguage.slice(0, 2)),
+    [expoInfo, uiLanguage],
+  );
+
+  const handleLinkCodeDialogOpenChange = (open: boolean) => {
+    setLinkCodeDialogOpen(open);
+    if (!open && pendingScanNavigate) {
+      setPendingScanNavigate(false);
+      navigate(`/scan-work1${qs}`, { replace: false });
+    }
+  };
+
+  // Auto-détection au montage : session auth puis visiteur anonyme connu
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        // 1. Vérifier une session Supabase Auth active
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("first_name, last_name, avatar_url")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          const displayName =
+            profile?.first_name?.trim() ||
+            profile?.last_name?.trim() ||
+            session.user.email?.split("@")[0] ||
+            "";
+          if (displayName && !cancelled) {
+            setReturningProfile({
+              pseudo: displayName,
+              avatarUrl: profile?.avatar_url?.trim() ?? "",
+              avatarObjectPath: "",
+              selfieUrl: "",
+              selfieObjectPath: "",
+            });
+            setReturningIsAuth(true);
+            setStep("welcome_back");
+            return;
+          }
+        }
+        // 2. Reconnaître un visiteur anonyme connu
+        getOrCreateVisitorUuid();
+        const known = await resolveReturningAnonymousVisitor();
+        if (!cancelled && known) {
+          setReturningProfile(known);
+          setReturningIsAuth(false);
+          setStep("welcome_back");
+        }
+      } catch {
+        // échec silencieux → afficher le portail
+      } finally {
+        if (!cancelled) setAutoDetecting(false);
+      }
+    };
+    void run();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Charger les infos de l'exposition si un expo_id est présent
+  useEffect(() => {
+    if (!expoId) return;
+    let cancelled = false;
+    void supabase
+      .from("expos")
+      .select("expo_name, logo_expo, date_expo_du, date_expo_au, expo_descript_i18n")
+      .eq("id", expoId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled && data) setExpoInfo(data as ExpoInfo);
+      });
+    return () => { cancelled = true; };
+  }, [expoId]);
+
+  useEffect(() => {
+    if (step !== "welcome_back" || !returningProfile) {
+      setReturningDisplayPseudo("");
+      return;
+    }
+
+    let cancelled = false;
+    void localizeVisitorAnonymousProfile(returningProfile, uiLanguage).then((localized) => {
+      if (!cancelled) setReturningDisplayPseudo(localized.pseudo);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, uiLanguage, returningProfile]);
+
+  useEffect(() => {
+    const raw = searchParams.get("recover")?.trim() ?? "";
+    if (!raw) return;
+    const norm = normalizeVisitorRecoveryCodeInput(raw);
+    if (norm.length !== 8) return;
+    setRecoveryCodeInput(formatVisitorRecoveryCodeDisplay(norm));
+    setStep("recover");
+  }, [searchParams]);
+
   const benefitClass =
     "flex gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground";
 
-  const handleQuickVisit = () => {
-    getOrCreateVisitorUuid();
-    navigate(`/scan-work1${qs}`, { replace: false });
+  const handleQuickVisitStart = async () => {
+    setQuickVisitBusy(true);
+    try {
+      getOrCreateVisitorUuid();
+      const known = await resolveReturningAnonymousVisitor();
+      if (known) {
+        setReturningProfile(known);
+        setStep("welcome_back");
+      } else {
+        setReturningProfile(null);
+        setStep("avatar");
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn("[VisitorWelcome] reconnaissance visiteur :", err);
+      }
+      setReturningProfile(null);
+      setStep("avatar");
+    } finally {
+      setQuickVisitBusy(false);
+    }
   };
+
+  const handleActiveAvatarChange = useCallback((avatar: VisitorPoolAvatar | null) => {
+    setSelectedAvatar(avatar);
+  }, []);
+
+  const handleCaptureSelfie = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const prepared = await prepareImageForSupabaseUpload(file, {
+        maxBytes: 350 * 1024,
+        maxEdgePx: 800,
+        forceFileType: "image/jpeg",
+        initialQuality: 0.72,
+      });
+      setVisitorPhotoFile(prepared);
+      setUserPhotoUrl(URL.createObjectURL(prepared));
+      toast.success(t("visitor_gate.quick_avatar.toast_selfie_saved"));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_selfie_failed");
+      toast.error(msg);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleWelcomeBackContinue = async () => {
+    if (!returningProfile) return;
+
+    const localizedPseudo = returningDisplayPseudo.trim() || returningProfile.pseudo;
+    const profileToSave = { ...returningProfile, pseudo: localizedPseudo };
+
+    setQuickVisitBusy(true);
+    try {
+      getOrCreateVisitorUuid();
+      await persistAnonymousVisitorIdentity({
+        pseudo: localizedPseudo,
+        avatarUrl: profileToSave.avatarUrl,
+        avatarObjectPath: profileToSave.avatarObjectPath,
+        keepSelfieUrl: profileToSave.selfieUrl,
+        keepSelfieObjectPath: profileToSave.selfieObjectPath,
+      });
+      setVisitorAnonymousProfile(profileToSave);
+      navigate(`/scan-work1${qs}`, { replace: false });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t("visitor_gate.welcome_back.toast_failed");
+      toast.error(msg);
+      if (import.meta.env.DEV) {
+        console.warn("[VisitorWelcome] visite de retour :", err);
+      }
+    } finally {
+      setQuickVisitBusy(false);
+    }
+  };
+
+  const showRecoveryCodeAfterProfile = async (): Promise<boolean> => {
+    const gen = await generateVisitorRecoveryCode(false);
+    if (gen.ok) {
+      setFreshLinkCode({ code: gen.code, display: gen.display });
+      setPendingScanNavigate(true);
+      setLinkCodeDialogOpen(true);
+      return true;
+    }
+    if (gen.error !== "already_set" && import.meta.env.DEV) {
+      console.warn("[VisitorWelcome] code liaison :", gen.error);
+    }
+    return false;
+  };
+
+  const handleRecoverSubmit = async () => {
+    setRecoverBusy(true);
+    try {
+      getOrCreateVisitorUuid();
+      const linked = await linkVisitorProfileByRecoveryCode(recoveryCodeInput);
+      if (!linked.ok) {
+        const key = RECOVERY_ERROR_KEYS[linked.error] ?? "visitor_gate.recover.errors.generic";
+        toast.error(t(key));
+        return;
+      }
+      setReturningProfile(linked.profile);
+      setStep("welcome_back");
+    } catch (err) {
+      toast.error(t("visitor_gate.recover.errors.generic"));
+      if (import.meta.env.DEV) console.warn("[VisitorWelcome] liaison code :", err);
+    } finally {
+      setRecoverBusy(false);
+    }
+  };
+
+  const handleQuickVisitConfirm = async () => {
+    if (!selectedAvatar) {
+      toast.error(t("visitor_gate.quick_avatar.toast_pick_avatar"));
+      return;
+    }
+
+    setQuickVisitBusy(true);
+    try {
+      getOrCreateVisitorUuid();
+      const profile = await persistAnonymousVisitorIdentity({
+        pseudo: selectedAvatar.pseudo,
+        avatarUrl: selectedAvatar.imageUrl,
+        avatarObjectPath: selectedAvatar.objectPath,
+        selfieFile: visitorPhotoFile,
+      });
+      setVisitorAnonymousProfile(profile);
+      const deferred = await showRecoveryCodeAfterProfile();
+      if (!deferred) {
+        navigate(`/scan-work1${qs}`, { replace: false });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_failed");
+      toast.error(msg);
+      if (import.meta.env.DEV) {
+        console.warn("[VisitorWelcome] visite rapide :", err);
+      }
+    } finally {
+      setQuickVisitBusy(false);
+    }
+  };
+
+  if (autoDetecting) {
+    return (
+      <div className="flex w-full flex-1 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
+      </div>
+    );
+  }
+
+  if (step === "recover") {
+    return (
+      <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-0">
+        <VisitorLinkCodeDialog
+          open={linkCodeDialogOpen}
+          onOpenChange={handleLinkCodeDialogOpenChange}
+          initialCode={freshLinkCode?.code}
+          initialDisplay={freshLinkCode?.display}
+          allowRegenerate={false}
+        />
+        <Card className="mt-1 w-full max-w-[320px] border-border shadow-lg">
+          <CardHeader className="space-y-1 px-3 pb-0 pt-2">
+            <CardTitle className="text-center font-sans text-xl leading-snug">
+              <span className="block font-black">{t("visitor_gate.recover.title")}</span>
+              <span className="mt-1 block text-xs font-semibold leading-snug tracking-[3.5px]">
+                {t("visitor_gate.recover.subtitle")}
+              </span>
+            </CardTitle>
+            <CardDescription className="pt-2 text-center text-sm">
+              {t("visitor_gate.recover.description")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 px-3 pb-2 pt-1">
+            <Input
+              value={recoveryCodeInput}
+              onChange={(e) => {
+                const norm = normalizeVisitorRecoveryCodeInput(e.target.value);
+                setRecoveryCodeInput(formatVisitorRecoveryCodeDisplay(norm));
+              }}
+              placeholder={t("visitor_gate.recover.placeholder")}
+              className="text-center font-mono text-lg tracking-widest"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={9}
+              aria-label={t("visitor_gate.recover.input_aria")}
+            />
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                disabled={recoverBusy || normalizeVisitorRecoveryCodeInput(recoveryCodeInput).length !== 8}
+                onClick={() => void handleRecoverSubmit()}
+              >
+                {recoverBusy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    {t("visitor_gate.recover.btn_loading")}
+                  </>
+                ) : (
+                  t("visitor_gate.recover.btn_submit")
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 w-full text-xs text-muted-foreground"
+                disabled={recoverBusy}
+                onClick={() => setStep("gate")}
+              >
+                {t("visitor_gate.quick_avatar.btn_back")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (step === "welcome_back" && returningProfile) {
+    const greetingPseudo = returningDisplayPseudo.trim() || returningProfile.pseudo;
+    const greetingKey = returningIsAuth
+      ? "visitor_gate.welcome_back.greeting_auth"
+      : "visitor_gate.welcome_back.greeting";
+    const subtitleKey = returningIsAuth
+      ? "visitor_gate.welcome_back.subtitle_auth"
+      : "visitor_gate.welcome_back.subtitle";
+    const expoDates = expoInfo
+      ? formatExpoDates(expoInfo.date_expo_du, expoInfo.date_expo_au, uiLanguage)
+      : "";
+    return (
+      <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-0">
+        <Card className="mt-1 w-full max-w-[320px] border-border shadow-lg">
+          <CardHeader className="space-y-1 px-3 pb-0 pt-2">
+            <CardTitle className="text-center font-sans text-xl leading-snug">
+              <span className="block font-black">
+                <Trans
+                  i18nKey={greetingKey}
+                  ns="landing"
+                  values={{ pseudo: greetingPseudo }}
+                  components={{
+                    pseudo: <span className="text-primary underline underline-offset-2" />,
+                  }}
+                />
+              </span>
+              <span className="mt-1 block text-xs font-semibold leading-snug tracking-[3.5px]">
+                {expoInfo?.expo_name
+                  ? t(subtitleKey, { expo_name: expoInfo.expo_name })
+                  : t("visitor_gate.welcome_back.subtitle_no_expo")}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 px-3 pb-2 pt-1">
+            {/* Avatars du visiteur */}
+            <div className="flex flex-row items-center justify-center gap-3">
+              {returningProfile.avatarUrl?.trim() ? (
+                <div className="relative flex h-[96px] w-[96px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background/50 shadow-sm">
+                  <img
+                    src={returningProfile.avatarUrl}
+                    alt={t("visitor_gate.welcome_back.avatar_alt", { pseudo: greetingPseudo })}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+              {returningProfile.selfieUrl?.trim() ? (
+                <div className="relative flex h-[96px] w-[96px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background/50 shadow-sm">
+                  <img
+                    src={returningProfile.selfieUrl}
+                    alt={t("visitor_gate.welcome_back.selfie_alt", { pseudo: greetingPseudo })}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            {/* Infos de l'exposition */}
+            {expoInfo && (
+              <div className="space-y-1.5 border-t border-border pt-3 text-center">
+                {expoInfo.logo_expo?.trim() ? (
+                  <img
+                    src={expoInfo.logo_expo}
+                    alt={expoInfo.expo_name}
+                    className="mx-auto mb-1 h-12 max-w-[180px] object-contain"
+                  />
+                ) : null}
+                <p className="text-sm font-semibold leading-snug">{expoInfo.expo_name}</p>
+                {expoDates ? (
+                  <p className="text-xs text-muted-foreground">{expoDates}</p>
+                ) : null}
+                {expoDescription ? (
+                  <p className="line-clamp-6 text-left text-xs leading-relaxed text-muted-foreground">
+                    {expoDescription}
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                disabled={quickVisitBusy}
+                onClick={() =>
+                  returningIsAuth
+                    ? navigate(`/scan-work1${qs}`, { replace: false })
+                    : void handleWelcomeBackContinue()
+                }
+              >
+                {quickVisitBusy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                    {t("visitor_gate.welcome_back.btn_loading")}
+                  </>
+                ) : (
+                  t("visitor_gate.welcome_back.btn_continue")
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-9 w-full text-xs text-muted-foreground"
+                disabled={quickVisitBusy}
+                onClick={() => {
+                  setReturningIsAuth(false);
+                  setStep("gate");
+                }}
+              >
+                {t("visitor_gate.quick_avatar.btn_back")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (step === "avatar") {
+    return (
+      <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-0">
+        <Card className="mt-1 w-full max-w-[320px] border-border shadow-lg">
+          <CardHeader className="space-y-1 px-3 pb-0 pt-2">
+            <CardTitle className="text-center font-sans text-xl leading-snug">
+              <span className="block font-black">{t("visitor_gate.quick_avatar.title")}</span>
+              <span className="mt-1 block text-xs font-semibold leading-snug tracking-[3.5px]">
+                {t("visitor_gate.quick_avatar.title_line2")}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-0 px-3 pb-2 pt-1">
+            <form
+              className="space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleQuickVisitConfirm();
+              }}
+            >
+              <VisitorPoolAvatarPicker
+                active
+                locale={uiLanguage}
+                showSelfie
+                preservedAvatar={
+                  avatarChangeFromProfile
+                    ? {
+                        imageUrl: avatarChangeFromProfile.avatarUrl,
+                        objectPath: avatarChangeFromProfile.avatarObjectPath,
+                        pseudo: returningDisplayPseudo.trim() || avatarChangeFromProfile.pseudo,
+                      }
+                    : null
+                }
+                disabled={quickVisitBusy}
+                visitorPhotoFile={visitorPhotoFile}
+                userPhotoUrl={userPhotoUrl}
+                onSelfieCapture={(e) => void handleCaptureSelfie(e)}
+                uploadingPhoto={uploadingPhoto}
+                onActiveAvatarChange={handleActiveAvatarChange}
+                onClearSelfie={() => {
+                  setVisitorPhotoFile(null);
+                  setUserPhotoUrl("");
+                }}
+                selfieInputId="visitor-welcome-selfie"
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="submit"
+                  className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                  disabled={quickVisitBusy || !selectedAvatar}
+                >
+                  {quickVisitBusy ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                      {t("visitor_gate.quick_avatar.btn_loading")}
+                    </>
+                  ) : (
+                    t("visitor_gate.quick_avatar.btn_continue")
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-9 w-full text-xs text-muted-foreground"
+                  disabled={quickVisitBusy}
+                  onClick={() => {
+                    setAvatarChangeFromProfile(null);
+                    setStep(avatarChangeFromProfile ? "welcome_back" : "gate");
+                  }}
+                >
+                  {t("visitor_gate.quick_avatar.btn_back")}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex w-full flex-1 flex-col items-center px-4 pb-24 pt-6">
+      <VisitorLinkCodeDialog
+        open={linkCodeDialogOpen}
+        onOpenChange={handleLinkCodeDialogOpenChange}
+        initialCode={freshLinkCode?.code}
+        initialDisplay={freshLinkCode?.display}
+        allowRegenerate={false}
+      />
       <Card className="w-full max-w-[360px] border-border shadow-lg">
         <CardHeader className="space-y-3 pb-2">
-          <div className="flex items-center justify-center gap-2 text-primary">
-            <Sparkles className="h-5 w-5" aria-hidden />
-            <span className="text-xs font-semibold uppercase tracking-wide">{t("visitor_gate.badge")}</span>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div aria-hidden />
+            <div className="flex items-center justify-center gap-2 text-primary">
+              <Sparkles className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="text-xs font-semibold uppercase tracking-wide">{t("visitor_gate.badge")}</span>
+            </div>
+            <div className="flex justify-end">
+              <UiLanguageSelector />
+            </div>
           </div>
           <CardTitle className="text-center font-serif text-xl leading-snug">{t("visitor_gate.aha")}</CardTitle>
           <CardDescription className="text-center text-sm">{t("visitor_gate.lead")}</CardDescription>
@@ -63,9 +681,29 @@ const VisitorWelcome = () => {
             <Button
               type="button"
               className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={handleQuickVisit}
+              disabled={quickVisitBusy}
+              onClick={() => void handleQuickVisitStart()}
             >
-              {t("visitor_gate.btn_quick")}
+              {quickVisitBusy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  {t("visitor_gate.quick_avatar.btn_loading")}
+                </>
+              ) : (
+                t("visitor_gate.btn_quick")
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 w-full"
+              disabled={quickVisitBusy}
+              onClick={() => {
+                setRecoveryCodeInput("");
+                setStep("recover");
+              }}
+            >
+              {t("visitor_gate.btn_recover")}
             </Button>
             <Button type="button" variant="outline" className="h-11 w-full" asChild>
               <Link to={`/register_visitor${qs}`}>{t("visitor_gate.btn_profile")}</Link>
@@ -76,7 +714,7 @@ const VisitorWelcome = () => {
           </div>
 
           <p className="text-center text-[11px] text-muted-foreground">
-            <Link to="/home" className="underline underline-offset-2 hover:text-foreground">
+            <Link to="/organisation" className="underline underline-offset-2 hover:text-foreground">
               {t("visitor_gate.link_organizer")}
             </Link>
           </p>

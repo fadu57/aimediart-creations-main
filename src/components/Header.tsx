@@ -66,7 +66,7 @@ function Logo({
   const isAgencyHome = normalizeRoleName(role_name) === ROLE_ADMIN_AGENCY || role_id === 4;
   const { session } = useAuthUser();
   // En espace connecté, éviter d’envoyer vers la vitrine publique.
-  const homeTo = session ? (isAgencyHome ? "/artistes" : "/dashboard") : "/home";
+  const homeTo = session ? (isAgencyHome ? "/artistes" : "/dashboard") : "/organisation";
 
   return (
     <Link to={homeTo} className="flex min-w-0 items-center">
@@ -120,7 +120,7 @@ export default function Header() {
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
   const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
-  const homePath = session ? "/dashboard" : "/home";
+  const homePath = session ? "/dashboard" : "/organisation";
   const { can } = useNavigationMatrix();
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("header");
@@ -172,8 +172,8 @@ export default function Header() {
     // Déconnexion tolérante hors-ligne: évite l'appel réseau `logout?scope=global`
     // qui échoue avec `ERR_INTERNET_DISCONNECTED`.
     await supabase.auth.signOut({ scope: "local" });
-    // Après déconnexion, revenir sur la landing publique.
-    window.location.href = "/home";
+    // Après déconnexion : page d'accueil visiteur (évite le repli /organisation).
+    window.location.href = "/visitor";
   };
 
   useEffect(() => {

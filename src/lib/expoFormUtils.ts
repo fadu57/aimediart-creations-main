@@ -1,6 +1,23 @@
 /** Formulaire exposition : colonnes `*_id` exclues (liaisons gérées ailleurs). */
 
-const READONLY_KEYS_INSERT = new Set(["created_at", "updated_at"]);
+const READONLY_KEYS_INSERT = new Set(["updated_at"]);
+
+/** Champs masqués dans le formulaire (techniques, redondants ou gérés par pickers dédiés). */
+const HIDDEN_EXPO_KEYS = new Set([
+  "id",
+  "logo2_expo",
+  "ref_expo",
+  "deleted_at",
+  "created_at",
+  // Curator : remplacé par le picker user
+  "curator",
+  "curator_name",
+  "curator_firstname",
+  "email_ref_expo",
+  "curator_email",
+  // Horaires : géré par ExpoHorairesEditor
+  "expo_horaires",
+]);
 
 /** Colonnes affichées / éditables (hors clés étrangères `*_id`). */
 export function isExpoFormColumn(key: string): boolean {
@@ -8,7 +25,7 @@ export function isExpoFormColumn(key: string): boolean {
 }
 
 export function filterExpoFormKeys(keys: string[]): string[] {
-  return keys.filter(isExpoFormColumn);
+  return keys.filter((k) => isExpoFormColumn(k) && !HIDDEN_EXPO_KEYS.has(k));
 }
 
 export function isReadonlyExpoKey(key: string, mode: "create" | "edit"): boolean {
@@ -35,6 +52,15 @@ export function fieldLabel(key: string): string {
     dates: "Dates",
     slug: "Slug",
     status: "Statut",
+    curator: "Commissaire d'expo",
+    curator_name: "Commissaire d'expo",
+    expo_descript_i18n: "Descriptif expo",
+    lieu_expo: "Lieu de l'exposition",
+    adress_expo: "Adresse",
+    zip_expo: "Code postal",
+    city_expo: "Ville",
+    date_expo_du: "Du",
+    date_expo_au: "Au",
   };
   return map[key] ?? key.replace(/_/g, " ");
 }
@@ -66,7 +92,7 @@ export function parseInputForKey(key: string, raw: string): unknown {
   const t = raw.trim();
   if (t === "") return null;
   if (key.endsWith("_at")) return t;
-  if ((key.includes("json") || key.includes("metadata") || key.includes("data")) && (t.startsWith("{") || t.startsWith("["))) {
+  if ((key.includes("json") || key.includes("metadata") || key.includes("data") || key.endsWith("_i18n")) && (t.startsWith("{") || t.startsWith("["))) {
     try {
       return JSON.parse(t) as unknown;
     } catch {

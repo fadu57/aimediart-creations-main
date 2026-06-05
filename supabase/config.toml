@@ -1,3 +1,7 @@
+# IP edge : appelée depuis le navigateur (preflight OPTIONS sans JWT).
+[functions.get-client-ip]
+verify_jwt = false
+
 [functions.generate-mediation]
 verify_jwt = true
 

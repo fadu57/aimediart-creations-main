@@ -121,6 +121,7 @@
     "error_title": "Pricing unavailable",
     "error_text": "Check the Supabase connection, the presence of the \u003ccode\u003epricing\u003c/code\u003e table and RLS read permissions.",
     "empty": "No offer found in the pricing table.",
+    "empty_hint": "Check that the table has rows and run the <code>pricing_public_anon_select</code> SQL policy (file supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Select your option",
     "option_prefix": "Option {{code}}",
     "col_monthly": "Monthly (incl. tax)",

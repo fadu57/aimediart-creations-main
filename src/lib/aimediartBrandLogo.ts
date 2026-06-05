@@ -2,7 +2,8 @@
 export const AIMEDIART_LOGO_RED = "#ca2b2b";
 
 export const AIMEDIART_BRAND_LOGO = {
-  widthPx: 161,
+  /** Largeur calculée depuis les bbox Inter (évite la troncature à droite). */
+  widthPx: 167,
   heightPx: 40,
   boxPx: 40,
   boxRadiusPx: 6,

@@ -65,6 +65,11 @@ type ExpoOption = {
   curatorLastName: string | null;
 };
 
+function expoMatchesAgencyFilter(ex: ExpoOption, agencyId: string | null | undefined): boolean {
+  if (!agencyId) return true;
+  return ex.agency_id === agencyId || ex.agency_id == null;
+}
+
 type ArtistFilterOption = {
   id: string;
   name: string;
@@ -215,7 +220,7 @@ function artworkExpoId(aw: unknown): string | null {
 const Statistics = () => {
   const { t, i18n } = useTranslation("statistiques");
   const { scope, loading: authLoading } = useDataScope();
-  const { role_id, role_name } = useAuthUser();
+  const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
   const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; name: string; logoUrl: string | null }>>([]);
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("all");
@@ -324,37 +329,63 @@ const Statistics = () => {
     };
   }, []);
 
+  const loadExpoOptions = useCallback(async () => {
+    const scopeAgencyId = scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : undefined;
+    const scopeExpoId = scope.mode === "expo" ? scope.expoId : undefined;
+
+    const agencyFilterId =
+      role_id === 4 && userAgencyId
+        ? userAgencyId
+        : scope.mode === "agency" && scopeAgencyId
+          ? scopeAgencyId
+          : null;
+
+    let query = supabase
+      .from("expos")
+      .select("*")
+      .is("deleted_at", null)
+      .order("expo_name", { ascending: true, nullsFirst: false });
+
+    if ((role_id === 5 || role_id === 6) && userExpoId) {
+      query = query.eq("id", userExpoId);
+    } else if (scope.mode === "expo" && scopeExpoId) {
+      query = query.eq("id", scopeExpoId);
+    } else if (agencyFilterId) {
+      query = query.or(`agency_id.eq.${agencyFilterId},agency_id.is.null`);
+    }
+
+    const { data, error } = await query;
+    if (error || !Array.isArray(data)) {
+      setExpoOptions([]);
+      return;
+    }
+
+    const options = (data as Record<string, unknown>[])
+      .map((row) => {
+        const curator = curatorNamesFromExpoRow(row);
+        return {
+          id: asTrimmedString(row.id),
+          expo_name: asTrimmedString(row.expo_name),
+          agency_id: asTrimmedString(row.agency_id) || null,
+          logoRaw: expoLogoRawFromRow(row),
+          date_expo_du: asTrimmedString(row.date_expo_du) || null,
+          date_expo_au: asTrimmedString(row.date_expo_au) || null,
+          curatorFirstName: curator.firstName || null,
+          curatorLastName: curator.lastName || null,
+        };
+      })
+      .filter((row) => row.id.length > 0)
+      .map((row) => ({ ...row, expo_name: row.expo_name || row.id }));
+
+    const unique = Array.from(new Map(options.map((ex) => [ex.id, ex])).values());
+    unique.sort((a, b) => a.expo_name.localeCompare(b.expo_name, "fr"));
+    setExpoOptions(unique);
+  }, [role_id, userAgencyId, userExpoId, scope]);
+
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const { data, error } = await supabase.from("expos").select("*").order("expo_name", { ascending: true });
-      if (cancelled) return;
-      if (error || !Array.isArray(data)) {
-        setExpoOptions([]);
-        return;
-      }
-      const options = (data as Record<string, unknown>[])
-        .map((row) => {
-          const curator = curatorNamesFromExpoRow(row);
-          return {
-            id: asTrimmedString(row.id),
-            expo_name: asTrimmedString(row.expo_name),
-            agency_id: asTrimmedString(row.agency_id) || null,
-            logoRaw: expoLogoRawFromRow(row),
-            date_expo_du: asTrimmedString(row.date_expo_du) || null,
-            date_expo_au: asTrimmedString(row.date_expo_au) || null,
-            curatorFirstName: curator.firstName || null,
-            curatorLastName: curator.lastName || null,
-          };
-        })
-        .filter((row) => row.id.length > 0)
-        .map((row) => ({ ...row, expo_name: row.expo_name || row.id }));
-      setExpoOptions(options);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (authLoading) return;
+    void loadExpoOptions();
+  }, [loadExpoOptions, authLoading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -434,7 +465,7 @@ const Statistics = () => {
         return expoOptions.filter((ex) => ex.id === scope.expoId);
       }
       if (scope.mode === "agency") {
-        return expoOptions.filter((ex) => ex.agency_id === scope.agencyId);
+        return expoOptions.filter((ex) => expoMatchesAgencyFilter(ex, scope.agencyId));
       }
       if (scope.mode === "all") {
         return expoOptions;
@@ -442,7 +473,7 @@ const Statistics = () => {
       return [] as ExpoOption[];
     })();
     if (!effectiveAgencyFilter) return byScope;
-    return byScope.filter((ex) => ex.agency_id === effectiveAgencyFilter);
+    return byScope.filter((ex) => expoMatchesAgencyFilter(ex, effectiveAgencyFilter));
   }, [scope.mode, scope.expoId, scope.agencyId, expoOptions, effectiveAgencyFilter]);
 
   const scopedArtworksBase = useMemo(() => {
@@ -454,9 +485,8 @@ const Statistics = () => {
   }, [scope, effectiveAgencyFilter, scopedExpos]);
 
   const expoOptionsForSelect = useMemo(() => {
-    // Filtrage strict demandé: ne montrer que les expos de l'organisation active.
     if (effectiveAgencyFilter) {
-      return scopedExpos.filter((ex) => ex.agency_id === effectiveAgencyFilter);
+      return scopedExpos.filter((ex) => expoMatchesAgencyFilter(ex, effectiveAgencyFilter));
     }
     return scopedExpos;
   }, [effectiveAgencyFilter, scopedExpos]);

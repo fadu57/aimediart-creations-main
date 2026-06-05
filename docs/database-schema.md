@@ -238,6 +238,54 @@
 **RLS :** ✅ activé — `visitors_deny_all` → ALL = false
 ⚠️ Accès complètement bloqué même en SELECT — accès uniquement via fonctions SECURITY DEFINER
 
+**Scripts SQL (ordre d’exécution) :**
+1. `supabase/sql/visitors_anonymous_fingerprint_and_pseudo.sql` — empreintes + RPC de base
+2. `supabase/sql/visitors_pseudo_pool_rpc.sql` — génération pseudo depuis `pseudo_pool`
+3. `supabase/sql/visitors_avatar_url_and_confirm_rpc.sql` — avatar URL + extension RPC pseudo
+4. `supabase/sql/visitors_get_profile_rpc.sql` — reconnaissance visiteur de retour
+5. `supabase/sql/visitors_recovery_code_rpc.sql` — code de liaison explicite (cross-navigateur) + `auth_user_id`
+
+**Colonnes principales (parcours scan / visite rapide) :**
+
+| Colonne | Type | Notes |
+|---------|------|-------|
+| `id` | uuid | PK |
+| `visitor_name` | text | ex. `Anonymous` à la création |
+| `visitor_pseudo` | text | Pseudo affiché (pool avatars + 3 chiffres, ex. `CanardTendre747`) |
+| `avatar_url` | text | URL publique Supabase Storage (bucket `avatars`) |
+| `avatar_object_path` | text | Chemin objet Storage relatif (ex. `adorable_duck.png`) |
+| `visitor_client_id` | text | UUID navigateur persistant (hors auth Supabase), UNIQUE |
+| `fingerprint` | text | visitorId FingerprintJS (si consentement traceur anonyme) |
+| `fingerprint_source` | text | ex. `fingerprintjs_visitor_id` |
+| `user_agent` | text | User-Agent transmis volontairement post-consentement |
+| `client_locale` | text | Locale navigateur |
+| `client_timezone` | text | Fuseau horaire IANA |
+| `screen_resolution` | text | ex. `1920x1080` |
+| `ip_address` | text | Dernière IP connue (Edge Function `get-client-ip`) |
+| `browser_name` | text | ex. Chrome, Safari |
+| `device_type` | text | `desktop`, `mobile`, `tablet` |
+| `country` | text | Géolocalisation optionnelle |
+| `city` | text | Géolocalisation optionnelle |
+| `last_seen_at` | timestamptz | Dernière activité |
+| `recovery_code_hash` | text | SHA-256 du code de liaison 8 caractères (cross-navigateur) |
+| `recovery_code_created_at` | timestamptz | Création / régénération du code |
+| `auth_user_id` | uuid | Compte `auth.users` lié à l’inscription visiteur |
+
+**Fonctions publiques (EXECUTE pour `anon` / `authenticated`) :**
+- `register_anonymous_visitor(...)` — crée ou met à jour la ligne (fingerprints + traces device)
+- `get_anonymous_visitor_profile(p_visitor_client_id?, p_fingerprint?)` — reconnaît un visiteur de retour (pseudo + avatar)
+- `generate_visitor_pseudo(locale)` — pseudo aléatoire depuis `pseudo_pool`
+- `confirm_visitor_pseudo_from_client(p_visitor_client_id, p_pseudo, p_avatar_url?, p_avatar_object_path?)` — persiste pseudo + avatar (visite rapide « Continuer la visite »)
+- `generate_visitor_recovery_code(p_visitor_client_id, p_regenerate?)` — code de liaison 8 caractères (affiché une fois)
+- `link_visitor_profile_by_recovery_code(p_recovery_code, p_visitor_client_id)` — rattache le profil sur un autre navigateur
+- `link_visitor_to_auth_user(p_visitor_client_id, p_auth_user_id)` — liaison compte à l’inscription
+
+**Flux app « Visite rapide » (`VisitorWelcome`) :**
+1. Clic « Visite rapide » → `get_anonymous_visitor_profile` (UUID navigateur + fingerprint) ou cache local
+2. Si profil connu → écran « bienvenue de retour » avec avatar + pseudo i18n
+3. Sinon → choix avatar → `register_anonymous_visitor` + `confirm_visitor_pseudo_from_client` + **code de liaison** (noter pour autre navigateur)
+4. Autre navigateur → « Retrouver mon profil » ou URL `?recover=XXXXXXXX` → `link_visitor_profile_by_recovery_code`
+
 ---
 
 ### visit_logs — Logs de visite

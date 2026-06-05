@@ -18,7 +18,61 @@
     "benefit_artist": "Enviar mensajes a los artistas",
     "benefit_profile": "Perfil permanente para tus próximas exposiciones",
     "link_organizer": "Espacio organizador",
-    "login_existing": "¿Ya tienes cuenta? Iniciar sesión"
+    "login_existing": "¿Ya tienes cuenta? Iniciar sesión",
+    "btn_recover": "Recuperar mi perfil visitante (código)",
+    "quick_avatar": {
+      "title": "Elija su avatar",
+      "title_line2": "que le acompañará durante toda su visita",
+      "btn_continue": "Continuar la visita",
+      "btn_back": "Volver",
+      "btn_loading": "Preparando…",
+      "toast_pick_avatar": "Elija un avatar para continuar.",
+      "toast_failed": "No se pudo iniciar la visita rápida. Inténtelo de nuevo.",
+      "toast_selfie_saved": "Selfie capturado.",
+      "toast_selfie_failed": "No se pudo capturar el selfie."
+    },
+    "welcome_back": {
+      "greeting": "¡Bienvenido de nuevo, <pseudo>{{pseudo}}</pseudo>!",
+      "subtitle": "Encantados de verte de nuevo en {{expo_name}}.",
+      "subtitle_no_expo": "Encantados de verte de nuevo.",
+      "greeting_auth": "¡Bienvenido, <pseudo>{{pseudo}}</pseudo>!",
+      "subtitle_auth": "Encantados de verte de nuevo en {{expo_name}}.",
+      "avatar_alt": "Avatar de {{pseudo}}",
+      "selfie_alt": "Selfie de {{pseudo}}",
+      "btn_continue": "Continuar la visita",
+      "btn_change_avatar": "Elegir otro avatar",
+      "btn_link_code": "Mi código de enlace",
+      "btn_not_me": "Eso no soy yo",
+      "btn_loading": "Preparando…",
+      "toast_failed": "No se pudo reanudar la visita. Inténtelo de nuevo."
+    },
+    "recover": {
+      "title": "Código de enlace",
+      "subtitle": "otro navegador o dispositivo",
+      "description": "Introduzca el código de 8 caracteres de su primera visita (ej. ABCD-2345).",
+      "placeholder": "ABCD-2345",
+      "input_aria": "Código de enlace visitante",
+      "btn_submit": "Recuperar mi perfil",
+      "btn_loading": "Comprobando…",
+      "errors": {
+        "invalid_format": "El código debe tener 8 caracteres.",
+        "not_found": "Código no encontrado. Compruébelo o cree un nuevo perfil.",
+        "incomplete": "Este perfil aún no está completo.",
+        "generic": "No se pudo vincular el perfil. Inténtelo de nuevo."
+      }
+    },
+    "recovery_code": {
+      "title": "Su código de enlace",
+      "description": "Guarde o copie este código para recuperar su avatar y apodo en otro navegador. Sustituye el reconocimiento automático por huella.",
+      "code_aria": "Código de enlace de ocho caracteres",
+      "unavailable": "Código no disponible en este dispositivo. Genere uno nuevo (el anterior dejará de funcionar).",
+      "btn_copy": "Copiar código",
+      "btn_regenerate": "Generar nuevo código",
+      "btn_done": "He guardado mi código",
+      "toast_copied": "Código copiado.",
+      "toast_copy_failed": "No se pudo copiar.",
+      "toast_regenerated": "Nuevo código generado."
+    }
   },
   "cookie_banner": {
     "aria_label": "Elección de cookies y rastreo",
@@ -27,7 +81,13 @@
     "link_rgpd": "Datos personales (RGPD)",
     "accept": "Aceptar todo",
     "refuse": "Rechazar",
-    "privacy_note": "Tu elección se guarda en una cookie y en el almacenamiento local. Borra los datos del sitio para restablecerla."
+    "privacy_note": "Tu elección se guarda en una cookie y en el almacenamiento local. Borra los datos del sitio para restablecerla.",
+    "refuse_dialog": {
+      "title": "Es una pena…",
+      "description": "Sin aceptar el identificador técnico anónimo no podrás aprovechar del todo la mediación adaptada a tu visita. Seguiremos usando las cookies estrictamente necesarias para el servicio.",
+      "confirm_refuse": "Confirmar rechazo",
+      "accept_instead": "Aceptar al final"
+    }
   },
   "legal_pages": {
     "back": "Volver",

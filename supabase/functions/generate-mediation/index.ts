@@ -211,9 +211,17 @@ const LANG_NAMES: Record<string, string> = {
 
 function buildLangInstruction(lang: string | undefined): string | null {
   if (!lang) return null;
-  const name = LANG_NAMES[lang.toLowerCase().slice(0, 2)];
+  const code = lang.toLowerCase().slice(0, 2);
+  const name = LANG_NAMES[code];
   if (!name) return null;
-  return `IMPORTANT : tu rédiges INTÉGRALEMENT les champs du JSON (analyse_et_reflexion + chaque valeur de mediations_par_style) UNIQUEMENT en ${name}. Aucune autre langue.`;
+  if (code === "fr") return null; // pas de consigne superflue pour le français (langue par défaut)
+  return [
+    `LANGUE CIBLE OBLIGATOIRE : ${name} (${code}).`,
+    `Rédige INTÉGRALEMENT le contenu textuel (analyse_et_reflexion + chaque valeur dans mediations_par_style) UNIQUEMENT en ${name}.`,
+    `INTERDICTION ABSOLUE : ne traduis PAS les clés JSON.`,
+    `Les clés "analyse_et_reflexion", "mediations_par_style" et les ids de style (ex : "poetique", "simple", "expert"…) sont des identifiants techniques — ils doivent rester EXACTEMENT tels quels, sans modification ni traduction.`,
+    `Seul le CONTENU (les valeurs des chaînes) est en ${name}.`,
+  ].join(" ");
 }
 
 const CORS_HEADERS = {
@@ -748,11 +756,13 @@ serve(async (req: Request) => {
     "",
   ].join("\n");
 
+  const expectedIdsFormatted = expectedIds.map((id) => `"${id}"`).join(", ");
   const userPromptSuffix = [
     "",
     "## Rappel sortie",
     "Un seul objet JSON avec les clés \"analyse_et_reflexion\" et \"mediations_par_style\" (clés internes = ids ci-dessus).",
     "Chaque valeur de mediations_par_style doit respecter le PLAFOND STRICT (tokens/mots/caractères) de son id — texte plus long = non conforme.",
+    `RAPPEL CRITIQUE : les clés dans mediations_par_style doivent être EXACTEMENT : ${expectedIdsFormatted}. Ne pas traduire ces identifiants.`,
   ].join("\n");
 
   const geminiMaxOutputTokens = geminiMediationMaxOutputTokens(styles);

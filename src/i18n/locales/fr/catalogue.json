@@ -50,6 +50,7 @@
   "qr_bulk_progress": "{{done}} / {{total}}",
   "qr_bulk_success": "{{count}} QR codes régénérés avec succès.",
   "qr_bulk_partial": "{{success}} QR codes régénérés, {{error}} erreur(s).",
+  "qr_bulk_warn_no_expo": "{{count}} œuvre(s) sans exposition assignée — leur QR ne contiendra pas de contexte expo (le visiteur verra l'œuvre mais ne pourra pas naviguer dans l'expo).",
 
   "pdf_error_no_id": "Identifiant de l'œuvre indisponible.",
   "pdf_error_no_qr_url": "Impossible de construire l'URL du QR pour cette œuvre.",

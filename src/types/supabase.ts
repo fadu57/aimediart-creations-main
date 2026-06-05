@@ -420,7 +420,73 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      /** SECURITY DEFINER — visiteurs anonymes (fingerprints + liaison client_uuid). */
+      register_anonymous_visitor: {
+        Args: {
+          p_visitor_client_id?: string | null;
+          p_fingerprint?: string | null;
+          p_fingerprint_source?: string | null;
+          p_user_agent?: string | null;
+          p_client_locale?: string | null;
+          p_client_timezone?: string | null;
+          p_screen_resolution?: string | null;
+          p_ip_address?: string | null;
+          p_browser_name?: string | null;
+          p_device_type?: string | null;
+          p_country?: string | null;
+          p_city?: string | null;
+          p_device_fingerprint?: string | null;
+        };
+        Returns: string;
+      };
+      /** SECURITY DEFINER — pseudo noun + adj + digits depuis `pseudo_pool`. */
+      generate_visitor_pseudo: {
+        Args: { locale?: string | null };
+        Returns: string;
+      };
+      /** SECURITY DEFINER — profil visiteur de retour (pseudo + avatar). */
+      get_anonymous_visitor_profile: {
+        Args: {
+          p_visitor_client_id?: string | null;
+          p_fingerprint?: string | null;
+        };
+        Returns: Json;
+      };
+      generate_visitor_recovery_code: {
+        Args: {
+          p_visitor_client_id: string;
+          p_regenerate?: boolean | null;
+        };
+        Returns: Json;
+      };
+      link_visitor_profile_by_recovery_code: {
+        Args: {
+          p_recovery_code: string;
+          p_visitor_client_id: string;
+        };
+        Returns: Json;
+      };
+      link_visitor_to_auth_user: {
+        Args: {
+          p_visitor_client_id: string;
+          p_auth_user_id: string;
+        };
+        Returns: boolean;
+      };
+      /** SECURITY DEFINER — `visitor_client_id` = UUID navigateur persisté localement. */
+      confirm_visitor_pseudo_from_client: {
+        Args: {
+          p_visitor_client_id: string;
+          p_pseudo: string;
+          p_avatar_url?: string | null;
+          p_avatar_object_path?: string | null;
+          p_selfie_url?: string | null;
+          p_selfie_object_path?: string | null;
+        };
+        Returns: string;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

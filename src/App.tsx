@@ -1,5 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -26,6 +36,8 @@ import Agencies2 from "./pages/Agencies2";
 import AgenciesCorbeille from "./pages/AgenciesCorbeille";
 import Expos from "./pages/Expos";
 import Expos2 from "./pages/Expos2";
+import ExposVisitors from "./pages/ExposVisitors";
+import ExposVisitorDetail from "./pages/ExposVisitorDetail";
 import ExposCorbeille from "./pages/ExposCorbeille";
 import Users from "./pages/Users";
 import Utilisateurs from "./pages/Utilisateurs";
@@ -57,8 +69,34 @@ import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getAudienceChoice } from "./lib/audienceChoice";
 import { isVisitorRole } from "./lib/authUser";
 import { Loader2 } from "lucide-react";
+import { useLayoutEffect } from "react";
 
 const queryClient = new QueryClient();
+
+/**
+ * URLs du type https://domaine.fr//scan?... ont un pathname "//scan" (double slash après l’hôte).
+ * React Router n’associe pas `//scan` à la route `scan` → SPA mal routée ; on replie en un seul "/".
+ */
+function NormalizeMultipleSlashPathname() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useLayoutEffect(() => {
+    const collapsed = location.pathname.replace(/\/{2,}/g, "/");
+    if (collapsed === location.pathname) return;
+
+    navigate(
+      {
+        pathname: collapsed === "" ? "/" : collapsed,
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  return null;
+}
 
 
 /** Redirige les anciens QR codes /oeuvre/:artworkId -> /artwork/:artworkId (retrocompat). */
@@ -96,6 +134,8 @@ function AppShell() {
     /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
+    normalizedPathname === "/scan" ||
+    normalizedPathname.startsWith("/scan/") ||
     normalizedPathname === "/scan-work1" ||
     normalizedPathname === "/scan-work2" ||
     normalizedPathname === "/scan-work-first";
@@ -148,12 +188,10 @@ function RootEntryRoute() {
   }
   const audience = getAudienceChoice();
   if (audience === "organizer") {
-    return <Navigate to="/home" replace />;
+    return <Navigate to="/organisation" replace />;
   }
-  if (audience === "visitor") {
-    return <Navigate to="/visitor" replace />;
-  }
-  return <WelcomeLanding />;
+  // Visiteurs connus ou première visite → /visitor
+  return <Navigate to="/visitor" replace />;
 }
 
 /**
@@ -166,8 +204,11 @@ function RootEntryRoute() {
 const AppRoutes = () => (
   <Routes>
     {/* Landing marketing publique (sans header) */}
-    <Route path="/home" element={<PublicHome />} />
-    <Route path="/home/commencer" element={<PublicHomeCommencer />} />
+    <Route path="/organisation" element={<PublicHome />} />
+    <Route path="/organisation/commencer" element={<PublicHomeCommencer />} />
+    {/* Rétrocompatibilité anciens liens /home */}
+    <Route path="/home" element={<Navigate to="/organisation" replace />} />
+    <Route path="/home/commencer" element={<Navigate to="/organisation/commencer" replace />} />
     <Route path="/cgv" element={<CgvPage />} />
     <Route path="/cookies" element={<CookiesPage />} />
     <Route path="/privacy" element={<PrivacyPage />} />
@@ -227,6 +268,8 @@ const AppRoutes = () => (
           <Route path="utilisateurs-corbeille" element={<UtilisateursCorbeille />} />
           <Route path="expos" element={<Expos />} />
           <Route path="expos/expos2" element={<Expos2 />} />
+          <Route path="expos/visitors" element={<ExposVisitors />} />
+          <Route path="expos/visitors/:id" element={<ExposVisitorDetail />} />
           <Route path="expos-corbeille" element={<ExposCorbeille />} />
           <Route path="prompts" element={<Prompts />} />
           <Route path="catalogue-corbeille" element={<CatalogueCorbeille />} />
@@ -264,6 +307,7 @@ const App = () => {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <UiLanguageProvider>
             <NavigationMatrixProvider>
+              <NormalizeMultipleSlashPathname />
               <AppRoutes />
               <CookieConsentBanner />
             </NavigationMatrixProvider>

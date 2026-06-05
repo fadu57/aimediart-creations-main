@@ -648,7 +648,9 @@ const Users = ({
     if (!rpcErr && Array.isArray(rpcData)) {
       let merged = (rpcData as RpcUserWithRolesRow[])
         .map(mapRpcRowToUserRow)
-        .filter((row): row is UserRow => row != null);
+        .filter((row): row is UserRow => row != null)
+        .filter((r) => r.role_id !== 7)   // Visiteurs gérés dans /expos/visitors
+        .filter((r) => r.role_id != null); // role_id null = compte non configuré (traité comme visiteur)
 
       if (currentRoleId === 2) {
         merged = merged.filter((r) => r.role_id !== 1);
@@ -748,7 +750,11 @@ const Users = ({
         };
       });
 
-    setRows(merged);
+    setRows(
+      merged
+        .filter((r) => r.role_id !== 7)   // Visiteurs gérés dans /expos/visitors
+        .filter((r) => r.role_id != null), // role_id null = compte non configuré
+    );
     setLoading(false);
   }, [connectedAgencyId, currentRoleId]);
 
@@ -1421,6 +1427,9 @@ const Users = ({
         avatar_url: nextPhoto || null,
         phone: editing.phone?.trim() || null,
         birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
+        // Niveaux 1-3 (admins globaux sans agence) : role_id stocké dans profiles.
+        // Niveaux 4-7 : role_id dans agency_users ; on efface profiles.role_id pour éviter les conflits.
+        role_id: isLevel123 ? nextRoleId : null,
       };
 
       if (mode === "create") {

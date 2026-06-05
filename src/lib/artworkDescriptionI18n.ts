@@ -268,6 +268,14 @@ export function mediationTextForStyleCodeAndLang(
   return "";
 }
 
+/** Langues pour lesquelles au moins un texte de médiation est renseigné dans le JSONB. */
+export function getMediationFilledUiLangs(raw: unknown): MediationUiLang[] {
+  const byLang = normalizeArtworkDescriptionToByLang(raw);
+  return MEDIATION_UI_LANGS.filter((L) =>
+    Object.values(byLang[L]).some((s) => s.trim().length > 0),
+  );
+}
+
 /** Nombre max de styles non vides sur une langue (pour indicateurs type catalogue). */
 export function countMaxMediationStylesAcrossLangs(raw: unknown): number {
   const byLang = normalizeArtworkDescriptionToByLang(raw);

@@ -4,50 +4,10 @@
 
 import {
   AIMEDIART_BRAND_LOGO,
-  AIMEDIART_LOGO_RED,
-  LUCIDE_HEART_PATH,
 } from "@/lib/aimediartBrandLogo";
+import { buildAimediartBrandLogoSvg } from "@/lib/aimediartBrandLogoSvg";
 
 const RENDER_SCALE = 4;
-
-function buildBrandLogoSvg(): string {
-  const { widthPx, heightPx, boxPx, boxRadiusPx, textX, titleFontSizePx, subtitleFontSizePx } =
-    AIMEDIART_BRAND_LOGO;
-  const heartOffset = (boxPx - 24) / 2;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">
-  <rect x="0" y="0" width="${boxPx}" height="${boxPx}" rx="${boxRadiusPx}" fill="${AIMEDIART_LOGO_RED}" />
-  <g transform="translate(${heartOffset}, ${heartOffset})">
-    <path
-      d="${LUCIDE_HEART_PATH}"
-      fill="none"
-      stroke="#ffffff"
-      stroke-width="2.25"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-  </g>
-  <text
-    x="${textX}"
-    y="15"
-    font-family="Inter, ui-sans-serif, system-ui, sans-serif"
-    font-size="${titleFontSizePx}"
-    font-weight="700"
-    letter-spacing="-0.025em"
-    fill="${AIMEDIART_LOGO_RED}"
-  >AIMEDIArt.com</text>
-  <text
-    x="${textX}"
-    y="32"
-    font-family="Inter, ui-sans-serif, system-ui, sans-serif"
-    font-size="${subtitleFontSizePx}"
-    font-weight="700"
-    font-style="italic"
-    fill="${AIMEDIART_LOGO_RED}"
-  >Art-mediation with AI</text>
-</svg>`;
-}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -84,7 +44,7 @@ export async function createAimediaHeaderLogoBlockPng(): Promise<PdfHeaderLogoBl
   await ensureInterFontLoaded();
 
   const { widthPx, heightPx } = AIMEDIART_BRAND_LOGO;
-  const svg = buildBrandLogoSvg();
+  const svg = buildAimediartBrandLogoSvg();
   const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   const svgUrl = URL.createObjectURL(svgBlob);
 

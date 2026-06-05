@@ -13,11 +13,11 @@ function resolveLocalTimezone(): string {
 
 /**
  * Données tracking inscription depuis l’URL (/login) + session (IP, device, fp de secours).
- * Renseigné lorsque `from=home-tarifs` (parcours vitrine → commencer → login).
+ * Renseigné lorsque `from=organisation-tarifs` (parcours vitrine → commencer → login).
  */
 export function buildSignupTrackingPayload(searchParams: URLSearchParams): Record<string, unknown> | null {
   const from = searchParams.get("from")?.trim();
-  if (from !== "home-tarifs") return null;
+  if (from !== "organisation-tarifs") return null;
 
   const city = searchParams.get("city")?.trim() || null;
   const zip = searchParams.get("zip")?.trim() || null;

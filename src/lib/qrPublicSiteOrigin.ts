@@ -18,7 +18,7 @@ export async function fetchQrPublicSiteOriginFromSettings(): Promise<string> {
   if (!rawValue.trim()) return "";
   try {
     const parsed = JSON.parse(rawValue) as { public_site_origin?: string | null };
-    return (parsed.public_site_origin ?? "").trim();
+    return (parsed.public_site_origin ?? "").trim().replace(/\/+$/, "");
   } catch {
     return "";
   }

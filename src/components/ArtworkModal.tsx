@@ -24,6 +24,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -260,6 +269,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [artistId, setArtistId] = useState("");
   const [artworkExpoId, setArtworkExpoId] = useState("");
   const [artworkAgencyId, setArtworkAgencyId] = useState("");
+  const canPickAgency = typeof role_id === "number" && role_id < 4;
+  const canPickExpo = typeof role_id === "number" && (role_id === 4 || role_id === 5);
+  const expoAgencyId = artworkAgencyId.trim() || agency_id?.trim() || "";
+  const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
+  const [expoOptions, setExpoOptions] = useState<{ id: string; name: string }[]>([]);
+  const [artworkAgencyOpen, setArtworkAgencyOpen] = useState(false);
+  const [artworkExpoOpen, setArtworkExpoOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [artworkQrImageUrl, setArtworkQrImageUrl] = useState("");
   const [sourceMaterial, setSourceMaterial] = useState("");
@@ -380,6 +396,44 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
     setMediationEditLang(mediationPrimaryLang);
   }, [open, mediationPrimaryLang, setMediationOptionalLang]);
+
+  // Charger les agences (super-admins uniquement)
+  useEffect(() => {
+    if (!canPickAgency || !open) return;
+    supabase
+      .from("agencies")
+      .select("id, name_agency")
+      .order("name_agency", { ascending: true })
+      .then(({ data }) => {
+        setAgencyOptions((data ?? []).map((r) => ({ id: r.id as string, name: (r.name_agency as string) ?? "" })));
+      });
+  }, [canPickAgency, open]);
+
+  // Rôles 4–5 : agence implicite (profil utilisateur)
+  useEffect(() => {
+    if (!open || canPickAgency || !canPickExpo || !agency_id?.trim()) return;
+    setArtworkAgencyId((prev) => prev.trim() || agency_id.trim());
+  }, [open, canPickAgency, canPickExpo, agency_id]);
+
+  const canManageExpoLink = canPickAgency || canPickExpo;
+
+  // Charger les expos filtrées par agence (sélectionnée ou profil)
+  useEffect(() => {
+    if (!open || !canManageExpoLink) { setExpoOptions([]); return; }
+    if (!expoAgencyId) { setExpoOptions([]); return; }
+    let query = supabase
+      .from("expos")
+      .select("id, expo_name")
+      .eq("agency_id", expoAgencyId)
+      .is("deleted_at", null)
+      .order("expo_name", { ascending: true });
+    if (role_id === 5 && expo_id?.trim()) {
+      query = query.eq("id", expo_id.trim());
+    }
+    void query.then(({ data }) => {
+      setExpoOptions((data ?? []).map((r) => ({ id: r.id as string, name: (r.expo_name as string) ?? "" })));
+    });
+  }, [open, canManageExpoLink, expoAgencyId, role_id, expo_id]);
 
   useEffect(() => {
     if (!open) {
@@ -963,19 +1017,6 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         );
         return false;
       }
-      setInitialDraftSignature(
-        serializeDraftSnapshot(
-          buildDraftSnapshot({
-            title,
-            artistId,
-            artworkExpoId,
-            artworkAgencyId,
-            imageUrl,
-            sourceMaterial,
-            descriptionsByLang: base,
-          }),
-        ),
-      );
     }
     toast.success(t(successToastKey, toastParams));
     return true;
@@ -1447,217 +1488,262 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         <input type="hidden" value={artworkAgencyId} readOnly />
         <input type="hidden" value={fingerprint} readOnly />
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="w-40 shrink-0">
-            <div className="group relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={t("img_alt")}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <Upload className="h-6 w-6 text-muted-foreground/70" />
-                </div>
-              )}
+        {/* ── Layout 2 rangées sur 2 colonnes fixes ──────────────────────────────
+            Rangée 1 : [Image + Analyser (w-40)] | [Titre + Artiste flex-1] [QR w-40]
+            Rangée 2 : [Agence 50%] [Expo 50%] côte à côte
+        ──────────────────────────────────────────────────────────────────────── */}
+        <div className="space-y-3">
 
-              {imageUrl && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-2 pt-6 px-1.5 bg-gradient-to-t from-black/55 via-black/25 to-transparent">
+          {/* ── Rangée 1 ─────────────────────────────────────────── */}
+          <div className="flex gap-4 items-start">
+
+            {/* Colonne gauche fixe (w-40) : image + bouton Analyser */}
+            <div className="w-40 shrink-0 space-y-2">
+              <div className="group relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                {imageUrl ? (
+                  <img src={imageUrl} alt={t("img_alt")} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Upload className="h-6 w-6 text-muted-foreground/70" />
+                  </div>
+                )}
+                <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     type="button"
                     variant="secondary"
-                    className="pointer-events-auto h-auto min-h-10 w-full gap-2 whitespace-normal border border-amber-300/60 bg-amber-50 px-[5px] py-[5px] text-center text-xs leading-tight text-amber-900 shadow-sm hover:bg-amber-100 sm:text-sm"
-                    disabled={!canAnalyzeImage}
-                    onClick={() => void handleAnalyzeImage()}
+                    className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isVisitorLocked || isLoading || uploadingImage}
                   >
-                    {analyzingImage ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("btn_analyzing")}
-                      </>
-                    ) : (
-                      t("btn_analyze")
-                    )}
+                    {uploadingImage ? t("btn_uploading") : t("btn_change_photo")}
                   </Button>
                 </div>
-              )}
-
-              <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
-
-              <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadArtworkImage(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+              {imageUrl && (
                 <Button
                   type="button"
                   variant="secondary"
-                  className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
-                  onClick={() => photoInputRef.current?.click()}
-                  disabled={isVisitorLocked || isLoading || uploadingImage}
+                  className="h-auto w-full gap-1 whitespace-normal border border-amber-300/60 bg-amber-50 px-[5px] py-[5px] text-center text-xs leading-tight text-amber-900 shadow-sm hover:bg-amber-100"
+                  disabled={!canAnalyzeImage}
+                  onClick={() => void handleAnalyzeImage()}
                 >
-                  {uploadingImage ? t("btn_uploading") : t("btn_change_photo")}
+                  {analyzingImage ? <><Loader2 className="h-3 w-3 animate-spin" />{t("btn_analyzing")}</> : t("btn_analyze")}
                 </Button>
-              </div>
-
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void uploadArtworkImage(file);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Label>{t("label_title")}</Label>
-                <Textarea
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  disabled={isVisitorLocked || isLoading}
-                  rows={2}
-                  className="min-h-[60px] resize-none p-[5px] text-base md:text-sm"
-                />
-              </div>
-              <div
-                className={cn(
-                  "group relative flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
-                  artworkQrImageUrl && "bg-white",
-                )}
-              >
-                {artworkQrImageUrl ? (
-                  <img
-                    src={artworkQrImageUrl}
-                    alt={t("qr_alt")}
-                    className="h-full w-full object-contain p-1"
-                  />
-                ) : (
-                  <p className="px-2 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">
-                    {t("qr_empty")}
-                  </p>
-                )}
-
-                {isEditingExisting && !isVisitorLocked && (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
-                    <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
-                        onClick={() => void handleRegenerateQr()}
-                        disabled={regeneratingQr || isLoading}
-                      >
-                        {regeneratingQr ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                            {t("btn_regenerating_qr")}
-                          </>
-                        ) : (
-                          t("btn_regenerate_qr")
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
+              )}
             </div>
 
-            <div className="absolute top-[167px] w-[359px] space-y-1.5">
-              <Label>{t("label_artist")}</Label>
-              <div className="relative">
-                  <Input
-                    value={artistSearch}
-                    onChange={(e) => {
-                      setArtistSearch(e.target.value);
-                      setShowArtistSuggestions(true);
-                    }}
-                    onFocus={() => setShowArtistSuggestions(true)}
-                    onBlur={() => {
-                      window.setTimeout(() => setShowArtistSuggestions(false), 120);
-                    }}
-                    placeholder={selectedArtistDisplay}
+            {/* Colonne droite : [Titre + Artiste (flex-1)] + [QR (w-40)] */}
+            <div className="flex-1 flex gap-4 items-start">
+
+              {/* Titre + Artiste empilés */}
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="space-y-1.5">
+                  <Label>{t("label_title")}</Label>
+                  <Textarea
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                     disabled={isVisitorLocked || isLoading}
-                    className="p-[5px]"
+                    rows={2}
+                    className="min-h-[60px] resize-none p-[5px] text-base md:text-sm"
                   />
-                  {showArtistSuggestions && (
-                    <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                      {artistSearch.trim().length > 0 && filteredArtists.length === 0 && (
-                        <p className="px-3 py-2 text-sm text-muted-foreground">{t("artist_not_found")}</p>
-                      )}
-                      {filteredArtists.map((artist) => {
-                        const label =
-                          [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
-                          artist.artist_nickname ||
-                          artist.artist_id;
-                        return (
-                          <button
-                            key={artist.artist_id}
-                            type="button"
-                            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
-                            onMouseDown={(ev) => ev.preventDefault()}
-                            onClick={() => {
-                              setArtistId(artist.artist_id);
-                              setArtistSearch(label);
-                              setShowArtistSuggestions(false);
-                            }}
-                          >
-                            <span className="truncate">{label}</span>
-                            <Check
-                              className={cn(
-                                "ml-2 h-4 w-4 shrink-0",
-                                artistId === artist.artist_id ? "opacity-100" : "opacity-0",
-                              )}
-                            />
-                          </button>
-                        );
-                      })}
-                      {!isVisitorLocked && (
-                        <>
-                          {filteredArtists.length > 0 && (
-                            <div className="mx-2 my-1 border-t border-border/60" />
-                          )}
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
-                            onMouseDown={(ev) => ev.preventDefault()}
-                            onClick={() => {
-                              setShowArtistSuggestions(false);
-                              setArtistDialogOpen(true);
-                            }}
-                          >
-                            <span className="text-base leading-none">+</span>
-                            {t("btn_create_artist")}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t("label_artist")}</Label>
+                  <div className="relative">
+                    <Input
+                      value={artistSearch}
+                      onChange={(e) => { setArtistSearch(e.target.value); setShowArtistSuggestions(true); }}
+                      onFocus={() => setShowArtistSuggestions(true)}
+                      onBlur={() => { window.setTimeout(() => setShowArtistSuggestions(false), 120); }}
+                      placeholder={selectedArtistDisplay}
+                      disabled={isVisitorLocked || isLoading}
+                      className="p-[5px]"
+                    />
+                    {showArtistSuggestions && (
+                      <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                        {artistSearch.trim().length > 0 && filteredArtists.length === 0 && (
+                          <p className="px-3 py-2 text-sm text-muted-foreground">{t("artist_not_found")}</p>
+                        )}
+                        {filteredArtists.map((artist) => {
+                          const label =
+                            [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
+                            artist.artist_nickname ||
+                            artist.artist_id;
+                          return (
+                            <button
+                              key={artist.artist_id}
+                              type="button"
+                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
+                              onMouseDown={(ev) => ev.preventDefault()}
+                              onClick={() => { setArtistId(artist.artist_id); setArtistSearch(label); setShowArtistSuggestions(false); }}
+                            >
+                              <span className="truncate">{label}</span>
+                              <Check className={cn("ml-2 h-4 w-4 shrink-0", artistId === artist.artist_id ? "opacity-100" : "opacity-0")} />
+                            </button>
+                          );
+                        })}
+                        {!isVisitorLocked && (
+                          <>
+                            {filteredArtists.length > 0 && <div className="mx-2 my-1 border-t border-border/60" />}
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                              onMouseDown={(ev) => ev.preventDefault()}
+                              onClick={() => { setShowArtistSuggestions(false); setArtistDialogOpen(true); }}
+                            >
+                              <span className="text-base leading-none">+</span>
+                              {t("btn_create_artist")}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            {!analyzingImage && analyzeImageError && (
-              <Alert variant="destructive">
-                <AlertTitle>{t("analyze_error_title")}</AlertTitle>
-                <AlertDescription className="space-y-3">
-                  <p className="text-xs break-words">{analyzeImageError}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => void handleAnalyzeImage()}
-                    disabled={!imageUrl || isVisitorLocked}
-                  >
-                    {t("btn_retry")}
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
+
+              {/* QR code */}
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={cn(
+                    "group relative flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
+                    artworkQrImageUrl && "bg-white",
+                    !artworkExpoId.trim() && "border-amber-400/70",
+                  )}
+                >
+                  {artworkQrImageUrl ? (
+                    <img src={artworkQrImageUrl} alt={t("qr_alt")} className="h-full w-full object-contain p-1" />
+                  ) : (
+                    <p className="px-2 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">{t("qr_empty")}</p>
+                  )}
+                  {isEditingExisting && !isVisitorLocked && (
+                    <>
+                      <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
+                      <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
+                          onClick={() => void handleRegenerateQr()}
+                          disabled={regeneratingQr || isLoading}
+                        >
+                          {regeneratingQr ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{t("btn_regenerating_qr")}</> : t("btn_regenerate_qr")}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {!artworkExpoId.trim() && (
+                  <p className="max-w-[160px] text-center text-[10px] leading-tight text-amber-600">{t("qr_warn_no_expo")}</p>
+                )}
+              </div>
+
+            </div>
           </div>
+
+          {/* ── Rangée 2 : [Agence 50%] (rôles &lt; 4) + [Expo] (rôles &lt; 4 ou 4–5) ── */}
+          {canManageExpoLink && (
+            <div className="flex gap-3 items-start">
+              {canPickAgency && (
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Label className="text-xs font-medium">Agence</Label>
+                <Popover open={artworkAgencyOpen} onOpenChange={setArtworkAgencyOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" role="combobox"
+                      className="h-9 w-full justify-between p-[5px] text-sm font-normal shadow-none"
+                      disabled={isVisitorLocked || isLoading}
+                    >
+                      <span className="truncate">
+                        {artworkAgencyId ? (agencyOptions.find((a) => a.id === artworkAgencyId)?.name ?? "Agence inconnue") : "Sélectionner une agence…"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher une agence…" />
+                      <CommandList>
+                        <CommandEmpty>Aucune agence trouvée.</CommandEmpty>
+                        <CommandGroup>
+                          {agencyOptions.map((a) => (
+                            <CommandItem key={a.id} value={a.name} onSelect={() => { setArtworkAgencyId(a.id); setArtworkExpoId(""); setArtworkAgencyOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", artworkAgencyId === a.id ? "opacity-100" : "opacity-0")} />
+                              {a.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              )}
+              <div className={cn("min-w-0 space-y-1.5", canPickAgency ? "flex-1" : "w-full flex-1")}>
+                <Label className="text-xs font-medium">Exposition</Label>
+                <Popover open={artworkExpoOpen} onOpenChange={setArtworkExpoOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" role="combobox"
+                      className="h-9 w-full justify-between p-[5px] text-sm font-normal shadow-none"
+                      disabled={isVisitorLocked || isLoading || !expoAgencyId}
+                    >
+                      <span className="truncate">
+                        {artworkExpoId
+                          ? (expoOptions.find((e) => e.id === artworkExpoId)?.name ?? "Expo inconnue")
+                          : expoAgencyId
+                            ? "Sélectionner une expo…"
+                            : "— agence non résolue —"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Rechercher une exposition…" />
+                      <CommandList>
+                        <CommandEmpty>Aucune exposition trouvée.</CommandEmpty>
+                        <CommandGroup>
+                          {expoOptions.map((e) => (
+                            <CommandItem key={e.id} value={e.name} onSelect={() => { setArtworkExpoId(e.id); setArtworkExpoOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4", artworkExpoId === e.id ? "opacity-100" : "opacity-0")} />
+                              {e.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          )}
+
+          {/* Erreur analyse image */}
+          {!analyzingImage && analyzeImageError && (
+            <Alert variant="destructive">
+              <AlertTitle>{t("analyze_error_title")}</AlertTitle>
+              <AlertDescription className="space-y-3">
+                <p className="text-xs break-words">{analyzeImageError}</p>
+                <Button type="button" variant="outline" size="sm" className="h-8"
+                  onClick={() => void handleAnalyzeImage()} disabled={!imageUrl || isVisitorLocked}
+                >
+                  {t("btn_retry")}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
         </div>
         {checkingDuplicate && (
           <p className="text-xs text-muted-foreground inline-flex items-center gap-2">

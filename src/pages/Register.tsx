@@ -1,18 +1,34 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+
+import { FunctionsHttpError } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { isVisitorRole } from "@/lib/authUser";
 import { getStoredVisitorUuid } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
+import {
+  hasVisitorRegistrationMetadata,
+  readOAuthNameParts,
+  startVisitorOAuthSignIn,
+  VISITOR_REGISTER_OAUTH_FLAG,
+} from "@/lib/visitorOAuth";
 import { getAnonymousTrackingConsent, loadOrCreateFingerprintJsId } from "@/lib/fingerprintConsent";
+import {
+  localizeVisitorAnonymousProfile,
+  persistAnonymousVisitorIdentity,
+  registerAnonymousVisitorSession,
+  resolveReturningAnonymousVisitor,
+} from "@/lib/registerAnonymousVisitorSession";
+import type { VisitorAnonymousProfile } from "@/lib/visitorAnonymousProfile";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -23,11 +39,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AppleLogoIcon, GoogleLogoIcon } from "@/components/OAuthProviderIcons";
+import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
+import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
+import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
 
 const PASSWORD_MIN_LENGTH = 6;
 const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
@@ -40,8 +60,23 @@ function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
     m.includes("already registered") ||
     m.includes("already been registered") ||
     m.includes("user already registered") ||
+    m.includes("already exists") ||
     m.includes("email address is already registered")
   );
+}
+
+/** Lorsque `functions.invoke` reçoit un statut hors 2xx, le SDK ne parse pas le corps : il est encore lisible via la Response attachée à l’erreur. */
+async function readFunctionsHttpErrorJson<T extends Record<string, unknown>>(err: unknown): Promise<T | null> {
+  if (!(err instanceof FunctionsHttpError)) return null;
+  const res = err.context as Response | undefined;
+  if (!res?.clone) return null;
+  const ct = (res.headers.get("Content-Type") ?? "").split(";")[0].trim();
+  if (ct !== "application/json") return null;
+  try {
+    return (await res.clone().json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 function isBypassEmail(email: string): boolean {
@@ -69,8 +104,16 @@ type RegisterVisitorInstantResponse = {
   error?: string;
 };
 
+type CompleteVisitorOAuthResponse = {
+  ok?: boolean;
+  user_id?: string;
+  code?: string;
+  error?: string;
+};
+
 const Register = () => {
   const { t, i18n } = useTranslation("auth");
+  const { language: uiLanguage } = useUiLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { session, loading: authLoading, role_name, role_id } = useAuthUser();
@@ -126,10 +169,16 @@ const Register = () => {
   const [userPhotoUrl, setUserPhotoUrl] = useState("");
   const [visitorPhotoFile, setVisitorPhotoFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activePoolAvatar, setActivePoolAvatar] = useState<VisitorPoolAvatar | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [emailDuplicateOpen, setEmailDuplicateOpen] = useState(false);
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+  const [oauthProfileFlow, setOauthProfileFlow] = useState(false);
+  const [postAuthHandled, setPostAuthHandled] = useState(false);
+  const [returningProfile, setReturningProfile] = useState<VisitorAnonymousProfile | null>(null);
+  const [returningDisplayPseudo, setReturningDisplayPseudo] = useState("");
   const trimmedEmail = email.trim();
   const emailLooksValid = /\S+@\S+\.\S+/.test(trimmedEmail);
   const passwordHasMinLength = password.length >= PASSWORD_MIN_LENGTH;
@@ -144,7 +193,87 @@ const Register = () => {
     if (expoIdFromUrl) setCurrentExpoId(expoIdFromUrl);
   }, [expoIdFromUrl]);
 
-  if (authLoading) {
+  useEffect(() => {
+    if (step !== 2) {
+      setReturningProfile(null);
+      setReturningDisplayPseudo("");
+      return;
+    }
+
+    let cancelled = false;
+    void resolveReturningAnonymousVisitor().then((profile) => {
+      if (cancelled) return;
+      setReturningProfile(profile);
+      if (profile) {
+        void registerAnonymousVisitorSession().catch(() => {
+          /* non bloquant */
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 2 || !returningProfile) {
+      setReturningDisplayPseudo("");
+      return;
+    }
+
+    let cancelled = false;
+    void localizeVisitorAnonymousProfile(returningProfile, uiLanguage).then((localized) => {
+      if (!cancelled) setReturningDisplayPseudo(localized.pseudo);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, uiLanguage, returningProfile]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!session?.user) {
+      setPostAuthHandled(true);
+      return;
+    }
+
+    const oauthReturn =
+      searchParams.get("oauth") === "1" ||
+      (typeof window !== "undefined" && sessionStorage.getItem(VISITOR_REGISTER_OAUTH_FLAG) === "1");
+
+    if (oauthReturn) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
+      }
+      if (searchParams.get("oauth") === "1") {
+        const next = new URL(window.location.href);
+        next.searchParams.delete("oauth");
+        window.history.replaceState({}, "", `${next.pathname}${next.search}`);
+      }
+
+      if (hasVisitorRegistrationMetadata(session.user)) {
+        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
+        navigate(target, { replace: true });
+        return;
+      }
+
+      const { prenom: oauthPrenom, nom: oauthNom } = readOAuthNameParts(session.user);
+      if (session.user.email) setEmail(session.user.email);
+      if (oauthPrenom) setPrenom(oauthPrenom);
+      if (oauthNom) setNom(oauthNom);
+      setOauthProfileFlow(true);
+      setStep(2);
+      setPostAuthHandled(true);
+      return;
+    }
+
+    setPostAuthHandled(true);
+  }, [authLoading, session, searchParams, expoIdFromUrl, navigate]);
+
+  if (authLoading || (session && !postAuthHandled)) {
     return (
       <div className="flex flex-1 items-center justify-center py-16">
         <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
@@ -152,7 +281,7 @@ const Register = () => {
     );
   }
 
-  if (session) {
+  if (session && !oauthProfileFlow) {
     const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/";
     return <Navigate to={target} replace />;
   }
@@ -201,6 +330,15 @@ const Register = () => {
     }
   };
 
+  const handleOAuthSignIn = async (provider: "google" | "apple") => {
+    setOauthLoading(provider);
+    const { error } = await startVisitorOAuthSignIn(provider, expoIdFromUrl || undefined, agencyIdFromUrl || undefined);
+    if (error) {
+      setOauthLoading(null);
+      toast.error(error.message || t("register_visitor.toast_oauth_failed"));
+    }
+  };
+
   const handleFinalize = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
@@ -209,10 +347,6 @@ const Register = () => {
     const birthIso = birthMonth && birthYear ? `${birthYear}-${birthMonth}` : "";
     const trimmedPhone = userPhone.trim();
 
-    if (!trimmed || !password) {
-      toast.error(t("register_visitor.toast_complete_email_password"));
-      return;
-    }
     if (!trimmedPrenom) {
       toast.error(t("register_visitor.toast_enter_firstname"));
       return;
@@ -230,6 +364,83 @@ const Register = () => {
       let deviceFingerprint: string | null = null;
       if (getAnonymousTrackingConsent() === "granted") {
         deviceFingerprint = await loadOrCreateFingerprintJsId();
+      }
+
+      const poolPhotoUrl = activePoolAvatar?.imageUrl ?? returningProfile?.avatarUrl ?? null;
+      const pseudoToPersist =
+        activePoolAvatar?.pseudo?.trim() ||
+        returningDisplayPseudo.trim() ||
+        returningProfile?.pseudo?.trim() ||
+        null;
+
+      if (pseudoToPersist && getStoredVisitorUuid()) {
+        try {
+          await persistAnonymousVisitorIdentity({
+            pseudo: pseudoToPersist,
+            avatarUrl: activePoolAvatar?.imageUrl ?? returningProfile?.avatarUrl,
+            avatarObjectPath: activePoolAvatar?.objectPath ?? returningProfile?.avatarObjectPath,
+            selfieFile: visitorPhotoFile,
+            keepSelfieUrl: returningProfile?.selfieUrl,
+            keepSelfieObjectPath: returningProfile?.selfieObjectPath,
+          });
+        } catch (persistErr) {
+          if (import.meta.env.DEV) {
+            console.warn("[Register] mise à jour visitors :", persistErr);
+          }
+        }
+      }
+
+      if (oauthProfileFlow && session?.user) {
+        const { data: completeData, error: completeError } =
+          await supabase.functions.invoke<CompleteVisitorOAuthResponse>("complete-visitor-oauth-profile", {
+            body: {
+              prenom: trimmedPrenom,
+              nom: trimmedNom,
+              agency_id: agencyIdFromUrl || null,
+              user_age: birthIso || null,
+              user_phone: trimmedPhone || null,
+              user_photo_url: poolPhotoUrl,
+              user_expo_id: expoIdFromUrl || null,
+              visitor_uuid: getStoredVisitorUuid(),
+              device_fingerprint: deviceFingerprint,
+            },
+          });
+
+        if (completeError) {
+          const httpPayload = await readFunctionsHttpErrorJson<CompleteVisitorOAuthResponse>(completeError);
+          toast.error(httpPayload?.error?.trim() || completeError.message || t("register_visitor.toast_visitor_signup_failed"));
+          return;
+        }
+        if (!completeData?.ok || !completeData.user_id) {
+          toast.error(completeData?.error || t("register_visitor.toast_incomplete_profile"));
+          return;
+        }
+
+        if (visitorPhotoFile) {
+          try {
+            const publicUrl = await uploadVisitorSelfiePhoto(completeData.user_id, visitorPhotoFile, visitorPhotoFile.name);
+            await supabase.auth.updateUser({ data: { user_photo_url: publicUrl } });
+          } catch (photoErr) {
+            if (import.meta.env.DEV) {
+              console.warn("[Register] selfie upload:", photoErr);
+            }
+          }
+        }
+
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("redirectAfterAuth");
+          sessionStorage.removeItem("redirectAfterLogin");
+          const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
+          navigate(target, { replace: true });
+        } else {
+          navigate("/scan-work1", { replace: true });
+        }
+        return;
+      }
+
+      if (!trimmed || !password) {
+        toast.error(t("register_visitor.toast_complete_email_password"));
+        return;
       }
 
       if (isBypassEmail(trimmed)) {
@@ -253,7 +464,7 @@ const Register = () => {
         agency_id: agencyIdFromUrl || null,
         user_age: birthIso || null,
         user_phone: trimmedPhone || null,
-        user_photo_url: null,
+        user_photo_url: poolPhotoUrl,
         user_expo_id: expoIdFromUrl || null,
         visitor_uuid: getStoredVisitorUuid(),
         device_fingerprint: deviceFingerprint,
@@ -265,12 +476,17 @@ const Register = () => {
       );
 
       if (createError) {
-        const msg = createError.message || t("register_visitor.toast_visitor_signup_failed");
-        if (isDuplicateEmailSignUpError(msg, createData?.code)) {
+        const httpPayload = await readFunctionsHttpErrorJson<RegisterVisitorInstantResponse>(createError);
+        const msg =
+          httpPayload?.error?.trim() ||
+          createError.message ||
+          t("register_visitor.toast_visitor_signup_failed");
+        const code = httpPayload?.code;
+        if (isDuplicateEmailSignUpError(msg, code)) {
           setEmailDuplicateOpen(true);
           return;
         }
-        toast.error(msg);
+        toast.error(formatSignUpError(msg));
         return;
       }
 
@@ -338,9 +554,11 @@ const Register = () => {
 
   const markOk = t("register_visitor.rule_ok");
   const markPending = t("register_visitor.rule_pending");
+  const oauthButtonClassName =
+    "h-9 w-full rounded-md border border-border bg-background text-sm font-normal text-foreground hover:bg-accent hover:text-accent-foreground";
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center px-4 pb-8 pt-1">
+    <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-0">
       <AlertDialog open={emailDuplicateOpen} onOpenChange={setEmailDuplicateOpen}>
         <AlertDialogContent className="max-w-[min(320px,calc(100vw-2rem))]">
           <AlertDialogHeader>
@@ -373,11 +591,9 @@ const Register = () => {
       </AlertDialog>
 
       <Card className="mt-1 w-full max-w-[320px] border-border shadow-lg">
-        <CardHeader className="space-y-1 px-3 pb-1 pt-3">
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-left font-serif text-xl leading-tight">
-              {step === 1 ? t("register_visitor.title_step_access") : t("register_visitor.title_step_profile")}
-            </CardTitle>
+        <CardHeader className="space-y-1 px-3 pb-0 pt-2">
+          <AimediartBrandLogoBlock size="sm" animateHeart />
+          <div className="flex justify-end">
             <span
               className="shrink-0 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium leading-none text-muted-foreground tabular-nums"
               aria-hidden
@@ -386,9 +602,9 @@ const Register = () => {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="px-3 pb-3 pt-0">
+        <CardContent className="space-y-0 px-3 pb-2 pt-1">
           {step === 1 ? (
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <div className="space-y-1">
                 <Label htmlFor="register-email" className="text-xs">
                   {t("register.email")}
@@ -483,13 +699,63 @@ const Register = () => {
               </div>
               <Button
                 type="button"
-                className="mt-1 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
                 onClick={goToStep2}
                 disabled={!canGoToStep2}
               >
                 {t("register_visitor.btn_continue")}
               </Button>
-              <p className="pt-1 text-center text-[11px] text-muted-foreground">
+
+              <div className="relative py-0.5">
+                <div className="absolute inset-0 flex items-center" aria-hidden>
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-[10px] uppercase tracking-wide">
+                  <span className="bg-card px-2 text-muted-foreground">{t("register_visitor.oauth_divider")}</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className={oauthButtonClassName}
+                disabled={oauthLoading != null}
+                onClick={() => void handleOAuthSignIn("google")}
+              >
+                {oauthLoading === "google" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("register_visitor.oauth_google_loading")}
+                  </>
+                ) : (
+                  <>
+                    <GoogleLogoIcon />
+                    {t("register_visitor.oauth_google")}
+                  </>
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className={oauthButtonClassName}
+                disabled={oauthLoading != null}
+                onClick={() => void handleOAuthSignIn("apple")}
+              >
+                {oauthLoading === "apple" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("register_visitor.oauth_apple_loading")}
+                  </>
+                ) : (
+                  <>
+                    <AppleLogoIcon className="text-foreground" />
+                    {t("register_visitor.oauth_apple")}
+                  </>
+                )}
+              </Button>
+
+              <p className="text-center text-[11px] text-muted-foreground">
                 <Link
                   to={expoIdFromUrl ? `/login?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/login"}
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
@@ -499,12 +765,64 @@ const Register = () => {
               </p>
             </div>
           ) : (
-            <form onSubmit={(e) => void handleFinalize(e)} className="space-y-3">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t("register_visitor.section_identity")}
-              </p>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="register-prenom" className="w-20 shrink-0 text-xs">
+            <form onSubmit={(e) => void handleFinalize(e)} className="space-y-2">
+              {oauthProfileFlow && session?.user?.email ? (
+                <p className="rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 text-[11px] leading-snug text-muted-foreground">
+                  {t("register_visitor.oauth_step2_hint", { email: session.user.email })}
+                </p>
+              ) : null}
+              {returningProfile ? (
+                <div className="space-y-2 border-b border-border/60 pb-3">
+                  <div className="text-center font-sans text-xl leading-snug">
+                    <span className="block font-black">
+                      <Trans
+                        i18nKey="register_visitor.returning_anonymous.greeting"
+                        ns="auth"
+                        values={{ pseudo: returningDisplayPseudo.trim() || returningProfile.pseudo }}
+                        components={{
+                          pseudo: <span className="text-primary underline underline-offset-2" />,
+                        }}
+                      />
+                    </span>
+                    <span className="mt-1 block text-xs font-semibold leading-snug tracking-[3.5px]">
+                      {t("register_visitor.returning_anonymous.subtitle")}
+                    </span>
+                  </div>
+                  <div className="flex flex-row items-center justify-center gap-3 pt-1">
+                    <div className="relative flex h-[96px] w-[96px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background/50 shadow-sm">
+                      <img
+                        src={returningProfile.avatarUrl}
+                        alt={t("register_visitor.returning_anonymous.avatar_alt", {
+                          pseudo: returningDisplayPseudo.trim() || returningProfile.pseudo,
+                        })}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    {returningProfile.selfieUrl?.trim() ? (
+                      <div className="relative flex h-[96px] w-[96px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background/50 shadow-sm">
+                        <img
+                          src={returningProfile.selfieUrl}
+                          alt={t("register_visitor.selfie_alt")}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <p className="text-center text-xs font-medium tracking-[-0.5px] text-foreground">
+                    {t("register_visitor.returning_anonymous.hint_identity")}
+                  </p>
+                  <p className="text-center text-xs font-medium tracking-[-0.5px] text-foreground">
+                    {t("register_visitor.returning_anonymous.hint_new_avatars")}
+                  </p>
+                </div>
+              ) : null}
+              {!returningProfile ? (
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("register_visitor.section_identity")}
+                </p>
+              ) : null}
+              <div className="space-y-1">
+                <Label htmlFor="register-prenom" className="text-xs">
                   {t("register_visitor.label_firstname")}
                 </Label>
                 <Input
@@ -515,12 +833,12 @@ const Register = () => {
                   onChange={(e) => setPrenom(e.target.value)}
                   placeholder="Jean"
                   disabled={submitting}
-                  className="h-9 flex-1 text-sm"
+                  className="h-9 w-full text-sm"
                   required
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="register-nom" className="w-20 shrink-0 text-xs">
+              <div className="space-y-1">
+                <Label htmlFor="register-nom" className="text-xs">
                   {t("register_visitor.label_lastname")}
                 </Label>
                 <Input
@@ -531,7 +849,7 @@ const Register = () => {
                   onChange={(e) => setNom(e.target.value)}
                   placeholder="Dupont"
                   disabled={submitting}
-                  className="h-9 flex-1 text-sm"
+                  className="h-9 w-full text-sm"
                   required
                 />
               </div>
@@ -576,7 +894,7 @@ const Register = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="register-phone" className="w-20 shrink-0 text-xs">
+                <Label htmlFor="register-phone" className="w-[30px] shrink-0 text-xs">
                   {t("register_visitor.label_tel")}
                 </Label>
                 <SmartPhoneInput
@@ -585,47 +903,49 @@ const Register = () => {
                   onChange={setUserPhone}
                   onValidityChange={setUserPhoneValid}
                   disabled={submitting || uploadingPhoto}
-                  className="flex-1"
+                  className="min-w-0 flex-1"
                 />
               </div>
-              <div className="rounded-md border border-dashed border-border/80 bg-muted/25 p-3">
-                <p className="mb-2 text-[11px] font-medium text-muted-foreground">{t("register_visitor.selfie_section")}</p>
-                <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
-                  {userPhotoUrl ? (
-                    <img
-                      src={userPhotoUrl}
-                      alt={t("register_visitor.selfie_alt")}
-                      className="h-[104px] w-[104px] rounded-full border border-border object-cover shadow-sm"
-                    />
-                  ) : (
-                    <div className="flex h-[104px] w-[104px] shrink-0 items-center justify-center rounded-full border-2 border-dashed border-border/90 bg-background/50 text-[10px] text-muted-foreground">
-                      {t("register_visitor.selfie_empty_hint")}
-                    </div>
-                  )}
-                  <label
-                    htmlFor="register-selfie"
-                    className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent hover:text-accent-foreground"
-                  >
-                    {uploadingPhoto ? t("register_visitor.btn_photo_uploading") : t("register_visitor.btn_take_selfie")}
-                  </label>
-                  <input
-                    id="register-selfie"
-                    type="file"
-                    accept="image/*"
-                    capture="user"
-                    onChange={(e) => void handleCaptureProfilePhoto(e)}
-                    disabled={submitting || uploadingPhoto}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
+              <VisitorPoolAvatarPicker
+                active={step === 2}
+                locale={uiLanguage}
+                showSelfie
+                preservedAvatar={
+                  returningProfile
+                    ? {
+                        imageUrl: returningProfile.avatarUrl,
+                        objectPath: returningProfile.avatarObjectPath,
+                        pseudo: returningDisplayPseudo.trim() || returningProfile.pseudo,
+                      }
+                    : null
+                }
+                disabled={creatingProfile}
+                visitorPhotoFile={visitorPhotoFile}
+                userPhotoUrl={userPhotoUrl}
+                onSelfieCapture={(e) => void handleCaptureProfilePhoto(e)}
+                uploadingPhoto={uploadingPhoto}
+                onActiveAvatarChange={setActivePoolAvatar}
+                onClearSelfie={() => {
+                  setVisitorPhotoFile(null);
+                  setUserPhotoUrl("");
+                }}
+                selfieInputId="register-selfie"
+              />
+              <div className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   className="h-9 flex-1 border-border px-2 text-xs"
                   disabled={creatingProfile}
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    if (oauthProfileFlow) {
+                      void supabase.auth.signOut();
+                      setOauthProfileFlow(false);
+                      setStep(1);
+                      return;
+                    }
+                    setStep(1);
+                  }}
                 >
                   {t("register_visitor.btn_back")}
                 </Button>

@@ -121,6 +121,7 @@
     "error_title": "Tariffe non disponibili",
     "error_text": "Verificare la connessione Supabase, la presenza della tabella \u003ccode\u003epricing\u003c/code\u003e e i diritti RLS di lettura.",
     "empty": "Nessuna offerta trovata nella tabella pricing.",
+    "empty_hint": "Verificare che la tabella contenga righe ed eseguire la policy SQL <code>pricing_public_anon_select</code> (file supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Seleziona la tua opzione",
     "option_prefix": "Opzione {{code}}",
     "col_monthly": "Mensile (IVA incl.)",

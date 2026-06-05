@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { isBackofficeRole, isVisitorRole } from "@/lib/authUser";
+import { isVisitorRole } from "@/lib/authUser";
 import { Loader2 } from "lucide-react";
 
 const OEUVRE_PATH = "/scan-work1";
@@ -10,26 +10,16 @@ const OEUVRE_PATH = "/scan-work1";
  * Session obligatoire + role autorise pour l'app de gestion.
  *
  * Logique d'acces :
- * - role_id 1-6 depuis agency_users  →  acces backoffice
- * - role_name reconnu via JWT (admin_general, super_admin, developpeur…) →  acces backoffice
- *   (cas des admins globaux sans ligne dans agency_users)
  * - visiteur (role_id 7 ou role_name "visiteur") →  redirect scan-work1
- * - sans role ni session →  redirect login / scan-work1
+ * - sans session →  redirect /login
+ * - session valide + role < 7 (ou role inconnu/null) →  acces backoffice
+ *   (role null = admin sans ligne agency_users ou JWT non enrichi ; on fait confiance a la session)
  */
 export function RequireBackoffice() {
   const { session, loading, role_name, role_id, expo_id } = useAuthUser();
   const location = useLocation();
 
   const isExplicitVisitor = isVisitorRole(role_name, role_id);
-  const isBackofficePath = location.pathname.toLowerCase().startsWith("/backoffice");
-
-  // Acces autorise si :
-  // 1. role_id numerique 1-6 (lu depuis agency_users apres migration schema)
-  // 2. OU role_name reconnu comme backoffice (fallback JWT pour admins sans agency_users row)
-  const hasBackofficeAccess =
-    !isExplicitVisitor &&
-    ((typeof role_id === "number" && role_id >= 1 && role_id <= 6) ||
-      isBackofficeRole(role_name));
 
   if (loading) {
     return (
@@ -44,11 +34,7 @@ export function RequireBackoffice() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // Anti-boucle : si l'utilisateur est deja sur une route "backoffice", ne redirige plus.
-  if (isBackofficePath) {
-    return <Outlet />;
-  }
-
+  // Seul le role visiteur (7) est redirige vers la page publique.
   if (isExplicitVisitor) {
     return <Navigate to={OEUVRE_PATH} replace state={{ from: location.pathname }} />;
   }
@@ -64,9 +50,6 @@ export function RequireBackoffice() {
     );
   }
 
-  if (!hasBackofficeAccess) {
-    return <Navigate to={OEUVRE_PATH} replace state={{ from: location.pathname }} />;
-  }
-
+  // Tout utilisateur authentifie non-visiteur accede au back-office.
   return <Outlet />;
 }
