@@ -7,6 +7,7 @@ import {
 import {
   ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
   Euro, Activity, TrendingUp, Award, RefreshCw, Search, CheckCircle2, XCircle, HelpCircle, History, ExternalLink,
+  ArrowUp, ArrowDown, ArrowUpDown, Database,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,14 +16,43 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
   getCostTimeSeries, getCostSelectOptions, exportCostsCsv, formatCost, formatUsdToEurHint,
+  DEFAULT_COST_SORT,
   type CostEvent, type CostFilters, type CostSummary,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
+  type CostSort, type CostSortColumn,
 } from "@/lib/costs";
 import { supabase } from "@/lib/supabase";
 import { getUsdToEurRate } from "@/lib/fxRates";
+import {
+  CURSOR_PLAN_AMOUNTS,
+  firstDayNextMonthLabelFr,
+  nextCursorPlan,
+  parseCursorPlan,
+  type CursorPlanName,
+} from "@/lib/cursorPlan";
+import {
+  SUPABASE_PLAN_AMOUNTS,
+  nextSupabasePlan,
+  parseSupabasePlan,
+} from "@/lib/supabasePlan";
+import {
+  VERCEL_PLAN_AMOUNTS,
+  nextVercelPlan,
+  parseVercelPlan,
+} from "@/lib/vercelPlan";
+import { formatOvhAmountEur, OVH_IMPORT_FROM_DATE } from "@/lib/ovhCost";
+import { formatProjectDate, PROJECT_CREATED_DATE } from "@/lib/projectMeta";
+import {
+  formatActivityDateTime,
+  formatActivityDay,
+  type ProjectActivityScanResult,
+} from "@/lib/projectActivityScan";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // Types — Fournisseurs
@@ -48,8 +78,69 @@ type CostProvider = {
   updated_at: string;
 };
 
-/** Fournisseurs suivis pour la sync de coûts (hors legacy OpenAI / SMTP / HF). */
-const COST_SYNC_PROVIDER_KEYS = ["groq", "google_gemini", "google_tts"] as const;
+/** Fournisseurs affichés dans la section coûts. */
+const COST_PROVIDER_KEYS = ["groq", "google_gemini", "google_tts", "cursor", "huggingface", "supabase", "vercel", "ovh"] as const;
+
+const PROVIDER_FALLBACK: Record<
+  typeof COST_PROVIDER_KEYS[number],
+  { provider_name: string; category: string; metadata?: Record<string, unknown> }
+> = {
+  groq: { provider_name: "Groq", category: "llm" },
+  google_gemini: { provider_name: "Google Gemini", category: "llm" },
+  google_tts: { provider_name: "Google TTS", category: "tts" },
+  cursor: { provider_name: "Cursor", category: "other", metadata: { cost_mode: "fixed_monthly" } },
+  huggingface: { provider_name: "HuggingFace", category: "image" },
+  supabase: { provider_name: "Supabase", category: "other", metadata: { cost_mode: "fixed_monthly" } },
+  vercel: { provider_name: "Vercel", category: "other", metadata: { cost_mode: "fixed_monthly" } },
+  ovh: {
+    provider_name: "OVH",
+    category: "other",
+    metadata: { billing_mode: "ovh_invoices", import_from_date: OVH_IMPORT_FROM_DATE, currency: "EUR" },
+  },
+};
+
+function isPlaceholderProvider(p: CostProvider): boolean {
+  return p.id.startsWith("placeholder-");
+}
+
+/** Affiche toujours les clés COST_PROVIDER_KEYS, même si la ligne SQL manque ou est inactive. */
+function mergeCostProviders(rows: CostProvider[]): CostProvider[] {
+  const byKey = new Map(rows.map((r) => [r.provider_key, r]));
+  const now = new Date().toISOString();
+  return COST_PROVIDER_KEYS.map((key) => {
+    const existing = byKey.get(key);
+    if (existing) return existing;
+    const fb = PROVIDER_FALLBACK[key];
+    return {
+      id: `placeholder-${key}`,
+      provider_key: key,
+      provider_name: fb.provider_name,
+      category: fb.category,
+      detected_in_code: true,
+      configured: false,
+      actively_used: false,
+      sync_supported: false,
+      cost_import_supported: false,
+      status: "unknown",
+      last_detected_at: null,
+      last_synced_at: null,
+      last_sync_status: null,
+      last_sync_error: null,
+      notes: null,
+      metadata: fb.metadata ?? {},
+      updated_at: now,
+    };
+  }).sort((a, b) => a.provider_name.localeCompare(b.provider_name, "fr"));
+}
+
+const FIXED_MONTHLY_PROVIDER_KEYS = ["cursor", "supabase", "vercel"] as const;
+type FixedMonthlyProviderKey = typeof FIXED_MONTHLY_PROVIDER_KEYS[number];
+
+const FIXED_MONTHLY_SYNC_FN: Record<FixedMonthlyProviderKey, string> = {
+  cursor: "sync-cursor-costs",
+  supabase: "sync-supabase-costs",
+  vercel: "sync-vercel-costs",
+};
 
 /** Fournisseurs avec backfill historique dans l'UI. */
 const BACKFILL_PROVIDER_KEYS = ["groq", "google_gemini"] as const;
@@ -128,6 +219,21 @@ function billingModeLabel(p: CostProvider, t: (k: string) => string): string {
       return t("providers.billing_tts_web_speech");
     }
     return t("providers.billing_tts_web_speech");
+  }
+  if (p.provider_key === "cursor" && p.metadata?.cost_mode === "fixed_monthly") {
+    return t("providers.billing_fixed_monthly");
+  }
+  if (p.provider_key === "supabase" && p.metadata?.cost_mode === "fixed_monthly") {
+    return t("providers.billing_supabase_fixed");
+  }
+  if (p.provider_key === "vercel" && p.metadata?.cost_mode === "fixed_monthly") {
+    return t("providers.billing_vercel_fixed");
+  }
+  if (p.provider_key === "ovh" && p.metadata?.billing_mode === "ovh_invoices") {
+    return `${t("providers.billing_ovh_invoices")} (≥ ${OVH_IMPORT_FROM_DATE})`;
+  }
+  if (p.provider_key === "huggingface") {
+    return t("providers.billing_hf_credits");
   }
   if (mode === "estimated_from_logs") return t("providers.billing_estimated");
   return "—";
@@ -314,19 +420,262 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
   );
 }
 
+function ProjectDbActivitySection() {
+  const { t } = useTranslation("settings");
+  const [scan, setScan] = useState<ProjectActivityScanResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const runScan = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke("project-activity-scan", {
+        method: "POST",
+        body: {},
+      });
+      if (invokeErr) throw new Error(await parseInvokeError(invokeErr));
+      setScan(data as ProjectActivityScanResult);
+    } catch (err) {
+      const msg = String(err);
+      setError(msg);
+      toast.error(t("couts.db_activity_error") + " — " + msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const chartData = useMemo(() => {
+    if (!scan?.daily_activity?.length) return [];
+    return scan.daily_activity.map((d) => ({
+      date: formatActivityDay(d.day),
+      events: d.event_count,
+    }));
+  }, [scan]);
+
+  const summary = scan?.summary;
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Database className="h-4 w-4 text-primary" aria-hidden />
+              {t("couts.db_activity_title")}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("couts.db_activity_sub")}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 shrink-0"
+            disabled={loading}
+            onClick={() => void runScan()}
+          >
+            {loading
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              : <Search className="h-3.5 w-3.5" aria-hidden />}
+            {t("couts.db_activity_analyze")}
+          </Button>
+        </div>
+        {error && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2">
+            {error}
+          </p>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!scan && !loading && (
+          <p className="text-sm text-center text-muted-foreground py-8">
+            {t("couts.db_activity_empty")}
+          </p>
+        )}
+
+        {scan && summary && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_first")}</p>
+                <p className="text-sm font-semibold mt-1">
+                  {formatActivityDateTime(summary.project_first_activity)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_last")}</p>
+                <p className="text-sm font-semibold mt-1">
+                  {formatActivityDateTime(summary.project_last_activity)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_columns_ok")}</p>
+                <p className="text-sm font-semibold mt-1">{summary.columns_scanned_ok}</p>
+              </div>
+              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_scan_errors")}</p>
+                <p className="text-sm font-semibold mt-1">{summary.columns_scan_errors}</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground font-mono">
+              {t("couts.db_activity_scanned_at", {
+                at: formatActivityDateTime(scan.scanned_at),
+              })}
+            </p>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="min-h-[220px]">
+                {chartData.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                    {t("settings_no_data")}
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                      <YAxis tick={{ fontSize: 10 }} width={36} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: number) => [value, t("couts.db_activity_events")]}
+                        contentStyle={{ fontSize: 12 }}
+                      />
+                      <Bar dataKey="events" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {t("couts.db_activity_chart_hint")}
+                </p>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-border/50 max-h-[280px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
+                    <tr className="border-b border-border/50">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                        {t("couts.db_activity_col_table")}
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                        {t("couts.db_activity_col_column")}
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                        {t("couts.db_activity_col_first")}
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
+                        {t("couts.db_activity_col_last")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...(scan.columns ?? [])]
+                      .sort((a, b) => a.table_name.localeCompare(b.table_name) || a.column_name.localeCompare(b.column_name))
+                      .map((col, i) => (
+                        <tr
+                          key={`${col.table_name}.${col.column_name}`}
+                          className={`border-b border-border/30 ${i % 2 === 1 ? "bg-muted/10" : ""}`}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-xs font-mono">{col.table_name}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs">{col.column_name}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-[11px] text-muted-foreground">
+                            {col.scan_error ? "—" : formatActivityDateTime(col.first_activity)}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-[11px] text-muted-foreground">
+                            {col.scan_error
+                              ? <span className="text-amber-700" title={col.scan_error}>err</span>
+                              : formatActivityDateTime(col.last_activity)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type CostsTableProps = {
   events: CostEvent[];
   loading: boolean;
   error: string | null;
   page: number;
   total: number;
+  sort: CostSort;
+  onSortChange: (sort: CostSort) => void;
   onPageChange: (p: number) => void;
   onExport: () => void;
   currency: string;
 };
-function CostsTable({ events, loading, error, page, total, onPageChange, onExport, currency }: CostsTableProps) {
+
+const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[] = [
+  { column: "created_at", labelKey: "couts.col_date" },
+  { column: "tool_type", labelKey: "couts.col_tool_type" },
+  { column: "provider", labelKey: "couts.col_provider" },
+  { column: "model_name", labelKey: "couts.col_model" },
+  { column: "operation_name", labelKey: "couts.col_operation" },
+  { column: "cost_estimated", labelKey: "couts.col_cost" },
+];
+
+const COST_TABLE_STATIC_COLUMNS = [
+  "couts.col_units_in",
+  "couts.col_units_out",
+  "couts.col_unit_type",
+  "couts.col_status",
+  "couts.col_source",
+] as const;
+
+function nextCostSort(column: CostSortColumn, current: CostSort): CostSort {
+  if (current.column === column) {
+    return { column, ascending: !current.ascending };
+  }
+  const descFirst = column === "created_at" || column === "cost_estimated";
+  return { column, ascending: !descFirst };
+}
+
+type SortableThProps = {
+  label: string;
+  column: CostSortColumn;
+  sort: CostSort;
+  onSort: (column: CostSortColumn) => void;
+};
+
+function SortableTh({ label, column, sort, onSort }: SortableThProps) {
+  const active = sort.column === column;
+  const SortIcon = active ? (sort.ascending ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          active && "text-foreground",
+        )}
+        aria-sort={active ? (sort.ascending ? "ascending" : "descending") : "none"}
+      >
+        {label}
+        <SortIcon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "opacity-40")} aria-hidden />
+      </button>
+    </th>
+  );
+}
+
+function CostsTable({
+  events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, currency,
+}: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const handleSort = (column: CostSortColumn) => {
+    onSortChange(nextCostSort(column, sort));
+  };
 
   if (error) {
     return (
@@ -372,16 +721,36 @@ function CostsTable({ events, loading, error, page, total, onPageChange, onExpor
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-muted/40">
-              {[
-                t("couts.col_date"), t("couts.col_tool_type"), t("couts.col_provider"),
-                t("couts.col_model"), t("couts.col_operation"), t("couts.col_cost"),
-                t("couts.col_units_in"), t("couts.col_units_out"), t("couts.col_unit_type"),
-                t("couts.col_status"), t("couts.col_source"),
-              ].map((h) => (
-                <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                  {h}
-                </th>
+              {COST_TABLE_SORTABLE_COLUMNS.map(({ column, labelKey }) => (
+                <SortableTh
+                  key={column}
+                  column={column}
+                  label={t(labelKey)}
+                  sort={sort}
+                  onSort={handleSort}
+                />
               ))}
+              {COST_TABLE_STATIC_COLUMNS.map((labelKey) => {
+                if (labelKey === "couts.col_status") {
+                  return (
+                    <SortableTh
+                      key={labelKey}
+                      column="status"
+                      label={t(labelKey)}
+                      sort={sort}
+                      onSort={handleSort}
+                    />
+                  );
+                }
+                return (
+                  <th
+                    key={labelKey}
+                    className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap"
+                  >
+                    {t(labelKey)}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -470,6 +839,477 @@ function providerStatusBadge(status: string) {
     <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${c.cls}`}>
       <Icon className="h-3 w-3" aria-hidden /> {c.label}
     </span>
+  );
+}
+
+type CursorPlanToggleProps = {
+  provider: CostProvider;
+  onUpdated: (metadata: Record<string, unknown>) => void;
+};
+
+function CursorPlanToggle({ provider, onUpdated }: CursorPlanToggleProps) {
+  const { t } = useTranslation("settings");
+  const currentPlan = parseCursorPlan(provider.metadata?.plan);
+  const targetPlan = nextCursorPlan(currentPlan);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const currentAmount = CURSOR_PLAN_AMOUNTS[currentPlan];
+  const targetAmount = CURSOR_PLAN_AMOUNTS[targetPlan];
+  const effectiveFrom = firstDayNextMonthLabelFr();
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    const prevMeta = { ...provider.metadata };
+    onUpdated({
+      ...provider.metadata,
+      plan: targetPlan,
+      amount_usd: targetAmount,
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("cost-providers-update-plan", {
+        method: "PATCH",
+        body: { provider_key: "cursor", plan: targetPlan },
+      });
+      if (error) {
+        let detail = error.message;
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx?.json) {
+            const body = await ctx.json() as Record<string, string>;
+            detail = body.details || body.error || error.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
+      const resp = data as { success?: boolean; new_plan?: string; new_amount?: number };
+      if (!resp?.success) throw new Error(t("providers.cursor_plan_error"));
+      toast.success(t("providers.cursor_plan_success", {
+        plan: resp.new_plan ?? targetPlan,
+        amount: resp.new_amount ?? targetAmount,
+      }));
+      setConfirmOpen(false);
+    } catch (err) {
+      onUpdated(prevMeta);
+      toast.error(t("providers.cursor_plan_error") + " — " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        disabled={loading}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+        {t("providers.cursor_plan_toggle", {
+          plan: targetPlan,
+          amount: targetAmount,
+        })}
+      </Button>
+
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!loading) setConfirmOpen(o); }}>
+        <DialogContent className="sm:max-w-md" hideCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{t("providers.cursor_plan_confirm_title")}</DialogTitle>
+            <DialogDescription>
+              {t("providers.cursor_plan_confirm_desc", {
+                fromPlan: currentPlan,
+                fromAmount: currentAmount,
+                toPlan: targetPlan,
+                toAmount: targetAmount,
+                effectiveFrom,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={loading} onClick={() => setConfirmOpen(false)}>
+              {t("providers.backfill_cancel")}
+            </Button>
+            <Button type="button" disabled={loading} className="gap-2" onClick={() => void handleConfirm()}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {t("providers.cursor_plan_confirm_btn")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+type SupabasePlanToggleProps = {
+  provider: CostProvider;
+  onUpdated: (metadata: Record<string, unknown>) => void;
+};
+
+function SupabasePlanToggle({ provider, onUpdated }: SupabasePlanToggleProps) {
+  const { t } = useTranslation("settings");
+  const currentPlan = parseSupabasePlan(provider.metadata?.plan);
+  const targetPlan = nextSupabasePlan(currentPlan);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const currentAmount = SUPABASE_PLAN_AMOUNTS[currentPlan];
+  const targetAmount = SUPABASE_PLAN_AMOUNTS[targetPlan];
+  const effectiveFrom = firstDayNextMonthLabelFr();
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    const prevMeta = { ...provider.metadata };
+    onUpdated({
+      ...provider.metadata,
+      plan: targetPlan,
+      amount_usd: targetAmount,
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("cost-providers-update-plan", {
+        method: "PATCH",
+        body: { provider_key: "supabase", plan: targetPlan },
+      });
+      if (error) {
+        let detail = error.message;
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx?.json) {
+            const body = await ctx.json() as Record<string, string>;
+            detail = body.details || body.error || error.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
+      const resp = data as { success?: boolean; new_plan?: string; new_amount?: number };
+      if (!resp?.success) throw new Error(t("providers.supabase_plan_error"));
+      toast.success(t("providers.supabase_plan_success", {
+        plan: resp.new_plan ?? targetPlan,
+        amount: resp.new_amount ?? targetAmount,
+      }));
+      setConfirmOpen(false);
+    } catch (err) {
+      onUpdated(prevMeta);
+      toast.error(t("providers.supabase_plan_error") + " — " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        disabled={loading}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+        {t("providers.supabase_plan_toggle", {
+          plan: targetPlan,
+          amount: targetAmount,
+        })}
+      </Button>
+
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!loading) setConfirmOpen(o); }}>
+        <DialogContent className="sm:max-w-md" hideCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{t("providers.supabase_plan_confirm_title")}</DialogTitle>
+            <DialogDescription>
+              {t("providers.supabase_plan_confirm_desc", {
+                fromPlan: currentPlan,
+                fromAmount: currentAmount,
+                toPlan: targetPlan,
+                toAmount: targetAmount,
+                effectiveFrom,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={loading} onClick={() => setConfirmOpen(false)}>
+              {t("providers.backfill_cancel")}
+            </Button>
+            <Button type="button" disabled={loading} className="gap-2" onClick={() => void handleConfirm()}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {t("providers.supabase_plan_confirm_btn")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+type VercelPlanToggleProps = {
+  provider: CostProvider;
+  onUpdated: (metadata: Record<string, unknown>) => void;
+};
+
+function VercelPlanToggle({ provider, onUpdated }: VercelPlanToggleProps) {
+  const { t } = useTranslation("settings");
+  const currentPlan = parseVercelPlan(provider.metadata?.plan);
+  const targetPlan = nextVercelPlan(currentPlan);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const currentAmount = VERCEL_PLAN_AMOUNTS[currentPlan];
+  const targetAmount = VERCEL_PLAN_AMOUNTS[targetPlan];
+  const effectiveFrom = firstDayNextMonthLabelFr();
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    const prevMeta = { ...provider.metadata };
+    onUpdated({
+      ...provider.metadata,
+      plan: targetPlan,
+      amount_usd: targetAmount,
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("cost-providers-update-plan", {
+        method: "PATCH",
+        body: { provider_key: "vercel", plan: targetPlan },
+      });
+      if (error) {
+        let detail = error.message;
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx?.json) {
+            const body = await ctx.json() as Record<string, string>;
+            detail = body.details || body.error || error.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
+      const resp = data as { success?: boolean; new_plan?: string; new_amount?: number };
+      if (!resp?.success) throw new Error(t("providers.vercel_plan_error"));
+      toast.success(t("providers.vercel_plan_success", {
+        plan: resp.new_plan ?? targetPlan,
+        amount: resp.new_amount ?? targetAmount,
+      }));
+      setConfirmOpen(false);
+    } catch (err) {
+      onUpdated(prevMeta);
+      toast.error(t("providers.vercel_plan_error") + " — " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        disabled={loading}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
+        {t("providers.vercel_plan_toggle", {
+          plan: targetPlan,
+          amount: targetAmount,
+        })}
+      </Button>
+
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!loading) setConfirmOpen(o); }}>
+        <DialogContent className="sm:max-w-md" hideCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{t("providers.vercel_plan_confirm_title")}</DialogTitle>
+            <DialogDescription>
+              {t("providers.vercel_plan_confirm_desc", {
+                fromPlan: currentPlan,
+                fromAmount: currentAmount,
+                toPlan: targetPlan,
+                toAmount: targetAmount,
+                effectiveFrom,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={loading} onClick={() => setConfirmOpen(false)}>
+              {t("providers.backfill_cancel")}
+            </Button>
+            <Button type="button" disabled={loading} className="gap-2" onClick={() => void handleConfirm()}>
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {t("providers.vercel_plan_confirm_btn")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+type OvhInvoiceSummaryProps = { refreshKey: number };
+
+function OvhInvoiceSummary({ refreshKey }: OvhInvoiceSummaryProps) {
+  const { t } = useTranslation("settings");
+  const [count, setCount] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      const { data, error } = await supabase
+        .from("ai_usage_events")
+        .select("cost_estimated")
+        .eq("provider", "ovh")
+        .gte("created_at", `${OVH_IMPORT_FROM_DATE}T00:00:00.000Z`);
+      if (cancelled) return;
+      if (error || !data) {
+        setCount(0);
+        setTotal(0);
+      } else {
+        let sum = 0;
+        for (const row of data) {
+          sum += Number((row as { cost_estimated?: number | null }).cost_estimated ?? 0);
+        }
+        setCount(data.length);
+        setTotal(sum);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  if (loading) return null;
+
+  return (
+    <p className="text-[11px] text-muted-foreground leading-snug">
+      {count === 0
+        ? t("providers.ovh_no_invoices", { from: OVH_IMPORT_FROM_DATE })
+        : t("providers.ovh_stats", { count, total: formatOvhAmountEur(total), from: OVH_IMPORT_FROM_DATE })}
+    </p>
+  );
+}
+
+type OvhSyncInvoicesButtonProps = {
+  disabled?: boolean;
+  configured: boolean;
+  onSynced: () => void;
+};
+
+const OVH_API_TOKEN_URL = "https://eu.api.ovh.com/createToken/?GET=/me/bill&GET=/me/bill/*";
+
+function OvhSyncInvoicesButton({ disabled, configured, onSynced }: OvhSyncInvoicesButtonProps) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(false);
+
+  const handleSync = async () => {
+    if (!configured) {
+      toast.error(t("providers.ovh_api_missing"));
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ovh-sync-invoices", {
+        method: "POST",
+        body: {},
+      });
+      if (error) throw new Error(await parseInvokeError(error));
+      const resp = data as {
+        message?: string;
+        imported?: number;
+        already_imported?: number;
+        errors?: string[];
+      };
+      const imported = resp?.imported ?? 0;
+      const already = resp?.already_imported ?? 0;
+      if (imported > 0) {
+        toast.success(t("providers.ovh_sync_success", { imported, already }));
+      } else if (already > 0) {
+        toast.info(t("providers.ovh_sync_up_to_date", { already }));
+      } else {
+        toast.info(resp?.message ?? t("providers.ovh_sync_empty"));
+      }
+      if (resp?.errors?.length) {
+        toast.warning(resp.errors.slice(0, 2).join(" — "));
+      }
+      onSynced();
+    } catch (err) {
+      toast.error(t("providers.ovh_sync_error") + " — " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8 gap-1.5 text-xs"
+      disabled={disabled || loading || !configured}
+      title={!configured ? t("providers.ovh_api_missing") : undefined}
+      onClick={() => void handleSync()}
+    >
+      {loading
+        ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+        : <RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+      {t("providers.ovh_sync_invoices")}
+    </Button>
+  );
+}
+
+type FixedMonthlySyncButtonProps = {
+  providerKey: FixedMonthlyProviderKey;
+  disabled?: boolean;
+  onDone: () => void;
+};
+
+function FixedMonthlySyncButton({ providerKey, disabled, onDone }: FixedMonthlySyncButtonProps) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(false);
+
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(FIXED_MONTHLY_SYNC_FN[providerKey], {
+        method: "POST",
+        body: {},
+      });
+      if (error) throw new Error(await parseInvokeError(error));
+      const resp = data as { message?: string; amount?: number; currency?: string; already_synced?: boolean };
+      if (resp?.already_synced) {
+        toast.info(t("providers.fixed_monthly_already_synced"));
+      } else if (typeof resp?.amount === "number" && resp.amount > 0) {
+        if (resp.currency === "EUR") {
+          toast.success(t("providers.fixed_monthly_sync_success_eur", { amount: resp.amount }));
+        } else {
+          toast.success(t("providers.fixed_monthly_sync_success", { amount: resp.amount }));
+        }
+      } else {
+        toast.info(resp?.message ?? t("providers.fixed_monthly_sync_skipped"));
+      }
+      onDone();
+    } catch (err) {
+      toast.error(t("providers.fixed_monthly_sync_error") + " — " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8 gap-1.5 text-xs"
+      disabled={disabled || loading}
+      onClick={() => void handleSync()}
+    >
+      {loading
+        ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+        : <RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+      {t("providers.action_sync_subscription")}
+    </Button>
   );
 }
 
@@ -626,6 +1466,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
   const [syncLoading, setSyncLoading] = useState(false);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillProviderKey, setBackfillProviderKey] = useState<BackfillProviderKey | null>(null);
+  const [ovhRefreshKey, setOvhRefreshKey] = useState(0);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -640,11 +1481,12 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
     const { data, error } = await supabase
       .from("cost_providers")
       .select("*")
-      .in("provider_key", [...COST_SYNC_PROVIDER_KEYS])
-      .neq("status", "inactive")
+      .in("provider_key", [...COST_PROVIDER_KEYS])
       .order("provider_name", { ascending: true });
     setLoadingProviders(false);
-    if (!error && Array.isArray(data)) setProviders(data as CostProvider[]);
+    if (!error && Array.isArray(data)) {
+      setProviders(mergeCostProviders(data as CostProvider[]));
+    }
   }, []);
 
   useEffect(() => {
@@ -842,6 +1684,11 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                         </span>
                       )}
                     </div>
+                    {isPlaceholderProvider(p) && (
+                      <p className="text-[11px] text-yellow-800 bg-yellow-50 rounded px-2 py-1 leading-snug">
+                        {t("providers.provider_row_missing")}
+                      </p>
+                    )}
                     {p.notes && (
                       <p className="text-[11px] text-muted-foreground leading-snug">{p.notes}</p>
                     )}
@@ -866,8 +1713,116 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                         </a>
                       </div>
                     )}
+                    {p.provider_key === "supabase" && parseSupabasePlan(p.metadata?.plan) === "Free" && (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {t("providers.supabase_free_note")}
+                      </p>
+                    )}
+                    {p.provider_key === "vercel" && parseVercelPlan(p.metadata?.plan) === "Hobby" && (
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {t("providers.vercel_hobby_note")}
+                      </p>
+                    )}
+                    {p.provider_key === "ovh" && (
+                      <>
+                        <OvhInvoiceSummary refreshKey={ovhRefreshKey} />
+                        {!p.configured && (
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                              {t("providers.ovh_api_required")}
+                            </span>
+                            <a
+                              href={OVH_API_TOKEN_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" aria-hidden />
+                              {t("providers.ovh_api_link")}
+                            </a>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
+                    {p.provider_key === "cursor" && (
+                      <>
+                        <CursorPlanToggle
+                          provider={p}
+                          onUpdated={(metadata) => {
+                            setProviders((prev) =>
+                              prev.map((row) =>
+                                row.provider_key === "cursor" ? { ...row, metadata } : row,
+                              ),
+                            );
+                          }}
+                        />
+                        <FixedMonthlySyncButton
+                          providerKey="cursor"
+                          disabled={syncLoading || backfillLoading}
+                          onDone={() => {
+                            void loadProviders();
+                            onCostsRefresh?.();
+                          }}
+                        />
+                      </>
+                    )}
+                    {p.provider_key === "supabase" && (
+                      <>
+                        <SupabasePlanToggle
+                          provider={p}
+                          onUpdated={(metadata) => {
+                            setProviders((prev) =>
+                              prev.map((row) =>
+                                row.provider_key === "supabase" ? { ...row, metadata } : row,
+                              ),
+                            );
+                          }}
+                        />
+                        <FixedMonthlySyncButton
+                          providerKey="supabase"
+                          disabled={syncLoading || backfillLoading}
+                          onDone={() => {
+                            void loadProviders();
+                            onCostsRefresh?.();
+                          }}
+                        />
+                      </>
+                    )}
+                    {p.provider_key === "vercel" && (
+                      <>
+                        <VercelPlanToggle
+                          provider={p}
+                          onUpdated={(metadata) => {
+                            setProviders((prev) =>
+                              prev.map((row) =>
+                                row.provider_key === "vercel" ? { ...row, metadata } : row,
+                              ),
+                            );
+                          }}
+                        />
+                        <FixedMonthlySyncButton
+                          providerKey="vercel"
+                          disabled={syncLoading || backfillLoading}
+                          onDone={() => {
+                            void loadProviders();
+                            onCostsRefresh?.();
+                          }}
+                        />
+                      </>
+                    )}
+                    {p.provider_key === "ovh" && (
+                      <OvhSyncInvoicesButton
+                        configured={p.configured}
+                        disabled={syncLoading || backfillLoading}
+                        onSynced={() => {
+                          setOvhRefreshKey((k) => k + 1);
+                          void loadProviders();
+                          onCostsRefresh?.();
+                        }}
+                      />
+                    )}
                     {(BACKFILL_PROVIDER_KEYS as readonly string[]).includes(p.provider_key) && (
                       <Button
                         type="button" variant="outline" size="sm"
@@ -954,6 +1909,7 @@ export default function SettingsCouts() {
   // ---- State ----
   const [filters, setFilters] = useState<CostFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<CostSort>(DEFAULT_COST_SORT);
 
   const [events,  setEvents]  = useState<CostEvent[]>([]);
   const [total,   setTotal]   = useState(0);
@@ -994,7 +1950,7 @@ export default function SettingsCouts() {
     setLoadingEvents(true);
     setErrorEvents(null);
 
-    getCostEvents(filters, page, PAGE_SIZE).then(({ data, count, error }) => {
+    getCostEvents(filters, page, PAGE_SIZE, sort).then(({ data, count, error }) => {
       if (cancelled) return;
       setLoadingEvents(false);
       if (error) { setErrorEvents(error); return; }
@@ -1005,7 +1961,7 @@ export default function SettingsCouts() {
     });
 
     return () => { cancelled = true; };
-  }, [filters, page, costsRefreshKey]);
+  }, [filters, page, sort, costsRefreshKey]);
 
   // ---- Chargement KPIs ----
   useEffect(() => {
@@ -1048,6 +2004,12 @@ export default function SettingsCouts() {
 
   const handleReset = useCallback(() => {
     setFilters(EMPTY_FILTERS);
+    setSort(DEFAULT_COST_SORT);
+    setPage(0);
+  }, []);
+
+  const handleSortChange = useCallback((next: CostSort) => {
+    setSort(next);
     setPage(0);
   }, []);
 
@@ -1065,16 +2027,16 @@ export default function SettingsCouts() {
   const kpis = useMemo(() => {
     if (!summary) return [];
     const eurTotal = isUsd && usdEurRate
-      ? formatUsdToEurHint(summary.totalCost, usdEurRate, 4)
+      ? formatUsdToEurHint(summary.totalCost, usdEurRate, 2)
       : undefined;
     const eurAvg = isUsd && usdEurRate
-      ? formatUsdToEurHint(summary.avgCostPerCall, usdEurRate, 6)
+      ? formatUsdToEurHint(summary.avgCostPerCall, usdEurRate, 2)
       : undefined;
     return [
       {
         icon: Euro,
         label: t("couts.kpi_total_cost"),
-        value: formatCost(summary.totalCost, currency, 4),
+        value: formatCost(summary.totalCost, currency, 2),
         eurHint: eurTotal,
         sub: fxSub ?? currency,
       },
@@ -1087,7 +2049,7 @@ export default function SettingsCouts() {
       {
         icon: TrendingUp,
         label: t("couts.kpi_avg_cost"),
-        value: formatCost(summary.avgCostPerCall, currency, 6),
+        value: formatCost(summary.avgCostPerCall, currency, 2),
         eurHint: eurAvg,
         sub: t("couts.kpi_avg_cost_sub"),
       },
@@ -1131,8 +2093,13 @@ export default function SettingsCouts() {
           </div>
           <h1 className="text-2xl font-serif font-bold tracking-tight">{t("couts.page_title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("couts.page_sub")}</p>
+          <p className="text-xs text-muted-foreground/90 mt-1.5">
+            {t("couts.project_created", { date: formatProjectDate(PROJECT_CREATED_DATE) })}
+          </p>
         </div>
       </div>
+
+      <ProjectDbActivitySection />
 
       {/* Filtres */}
       <FiltersBar
@@ -1238,6 +2205,8 @@ export default function SettingsCouts() {
             error={errorEvents}
             page={page}
             total={total}
+            sort={sort}
+            onSortChange={handleSortChange}
             onPageChange={setPage}
             onExport={handleExport}
             currency={currency}

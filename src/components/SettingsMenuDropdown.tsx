@@ -8,6 +8,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SETTINGS_TRASH_MENU_LINKS } from "@/lib/trashMenuLinks";
@@ -57,10 +60,12 @@ export function SettingsMenuDropdown({
           <Link
             key={link.id}
             to={link.to}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/60"
+            className={cn(
+              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
+              location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
+            )}
             onClick={onNavigate}
           >
-            <ArchiveRestore className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
             {t(link.labelKey)}
           </Link>
         ))}
@@ -96,17 +101,31 @@ export function SettingsMenuDropdown({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          {t("settings_submenu_trash")}
-        </DropdownMenuLabel>
-        {SETTINGS_TRASH_MENU_LINKS.map((link) => (
-          <DropdownMenuItem key={link.id} asChild>
-            <Link to={link.to} className="flex items-center gap-2">
-              <ArchiveRestore className="h-4 w-4 opacity-70" aria-hidden />
-              {t(link.labelKey)}
-            </Link>
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger
+            className={cn(
+              "flex items-center gap-2",
+              trashActive && "text-[#E63946] focus:text-[#E63946]",
+            )}
+          >
+            <ArchiveRestore className="h-4 w-4 opacity-70" aria-hidden />
+            {t("settings_submenu_trash")}
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {SETTINGS_TRASH_MENU_LINKS.map((link) => (
+              <DropdownMenuItem key={link.id} asChild>
+                <Link
+                  to={link.to}
+                  className={cn(
+                    location.pathname.startsWith(link.to) && "text-[#E63946] font-medium",
+                  )}
+                >
+                  {t(link.labelKey)}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   );

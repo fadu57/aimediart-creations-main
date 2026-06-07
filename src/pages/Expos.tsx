@@ -465,25 +465,6 @@ const Expos = () => {
     openEdit(expoPopupId);
   }, [expoPopupId, loading, rows, role_id, userAgencyId, userExpoId]);
 
-  const handleDownloadVisitorQr = useCallback(async (expoId: string, expoName: string) => {
-    if (!expoId) return;
-    try {
-      const origin =
-        (await fetchQrPublicSiteOriginFromSettings()) ||
-        (typeof window !== "undefined" && window.location?.origin?.trim()) ||
-        "https://www.aimediart.com";
-      const targetUrl = `${origin}/visitor?expo_id=${encodeURIComponent(expoId)}`;
-      const dataUrl = await QRCode.toDataURL(targetUrl, { width: 1024, margin: 2 });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      const safeName = expoName.replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 40) || expoId.slice(0, 8);
-      a.download = `qr-visiteur-${safeName}.png`;
-      a.click();
-    } catch (e) {
-      console.warn("[Expos] QR visiteur download :", e);
-    }
-  }, []);
-
   const handleGenerateQrForExpo = useCallback(async (expoId: string) => {
     if (!expoId || generatingQrForExpoId) return;
     setGeneratingQrForExpoId(expoId);
@@ -872,18 +853,6 @@ const Expos = () => {
                     >
                       {t("card.cardVisitors")}
                     </Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDownloadVisitorQr(ex.id, expoTitle(ex));
-                    }}
-                  >
-                    {t("card.downloadQrVisitor")}
                   </Button>
                   <Button
                     type="button"

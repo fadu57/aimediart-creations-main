@@ -36,3 +36,33 @@ entrypoint = "./functions/providers-analyze/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/providers-sync-costs/index.ts"
+
+[functions.sync-cursor-costs]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-cursor-costs/index.ts"
+
+[functions.sync-supabase-costs]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-supabase-costs/index.ts"
+
+[functions.sync-vercel-costs]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-vercel-costs/index.ts"
+
+[functions.ovh-sync-invoices]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/ovh-sync-invoices/index.ts"
+
+[functions.project-activity-scan]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/project-activity-scan/index.ts"
+
+[functions.cost-providers-update-plan]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/cost-providers-update-plan/index.ts"

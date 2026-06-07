@@ -27,7 +27,6 @@
     "qrRegenerateAriaLabel": "Régénérer le QR code de l'exposition",
     "testQr": "Tester le QR-Code (scan)",
     "cardVisitors": "Visiteurs de l'expo",
-    "downloadQrVisitor": "Télécharger QR visiteur",
     "printPanel": "Print panneau expo",
     "viewCatalogue": "Catalogue des œuvres",
     "curatorLabel": "Commissaire : {{name}}",

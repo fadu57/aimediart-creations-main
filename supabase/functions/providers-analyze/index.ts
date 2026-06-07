@@ -11,7 +11,47 @@ import { getServiceRoleClient } from "../_shared/supabaseAdmin.ts";
 import { requireAdminUser } from "../_shared/adminAuth.ts";
 import { detectAllProviders, getActiveProviderKeys } from "../_shared/providerRegistry.ts";
 import { isGoogleBillingConfigured } from "../_shared/googleBilling.ts";
+import { isOvhApiConfigured } from "../_shared/ovhApiClient.ts";
 import { ACTIVE_COST_SYNC_PROVIDER_KEYS } from "../_shared/providerSyncContext.ts";
+
+const FIXED_MONTHLY_PROVIDER_KEYS = new Set(["cursor", "supabase", "vercel"]);
+const PRESERVE_METADATA_KEYS = [
+  "plan",
+  "amount_usd",
+  "amount_eur",
+  "label",
+  "currency",
+  "cost_mode",
+  "billing_mode",
+  "project_ref",
+  "billing_day",
+] as const;
+
+function mergeProviderMetadata(
+  providerKey: string,
+  detectionMeta: Record<string, unknown>,
+  existingMeta: Record<string, unknown> | undefined,
+  stats: {
+    eventsCount: number;
+    logsCount: number;
+    googleBillingReady: boolean;
+  },
+): Record<string, unknown> {
+  let base: Record<string, unknown> = { ...(detectionMeta ?? {}) };
+  if (FIXED_MONTHLY_PROVIDER_KEYS.has(providerKey) && existingMeta) {
+    for (const key of PRESERVE_METADATA_KEYS) {
+      if (existingMeta[key] !== undefined) base[key] = existingMeta[key];
+    }
+  }
+  return {
+    ...base,
+    recent_events_count: stats.eventsCount,
+    recent_logs_count: stats.logsCount,
+    ...(providerKey.startsWith("google_")
+      ? { billing_configured: stats.googleBillingReady }
+      : {}),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Détection de l'usage réel dans les logs de consommation
@@ -104,17 +144,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
   try {
     const detections = detectAllProviders();
 
+    const { data: existingProviderRows } = await admin
+      .from("cost_providers")
+      .select("provider_key, metadata")
+      .in("provider_key", detections.map(({ definition }) => definition.key));
+
+    const existingMetaByKey = new Map<string, Record<string, unknown>>(
+      (existingProviderRows ?? []).map((row) => [
+        (row as { provider_key: string }).provider_key,
+        ((row as { metadata?: Record<string, unknown> }).metadata ?? {}) as Record<string, unknown>,
+      ]),
+    );
+
     // Construire les lignes d'upsert en parallèle (détection usage)
     const upsertRows = await Promise.all(
       detections.map(async ({ definition, detection }) => {
         const configured = detection.configured;
+        const isInfraProvider = FIXED_MONTHLY_PROVIDER_KEYS.has(definition.key);
 
         // Vérifier l'usage réel dans les logs
         const [eventsCount, logsCount] = await Promise.all([
           countRecentEvents(admin, definition.key),
           countRecentUsageLogs(admin, definition.key),
         ]);
-        const activelyUsed = eventsCount > 0 || logsCount > 0;
+        const activelyUsed = isInfraProvider || eventsCount > 0 || logsCount > 0;
 
         // Calcul du statut :
         // - active              = configuré ET utilisé
@@ -145,6 +198,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
           ? googleBillingReady
           : definition.key === "google_tts"
           ? false
+          : definition.key === "ovh"
+          ? isOvhApiConfigured()
           : false;
 
         return {
@@ -154,7 +209,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
           detected_in_code: true,
           configured,
           actively_used: activelyUsed,
-          sync_supported: isCostSyncProvider && definition.supportsCostSync,
+          sync_supported: definition.key === "ovh"
+            ? isOvhApiConfigured()
+            : isCostSyncProvider && definition.supportsCostSync,
           cost_import_supported: costImportSupported,
           status,
           last_detected_at: now,
@@ -164,13 +221,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
             ? "Coûts estimés depuis ai_usage_logs (pas d'API billing Groq)."
             : definition.key === "google_gemini"
             ? "Coûts réels via export billing BigQuery si configuré."
+            : definition.key === "huggingface"
+            ? "Inférence HF (HF_TOKEN). Coûts = crédits HuggingFace — pas de sync billing automatique."
+            : definition.key === "cursor"
+            ? "Abonnement Cursor (Pro / Pro+). Coût mensuel fixe — sync via sync-cursor-costs."
+            : definition.key === "supabase"
+            ? "Hébergement Supabase (Free / Pro). Coût mensuel fixe — sync via sync-supabase-costs."
+            : definition.key === "vercel"
+            ? "Hébergement frontend Vercel (Hobby / Pro). Coût mensuel fixe — sync via sync-vercel-costs."
+            : definition.key === "ovh"
+            ? "Factures OVH via API /me/bill (≥ 2026-04-01). Sync auto hebdo + bouton manuel ovh-sync-invoices."
             : null,
-          metadata: {
-            ...(detection.meta ?? {}),
-            recent_events_count: eventsCount,
-            recent_logs_count: logsCount,
-            billing_configured: definition.key.startsWith("google_") ? googleBillingReady : undefined,
-          },
+          metadata: mergeProviderMetadata(
+            definition.key,
+            (detection.meta ?? {}) as Record<string, unknown>,
+            existingMetaByKey.get(definition.key),
+            {
+              eventsCount,
+              logsCount,
+              googleBillingReady,
+            },
+          ),
         };
       }),
     );

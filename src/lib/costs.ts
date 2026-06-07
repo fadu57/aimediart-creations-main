@@ -72,6 +72,25 @@ export type CostSelectOptions = {
   currencies: string[];
 };
 
+export type CostSortColumn =
+  | "created_at"
+  | "tool_type"
+  | "provider"
+  | "model_name"
+  | "operation_name"
+  | "cost_estimated"
+  | "status";
+
+export type CostSort = {
+  column: CostSortColumn;
+  ascending: boolean;
+};
+
+export const DEFAULT_COST_SORT: CostSort = {
+  column: "created_at",
+  ascending: false,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers internes
 // ---------------------------------------------------------------------------
@@ -103,11 +122,12 @@ export async function getCostEvents(
   filters: CostFilters,
   page = 0,
   pageSize = 50,
+  sort: CostSort = DEFAULT_COST_SORT,
 ): Promise<{ data: CostEvent[]; count: number; error: string | null }> {
   let q = supabase
     .from("ai_usage_events")
     .select("*", { count: "exact" })
-    .order("created_at", { ascending: false })
+    .order(sort.column, { ascending: sort.ascending, nullsFirst: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
 
   q = applyFilters(q, filters);

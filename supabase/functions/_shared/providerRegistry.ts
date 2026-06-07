@@ -112,6 +112,106 @@ export const PROVIDER_REGISTRY: ProviderDefinition[] = [
     supportsCostSync: false,
   },
 
+  // ---- HuggingFace (inférence image — scripts avatars, crédits payants) ----
+  {
+    key: "huggingface",
+    name: "HuggingFace",
+    category: "image",
+    detectConfiguration: () => ({
+      configured: Boolean(Deno.env.get("HF_TOKEN")),
+      meta: {
+        billing_mode: "hf_credits",
+        key_var: "HF_TOKEN",
+        note: "Inférence via router.huggingface.co (ex. generate-avatars.js). Coûts = crédits HF.",
+      },
+    }),
+    supportsCostSync: false,
+  },
+
+  // ---- Cursor (IDE — abonnement mensuel fixe, sync dédiée) ----
+  {
+    key: "cursor",
+    name: "Cursor",
+    category: "other",
+    detectConfiguration: () => ({
+      configured: true,
+      meta: {
+        billing_mode: "fixed_monthly",
+        cost_mode: "fixed_monthly",
+        plan: "Pro+",
+        amount_usd: 60,
+        currency: "USD",
+      },
+    }),
+    supportsCostSync: false,
+  },
+
+  // ---- Supabase (hébergement — abonnement mensuel fixe, sync dédiée) ----
+  {
+    key: "supabase",
+    name: "Supabase",
+    category: "other",
+    detectConfiguration: () => {
+      const url = Deno.env.get("SUPABASE_URL") ?? "";
+      const projectRef = url.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] ?? null;
+      return {
+        configured: Boolean(url || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+        meta: {
+          billing_mode: "fixed_monthly",
+          cost_mode: "fixed_monthly",
+          plan: "Free",
+          amount_usd: 0,
+          currency: "USD",
+          project_ref: projectRef,
+        },
+      };
+    },
+    supportsCostSync: false,
+  },
+
+  // ---- Vercel (frontend — abonnement mensuel fixe, sync dédiée) ----
+  {
+    key: "vercel",
+    name: "Vercel",
+    category: "other",
+    detectConfiguration: () => ({
+      configured: true,
+      meta: {
+        billing_mode: "fixed_monthly",
+        cost_mode: "fixed_monthly",
+        plan: "Hobby",
+        amount_usd: 0,
+        currency: "USD",
+      },
+    }),
+    supportsCostSync: false,
+  },
+
+  // ---- OVH (factures API OVHcloud — import ≥ 2026-04-01) ----
+  {
+    key: "ovh",
+    name: "OVH",
+    category: "other",
+    detectConfiguration: () => {
+      const apiReady = Boolean(
+        Deno.env.get("OVH_APP_KEY") &&
+        Deno.env.get("OVH_APP_SECRET") &&
+        Deno.env.get("OVH_CONSUMER_KEY"),
+      );
+      return {
+        configured: apiReady,
+        meta: {
+          billing_mode: "ovh_invoices",
+          currency: "EUR",
+          import_from_date: "2026-04-01",
+          amount_type: "ttc",
+          api_configured: apiReady,
+        },
+      };
+    },
+    supportsCostSync: true,
+  },
+
   // ---- SMTP Email ----
   {
     key: "smtp_email",
@@ -127,24 +227,10 @@ export const PROVIDER_REGISTRY: ProviderDefinition[] = [
 ];
 
 /**
- * Fournisseurs abandonnés / hors prod — non analysés ni affichés par défaut.
- * Pour réactiver : déplacer l'entrée dans PROVIDER_REGISTRY et redéployer.
- *
- * HuggingFace : tests abandonnés, plus utilisé en prod.
- * Seul usage résiduel : scripts/generate-avatars.js (outil local, hors Edge Functions).
+ * Fournisseurs hors registre actif — conservés pour référence uniquement.
+ * Pour réactiver : déplacer l'entrée dans PROVIDER_REGISTRY et redéployer providers-analyze.
  */
-export const LEGACY_PROVIDER_REGISTRY: ProviderDefinition[] = [
-  {
-    key: "huggingface",
-    name: "HuggingFace",
-    category: "llm",
-    visibility: "legacy",
-    detectConfiguration: () => ({
-      configured: Boolean(Deno.env.get("HF_TOKEN")),
-    }),
-    supportsCostSync: false,
-  },
-];
+export const LEGACY_PROVIDER_REGISTRY: ProviderDefinition[] = [];
 
 // ---------------------------------------------------------------------------
 // Helpers

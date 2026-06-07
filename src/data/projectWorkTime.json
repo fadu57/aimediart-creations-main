@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-06-07T17:19:37.813Z",
+  "timezone": "Europe/Paris",
+  "method": "git_sessions",
+  "session_gap_minutes": 90,
+  "min_session_minutes": 20,
+  "total_minutes": 882,
+  "total_hours": 14.7,
+  "total_duration_label": "14 h 42 min",
+  "days": [
+    {
+      "date": "2026-04-29",
+      "minutes": 120,
+      "hours": 2,
+      "commits": 5,
+      "duration_label": "2 h"
+    },
+    {
+      "date": "2026-04-30",
+      "minutes": 65,
+      "hours": 1.08,
+      "commits": 5,
+      "duration_label": "1 h 5 min"
+    },
+    {
+      "date": "2026-05-01",
+      "minutes": 40,
+      "hours": 0.67,
+      "commits": 2,
+      "duration_label": "40 min"
+    },
+    {
+      "date": "2026-05-03",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-04",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-05",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 2,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-08",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-09",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-10",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-13",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-14",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-15",
+      "minutes": 58,
+      "hours": 0.97,
+      "commits": 3,
+      "duration_label": "58 min"
+    },
+    {
+      "date": "2026-05-16",
+      "minutes": 50,
+      "hours": 0.83,
+      "commits": 4,
+      "duration_label": "50 min"
+    },
+    {
+      "date": "2026-05-17",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-05-20",
+      "minutes": 70,
+      "hours": 1.17,
+      "commits": 3,
+      "duration_label": "1 h 10 min"
+    },
+    {
+      "date": "2026-05-21",
+      "minutes": 259,
+      "hours": 4.32,
+      "commits": 14,
+      "duration_label": "4 h 19 min"
+    },
+    {
+      "date": "2026-06-05",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    },
+    {
+      "date": "2026-06-07",
+      "minutes": 20,
+      "hours": 0.33,
+      "commits": 1,
+      "duration_label": "20 min"
+    }
+  ]
+}
