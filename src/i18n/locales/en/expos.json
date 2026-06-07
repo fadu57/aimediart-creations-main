@@ -3,6 +3,9 @@
     "title": "Exhibitions",
     "search": "Search an exhibition...",
     "clearSearch": "Clear search",
+    "searchOrg": "Search by organisation...",
+    "clearSearchOrg": "Clear organisation filter",
+    "noOrgFound": "No organisation found.",
     "clear": "Clear",
     "create": "New exhibition",
     "tableau": "Expo list",
@@ -37,6 +40,9 @@
   "panel": {
     "chooseFormat": "Choose the panel format to print",
     "cancel": "Cancel"
+  },
+  "form": {
+    "navTypeLabel": "For the visitor, navigation type"
   },
   "tableau": {
     "title": "Exhibitions — Full table",

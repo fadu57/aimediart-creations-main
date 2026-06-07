@@ -51,6 +51,7 @@ export default function Artists2() {
   const navigate = useNavigate();
   const { loading: authLoading, role_id } = useAuthUser();
   const canAccess = role_id !== 7;
+  const canArchive = role_id !== null && role_id !== undefined && role_id <= 3;
 
   const [rows, setRows] = useState<ArtistRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,20 +308,22 @@ export default function Artists2() {
                       {specialtyLabel(r) || "—"}
                     </td>
                     <td className="px-2 py-1">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        className="h-[30px] w-[30px] text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setArchiveTarget(r);
-                        }}
-                        aria-label={t("tableau_archive_aria")}
-                        title={t("tableau_archive_title")}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canArchive && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-[30px] w-[30px] text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setArchiveTarget(r);
+                          }}
+                          aria-label={t("tableau_archive_aria")}
+                          title={t("tableau_archive_title")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

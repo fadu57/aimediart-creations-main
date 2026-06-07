@@ -16,6 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Header from "./components/Header";
 import { BackofficeNavGuard } from "./components/BackofficeNavGuard";
 import { OeuvrePageAccessGuard } from "./components/OeuvrePageAccessGuard";
+import { ArtworkEntryGate } from "./components/visitor/ArtworkEntryGate";
 import { RequireBackoffice } from "./components/RequireBackoffice";
 import { NavigationMatrixProvider } from "./providers/NavigationMatrixProvider";
 import { UiLanguageProvider } from "./providers/UiLanguageProvider";
@@ -31,6 +32,7 @@ import Catalogue2 from "./pages/Catalogue2";
 import CatalogueCorbeille from "./pages/CatalogueCorbeille";
 import Statistics from "./pages/Statistics";
 import SettingsPage from "./pages/Settings";
+import SettingsCouts from "./pages/SettingsCouts";
 import Agencies from "./pages/Agencies";
 import Agencies2 from "./pages/Agencies2";
 import AgenciesCorbeille from "./pages/AgenciesCorbeille";
@@ -168,11 +170,30 @@ function AdminShell() {
   );
 }
 
+function buildVisitorLandingPath(searchParams: URLSearchParams): string | null {
+  const expoId = searchParams.get("expo_id")?.trim() || "";
+  const artworkId = searchParams.get("artwork_id")?.trim() || searchParams.get("artworkId")?.trim() || "";
+  if (!expoId && !artworkId) return null;
+  const qs = new URLSearchParams();
+  if (expoId) qs.set("expo_id", expoId);
+  if (artworkId) qs.set("artwork_id", artworkId);
+  const query = qs.toString();
+  return query ? `/visitor?${query}` : "/visitor";
+}
+
+/** Ancienne route /scan avec expo_id → landing visiteur unifiée. */
+function ScanEntryRedirect() {
+  const [searchParams] = useSearchParams();
+  const target = buildVisitorLandingPath(searchParams);
+  if (target) return <Navigate to={target} replace />;
+  return <Intro />;
+}
+
 function RootEntryRoute() {
   const [searchParams] = useSearchParams();
-  const expoId = searchParams.get("expo_id")?.trim() || "";
-  if (expoId) {
-    return <Navigate to={`/scan?expo_id=${encodeURIComponent(expoId)}`} replace />;
+  const visitorLanding = buildVisitorLandingPath(searchParams);
+  if (visitorLanding) {
+    return <Navigate to={visitorLanding} replace />;
   }
   const { session, loading, role_name, role_id } = useAuthUser();
   if (loading) {
@@ -183,7 +204,9 @@ function RootEntryRoute() {
     );
   }
   if (session) {
-    const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/dashboard";
+    let target = "/dashboard";
+    if (isVisitorRole(role_name, role_id)) target = "/scan-work1";
+    else if (role_id === 4) target = "/expos";
     return <Navigate to={target} replace />;
   }
   const audience = getAudienceChoice();
@@ -229,7 +252,7 @@ const AppRoutes = () => (
       <Route path="œuvre" element={<Navigate to="/artwork" replace />} />
       <Route path="œuvre/:artworkId" element={<OeuvreToArtworkRedirect />} />
       <Route element={<VisitorShell />}>
-        <Route path="scan" element={<Intro />} />
+        <Route path="scan" element={<ScanEntryRedirect />} />
         <Route path="scan-work1" element={<WorkScanner />} />
         <Route path="scan-work-first" element={<Navigate to="/scan-work1" replace />} />
         <Route path="scan-work2" element={<ScanWork2 />} />
@@ -239,13 +262,15 @@ const AppRoutes = () => (
         <Route path="register_visitor" element={<RegisterVisitor />} />
         <Route path="visitor" element={<VisitorWelcome />} />
         <Route element={<OeuvrePageAccessGuard />}>
-          <Route path="artworks" element={<ArtworksListRedirect />} />
-          <Route path="artworks/:artworkId" element={<OeuvreToArtworkRedirect />} />
-          <Route path="artwork" element={<ArtworkDetail />} />
-          <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
+          <Route element={<ArtworkEntryGate />}>
+            <Route path="artworks" element={<ArtworksListRedirect />} />
+            <Route path="artworks/:artworkId" element={<OeuvreToArtworkRedirect />} />
+            <Route path="artwork" element={<ArtworkDetail />} />
+            <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
+            <Route path="visitor/:artworkId" element={<ArtworkDetail />} />
+          </Route>
           <Route path="artworks_artist" element={<OeuvresArtiste />} />
           <Route path="artworks_artist/:artistId" element={<OeuvresArtiste />} />
-          <Route path="visitor/:artworkId" element={<ArtworkDetail />} />
         </Route>
       </Route>
       <Route element={<RequireBackoffice />}>
@@ -276,6 +301,7 @@ const AppRoutes = () => (
           <Route path="qr-codes" element={<Navigate to="/catalogue" replace />} />
           <Route path="statistiques" element={<Statistics />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/couts" element={<SettingsCouts />} />
           <Route path="setting" element={<Navigate to="/settings" replace />} />
           <Route path="*" element={<NotFound />} />
         </Route>

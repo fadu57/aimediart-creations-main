@@ -249,6 +249,11 @@ const Statistics = () => {
   const [crossSortDirection, setCrossSortDirection] = useState<TopSortDirection>("desc");
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const [paperFormatDialogOpen, setPaperFormatDialogOpen] = useState(false);
+  const [previewDateDialogOpen, setPreviewDateDialogOpen] = useState(false);
+  const [manualPreviewDateFrom, setManualPreviewDateFrom] = useState("");
+  const [manualPreviewDateTo, setManualPreviewDateTo] = useState("");
+  const [dialogDateFrom, setDialogDateFrom] = useState("");
+  const [dialogDateTo, setDialogDateTo] = useState("");
   const [selectedPdfPaper, setSelectedPdfPaper] = useState<PdfPaperFormat>("a4");
   const [printExportBusy, setPrintExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState<StatisticsPdfExportProgress | null>(null);
@@ -727,12 +732,18 @@ const Statistics = () => {
   ]);
 
   const expoDateRange = useMemo(() => {
-    if (!selectedFilteredExpo) return null;
-    const start = parseExpoYmdDate(selectedFilteredExpo.date_expo_du);
-    const end = parseExpoYmdDate(selectedFilteredExpo.date_expo_au);
-    if (!start || !end || start.getTime() > end.getTime()) return null;
-    return { start, end };
-  }, [selectedFilteredExpo]);
+    if (selectedFilteredExpo) {
+      const start = parseExpoYmdDate(selectedFilteredExpo.date_expo_du);
+      const end = parseExpoYmdDate(selectedFilteredExpo.date_expo_au);
+      if (start && end && start.getTime() <= end.getTime()) return { start, end };
+    }
+    if (manualPreviewDateFrom && manualPreviewDateTo) {
+      const start = parseExpoYmdDate(manualPreviewDateFrom);
+      const end = parseExpoYmdDate(manualPreviewDateTo);
+      if (start && end && start.getTime() <= end.getTime()) return { start, end };
+    }
+    return null;
+  }, [selectedFilteredExpo, manualPreviewDateFrom, manualPreviewDateTo]);
 
   const stickyExpoLogoMeta = useMemo(() => {
     if (!selectedFilteredExpo) return { logoUrl: null as string | null, name: null as string | null };
@@ -751,6 +762,11 @@ const Statistics = () => {
       to: toFrDateLabel(expoDateRange.end),
     };
   }, [expoDateRange]);
+
+  useEffect(() => {
+    setManualPreviewDateFrom("");
+    setManualPreviewDateTo("");
+  }, [drillExpoId]);
 
   useEffect(() => {
     setWeekOffset(0);
@@ -776,6 +792,11 @@ const Statistics = () => {
       let query = supabase.from("visitor_feedback").select("emotion_id, visitor_id, heart_rating, artwork_id");
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
       if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+      if (expoDateRange) {
+        const rangeStart = new Date(expoDateRange.start); rangeStart.setHours(0, 0, 0, 0);
+        const rangeEnd = new Date(expoDateRange.end); rangeEnd.setHours(23, 59, 59, 999);
+        query = query.gte("submitted_at", rangeStart.toISOString()).lte("submitted_at", rangeEnd.toISOString());
+      }
       const { data, error } = await query;
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
@@ -824,7 +845,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds, expoDateRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1105,6 +1126,11 @@ const Statistics = () => {
       let query = supabase.from("visitor_feedback").select("submitted_at, artwork_id");
       if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
       if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+      if (expoDateRange) {
+        const rangeStart = new Date(expoDateRange.start); rangeStart.setHours(0, 0, 0, 0);
+        const rangeEnd = new Date(expoDateRange.end); rangeEnd.setHours(23, 59, 59, 999);
+        query = query.gte("submitted_at", rangeStart.toISOString()).lte("submitted_at", rangeEnd.toISOString());
+      }
       const { data, error } = await query;
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
@@ -1133,7 +1159,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds, expoDateRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1171,6 +1197,11 @@ const Statistics = () => {
       let feedbackQuery = supabase.from("visitor_feedback").select("artwork_id, heart_rating");
       if (targetAgencyId) feedbackQuery = feedbackQuery.eq("agency_id", targetAgencyId);
       if (targetExpoId) feedbackQuery = feedbackQuery.eq("expo_id", targetExpoId);
+      if (expoDateRange) {
+        const rangeStart = new Date(expoDateRange.start); rangeStart.setHours(0, 0, 0, 0);
+        const rangeEnd = new Date(expoDateRange.end); rangeEnd.setHours(23, 59, 59, 999);
+        feedbackQuery = feedbackQuery.gte("submitted_at", rangeStart.toISOString()).lte("submitted_at", rangeEnd.toISOString());
+      }
       const { data: feedbackData, error: feedbackError } = await feedbackQuery;
       if (cancelled) return;
       if (feedbackError || !Array.isArray(feedbackData)) {
@@ -1275,7 +1306,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId, expoDateRange]);
 
   const emotionCatalog = useMemo(() => emotionCatalogFromDb, [emotionCatalogFromDb]);
 
@@ -1334,6 +1365,11 @@ const Statistics = () => {
       let feedbackQuery = supabase.from("visitor_feedback").select("artwork_id, emotion_id");
       if (targetAgencyId) feedbackQuery = feedbackQuery.eq("agency_id", targetAgencyId);
       if (targetExpoId) feedbackQuery = feedbackQuery.eq("expo_id", targetExpoId);
+      if (expoDateRange) {
+        const rangeStart = new Date(expoDateRange.start); rangeStart.setHours(0, 0, 0, 0);
+        const rangeEnd = new Date(expoDateRange.end); rangeEnd.setHours(23, 59, 59, 999);
+        feedbackQuery = feedbackQuery.gte("submitted_at", rangeStart.toISOString()).lte("submitted_at", rangeEnd.toISOString());
+      }
       const { data: feedbackData, error: feedbackError } = await feedbackQuery;
       if (cancelled) return;
       if (feedbackError || !Array.isArray(feedbackData)) {
@@ -1370,7 +1406,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId, expoDateRange]);
 
   const miniKpis = useMemo(() => {
     const kpi = (
@@ -1702,9 +1738,21 @@ const Statistics = () => {
   }, [printExportBusy]);
 
   const handlePrintPreviewOpenChange = useCallback(
-    (open: boolean) => {
+    (open: boolean, skipDateCheck = false) => {
       if (!open && printExportBusy) return;
       if (open) {
+        const hasExpoDates = (() => {
+          if (!selectedFilteredExpo) return false;
+          const s = parseExpoYmdDate(selectedFilteredExpo.date_expo_du);
+          const e = parseExpoYmdDate(selectedFilteredExpo.date_expo_au);
+          return !!(s && e && s.getTime() <= e.getTime());
+        })();
+        if (!hasExpoDates && !skipDateCheck && !manualPreviewDateFrom) {
+          setDialogDateFrom("");
+          setDialogDateTo("");
+          setPreviewDateDialogOpen(true);
+          return;
+        }
         previewFiltersSnapshotRef.current = {
           agencyId: selectedAgencyId,
           expoId: drillExpoId,
@@ -1716,11 +1764,13 @@ const Statistics = () => {
       shouldRestorePreviewFiltersRef.current = true;
       setPrintPreviewOpen(false);
     },
-    [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy],
+    [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy, selectedFilteredExpo, manualPreviewDateFrom],
   );
 
   const liveReportViewProps = buildReportExportSnapshot();
   const reportViewProps = reportExportSnapshot ?? liveReportViewProps;
+
+  const todayYmd = toYmd(new Date());
 
   /** PDF navigateur (jsPDF + capture DOM) — même logique que le panneau expo. */
   const handleBrowserPdfStatistics = async (paperFormat: PdfPaperFormat) => {
@@ -1884,6 +1934,8 @@ const Statistics = () => {
                   setSelectedAgencyId(v);
                   setDrillExpoId("all");
                   setSelectedArtistId("all");
+                  setManualPreviewDateFrom("");
+                  setManualPreviewDateTo("");
                 }}
               >
                 {scope.mode === "all" && role_id === 1 && <option value="all">— (vue globale)</option>}
@@ -1913,6 +1965,8 @@ const Statistics = () => {
                 const v = e.target.value;
                 setDrillExpoId(v === "all" ? "all" : v);
                 setSelectedArtistId("all");
+                setManualPreviewDateFrom("");
+                setManualPreviewDateTo("");
               }}
             >
               {canDrillExpo && <option value="all">{t("filter.allExpos")}</option>}
@@ -1923,6 +1977,36 @@ const Statistics = () => {
               ))}
             </select>
           </div>
+          {showOrganizationFilter && selectedAgencyId === "all" && drillExpoId === "all" && (
+            <div>
+              <label className="text-xs text-muted-foreground font-medium">
+                {t("filter.expoPeriod")}
+              </label>
+              <div className="flex flex-row gap-2 mt-1">
+                <input
+                  type="date"
+                  value={manualPreviewDateFrom}
+                  max={manualPreviewDateTo || todayYmd}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setManualPreviewDateFrom(v);
+                    if (manualPreviewDateTo && v > manualPreviewDateTo) setManualPreviewDateTo("");
+                  }}
+                  className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  title={t("preview.dateFrom")}
+                />
+                <input
+                  type="date"
+                  value={manualPreviewDateTo}
+                  min={manualPreviewDateFrom || undefined}
+                  max={todayYmd}
+                  onChange={(e) => setManualPreviewDateTo(e.target.value)}
+                  className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  title={t("preview.dateTo")}
+                />
+              </div>
+            </div>
+          )}
           {showArtistFilter ? (
             <div>
               <label htmlFor="statistics-scope-artist" className="text-xs text-muted-foreground font-medium">
@@ -2379,6 +2463,73 @@ const Statistics = () => {
               ) : (
                 t("preview.browserPdf")
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewDateDialogOpen} onOpenChange={setPreviewDateDialogOpen}>
+        <DialogContent className="max-w-sm border-border bg-white text-neutral-900">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-lg">{t("preview.dateRangeTitle")}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {t("preview.dateRangeDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-row gap-4 py-2">
+            <div className="flex flex-col gap-1.5 w-[152px]">
+              <label htmlFor="preview-date-from" className="text-xs font-medium text-neutral-700">
+                {t("preview.dateFrom")}
+              </label>
+              <input
+                id="preview-date-from"
+                type="date"
+                value={dialogDateFrom}
+                max={dialogDateTo || todayYmd}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDialogDateFrom(v);
+                  if (dialogDateTo && v > dialogDateTo) setDialogDateTo("");
+                }}
+                className="rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-[150px]"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 w-[152px]">
+              <label htmlFor="preview-date-to" className="text-xs font-medium text-neutral-700">
+                {t("preview.dateTo")}
+              </label>
+              <input
+                id="preview-date-to"
+                type="date"
+                value={dialogDateTo}
+                min={dialogDateFrom || undefined}
+                max={todayYmd}
+                onChange={(e) => setDialogDateTo(e.target.value)}
+                className="rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-[150px]"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => setPreviewDateDialogOpen(false)}>
+              {t("preview.close")}
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#E63946] hover:bg-[#c62f3a]"
+              disabled={!dialogDateFrom || !dialogDateTo || dialogDateFrom > dialogDateTo}
+              onClick={() => {
+                setManualPreviewDateFrom(dialogDateFrom);
+                setManualPreviewDateTo(dialogDateTo);
+                setPreviewDateDialogOpen(false);
+                previewFiltersSnapshotRef.current = {
+                  agencyId: selectedAgencyId,
+                  expoId: drillExpoId,
+                  artistId: selectedArtistId,
+                };
+                setPrintPreviewOpen(true);
+              }}
+            >
+              {t("preview.dateRangeConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

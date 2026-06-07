@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArchiveRestore, ChevronDown, Settings } from "lucide-react";
+import { ArchiveRestore, ChevronDown, Euro, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -40,7 +40,15 @@ export function SettingsMenuDropdown({
           onClick={onNavigate}
         >
           <Settings className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
-          <span>{t("settings")}</span>
+          <span>{t("settings_submenu_params")}</span>
+        </NavLink>
+        <NavLink
+          to="/settings/couts"
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted/60"
+          onClick={onNavigate}
+        >
+          <Euro className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span>{t("settings_submenu_couts")}</span>
         </NavLink>
         <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {t("settings_submenu_trash")}
@@ -80,6 +88,12 @@ export function SettingsMenuDropdown({
         <DropdownMenuLabel>{t("settings")}</DropdownMenuLabel>
         <DropdownMenuItem asChild>
           <Link to="/settings">{t("settings_submenu_params")}</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/settings/couts" className="flex items-center gap-2">
+            <Euro className="h-4 w-4 opacity-70" aria-hidden />
+            {t("settings_submenu_couts")}
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">

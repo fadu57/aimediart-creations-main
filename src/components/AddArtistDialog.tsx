@@ -451,6 +451,15 @@ export function AddArtistDialog({
 
   const canShowGenerateBio = !ficheReadOnly;
 
+  /** Verrou champ : toujours bloqué en lecture seule, ET bloqué si la valeur est déjà remplie en mode édition. */
+  const isLocked = (value: unknown) =>
+    ficheReadOnly ||
+    (Boolean(editingArtistId) &&
+      value !== "" &&
+      value !== null &&
+      value !== undefined &&
+      !(Array.isArray(value) && value.length === 0));
+
   pendingPhotoFileRef.current = pendingPhotoFile;
   photoDirtyRef.current = photoDirty;
   biosDraftRef.current = biosDraft;
@@ -1114,6 +1123,15 @@ export function AddArtistDialog({
                 </h2>
 
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  {editingArtistId && (
+                    <a
+                      href={`mailto:contact@aimediart.com?subject=${encodeURIComponent(t("btn_report_error_email_subject"))}&body=${encodeURIComponent(`Artiste : ${artistTitleName || "inconnu"}\nArtist ID : ${editingArtistId}\n\nDécrivez l'information erronée :`)}`}
+                      className="inline-flex h-9 w-[150px] items-center justify-center gap-1.5 rounded-md border border-white/60 bg-[#FDFDFC] px-3 text-[11px] font-black text-[#D99726]/80 text-center hover:border-white hover:text-white transition-colors"
+                      title={t("btn_report_error_title")}
+                    >
+                      ⚠️ {t("btn_report_error")}
+                    </a>
+                  )}
                   {editingArtistId && ficheReadOnly && (
                     <Button
                       type="button"
@@ -1215,7 +1233,7 @@ export function AddArtistDialog({
                     <FormItem>
                       <FormLabel>{t("form_nickname_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={ficheReadOnly} />
+                        <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={isLocked(field.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1246,7 +1264,7 @@ export function AddArtistDialog({
                               <Button
                                 type="button"
                                 variant="outline"
-                                disabled={ficheReadOnly}
+                                disabled={isLocked(artistTyp)}
                                 className={cn(
                                   "h-10 w-full justify-between font-normal",
                                   !artistTyp?.length && "text-muted-foreground",
@@ -1272,7 +1290,7 @@ export function AddArtistDialog({
                                       id={`add-artist-type-${idx}`}
                                       name={`artist_type_${idx}`}
                                       checked={artistTyp?.includes(opt)}
-                                      disabled={ficheReadOnly}
+                                      disabled={isLocked(artistTyp)}
                                       onCheckedChange={(c) => toggleArtistType(opt, c === true)}
                                     />
                                     <span className="leading-snug">{opt}</span>
@@ -1302,7 +1320,7 @@ export function AddArtistDialog({
                               <Button
                                 type="button"
                                 variant="outline"
-                                disabled={ficheReadOnly}
+                                disabled={isLocked(field.value)}
                                 className={cn(
                                   "h-10 w-full pl-3 text-left font-normal",
                                   !field.value && "text-muted-foreground",
@@ -1373,22 +1391,57 @@ export function AddArtistDialog({
                     <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
                       {canShowGenerateBio && (
-                        <Button
-                          type="button"
-                          variant="default"
-                          className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                          onClick={() => void handleGenerateBio()}
-                          disabled={generatingBio || !hasTripleRequired}
-                        >
-                          {generatingBio ? (
+                        <>
+                          {biosDraft[activeLanguage]?.trim() ? (
                             <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              {t("btn_generating_bio")}
+                              {/* Bio existante : 3 actions */}
+                              <Button
+                                type="button"
+                                variant="default"
+                                className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                                onClick={() => void handleGenerateBio()}
+                                disabled={generatingBio || !hasTripleRequired}
+                                title={t("btn_report_error_title", "Regénérer la biographie via l'IA")}
+                              >
+                                {generatingBio ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    {t("btn_generating_bio")}
+                                  </>
+                                ) : (
+                                  t("bio_regen")
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="default"
+                                className="h-8 shrink-0 gap-1.5 border border-amber-500 bg-white px-2.5 text-xs font-semibold text-amber-600 shadow-none hover:bg-amber-50"
+                                onClick={() =>
+                                  setBiosDraft((prev) => ({ ...prev, [activeLanguage]: "" }))
+                                }
+                              >
+                                {t("bio_new")}
+                              </Button>
                             </>
                           ) : (
-                            t("btn_generate_bio")
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                              onClick={() => void handleGenerateBio()}
+                              disabled={generatingBio || !hasTripleRequired}
+                            >
+                              {generatingBio ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  {t("btn_generating_bio")}
+                                </>
+                              ) : (
+                                t("btn_generate_bio")
+                              )}
+                            </Button>
                           )}
-                        </Button>
+                        </>
                       )}
                       <TabsList className="flex h-auto min-h-9 w-auto shrink-0 flex-wrap justify-start gap-1">
                         {ARTIST_BIO_LANGUAGES.map((lang) => (
@@ -1419,7 +1472,7 @@ export function AddArtistDialog({
                                 [lang]: e.target.value,
                               }))
                             }
-                            placeholder={`Bio en ${lang.toUpperCase()}...`}
+                            placeholder={`Bio en ${lang.toUpperCase()}… (spécifique à votre organisation)`}
                             disabled={ficheReadOnly}
                             spellCheck
                             lang={lang}
@@ -1556,7 +1609,7 @@ export function AddArtistDialog({
                               <Input
                                 placeholder={t("form_address_line2_placeholder")}
                                 {...field}
-                                disabled={ficheReadOnly}
+                                disabled={isLocked(field.value)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1575,7 +1628,7 @@ export function AddArtistDialog({
                               <Input
                                 placeholder={t("form_address_placeholder")}
                                 {...field}
-                                disabled={ficheReadOnly}
+                                disabled={isLocked(field.value)}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1592,9 +1645,9 @@ export function AddArtistDialog({
                   render={({ field }) => (
                     <FormItem className="w-[100px] max-w-full justify-self-start space-y-[5px] sm:col-span-1">
                       <FormLabel>{t("form_country_label")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={ficheReadOnly}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isLocked(field.value)}>
                         <FormControl>
-                          <SelectTrigger disabled={ficheReadOnly}>
+                          <SelectTrigger disabled={isLocked(field.value)}>
                             <SelectValue placeholder={t("form_country_placeholder")} />
                           </SelectTrigger>
                         </FormControl>
@@ -1621,7 +1674,7 @@ export function AddArtistDialog({
                     <FormItem className="w-[115px] max-w-full justify-self-start space-y-[5px] sm:col-span-2">
                       <FormLabel>{t("form_zipcode_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={postalPlaceholder} {...field} disabled={ficheReadOnly} />
+                        <Input placeholder={postalPlaceholder} {...field} disabled={isLocked(field.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1635,7 +1688,7 @@ export function AddArtistDialog({
                     <FormItem className="space-y-[5px] sm:col-span-7">
                       <FormLabel>{t("form_city_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={ficheReadOnly} />
+                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={isLocked(field.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1662,7 +1715,7 @@ export function AddArtistDialog({
                           onCountryNameChange={(name) =>
                             form.setValue("country", name, { shouldDirty: true, shouldValidate: true })
                           }
-                          disabled={ficheReadOnly}
+                          disabled={isLocked(field.value)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1677,7 +1730,7 @@ export function AddArtistDialog({
                     <FormItem>
                       <FormLabel>{t("form_email_label")}</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder={t("form_email_placeholder")} {...field} disabled={ficheReadOnly} />
+                        <Input type="email" placeholder={t("form_email_placeholder")} {...field} disabled={isLocked(field.value)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -454,7 +454,7 @@ const Oeuvre = () => {
     if (isAuthenticated) {
       await supabase.auth.signOut({ scope: "local" });
       setIsAuthenticated(false);
-      window.location.href = "/organisation";
+      window.location.href = "/visitor";
       return;
     }
     window.location.href = "/login";

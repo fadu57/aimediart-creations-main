@@ -373,7 +373,7 @@ export default function SettingsPage() {
   const sectionIdSet = useMemo(() => new Set(sectionsCatalog.map((s) => s.id)), [sectionsCatalog]);
   const accordionSectionParam = searchParams.get("section");
   const accordionOpenValue =
-    accordionSectionParam != null && sectionIdSet.has(accordionSectionParam) ? accordionSectionParam : undefined;
+    accordionSectionParam != null && sectionIdSet.has(accordionSectionParam) ? accordionSectionParam : "";
 
   const setAccordionSectionInUrl = useCallback(
     (value: string) => {

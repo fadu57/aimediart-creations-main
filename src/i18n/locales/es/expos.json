@@ -3,6 +3,9 @@
     "title": "Exposiciones",
     "search": "Buscar una exposición...",
     "clearSearch": "Borrar búsqueda",
+    "searchOrg": "Buscar por organización...",
+    "clearSearchOrg": "Borrar filtro de organización",
+    "noOrgFound": "No se encontró ninguna organización.",
     "clear": "Borrar",
     "create": "Nueva exposición",
     "tableau": "Lista de exposiciones",
@@ -37,6 +40,9 @@
   "panel": {
     "chooseFormat": "Elija el formato del panel a imprimir",
     "cancel": "Cancelar"
+  },
+  "form": {
+    "navTypeLabel": "Para el visitante, tipo de navegación"
   },
   "tableau": {
     "title": "Exposiciones — Tabla completa",

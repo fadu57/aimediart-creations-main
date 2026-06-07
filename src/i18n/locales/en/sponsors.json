@@ -1,0 +1,54 @@
+{
+  "title": {
+    "listExpo": "Sponsors / Patrons — {{name}}",
+    "listAll": "Sponsors / Patrons — all exhibitions",
+    "edit": "Edit sponsor / patron profile",
+    "new": "New sponsor / patron"
+  },
+  "list": {
+    "empty": "No sponsor registered.",
+    "emptyExpo": "No sponsor registered for this exhibition.",
+    "editTitle": "Edit",
+    "addBtn": "Add a sponsor / patron"
+  },
+  "form": {
+    "changeLogo": "Change logo",
+    "uploadLogo": "Upload a logo",
+    "logoHint": "PNG, JPG, WebP or SVG · 2 MB max",
+    "nameLabel": "Sponsor name",
+    "namePlaceholder": "Organisation name…",
+    "contactLabel": "Contact",
+    "contactPlaceholder": "Contact name",
+    "phoneLabel": "Phone",
+    "emailLabel": "Email",
+    "addressLabel": "Address",
+    "zipLabel": "Postcode",
+    "cityLabel": "City",
+    "amountLabel": "Committed amount",
+    "currencyLabel": "Currency",
+    "descLabel": "Description / presentation",
+    "descPlaceholder": "Sponsor presentation, nature of support…",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "save": "Save",
+    "add": "Add"
+  },
+  "errors": {
+    "nameRequired": "Sponsor name is required.",
+    "amountInvalid": "Amount must be a positive number.",
+    "loadFailed": "Unable to load sponsors.",
+    "saveFailed": "Error saving the record.",
+    "deleteFailed": "Error deleting the sponsor."
+  },
+  "toast": {
+    "updated": "Sponsor updated.",
+    "added": "Sponsor added.",
+    "deleted": "Sponsor deleted."
+  },
+  "deleteConfirm": {
+    "title": "Delete this sponsor?",
+    "description": "Deleting «\u00a0{{name}}\u00a0» is permanent. This action cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete"
+  }
+}

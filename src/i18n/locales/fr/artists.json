@@ -95,5 +95,13 @@
   "tableau_warning": "ATTENTION - La suppression est définitive. Supprimer avec le maximum de discernement sinon vous risquez de problèmes avec votre application",
   "tableau_cancel": "Annuler",
   "tableau_confirm": "Supprimer",
-  "tableau_archiving": "Archivage..."
+  "tableau_archiving": "Archivage...",
+
+  "btn_report_error": "Signaler une information erronée",
+  "btn_report_error_title": "Signaler une information erronée à l'équipe aimediart",
+  "btn_report_error_email_subject": "Fiche artiste : information(s) erronée(s)",
+  "bio_regen": "✨ Regénérer (IA)",
+  "bio_new": "✏️ Nouvelle bio",
+  "info_shared_profiles": "Les fiches artistes sont communes à tous. Elles peuvent être complétées (informations manquantes) mais non supprimées. En cas d'erreur sur une des informations déjà saisies, merci de cliquer sur «\u00a0Signaler une information erronée\u00a0» dans la fiche.",
+  "info_bio_only": "Seule la biographie peut être réécrite pour s'adapter à votre organisation."
 }

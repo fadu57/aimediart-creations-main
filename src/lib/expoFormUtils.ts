@@ -6,7 +6,6 @@ const READONLY_KEYS_INSERT = new Set(["updated_at"]);
 const HIDDEN_EXPO_KEYS = new Set([
   "id",
   "logo2_expo",
-  "ref_expo",
   "deleted_at",
   "created_at",
   // Curator : remplacé par le picker user
@@ -17,6 +16,8 @@ const HIDDEN_EXPO_KEYS = new Set([
   "curator_email",
   // Horaires : géré par ExpoHorairesEditor
   "expo_horaires",
+  // Navigation : gérée par les boutons radio dans la section logo
+  "type_navigation",
 ]);
 
 /** Colonnes affichées / éditables (hors clés étrangères `*_id`). */
@@ -61,6 +62,8 @@ export function fieldLabel(key: string): string {
     city_expo: "Ville",
     date_expo_du: "Du",
     date_expo_au: "Au",
+    ref_expo: "Réf. expo",
+    tel_ref_expo: "Tél. référent",
   };
   return map[key] ?? key.replace(/_/g, " ");
 }
@@ -76,7 +79,7 @@ export function sortExpoFieldKeys(keys: string[]): string[] {
   const filtered = filterExpoFormKeys(keys);
   const ts = filtered.filter((k) => k.endsWith("_at")).sort();
   const rest = filtered.filter((k) => !k.endsWith("_at"));
-  const priority = ["id", "expo_name", "logo_expo", "expo_logo"];
+  const priority = ["id", "expo_name", "logo_expo", "expo_logo", "lieu_expo", "adress_expo", "zip_expo"];
   const head = priority.filter((k) => rest.includes(k));
   const mid = rest.filter((k) => !priority.includes(k)).sort((a, b) => a.localeCompare(b, "fr"));
   return [...head, ...mid, ...ts];

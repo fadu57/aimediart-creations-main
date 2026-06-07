@@ -372,6 +372,7 @@ export interface Database {
           total_tokens: number | null;
           artwork_id: string | null;
           created_at: string | null;
+          metadata: Record<string, unknown> | null;
         };
         Insert: {
           id?: string;
@@ -382,6 +383,7 @@ export interface Database {
           total_tokens?: number | null;
           artwork_id?: string | null;
           created_at?: string | null;
+          metadata?: Record<string, unknown> | null;
         };
         Update: {
           model_id?: string;
@@ -391,6 +393,7 @@ export interface Database {
           total_tokens?: number | null;
           artwork_id?: string | null;
           created_at?: string | null;
+          metadata?: Record<string, unknown> | null;
         };
         Relationships: [];
       };

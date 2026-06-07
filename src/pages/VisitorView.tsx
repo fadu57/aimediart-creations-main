@@ -1,9 +1,13 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
+import { TtsPlayButton } from "@/components/TtsPlayButton";
+import { TtsConsentModal } from "@/components/TtsConsentModal";
+import { VoiceSelector } from "@/components/VoiceSelector";
+import { useTextToSpeechWithVoices } from "@/hooks/useTextToSpeechWithVoices";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { BarChart3, Building2, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
+import { BarChart3, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { Swiper as SwiperInstance } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -27,8 +31,11 @@ import {
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import { getVisitorAnonymousProfile, getVisitorAnonymousPseudo } from "@/lib/visitorAnonymousProfile";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
+
+type QuickFeedbackHint = "both" | "emotion" | "heart";
 
 type ArtworkRow = {
   artwork_id: string;
@@ -177,6 +184,7 @@ const VisitorView = () => {
   const { session, loading: authLoading, role_id, role_name, first_name } = useAuthUser();
   const { language, setLanguage } = useUiLanguage();
   const { can, loading: navMatrixLoading } = useNavigationMatrix();
+  const tts = useTextToSpeechWithVoices();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const [artist, setArtist] = useState<ArtistRow | null>(null);
@@ -207,12 +215,11 @@ const VisitorView = () => {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [sameArtistArtworkIds, setSameArtistArtworkIds] = useState<string[]>([]);
-  const [quickFeedbackMessage, setQuickFeedbackMessage] = useState<string | null>(null);
-  const [quickFeedbackTop, setQuickFeedbackTop] = useState<number>(92);
+  const [quickFeedbackHint, setQuickFeedbackHint] = useState<QuickFeedbackHint | null>(null);
+  const [headerAvatarUrl, setHeaderAvatarUrl] = useState<string | null>(null);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
-  const thumbsSectionRef = useRef<HTMLDivElement | null>(null);
   const mediationMainSwiperRef = useRef<SwiperInstance | null>(null);
   const artistPhotoCloseTimerRef = useRef<number | null>(null);
   const quickFeedbackTimerRef = useRef<number | null>(null);
@@ -623,26 +630,6 @@ const VisitorView = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!quickFeedbackMessage) return;
-
-    const updateQuickFeedbackPosition = () => {
-      const targetRect = thumbsSectionRef.current?.getBoundingClientRect();
-      if (!targetRect) return;
-      // Positionne le popup à la base (bas) du bloc navigation médiation.
-      const nextTop = Math.max(68, Math.round(targetRect.bottom - 106));
-      setQuickFeedbackTop(nextTop);
-    };
-
-    updateQuickFeedbackPosition();
-    window.addEventListener("scroll", updateQuickFeedbackPosition, { passive: true });
-    window.addEventListener("resize", updateQuickFeedbackPosition);
-    return () => {
-      window.removeEventListener("scroll", updateQuickFeedbackPosition);
-      window.removeEventListener("resize", updateQuickFeedbackPosition);
-    };
-  }, [quickFeedbackMessage]);
-
   const artworkTitle = artwork?.artwork_title?.trim() || t("artwork_no_title");
   const artistDisplayName =
     `${artist?.artist_firstname ?? artist?.artist_prenom ?? artwork?.artwork_artist_firstname ?? artwork?.artwork_artist_prenom ?? ""} ${
@@ -687,17 +674,47 @@ const VisitorView = () => {
   const userMeta = (session?.user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const headerFirstName =
     (first_name?.trim() || "") ||
-    (typeof userMeta.full_name === "string" ? userMeta.full_name.trim() : "") ||
     (typeof userMeta.first_name === "string" ? userMeta.first_name.trim() : "") ||
-    (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "");
-  const headerLastName =
-    (typeof userMeta.user_nom === "string" ? userMeta.user_nom.trim() : "") ||
-    (typeof userMeta.nom === "string" ? userMeta.nom.trim() : "") ||
-    (typeof userMeta.last_name === "string" ? userMeta.last_name.trim() : "");
-  const headerDisplayName = `${headerFirstName} ${headerLastName}`.trim();
+    (typeof userMeta.firstname === "string" ? userMeta.firstname.trim() : "") ||
+    (typeof userMeta.full_name === "string" ? userMeta.full_name.trim().split(/\s+/)[0] ?? "" : "");
   const headerIdentityLabel = isAnonymousVisitor
     ? t("header_anon")
-    : t("header_greeting", { name: headerDisplayName || t("header_visitor") });
+    : t("header_greeting", { name: headerFirstName || t("header_visitor") });
+  const anonymousPseudo = getVisitorAnonymousPseudo()?.trim() || "";
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      const anon = getVisitorAnonymousProfile();
+      const url = anon?.selfieUrl?.trim() || anon?.avatarUrl?.trim() || null;
+      setHeaderAvatarUrl(url);
+      return;
+    }
+    const userId = session?.user?.id?.trim();
+    if (!userId) {
+      setHeaderAvatarUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.from("profiles").select("avatar_url").eq("id", userId).maybeSingle();
+      if (cancelled) return;
+      const row = data as { avatar_url?: string | null } | null;
+      const profileUrl = row?.avatar_url?.trim() || "";
+      if (profileUrl) {
+        setHeaderAvatarUrl(profileUrl);
+        return;
+      }
+      const meta = session?.user?.user_metadata as Record<string, unknown> | undefined;
+      const metaUrl =
+        (typeof meta?.avatar_url === "string" && meta.avatar_url.trim()) ||
+        (typeof meta?.picture === "string" && meta.picture.trim()) ||
+        null;
+      setHeaderAvatarUrl(metaUrl);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, session?.user?.id, session?.user?.user_metadata]);
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {
@@ -712,11 +729,16 @@ const VisitorView = () => {
     actionBarRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [canSubmitFeedback]);
 
+  useEffect(() => {
+    if (!quickFeedbackHint || !canSubmitFeedback) return;
+    setQuickFeedbackHint(null);
+  }, [canSubmitFeedback, quickFeedbackHint]);
+
   const handleAuthAffordanceClick = async () => {
     if (isAuthenticated) {
       await supabase.auth.signOut({ scope: "local" });
       setIsAuthenticated(false);
-      navigate("/organisation", { replace: true });
+      navigate("/visitor", { replace: true });
       return;
     }
     if (typeof window !== "undefined") {
@@ -899,21 +921,40 @@ const VisitorView = () => {
     navigate(`/artwork/${encodeURIComponent(nextArtworkId)}${query}`);
   };
 
-  const showQuickFeedbackMessage = (message: string) => {
-    setQuickFeedbackMessage(message);
+  const sameArtistNavMeta = useMemo(() => {
+    if (!isSameArtistNavigation || sameArtistArtworkIds.length === 0) return null;
+    const currentId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
+    const index = sameArtistArtworkIds.findIndex((id) => id === currentId);
+    const safeIndex = index >= 0 ? index : 0;
+    return {
+      current: safeIndex + 1,
+      total: sameArtistArtworkIds.length,
+    };
+  }, [isSameArtistNavigation, sameArtistArtworkIds, artwork?.artwork_id, artworkId]);
+
+  const quickFeedbackHintMessageKey = useMemo((): string | null => {
+    if (!quickFeedbackHint) return null;
+    if (quickFeedbackHint === "emotion") return "quick_feedback_missing_emotion";
+    if (quickFeedbackHint === "heart") return "quick_feedback_missing_heart";
+    return "quick_feedback_missing";
+  }, [quickFeedbackHint]);
+
+  const showQuickFeedbackHint = (hint: QuickFeedbackHint) => {
+    setQuickFeedbackHint(hint);
     if (quickFeedbackTimerRef.current != null) {
       window.clearTimeout(quickFeedbackTimerRef.current);
     }
     quickFeedbackTimerRef.current = window.setTimeout(() => {
-      setQuickFeedbackMessage(null);
+      setQuickFeedbackHint(null);
       quickFeedbackTimerRef.current = null;
-    }, 2800);
+    }, 4500);
   };
 
   const handleSameArtistNavigationClick = (direction: -1 | 1) => {
-    const hasNoEmotionAndNoHeart = !selectedEmotion && heartRating === 0;
-    if (hasNoEmotionAndNoHeart) {
-      showQuickFeedbackMessage(t("quick_feedback_missing"));
+    const hasNoEmotion = !selectedEmotion;
+    const hasNoHeart = heartRating === 0;
+    if (hasNoEmotion || hasNoHeart) {
+      showQuickFeedbackHint(hasNoEmotion && hasNoHeart ? "both" : hasNoEmotion ? "emotion" : "heart");
       window.setTimeout(() => {
         emotionSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);
@@ -1001,7 +1042,7 @@ const VisitorView = () => {
               <p className="text-[10px] font-semibold italic text-[#E63946]">{t("tagline")}</p>
             </div>
           </div>
-          <div className="flex min-w-0 grow basis-auto flex-col items-center gap-1 px-2">
+          <div className="flex min-w-0 grow basis-auto flex-col items-center justify-center gap-1 px-2">
             {isAnonymousVisitor && (
               <button
                 type="button"
@@ -1011,21 +1052,26 @@ const VisitorView = () => {
                 {t("btn_register")}
               </button>
             )}
-            <p className="max-w-[170px] whitespace-normal break-words text-center text-[10px] font-semibold italic text-[#F0F0F0]">
-              {isAnonymousVisitor ? (
-                <>
-                  {t("anon_cta_header")}
-                </>
-              ) : (
-                <>
-                  {authLoading ? (
-                    <Loader2 className="mx-auto h-3.5 w-3.5 animate-spin text-[#F0F0F0]" aria-hidden />
-                  ) : (
-                    headerIdentityLabel
-                  )}
-                </>
-              )}
-            </p>
+            <div className="flex max-w-[220px] items-center justify-end gap-2">
+              <p className="min-w-0 flex-1 whitespace-normal break-words text-right text-[10px] font-semibold italic text-[#F0F0F0]">
+                {authLoading ? (
+                  <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin text-[#F0F0F0]" aria-hidden />
+                ) : isAnonymousVisitor ? (
+                  anonymousPseudo ? t("header_anon_named", { name: anonymousPseudo }) : t("anon_cta_header")
+                ) : (
+                  headerIdentityLabel
+                )}
+              </p>
+              {headerAvatarUrl ? (
+                <img
+                  src={headerAvatarUrl}
+                  alt={t("header_avatar_alt", {
+                    name: headerFirstName || anonymousPseudo || t("header_visitor"),
+                  })}
+                  className="h-10 w-10 shrink-0 rounded-full border-2 border-[#E63946]/75 object-cover shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+                />
+              ) : null}
+            </div>
           </div>
           {!isEmbedded && (
           <div className={`fab-container œuvre-navi basis-auto shrink-0 grow-0 ${isFabOpen ? "active" : ""}`}>
@@ -1098,7 +1144,10 @@ const VisitorView = () => {
                   <select
                     id="languageSelector"
                     value={language}
-                    onChange={(e) => setLanguage(e.target.value as UiLanguage)}
+                    onChange={(e) => {
+                      setLanguage(e.target.value as UiLanguage);
+                      setIsFabOpen(false);
+                    }}
                     className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
                     aria-label={t("aria_language")}
                     title={t("aria_language")}
@@ -1156,37 +1205,57 @@ const VisitorView = () => {
           isEmbedded ? "pt-[58px]" : isSameArtistNavigation ? "pt-[68px]" : "pt-[92px]"
         } space-y-0 pb-6`}
       >
-        {isSameArtistNavigation && (
-          <div className="œuvre-full-width-box mb-2 mt-0 px-5">
-            <div ref={sameArtistNavRef} className="flex w-full items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <button
-                  type="button"
-                  aria-label={t("aria_prev_artwork")}
-                  title={t("title_prev_artwork")}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
-                  onClick={() => handleSameArtistNavigationClick(-1)}
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden />
-                </button>
-                <p className="m-0 min-w-0 text-left text-[9px] font-semibold leading-tight text-[#F0F0F0]/95 whitespace-pre-line">
-                  {t("same_artist_nav_prev_caption")}
-                </p>
+        {isSameArtistNavigation && sameArtistNavMeta && (
+          <div className="œuvre-full-width-box mb-3 mt-0 px-4">
+            <div
+              ref={sameArtistNavRef}
+              className="flex overflow-hidden rounded-2xl border border-white/10 bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            >
+              <button
+                type="button"
+                aria-label={t("aria_prev_artwork")}
+                title={t("title_prev_artwork")}
+                className="group flex min-w-0 flex-1 items-center gap-2 border-r border-white/10 px-3 py-3 text-left transition-colors hover:bg-white/[0.04] active:bg-[#E63946]/15"
+                onClick={() => handleSameArtistNavigationClick(-1)}
+              >
+                <ChevronLeft
+                  className="h-5 w-5 shrink-0 text-[#E63946] transition-transform group-hover:-translate-x-0.5"
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-[#F0F0F0]/85">
+                  {t("same_artist_nav_prev_short")}
+                </span>
+              </button>
+
+              <div className="flex shrink-0 flex-col items-center justify-center px-3 py-2.5 sm:px-4">
+                <span className="text-sm font-bold tabular-nums leading-none text-[#E63946]">
+                  {t("same_artist_nav_position", {
+                    current: sameArtistNavMeta.current,
+                    total: sameArtistNavMeta.total,
+                  })}
+                </span>
+                <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#F0F0F0]/40">
+                  {t("same_artist_nav_hub")}
+                </span>
               </div>
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                <p className="m-0 min-w-0 text-right text-[9px] font-semibold leading-tight text-[#F0F0F0]/95 whitespace-pre-line">
-                  {t("same_artist_nav_next_caption")}
-                </p>
-                <button
-                  type="button"
-                  aria-label={t("aria_next_artwork")}
-                  title={t("title_next_artwork")}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
-                  onClick={() => handleSameArtistNavigationClick(1)}
-                >
-                  <ChevronRight className="h-4 w-4" aria-hidden />
-                </button>
-              </div>
+
+              <button
+                type="button"
+                aria-label={t("aria_next_artwork")}
+                title={t("title_next_artwork")}
+                className="group flex min-w-0 flex-1 items-center justify-end gap-2 border-l border-white/10 px-3 py-3 text-right transition-colors hover:bg-white/[0.04] active:bg-[#E63946]/15"
+                onClick={() => handleSameArtistNavigationClick(1)}
+              >
+                <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-[#F0F0F0]/85">
+                  {t("same_artist_nav_next_short")}
+                </span>
+                <ChevronRight
+                  className="h-5 w-5 shrink-0 text-[#E63946] transition-transform group-hover:translate-x-0.5"
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+              </button>
             </div>
           </div>
         )}
@@ -1260,6 +1329,15 @@ const VisitorView = () => {
             <span className="text-xl">📖</span>
             <h3 className="font-bold text-[14px] text-[#F0F0F0]">{t("ai_select_style")}</h3>
           </div>
+          {tts.supported && !tts.isLoadingVoices && (
+            <VoiceSelector
+              lang={language}
+              voices={tts.availableVoices}
+              preferredVoiceName={tts.preferredVoices[language.split(/[-_]/)[0]]}
+              onChange={(name) => tts.setPreferredVoice(language, name)}
+              className="mb-2 px-5"
+            />
+          )}
           {stylesQueryError ? (
             <p className="mb-2 text-center text-xs text-red-600">{stylesQueryError}</p>
           ) : null}
@@ -1269,86 +1347,132 @@ const VisitorView = () => {
             </div>
           ) : (
             <>
-              <div ref={thumbsSectionRef} className="flex items-center justify-center gap-6 px-5 py-1">
-                <Button
+              <div className="relative mt-1 px-0.5">
+                {/* Zone cliquable gauche — toute la hauteur du carrousel */}
+                <button
                   type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 rounded-full border-white/20 bg-white/5 text-[#F0F0F0] hover:bg-white/10 hover:text-white"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_prev")}
                   onClick={goMediationPrev}
+                  className="absolute left-0 top-0 bottom-0 z-10 w-8 flex items-start justify-center pt-3 text-[#E63946]/50 transition-all duration-200 hover:text-[#E63946] hover:bg-[#E63946]/8 rounded-l-2xl disabled:pointer-events-none disabled:opacity-20"
                 >
-                  <ChevronLeft className="h-5 w-5" aria-hidden />
-                </Button>
-                <Button
+                  <ChevronLeft className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                </button>
+
+                <div className="min-w-0 px-8">
+                  <Swiper
+                    key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
+                    onSwiper={(swiper) => {
+                      mediationMainSwiperRef.current = swiper;
+                    }}
+                    loop={mediationSwiperLoop}
+                    loopAdditionalSlides={2}
+                    watchSlidesProgress
+                    centeredSlides
+                    autoHeight
+                    slidesPerView={1}
+                    spaceBetween={10}
+                    className="px-0"
+                    onSlideChange={(swiper) => {
+                      const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
+                      const active = resolveLogicalSlide(raw);
+                      if (active) setSelectedPromptStyleId(active.sid);
+                    }}
+                  >
+                    {carouselSlides.map((slide) => {
+                      const isConteur = slide.canonicalCode === "conteur";
+                      return (
+                        <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
+                          <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-left text-sm leading-5 text-[#F0F0F0]/90 w-full">
+                            <div className="mb-2 flex items-center justify-between gap-1.5">
+                              <div className="flex items-center gap-1.5">
+                                {slide.icon ? (
+                                  <span
+                                    className={`shrink-0 text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
+                                    aria-hidden
+                                  >
+                                    {slide.icon}
+                                  </span>
+                                ) : null}
+                                <span className="inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-5 text-white">
+                                  {slide.label}
+                                </span>
+                              </div>
+                              <TtsPlayButton
+                                isPlaying={tts.isSpeaking && tts.speakingText === slide.text}
+                                onPress={() => tts.speak(slide.text, language)}
+                                supported={tts.supported}
+                              />
+                            </div>
+                            <VisitorMediationMarkdown
+                              text={slide.text}
+                              verseMode={slide.canonicalCode === "poetique"}
+                              className="text-left"
+                            />
+                          </article>
+                        </SwiperSlide>
+                      );
+                    })}
+                  </Swiper>
+                </div>
+
+                {/* Zone cliquable droite — toute la hauteur du carrousel */}
+                <button
                   type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 rounded-full border-white/20 bg-white/5 text-[#F0F0F0] hover:bg-white/10 hover:text-white"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_next")}
                   onClick={goMediationNext}
+                  className="absolute right-0 top-0 bottom-0 z-10 w-8 flex items-start justify-center pt-3 text-[#E63946]/50 transition-all duration-200 hover:text-[#E63946] hover:bg-[#E63946]/8 rounded-r-2xl disabled:pointer-events-none disabled:opacity-20"
                 >
-                  <ChevronRight className="h-5 w-5" aria-hidden />
-                </Button>
+                  <ChevronRight className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                </button>
               </div>
 
-              <Swiper
-                key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
-                onSwiper={(swiper) => {
-                  mediationMainSwiperRef.current = swiper;
-                }}
-                loop={mediationSwiperLoop}
-                loopAdditionalSlides={2}
-                watchSlidesProgress
-                centeredSlides
-                autoHeight
-                slidesPerView={1}
-                spaceBetween={10}
-                className="mt-2 px-5"
-                onSlideChange={(swiper) => {
-                  const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
-                  const active = resolveLogicalSlide(raw);
-                  if (active) setSelectedPromptStyleId(active.sid);
-                }}
-              >
-                {carouselSlides.map((slide) => {
-                  const isConteur = slide.canonicalCode === "conteur";
-                  return (
-                  <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
-                    <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-sm leading-relaxed text-[#F0F0F0]/90">
-                      <div className="mb-2 flex items-center gap-1.5">
-                        {slide.icon ? (
-                          <span
-                            className={`shrink-0 text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
-                            aria-hidden
-                          >
-                            {slide.icon}
-                          </span>
-                        ) : null}
-                        <span className="inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-relaxed text-white">
-                          {slide.label}
-                        </span>
-                      </div>
-                      <VisitorMediationMarkdown
-                        text={slide.text}
-                        verseMode={slide.canonicalCode === "poetique"}
-                      />
-                    </article>
-                  </SwiperSlide>
-                  );
-                })}
-              </Swiper>
             </>
           )}
         </div>
 
+        {quickFeedbackHint && quickFeedbackHintMessageKey ? (
+          <div
+            className="mx-4 mt-4 animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-300 sm:mx-5"
+            role="status"
+            aria-live="assertive"
+            aria-label={t("aria_missing_selection")}
+          >
+            <div className="relative overflow-hidden rounded-2xl border-[3px] border-[#E63946] bg-white px-4 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.45),0_0_0_6px_rgba(230,57,70,0.18)]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#E63946] via-[#ff6b6b] to-[#E63946]" aria-hidden />
+              <div className="flex items-start gap-3">
+                <span
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#E63946] text-xl text-white shadow-md"
+                  aria-hidden
+                >
+                  💛
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-extrabold leading-tight tracking-tight text-[#E63946] sm:text-lg">
+                    {t("quick_feedback_title")}
+                  </p>
+                  <p className="mt-1.5 text-sm font-medium leading-snug text-[#1a1a1a] sm:text-[15px]">
+                    {t(quickFeedbackHintMessageKey)}
+                  </p>
+                </div>
+                <ChevronDown
+                  className="mt-0.5 h-7 w-7 shrink-0 animate-bounce text-[#E63946]"
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Emotion feedback */}
         <div
           ref={emotionSectionRef}
-          className={`œuvre-full-width-box mt-2 space-y-3 px-5 rounded-xl transition-all duration-200 ${
-            quickFeedbackMessage ? "border-2 border-[#E63946] bg-[#E63946]/5" : "border-2 border-transparent"
+          className={`œuvre-full-width-box mt-2 space-y-3 px-5 rounded-xl transition-all duration-300 ${
+            quickFeedbackHint === "both" || quickFeedbackHint === "emotion"
+              ? "border-2 border-[#E63946] bg-[#E63946]/10 shadow-[0_0_0_4px_rgba(230,57,70,0.12)]"
+              : "border-2 border-transparent"
           }`}
         >
           <div className="flex items-center gap-2">
@@ -1396,8 +1520,10 @@ const VisitorView = () => {
 
         {/* Heart rating */}
         <div
-          className={`œuvre-full-width-box !mt-[10px] space-y-2 px-5 rounded-xl transition-all duration-200 ${
-            quickFeedbackMessage ? "border-2 border-[#E63946] bg-[#E63946]/5" : "border-2 border-transparent"
+          className={`œuvre-full-width-box !mt-[10px] space-y-2 px-5 rounded-xl transition-all duration-300 ${
+            quickFeedbackHint === "both" || quickFeedbackHint === "heart"
+              ? "border-2 border-[#E63946] bg-[#E63946]/10 shadow-[0_0_0_4px_rgba(230,57,70,0.12)]"
+              : "border-2 border-transparent"
           }`}
         >
           <p className="font-bold text-[14px] text-[#F0F0F0]">{t("heart_rating_title")}</p>
@@ -1469,28 +1595,6 @@ const VisitorView = () => {
                 {submittingFeedback ? t("btn_saving") : t("btn_validate")}
               </Button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {quickFeedbackMessage && (
-        <div
-          className="pointer-events-none fixed left-1/2 z-[130] w-full max-w-[360px] -translate-x-1/2 px-4"
-          style={{ top: `${quickFeedbackTop}px` }}
-        >
-          <div
-            className="rounded-xl border border-black/10 bg-white px-4 py-3 text-center shadow-xl"
-            role="status"
-            aria-live="polite"
-            aria-label={t("aria_missing_selection")}
-          >
-            <p className="text-sm font-semibold text-[#9D2525]">{quickFeedbackMessage}</p>
-            <p
-              className="mt-1 block w-full overflow-hidden whitespace-nowrap text-xs font-bold leading-none tracking-tight text-[#E63946]"
-              aria-hidden
-            >
-              {"↓ ".repeat(80)}
-            </p>
           </div>
         </div>
       )}
@@ -1681,6 +1785,13 @@ const VisitorView = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {tts.showConsentModal && (
+        <TtsConsentModal
+          onGrant={tts.grantConsent}
+          onDismiss={tts.dismissConsent}
+        />
       )}
     </div>
   );

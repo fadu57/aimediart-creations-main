@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Building2, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +84,8 @@ export type SponsorDialogProps = {
   /** null = mode global (tous les expos) */
   expoId?: string | null;
   expoName?: string;
+  /** Si fourni, ouvre directement la fiche de ce sponsor */
+  initialSponsorId?: string | null;
 };
 
 // ─── Upload logo ─────────────────────────────────────────────────────────────
@@ -95,7 +108,9 @@ export function SponsorDialog({
   onOpenChange,
   expoId = null,
   expoName = "",
+  initialSponsorId = null,
 }: SponsorDialogProps) {
+  const { t } = useTranslation("sponsors");
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"list" | "form">("list");
@@ -105,7 +120,10 @@ export function SponsorDialog({
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  /** Sponsor en attente de confirmation de suppression (liste ou formulaire) */
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; nom: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handledInitialRef = useRef<string | null>(null);
 
   // ── Chargement ─────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -117,7 +135,7 @@ export function SponsorDialog({
       if (error) throw error;
       setSponsors((data as Sponsor[]) ?? []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Impossible de charger les sponsors.");
+      toast.error(e instanceof Error ? e.message : t("errors.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -128,6 +146,19 @@ export function SponsorDialog({
     setView("list");
     void load();
   }, [open, load]);
+
+  // Ouvre directement la fiche sponsor quand initialSponsorId est fourni et les données chargées
+  useEffect(() => {
+    if (!open || !initialSponsorId || sponsors.length === 0) return;
+    if (handledInitialRef.current === initialSponsorId) return;
+    const target = sponsors.find((s) => s.id === initialSponsorId);
+    if (target) {
+      handledInitialRef.current = initialSponsorId;
+      openEdit(target);
+    }
+  // openEdit est stable dans ce scope — on supprime le warning exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialSponsorId, sponsors]);
 
   // ── Helpers formulaire ─────────────────────────────────────
   const set = (key: keyof FormValues, val: string) =>
@@ -171,12 +202,12 @@ export function SponsorDialog({
   // ── Sauvegarde ─────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.nom_sponsor.trim()) {
-      toast.error("Le nom du sponsor est obligatoire.");
+      toast.error(t("errors.nameRequired"));
       return;
     }
     const parsedAmount = form.amount.trim() ? parseFloat(form.amount) : null;
     if (form.amount.trim() && (isNaN(parsedAmount!) || parsedAmount! < 0)) {
-      toast.error("Le montant doit être un nombre positif.");
+      toast.error(t("errors.amountInvalid"));
       return;
     }
     setSaving(true);
@@ -202,7 +233,7 @@ export function SponsorDialog({
           .update({ ...payload, url_logo_sponsor: logoUrl })
           .eq("id", editingId);
         if (error) throw error;
-        toast.success("Sponsor mis à jour.");
+        toast.success(t("toast.updated"));
       } else {
         const newId = crypto.randomUUID();
         if (logoFile) logoUrl = await uploadSponsorLogo(logoFile, newId);
@@ -214,14 +245,14 @@ export function SponsorDialog({
           url_logo_sponsor: logoUrl,
         });
         if (error) throw error;
-        toast.success("Sponsor ajouté.");
+        toast.success(t("toast.added"));
       }
       await load();
       setView("list");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("[SponsorDialog] save error:", e);
-      toast.error(msg || "Erreur lors de l'enregistrement.");
+      toast.error(msg || t("errors.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -233,10 +264,10 @@ export function SponsorDialog({
     try {
       const { error } = await supabase.from("sponsors").delete().eq("id", id);
       if (error) throw error;
-      toast.success("Sponsor supprimé.");
+      toast.success(t("toast.deleted"));
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur lors de la suppression.");
+      toast.error(e instanceof Error ? e.message : t("errors.deleteFailed"));
     } finally {
       setDeleting(null);
     }
@@ -246,17 +277,17 @@ export function SponsorDialog({
   const dialogTitle =
     view === "list"
       ? expoId
-        ? `Sponsors / Mécènes — ${expoName}`
-        : "Sponsors / Mécènes — toutes les expositions"
+        ? t("title.listExpo", { name: expoName })
+        : t("title.listAll")
       : editingId
-        ? "Modifier le sponsor"
-        : "Nouveau sponsor";
+        ? t("title.edit")
+        : t("title.new");
 
   // ── Rendu ──────────────────────────────────────────────────
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* On garde le DialogContent par défaut (p-6, max-w-lg) sans le surcharger */}
-      <DialogContent aria-describedby={undefined} className="max-w-lg">
+      <DialogContent aria-describedby={undefined} className="!w-auto min-w-[420px] max-w-[90vw]">
         <DialogTitle className="text-base font-semibold leading-tight">
           {dialogTitle}
         </DialogTitle>
@@ -273,8 +304,7 @@ export function SponsorDialog({
                 </div>
               ) : sponsors.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Aucun sponsor enregistré
-                  {expoId ? " pour cette exposition" : ""}.
+                  {expoId ? t("list.emptyExpo") : t("list.empty")}
                 </p>
               ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
@@ -311,7 +341,7 @@ export function SponsorDialog({
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          title="Modifier"
+                          title={t("list.editTitle")}
                           onClick={() => openEdit(s)}
                         >
                           <Pencil className="h-3.5 w-3.5" aria-hidden />
@@ -322,8 +352,8 @@ export function SponsorDialog({
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           disabled={deleting === s.id}
-                          title="Supprimer"
-                          onClick={() => void handleDelete(s.id)}
+                          title={t("form.delete")}
+                          onClick={() => setPendingDelete({ id: s.id, nom: s.nom_sponsor })}
                         >
                           {deleting === s.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -344,7 +374,7 @@ export function SponsorDialog({
                   onClick={openNew}
                 >
                   <Plus className="mr-2 h-4 w-4" aria-hidden />
-                  Ajouter un sponsor / mécène
+                  {t("list.addBtn")}
                 </Button>
               )}
             </div>
@@ -370,7 +400,7 @@ export function SponsorDialog({
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="mr-2 h-3.5 w-3.5" aria-hidden />
-                    {logoPreview ? "Changer le logo" : "Télécharger un logo"}
+                    {logoPreview ? t("form.changeLogo") : t("form.uploadLogo")}
                   </Button>
                   <input
                     ref={fileInputRef}
@@ -379,34 +409,34 @@ export function SponsorDialog({
                     className="hidden"
                     onChange={handleLogoChange}
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WebP ou SVG · 2 Mo max</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("form.logoHint")}</p>
                 </div>
               </div>
 
               {/* Nom */}
               <div className="space-y-1">
                 <Label className="text-xs">
-                  Nom du sponsor <span className="text-destructive">*</span>
+                  {t("form.nameLabel")} <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   value={form.nom_sponsor}
                   onChange={(e) => set("nom_sponsor", e.target.value)}
-                  placeholder="Nom de l'organisation…"
+                  placeholder={t("form.namePlaceholder")}
                 />
               </div>
 
               {/* Contact + Tel */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Contact</Label>
+                  <Label className="text-xs">{t("form.contactLabel")}</Label>
                   <Input
                     value={form.contact_sponsor}
                     onChange={(e) => set("contact_sponsor", e.target.value)}
-                    placeholder="Nom du contact"
+                    placeholder={t("form.contactPlaceholder")}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Téléphone</Label>
+                  <Label className="text-xs">{t("form.phoneLabel")}</Label>
                   <Input
                     value={form.tel_sponsor}
                     onChange={(e) => set("tel_sponsor", e.target.value)}
@@ -417,7 +447,7 @@ export function SponsorDialog({
 
               {/* Email */}
               <div className="space-y-1">
-                <Label className="text-xs">Email</Label>
+                <Label className="text-xs">{t("form.emailLabel")}</Label>
                 <Input
                   type="email"
                   value={form.mail_sponsor}
@@ -428,7 +458,7 @@ export function SponsorDialog({
 
               {/* Adresse */}
               <div className="space-y-1">
-                <Label className="text-xs">Adresse</Label>
+                <Label className="text-xs">{t("form.addressLabel")}</Label>
                 <Input
                   value={form.adresse_sponsor}
                   onChange={(e) => set("adresse_sponsor", e.target.value)}
@@ -436,14 +466,14 @@ export function SponsorDialog({
               </div>
               <div className="grid grid-cols-[100px_1fr] gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Code postal</Label>
+                  <Label className="text-xs">{t("form.zipLabel")}</Label>
                   <Input
                     value={form.zipcode_sponsor}
                     onChange={(e) => set("zipcode_sponsor", e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Ville</Label>
+                  <Label className="text-xs">{t("form.cityLabel")}</Label>
                   <Input
                     value={form.city_sponsor}
                     onChange={(e) => set("city_sponsor", e.target.value)}
@@ -454,18 +484,19 @@ export function SponsorDialog({
               {/* Montant + Devise */}
               <div className="grid grid-cols-[1fr_120px] gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Montant du mécénat</Label>
+                  <Label className="text-xs">{t("form.amountLabel")}</Label>
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
                     placeholder="0.00"
+                    className="text-right"
                     value={form.amount}
                     onChange={(e) => set("amount", e.target.value)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Devise</Label>
+                  <Label className="text-xs">{t("form.currencyLabel")}</Label>
                   <Select value={form.currency} onValueChange={(v) => set("currency", v)}>
                     <SelectTrigger className="h-10">
                       <SelectValue />
@@ -481,13 +512,13 @@ export function SponsorDialog({
 
               {/* Description */}
               <div className="space-y-1">
-                <Label className="text-xs">Description / présentation</Label>
+                <Label className="text-xs">{t("form.descLabel")}</Label>
                 <Textarea
                   rows={3}
                   value={form.descrip_sponsor}
                   onChange={(e) => set("descrip_sponsor", e.target.value)}
                   className="resize-none"
-                  placeholder="Présentation du sponsor, nature du soutien…"
+                  placeholder={t("form.descPlaceholder")}
                 />
               </div>
 
@@ -500,8 +531,21 @@ export function SponsorDialog({
                   disabled={saving}
                   onClick={() => setView("list")}
                 >
-                  ← Annuler
+                  ← {t("form.cancel")}
                 </Button>
+                {editingId && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={saving || deleting === editingId}
+                    onClick={() => setPendingDelete({ id: editingId!, nom: form.nom_sponsor })}
+                  >
+                    {deleting === editingId
+                      ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      : <Trash2 className="h-4 w-4" aria-hidden />}
+                    {t("form.delete")}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   className="flex-1 gradient-gold gradient-gold-hover-bg text-primary-foreground"
@@ -509,7 +553,7 @@ export function SponsorDialog({
                   onClick={() => void handleSave()}
                 >
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
-                  {editingId ? "Enregistrer" : "Ajouter"}
+                  {editingId ? t("form.save") : t("form.add")}
                 </Button>
               </div>
             </div>
@@ -517,5 +561,37 @@ export function SponsorDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={!!pendingDelete} onOpenChange={(v) => { if (!v) setPendingDelete(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("deleteConfirm.title")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("deleteConfirm.description", { name: pendingDelete?.nom ?? "" })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={!!deleting}>
+            {t("deleteConfirm.cancel")}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={!!deleting}
+            onClick={() => {
+              if (!pendingDelete) return;
+              const { id } = pendingDelete;
+              setPendingDelete(null);
+              void handleDelete(id).then(() => {
+                if (view === "form") setView("list");
+              });
+            }}
+          >
+            {!!deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
+            {t("deleteConfirm.confirm")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

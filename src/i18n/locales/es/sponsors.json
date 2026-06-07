@@ -1,0 +1,54 @@
+{
+  "title": {
+    "listExpo": "Patrocinadores / Mecenas — {{name}}",
+    "listAll": "Patrocinadores / Mecenas — todas las exposiciones",
+    "edit": "Editar ficha del patrocinador / mecenas",
+    "new": "Nuevo patrocinador / mecenas"
+  },
+  "list": {
+    "empty": "Ningún patrocinador registrado.",
+    "emptyExpo": "Ningún patrocinador registrado para esta exposición.",
+    "editTitle": "Editar",
+    "addBtn": "Añadir un patrocinador / mecenas"
+  },
+  "form": {
+    "changeLogo": "Cambiar el logo",
+    "uploadLogo": "Subir un logo",
+    "logoHint": "PNG, JPG, WebP o SVG · 2 MB máx.",
+    "nameLabel": "Nombre del patrocinador",
+    "namePlaceholder": "Nombre de la organización…",
+    "contactLabel": "Contacto",
+    "contactPlaceholder": "Nombre del contacto",
+    "phoneLabel": "Teléfono",
+    "emailLabel": "Correo electrónico",
+    "addressLabel": "Dirección",
+    "zipLabel": "Código postal",
+    "cityLabel": "Ciudad",
+    "amountLabel": "Importe comprometido",
+    "currencyLabel": "Divisa",
+    "descLabel": "Descripción / presentación",
+    "descPlaceholder": "Presentación del patrocinador, naturaleza del apoyo…",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "add": "Añadir"
+  },
+  "errors": {
+    "nameRequired": "El nombre del patrocinador es obligatorio.",
+    "amountInvalid": "El importe debe ser un número positivo.",
+    "loadFailed": "No se pueden cargar los patrocinadores.",
+    "saveFailed": "Error al guardar el registro.",
+    "deleteFailed": "Error al eliminar el patrocinador."
+  },
+  "toast": {
+    "updated": "Patrocinador actualizado.",
+    "added": "Patrocinador añadido.",
+    "deleted": "Patrocinador eliminado."
+  },
+  "deleteConfirm": {
+    "title": "¿Eliminar este patrocinador?",
+    "description": "La eliminación de «\u00a0{{name}}\u00a0» es definitiva. Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "confirm": "Eliminar"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "title": {
+    "listExpo": "Sponsoren / Mäzene — {{name}}",
+    "listAll": "Sponsoren / Mäzene — alle Ausstellungen",
+    "edit": "Sponsor- / Mäzenprofil bearbeiten",
+    "new": "Neuer Sponsor / Mäzen"
+  },
+  "list": {
+    "empty": "Kein Sponsor eingetragen.",
+    "emptyExpo": "Kein Sponsor für diese Ausstellung eingetragen.",
+    "editTitle": "Bearbeiten",
+    "addBtn": "Sponsor / Mäzen hinzufügen"
+  },
+  "form": {
+    "changeLogo": "Logo ändern",
+    "uploadLogo": "Logo hochladen",
+    "logoHint": "PNG, JPG, WebP oder SVG · max. 2 MB",
+    "nameLabel": "Sponsorname",
+    "namePlaceholder": "Organisationsname…",
+    "contactLabel": "Kontakt",
+    "contactPlaceholder": "Kontaktname",
+    "phoneLabel": "Telefon",
+    "emailLabel": "E-Mail",
+    "addressLabel": "Adresse",
+    "zipLabel": "Postleitzahl",
+    "cityLabel": "Stadt",
+    "amountLabel": "Zugesagter Betrag",
+    "currencyLabel": "Währung",
+    "descLabel": "Beschreibung / Präsentation",
+    "descPlaceholder": "Sponsorvorstellung, Art der Unterstützung…",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "add": "Hinzufügen"
+  },
+  "errors": {
+    "nameRequired": "Der Sponsorname ist erforderlich.",
+    "amountInvalid": "Der Betrag muss eine positive Zahl sein.",
+    "loadFailed": "Sponsoren konnten nicht geladen werden.",
+    "saveFailed": "Fehler beim Speichern.",
+    "deleteFailed": "Fehler beim Löschen des Sponsors."
+  },
+  "toast": {
+    "updated": "Sponsor aktualisiert.",
+    "added": "Sponsor hinzugefügt.",
+    "deleted": "Sponsor gelöscht."
+  },
+  "deleteConfirm": {
+    "title": "Diesen Sponsor löschen?",
+    "description": "Das Löschen von «\u00a0{{name}}\u00a0» ist endgültig. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "cancel": "Abbrechen",
+    "confirm": "Löschen"
+  }
+}

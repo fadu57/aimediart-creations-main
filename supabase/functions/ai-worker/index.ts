@@ -6,6 +6,10 @@ import {
   jsonResponse,
 } from '../_shared/cors.ts';
 import { getServiceRoleClient } from '../_shared/supabaseAdmin.ts';
+import {
+  insertAiUsageLog,
+  tokensFromGroqOpenAiUsage,
+} from '../_shared/ai_usage_log.ts';
 
 type AiJob = {
   id: string;
@@ -24,6 +28,61 @@ type AiJob = {
 type WorkerBody = {
   job_id?: string;
 };
+
+/** Journalise la consommation Groq sans bloquer le job principal. */
+async function logGroqUsageSafe(
+  supabase: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  params: {
+    job: AiJob;
+    completion: { model?: string; usage?: unknown };
+    payload: Record<string, unknown>;
+  },
+): Promise<void> {
+  const { job, completion, payload } = params;
+  const modelId = (completion.model ?? job.model ?? '').trim();
+  if (!modelId) {
+    console.warn('[ai-worker] usage log skipped: model_id vide', { job_id: job.id, job_type: job.job_type });
+    return;
+  }
+
+  const usageMissing = completion.usage == null;
+  if (usageMissing) {
+    console.warn('[ai-worker] Groq usage absent dans la réponse', {
+      job_id: job.id,
+      job_type: job.job_type,
+      model_id: modelId,
+    });
+  }
+
+  const tok = tokensFromGroqOpenAiUsage(completion.usage);
+  const artworkId =
+    typeof payload.ficheId === 'string' ? payload.ficheId
+    : typeof payload.artwork_id === 'string' ? payload.artwork_id
+    : null;
+
+  try {
+    await insertAiUsageLog(supabase, {
+      model_id: modelId,
+      provider: 'groq',
+      prompt_tokens: tok.prompt_tokens,
+      completion_tokens: tok.completion_tokens,
+      total_tokens: tok.total_tokens,
+      artwork_id: artworkId,
+      metadata: {
+        job_type: job.job_type,
+        source_function: 'ai-worker',
+        job_id: job.id,
+        ...(usageMissing ? { usage_missing: true } : {}),
+      },
+    });
+  } catch (logErr) {
+    console.error('[ai-worker] insertAiUsageLog failed (non-blocking)', {
+      job_id: job.id,
+      job_type: job.job_type,
+      error: logErr instanceof Error ? logErr.message : String(logErr),
+    });
+  }
+}
 
 function getGroqClient(): Groq | null {
   const apiKey = Deno.env.get('GROQ_API_KEY')?.trim();
@@ -284,6 +343,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.log(
       `[ai-worker] Groq done job=${job.id} textLen=${text.length}`,
     );
+
+    await logGroqUsageSafe(supabase, { job, completion, payload });
 
     // Write-back expo_descript_i18n si translate_fiche avec expo_id + targetLang
     if (

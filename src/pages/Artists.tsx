@@ -178,6 +178,15 @@ const Artists = () => {
         </div>
       </div>
 
+      <div className="rounded-xl border border-white/10 bg-white/5 px-1.5 py-1.5 text-sm text-[#F0F0F0]/80">
+        <p className="leading-[18px]">
+          {t("info_shared_profiles")}
+        </p>
+        <p className="font-semibold leading-[18px]" style={{ color: "#D99726" }}>
+          {t("info_bio_only")}
+        </p>
+      </div>
+
       <AddArtistDialog
         open={dialogOpen}
         onOpenChange={(o) => {

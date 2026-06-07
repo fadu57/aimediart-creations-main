@@ -29,6 +29,13 @@ export default defineConfig(({ mode }) => {
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/api/fx-rate": {
+        target: "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fx-rate/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

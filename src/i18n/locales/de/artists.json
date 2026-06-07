@@ -93,5 +93,13 @@
   "tableau_warning": "ACHTUNG - Die Löschung ist endgültig. Löschen Sie mit größter Sorgfalt, da Sie sonst Probleme mit Ihrer Anwendung riskieren",
   "tableau_cancel": "Abbrechen",
   "tableau_confirm": "Löschen",
-  "tableau_archiving": "Archivierung..."
+  "tableau_archiving": "Archivierung...",
+
+  "btn_report_error": "Fehler melden",
+  "btn_report_error_title": "Falsche Informationen dem aimediart-Team melden",
+  "btn_report_error_email_subject": "Künstlerprofil: fehlerhafte Information(en)",
+  "bio_regen": "✨ Neu generieren (KI)",
+  "bio_new": "✏️ Neue Bio",
+  "info_shared_profiles": "Künstlerprofile werden von allen gemeinsam genutzt. Sie können ergänzt (fehlende Informationen), aber nicht gelöscht werden. Bei einem Fehler in bereits eingetragenen Informationen klicken Sie bitte auf «\u00a0Fehler melden\u00a0» im Profil.",
+  "info_bio_only": "Nur die Biografie kann für Ihre Organisation neu geschrieben werden."
 }

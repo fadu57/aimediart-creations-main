@@ -4,14 +4,26 @@ import { Trans, useTranslation } from "react-i18next";
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { UiLanguageSelector } from "@/components/UiLanguageSelector";
 import { VisitorLinkCodeDialog } from "@/components/visitor/VisitorLinkCodeDialog";
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { supabase } from "@/lib/supabase";
+import {
+  fetchExpoRowForVisitor,
+  mapExpoRowToInfo,
+  type VisitorExpoInfo,
+} from "@/lib/visitorExpoFetch";
+import { markVisitorExpoGateDone } from "@/lib/visitorExpoGateSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import {
@@ -33,13 +45,17 @@ function buildQuery(expoId: string): string {
   return `?expo_id=${encodeURIComponent(expoId)}`;
 }
 
-type ExpoInfo = {
-  expo_name: string;
-  logo_expo: string | null;
-  date_expo_du: string | null;
-  date_expo_au: string | null;
-  expo_descript_i18n: string | Record<string, string> | null;
-};
+function buildPostGatePath(artworkId: string, expoId: string): string {
+  if (artworkId) {
+    const params = new URLSearchParams();
+    if (expoId) params.set("expo_id", expoId);
+    const query = params.toString();
+    return `/artwork/${encodeURIComponent(artworkId)}${query ? `?${query}` : ""}`;
+  }
+  return `/scan-work1${buildQuery(expoId)}`;
+}
+
+type ExpoInfo = VisitorExpoInfo;
 
 function formatExpoDates(du: string | null, au: string | null, locale: string): string {
   const fmt = (d: string) =>
@@ -52,10 +68,9 @@ function formatExpoDates(du: string | null, au: string | null, locale: string): 
   return "";
 }
 
-function extractExpoDescription(
+function resolveExpoDescriptionText(
   raw: string | Record<string, string> | null | undefined,
   lang: string,
-  maxChars = 1000,
 ): string | null {
   if (!raw) return null;
   let text: string | null = null;
@@ -69,8 +84,12 @@ function extractExpoDescription(
       text = raw;
     }
   }
-  if (!text) return null;
-  return text.length > maxChars ? text.slice(0, maxChars) + "…" : text;
+  if (!text?.trim()) return null;
+  return text.trim();
+}
+
+function truncateExpoDescription(text: string, maxChars = 1000): string {
+  return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
 }
 
 type GateStep = "gate" | "avatar" | "welcome_back" | "recover";
@@ -88,7 +107,19 @@ const VisitorWelcome = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expoId = useMemo(() => searchParams.get("expo_id")?.trim() ?? "", [searchParams]);
-  const qs = buildQuery(expoId);
+  const artworkId = useMemo(
+    () => searchParams.get("artwork_id")?.trim() ?? searchParams.get("artworkId")?.trim() ?? "",
+    [searchParams],
+  );
+  const [activeExpoId, setActiveExpoId] = useState("");
+  const [expoInfoLoading, setExpoInfoLoading] = useState(false);
+  const effectiveExpoId = expoId || activeExpoId;
+  const qs = buildQuery(effectiveExpoId);
+  const hasExpoLandingContext = Boolean(expoId || artworkId);
+  const postGatePath = useMemo(
+    () => buildPostGatePath(artworkId, effectiveExpoId),
+    [artworkId, effectiveExpoId],
+  );
 
   const [autoDetecting, setAutoDetecting] = useState(true);
   const [step, setStep] = useState<GateStep>("gate");
@@ -108,17 +139,24 @@ const VisitorWelcome = () => {
   const [freshLinkCode, setFreshLinkCode] = useState<{ code: string; display: string } | null>(null);
   const [pendingScanNavigate, setPendingScanNavigate] = useState(false);
   const [expoInfo, setExpoInfo] = useState<ExpoInfo | null>(null);
+  const [descriptionPopupOpen, setDescriptionPopupOpen] = useState(false);
 
-  const expoDescription = useMemo(
-    () => extractExpoDescription(expoInfo?.expo_descript_i18n, uiLanguage.slice(0, 2)),
+  const fullExpoDescription = useMemo(
+    () => resolveExpoDescriptionText(expoInfo?.expo_descript_i18n, uiLanguage.slice(0, 2)),
     [expoInfo, uiLanguage],
   );
+  const expoDescriptionPreview = useMemo(
+    () => (fullExpoDescription ? truncateExpoDescription(fullExpoDescription, 450) : null),
+    [fullExpoDescription],
+  );
+  const expoDescriptionTruncated = Boolean(fullExpoDescription && fullExpoDescription.length > 450);
+  const showExpoWelcome = Boolean(hasExpoLandingContext || effectiveExpoId || expoInfo);
 
   const handleLinkCodeDialogOpenChange = (open: boolean) => {
     setLinkCodeDialogOpen(open);
     if (!open && pendingScanNavigate) {
       setPendingScanNavigate(false);
-      navigate(`/scan-work1${qs}`, { replace: false });
+      navigate(postGatePath, { replace: false });
     }
   };
 
@@ -149,7 +187,13 @@ const VisitorWelcome = () => {
               selfieObjectPath: "",
             });
             setReturningIsAuth(true);
-            setStep("welcome_back");
+            if (hasExpoLandingContext) {
+              // Visiteur reconnu avec contexte expo → bypass gate
+              markVisitorExpoGateDone();
+              navigate(buildPostGatePath(artworkId, expoId), { replace: true });
+            } else {
+              setStep("welcome_back");
+            }
             return;
           }
         }
@@ -159,7 +203,13 @@ const VisitorWelcome = () => {
         if (!cancelled && known) {
           setReturningProfile(known);
           setReturningIsAuth(false);
-          setStep("welcome_back");
+          if (hasExpoLandingContext) {
+            // Visiteur reconnu avec contexte expo → bypass gate
+            markVisitorExpoGateDone();
+            navigate(buildPostGatePath(artworkId, expoId), { replace: true });
+          } else {
+            setStep("welcome_back");
+          }
         }
       } catch {
         // échec silencieux → afficher le portail
@@ -169,22 +219,43 @@ const VisitorWelcome = () => {
     };
     void run();
     return () => { cancelled = true; };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasExpoLandingContext, artworkId, expoId, navigate]);
 
-  // Charger les infos de l'exposition si un expo_id est présent
+  // Charger les infos de l'exposition (QR expo ou QR œuvre)
   useEffect(() => {
-    if (!expoId) return;
     let cancelled = false;
-    void supabase
-      .from("expos")
-      .select("expo_name, logo_expo, date_expo_du, date_expo_au, expo_descript_i18n")
-      .eq("id", expoId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled && data) setExpoInfo(data as ExpoInfo);
-      });
+    setExpoInfoLoading(true);
+
+    void (async () => {
+      let resolvedExpoId = expoId;
+      if (!resolvedExpoId && artworkId) {
+        const { data: artworkRow } = await supabase
+          .from("artworks")
+          .select("artwork_expo_id")
+          .eq("artwork_id", artworkId)
+          .maybeSingle();
+        if (cancelled) return;
+        resolvedExpoId = (artworkRow as { artwork_expo_id?: string | null } | null)?.artwork_expo_id?.trim() ?? "";
+      }
+      if (!resolvedExpoId) {
+        if (!cancelled) {
+          setActiveExpoId("");
+          setExpoInfo(null);
+          setExpoInfoLoading(false);
+        }
+        return;
+      }
+
+      const row = await fetchExpoRowForVisitor(resolvedExpoId);
+      if (cancelled) return;
+      setActiveExpoId(resolvedExpoId);
+      setExpoInfo(row ? mapExpoRowToInfo(row) : null);
+      setExpoInfoLoading(false);
+    })();
+
     return () => { cancelled = true; };
-  }, [expoId]);
+  }, [expoId, artworkId]);
 
   useEffect(() => {
     if (step !== "welcome_back" || !returningProfile) {
@@ -215,6 +286,7 @@ const VisitorWelcome = () => {
     "flex gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground";
 
   const handleQuickVisitStart = async () => {
+    markVisitorExpoGateDone();
     setQuickVisitBusy(true);
     try {
       getOrCreateVisitorUuid();
@@ -281,7 +353,8 @@ const VisitorWelcome = () => {
         keepSelfieObjectPath: profileToSave.selfieObjectPath,
       });
       setVisitorAnonymousProfile(profileToSave);
-      navigate(`/scan-work1${qs}`, { replace: false });
+      markVisitorExpoGateDone();
+      navigate(postGatePath, { replace: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.welcome_back.toast_failed");
       toast.error(msg);
@@ -343,9 +416,10 @@ const VisitorWelcome = () => {
         selfieFile: visitorPhotoFile,
       });
       setVisitorAnonymousProfile(profile);
+      markVisitorExpoGateDone();
       const deferred = await showRecoveryCodeAfterProfile();
       if (!deferred) {
-        navigate(`/scan-work1${qs}`, { replace: false });
+        navigate(postGatePath, { replace: false });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_failed");
@@ -494,19 +568,21 @@ const VisitorWelcome = () => {
             {expoInfo && (
               <div className="space-y-1.5 border-t border-border pt-3 text-center">
                 {expoInfo.logo_expo?.trim() ? (
-                  <img
-                    src={expoInfo.logo_expo}
-                    alt={expoInfo.expo_name}
-                    className="mx-auto mb-1 h-12 max-w-[180px] object-contain"
-                  />
+                  <div className="mx-auto flex max-w-[220px] justify-center rounded-xl border border-border/60 bg-white px-3 py-2">
+                    <img
+                      src={expoInfo.logo_expo}
+                      alt={expoInfo.expo_name}
+                      className="max-h-16 max-w-full object-contain"
+                    />
+                  </div>
                 ) : null}
                 <p className="text-sm font-semibold leading-snug">{expoInfo.expo_name}</p>
                 {expoDates ? (
                   <p className="text-xs text-muted-foreground">{expoDates}</p>
                 ) : null}
-                {expoDescription ? (
+                {fullExpoDescription ? (
                   <p className="line-clamp-6 text-left text-xs leading-relaxed text-muted-foreground">
-                    {expoDescription}
+                    {truncateExpoDescription(fullExpoDescription)}
                   </p>
                 ) : null}
               </div>
@@ -518,11 +594,14 @@ const VisitorWelcome = () => {
                 type="button"
                 className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
                 disabled={quickVisitBusy}
-                onClick={() =>
-                  returningIsAuth
-                    ? navigate(`/scan-work1${qs}`, { replace: false })
-                    : void handleWelcomeBackContinue()
-                }
+                onClick={() => {
+                  if (returningIsAuth) {
+                    markVisitorExpoGateDone();
+                    navigate(postGatePath, { replace: false });
+                    return;
+                  }
+                  void handleWelcomeBackContinue();
+                }}
               >
                 {quickVisitBusy ? (
                   <>
@@ -632,30 +711,144 @@ const VisitorWelcome = () => {
     );
   }
 
-  return (
-    <div className="flex w-full flex-1 flex-col items-center px-4 pb-24 pt-6">
-      <VisitorLinkCodeDialog
-        open={linkCodeDialogOpen}
-        onOpenChange={handleLinkCodeDialogOpenChange}
-        initialCode={freshLinkCode?.code}
-        initialDisplay={freshLinkCode?.display}
-        allowRegenerate={false}
-      />
-      <Card className="w-full max-w-[360px] border-border shadow-lg">
-        <CardHeader className="space-y-3 pb-2">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <div aria-hidden />
-            <div className="flex items-center justify-center gap-2 text-primary">
-              <Sparkles className="h-5 w-5 shrink-0" aria-hidden />
-              <span className="text-xs font-semibold uppercase tracking-wide">{t("visitor_gate.badge")}</span>
-            </div>
-            <div className="flex justify-end">
-              <UiLanguageSelector />
-            </div>
+  {
+    const expoName = expoInfo?.expo_name?.trim() ?? "";
+    const welcomeParts = expoName
+      ? t("visitor_gate.welcome_expo", { expo_name: "\x00" }).split("\x00")
+      : ["", ""];
+
+    return (
+      <div className="flex w-full flex-1 flex-col items-center">
+        <VisitorLinkCodeDialog
+          open={linkCodeDialogOpen}
+          onOpenChange={handleLinkCodeDialogOpenChange}
+          initialCode={freshLinkCode?.code}
+          initialDisplay={freshLinkCode?.display}
+          allowRegenerate={false}
+        />
+        <Dialog open={descriptionPopupOpen} onOpenChange={setDescriptionPopupOpen}>
+          <DialogContent
+            className="max-h-[80vh] w-[calc(100vw-2rem)] max-w-[360px] overflow-y-auto"
+            aria-describedby={undefined}
+          >
+            <DialogTitle className="font-serif text-lg">
+              {expoInfo?.expo_name?.trim() || t("visitor_gate.description_popup_title")}
+            </DialogTitle>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              {fullExpoDescription}
+            </p>
+          </DialogContent>
+        </Dialog>
+
+        {/* Header fixe : logo AIMEDIArt + boutons d'action */}
+        <header className="sticky top-0 z-20 flex w-full max-w-[360px] items-center gap-3 border-b border-border/40 bg-[#121212]/95 px-4 py-2 backdrop-blur-md">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <AimediartBrandLogoBlock size="sm" animateHeart backdrop />
+            <Link
+              to={`/login${qs}`}
+              className="pl-1 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {t("visitor_gate.login_existing")}
+            </Link>
           </div>
-          <CardTitle className="text-center font-serif text-xl leading-snug">{t("visitor_gate.aha")}</CardTitle>
-          <CardDescription className="text-center text-sm">{t("visitor_gate.lead")}</CardDescription>
-        </CardHeader>
+          <div className="ml-auto flex shrink-0 flex-col gap-1.5">
+            <Button
+              type="button"
+              className="h-8 w-[120px] px-3 text-[10px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
+              disabled={quickVisitBusy}
+              onClick={() => void handleQuickVisitStart()}
+            >
+              {quickVisitBusy ? (
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+              ) : (
+                t("visitor_gate.btn_quick")
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-[120px] px-3 text-[10px] !shadow-none"
+              asChild
+            >
+              <Link to={`/register_visitor${qs}`} onClick={() => markVisitorExpoGateDone()}>
+                {t("visitor_gate.btn_profile")}
+              </Link>
+            </Button>
+          </div>
+        </header>
+
+        <div className="w-full max-w-[360px] px-4 pb-24 pt-3">
+          <Card className="w-full border-border shadow-lg">
+            <CardHeader className="space-y-3 pb-2">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <div aria-hidden />
+                <div className="flex items-center justify-center gap-2 text-primary">
+                  <Sparkles className="h-5 w-5 shrink-0" aria-hidden />
+                  <span className="text-xs font-semibold uppercase tracking-wide">{t("visitor_gate.badge")}</span>
+                </div>
+                <div className="flex justify-end">
+                  <UiLanguageSelector />
+                </div>
+              </div>
+
+              {showExpoWelcome ? (
+                <div className="space-y-3 border-b border-border/60 pb-3">
+                  {expoInfoLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
+                      <span className="text-sm text-muted-foreground">{t("visitor_gate.expo_loading")}</span>
+                    </div>
+                  ) : expoName ? (
+                    <>
+                      {/* Logo (gauche) + texte de bienvenue (droite) */}
+                      <div className="flex items-center gap-3">
+                        {expoInfo!.logo_expo?.trim() ? (
+                          <div className="shrink-0 rounded-xl border border-border/60 bg-white p-0">
+                            <img
+                              src={expoInfo!.logo_expo}
+                              alt={expoName}
+                              className="h-16 w-20 object-contain"
+                            />
+                          </div>
+                        ) : null}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-serif text-base font-semibold leading-snug text-foreground">
+                            {welcomeParts[0]}
+                            <span className="text-[#E63946]">{expoName}</span>
+                            {welcomeParts[1]}
+                          </p>
+                          {formatExpoDates(expoInfo!.date_expo_du, expoInfo!.date_expo_au, uiLanguage) ? (
+                            <p className="text-xs text-muted-foreground">
+                              {formatExpoDates(expoInfo!.date_expo_du, expoInfo!.date_expo_au, uiLanguage)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      {/* Description (pleine largeur) */}
+                      {expoDescriptionPreview ? (
+                        <div className="mt-0 space-y-2 leading-3 rounded-lg border border-[rgba(231,57,70,0.6)] bg-muted/50 px-3 py-3 shadow-[8px_8px_12px_0px_rgba(0,0,0,0.15)]">
+                          <p className="text-sm leading-[18px] text-foreground">{expoDescriptionPreview}</p>
+                          {expoDescriptionTruncated ? (
+                            <button
+                              type="button"
+                              className="text-xs font-semibold text-primary underline-offset-2 hover:underline"
+                              onClick={() => setDescriptionPopupOpen(true)}
+                            >
+                              {t("visitor_gate.read_more")}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  ) : effectiveExpoId ? (
+                    <p className="text-center text-sm text-muted-foreground">{t("visitor_gate.expo_fallback")}</p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <CardTitle className="mt-0 text-left font-serif text-sm leading-snug">{t("visitor_gate.aha")}</CardTitle>
+              <CardDescription className="text-center text-sm">{t("visitor_gate.lead")}</CardDescription>
+            </CardHeader>
         <CardContent className="space-y-5 px-4 pb-4">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -664,53 +857,18 @@ const VisitorWelcome = () => {
             <ul className="space-y-2">
               <li className={benefitClass}>
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                <span>{t("visitor_gate.benefit_summary")}</span>
+                <span>{t("visitor_gate.benefit_summary")}*</span>
               </li>
               <li className={benefitClass}>
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                <span>{t("visitor_gate.benefit_artist")}</span>
+                <span>{t("visitor_gate.benefit_artist")}*</span>
               </li>
               <li className={benefitClass}>
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
                 <span>{t("visitor_gate.benefit_profile")}</span>
               </li>
+              <p className="text-[10px] text-muted-foreground">{t("visitor_gate.benefit_profile_wip")}</p>
             </ul>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              className="h-11 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              disabled={quickVisitBusy}
-              onClick={() => void handleQuickVisitStart()}
-            >
-              {quickVisitBusy ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                  {t("visitor_gate.quick_avatar.btn_loading")}
-                </>
-              ) : (
-                t("visitor_gate.btn_quick")
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 w-full"
-              disabled={quickVisitBusy}
-              onClick={() => {
-                setRecoveryCodeInput("");
-                setStep("recover");
-              }}
-            >
-              {t("visitor_gate.btn_recover")}
-            </Button>
-            <Button type="button" variant="outline" className="h-11 w-full" asChild>
-              <Link to={`/register_visitor${qs}`}>{t("visitor_gate.btn_profile")}</Link>
-            </Button>
-            <Button type="button" variant="ghost" className="h-9 w-full text-xs text-muted-foreground" asChild>
-              <Link to={`/login${qs}`}>{t("visitor_gate.login_existing")}</Link>
-            </Button>
           </div>
 
           <p className="text-center text-[11px] text-muted-foreground">
@@ -718,10 +876,12 @@ const VisitorWelcome = () => {
               {t("visitor_gate.link_organizer")}
             </Link>
           </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default VisitorWelcome;

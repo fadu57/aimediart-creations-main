@@ -265,18 +265,6 @@ export default function Header() {
         {isDesktopHeader && (
           <div className="ml-4 hidden shrink-0 flex-col items-end gap-1 xl:flex">
             <nav className="flex items-center gap-1">
-              {canSeeHomeMenu && (
-                <NavLink
-                  to={homePath}
-                  className={({ isActive }) =>
-                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
-                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                    }`
-                  }
-                >
-                  {t("nav_home")}
-                </NavLink>
-              )}
               {hasFullHeader &&
                 HEADER_NAV_ITEMS.map((item) => {
                   if (item.key === "menu_home") return null;
@@ -296,6 +284,18 @@ export default function Header() {
                     </NavLink>
                   );
                 })}
+              {canSeeHomeMenu && (
+                <NavLink
+                  to={homePath}
+                  className={({ isActive }) =>
+                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
+                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                    }`
+                  }
+                >
+                  {t("nav_home")}
+                </NavLink>
+              )}
               {hasFullHeader && canSeeSettings && (
                 <SettingsMenuDropdown triggerClassName={HEADER_NAV_PILL_BLUR} />
               )}

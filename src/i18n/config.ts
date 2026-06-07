@@ -126,6 +126,12 @@ import deTrash from "./locales/de/trash.json";
 import esTrash from "./locales/es/trash.json";
 import itTrash from "./locales/it/trash.json";
 
+import frSponsors from "./locales/fr/sponsors.json";
+import enSponsors from "./locales/en/sponsors.json";
+import deSponsors from "./locales/de/sponsors.json";
+import esSponsors from "./locales/es/sponsors.json";
+import itSponsors from "./locales/it/sponsors.json";
+
 import frSettings from "./locales/fr/settings.json";
 import enSettings from "./locales/en/settings.json";
 import deSettings from "./locales/de/settings.json";
@@ -145,15 +151,15 @@ function getInitialLanguage(): SupportedLang {
 
 i18n.use(initReactI18next).init({
   resources: {
-    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome, artwork_modal: frArtworkModal, visitor: frVisitor, auth: frAuth, trash: frTrash, settings: frSettings, landing: frLanding, cgv: frCgv, cookies: frCookies, privacy: frPrivacy, terms: frTerms, ai_policy: frAiPolicy, legal_pack: frLegalPack },
-    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome, artwork_modal: enArtworkModal, visitor: enVisitor, auth: enAuth, trash: enTrash, settings: enSettings, landing: enLanding, cgv: enCgv, cookies: enCookies, privacy: enPrivacy, terms: enTerms, ai_policy: enAiPolicy, legal_pack: enLegalPack },
-    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome, artwork_modal: deArtworkModal, visitor: deVisitor, auth: deAuth, trash: deTrash, settings: deSettings, landing: deLanding, cgv: deCgv, cookies: deCookies, privacy: dePrivacy, terms: deTerms, ai_policy: deAiPolicy, legal_pack: deLegalPack },
-    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome, artwork_modal: esArtworkModal, visitor: esVisitor, auth: esAuth, trash: esTrash, settings: esSettings, landing: esLanding, cgv: esCgv, cookies: esCookies, privacy: esPrivacy, terms: esTerms, ai_policy: esAiPolicy, legal_pack: esLegalPack },
-    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome, artwork_modal: itArtworkModal, visitor: itVisitor, auth: itAuth, trash: itTrash, settings: itSettings, landing: itLanding, cgv: itCgv, cookies: itCookies, privacy: itPrivacy, terms: itTerms, ai_policy: itAiPolicy, legal_pack: itLegalPack },
+    fr: { header: frHeader, catalogue: frCatalogue, artists: frArtists, statistiques: frStatistiques, agencies: frAgencies, expos: frExpos, utilisateurs: frUtilisateurs, home: frHome, artwork_modal: frArtworkModal, visitor: frVisitor, auth: frAuth, trash: frTrash, settings: frSettings, landing: frLanding, cgv: frCgv, cookies: frCookies, privacy: frPrivacy, terms: frTerms, ai_policy: frAiPolicy, legal_pack: frLegalPack, sponsors: frSponsors },
+    en: { header: enHeader, catalogue: enCatalogue, artists: enArtists, statistiques: enStatistiques, agencies: enAgencies, expos: enExpos, utilisateurs: enUtilisateurs, home: enHome, artwork_modal: enArtworkModal, visitor: enVisitor, auth: enAuth, trash: enTrash, settings: enSettings, landing: enLanding, cgv: enCgv, cookies: enCookies, privacy: enPrivacy, terms: enTerms, ai_policy: enAiPolicy, legal_pack: enLegalPack, sponsors: enSponsors },
+    de: { header: deHeader, catalogue: deCatalogue, artists: deArtists, statistiques: deStatistiques, agencies: deAgencies, expos: deExpos, utilisateurs: deUtilisateurs, home: deHome, artwork_modal: deArtworkModal, visitor: deVisitor, auth: deAuth, trash: deTrash, settings: deSettings, landing: deLanding, cgv: deCgv, cookies: deCookies, privacy: dePrivacy, terms: deTerms, ai_policy: deAiPolicy, legal_pack: deLegalPack, sponsors: deSponsors },
+    es: { header: esHeader, catalogue: esCatalogue, artists: esArtists, statistiques: esStatistiques, agencies: esAgencies, expos: esExpos, utilisateurs: esUtilisateurs, home: esHome, artwork_modal: esArtworkModal, visitor: esVisitor, auth: esAuth, trash: esTrash, settings: esSettings, landing: esLanding, cgv: esCgv, cookies: esCookies, privacy: esPrivacy, terms: esTerms, ai_policy: esAiPolicy, legal_pack: esLegalPack, sponsors: esSponsors },
+    it: { header: itHeader, catalogue: itCatalogue, artists: itArtists, statistiques: itStatistiques, agencies: itAgencies, expos: itExpos, utilisateurs: itUtilisateurs, home: itHome, artwork_modal: itArtworkModal, visitor: itVisitor, auth: itAuth, trash: itTrash, settings: itSettings, landing: itLanding, cgv: itCgv, cookies: itCookies, privacy: itPrivacy, terms: itTerms, ai_policy: itAiPolicy, legal_pack: itLegalPack, sponsors: itSponsors },
   },
   lng: getInitialLanguage(),
   fallbackLng: "fr",
-  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home", "artwork_modal", "visitor", "auth", "trash", "settings", "landing", "cgv", "cookies", "privacy", "terms", "ai_policy", "legal_pack"],
+  ns: ["header", "catalogue", "artists", "statistiques", "agencies", "expos", "utilisateurs", "home", "artwork_modal", "visitor", "auth", "trash", "settings", "landing", "cgv", "cookies", "privacy", "terms", "ai_policy", "legal_pack", "sponsors"],
   defaultNS: "header",
   interpolation: {
     escapeValue: false,

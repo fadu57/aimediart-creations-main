@@ -1,0 +1,1252 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from "recharts";
+import {
+  ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
+  Euro, Activity, TrendingUp, Award, RefreshCw, Search, CheckCircle2, XCircle, HelpCircle, History, ExternalLink,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  getCostEvents, getCostSummary, getCostBreakdownByProvider,
+  getCostTimeSeries, getCostSelectOptions, exportCostsCsv, formatCost, formatUsdToEurHint,
+  type CostEvent, type CostFilters, type CostSummary,
+  type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
+} from "@/lib/costs";
+import { supabase } from "@/lib/supabase";
+import { getUsdToEurRate } from "@/lib/fxRates";
+
+// ---------------------------------------------------------------------------
+// Types — Fournisseurs
+// ---------------------------------------------------------------------------
+
+type CostProvider = {
+  id: string;
+  provider_key: string;
+  provider_name: string;
+  category: string | null;
+  detected_in_code: boolean;
+  configured: boolean;
+  actively_used: boolean;
+  sync_supported: boolean;
+  cost_import_supported: boolean;
+  status: string;
+  last_detected_at: string | null;
+  last_synced_at: string | null;
+  last_sync_status: string | null;
+  last_sync_error: string | null;
+  notes: string | null;
+  metadata: Record<string, unknown>;
+  updated_at: string;
+};
+
+/** Fournisseurs suivis pour la sync de coûts (hors legacy OpenAI / SMTP / HF). */
+const COST_SYNC_PROVIDER_KEYS = ["groq", "google_gemini", "google_tts"] as const;
+
+/** Fournisseurs avec backfill historique dans l'UI. */
+const BACKFILL_PROVIDER_KEYS = ["groq", "google_gemini"] as const;
+type BackfillProviderKey = typeof BACKFILL_PROVIDER_KEYS[number];
+
+const GCP_BILLING_DOC_URL = "/downloads/GOOGLE-BILLING-COSTS.md";
+
+function BoolIcon({ ok, okLabel, noLabel }: { ok: boolean; okLabel: string; noLabel: string }) {
+  return ok
+    ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" aria-label={okLabel} />
+    : <XCircle className="h-4 w-4 text-muted-foreground/50 shrink-0" aria-label={noLabel} />;
+}
+
+function ProviderStatCell({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5 min-w-0 text-xs">{children}</div>
+    </div>
+  );
+}
+
+type BackfillPreset = "7d" | "30d" | "90d" | "custom";
+
+type ProvidersSyncResponse = {
+  success?: boolean;
+  synced?: number;
+  mode?: string;
+  results?: Array<{ provider_key: string; status: string; message: string }>;
+  message?: string;
+};
+
+function ymdDaysAgo(days: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function presetDateRange(preset: BackfillPreset): { from: string; to: string } {
+  if (preset === "custom") return { from: "", to: TODAY };
+  const days = preset === "7d" ? 7 : preset === "30d" ? 30 : 90;
+  return { from: ymdDaysAgo(days), to: TODAY };
+}
+
+async function parseInvokeError(error: unknown): Promise<string> {
+  if (!error || typeof error !== "object") return "Erreur inconnue.";
+  const err = error as { message?: string; context?: Response };
+  let detail = err.message ?? "Erreur inconnue.";
+  try {
+    if (err.context?.json) {
+      const body = await err.context.json() as Record<string, string>;
+      detail = body.details || body.error || body.message || detail;
+    }
+  } catch { /* ignore */ }
+  return detail;
+}
+
+async function invokeProvidersSyncCosts(body: Record<string, unknown>): Promise<ProvidersSyncResponse> {
+  const { data, error } = await supabase.functions.invoke("providers-sync-costs", { body });
+  if (error) throw new Error(await parseInvokeError(error));
+  return (data ?? {}) as ProvidersSyncResponse;
+}
+
+function billingModeLabel(p: CostProvider, t: (k: string) => string): string {
+  const mode = typeof p.metadata?.billing_mode === "string" ? p.metadata.billing_mode : null;
+  if (p.provider_key === "groq") return t("providers.billing_estimated");
+  if (p.provider_key === "google_gemini") {
+    return p.cost_import_supported
+      ? t("providers.billing_gcp_export")
+      : t("providers.billing_gcp_missing");
+  }
+  if (p.provider_key === "google_tts") {
+    if (p.metadata?.billing_mode === "no_server_cost" || p.metadata?.app_tts_engine === "web_speech_api") {
+      return t("providers.billing_tts_web_speech");
+    }
+    return t("providers.billing_tts_web_speech");
+  }
+  if (mode === "estimated_from_logs") return t("providers.billing_estimated");
+  return "—";
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const PAGE_SIZE = 50;
+const TODAY = new Date().toISOString().slice(0, 10);
+
+const EMPTY_FILTERS: CostFilters = {
+  dateFrom: "", dateTo: "", toolType: "", provider: "",
+  apiName: "", modelName: "", status: "", currency: "",
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function frDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("fr-FR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** Date ISO (YYYY-MM-DD) → jj/mm pour les axes de graphiques. */
+function chartDateFr(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}`;
+}
+
+function statusBadge(status: string) {
+  const classes: Record<string, string> = {
+    success: "bg-green-100 text-green-800",
+    error:   "bg-red-100 text-red-700",
+    partial: "bg-yellow-100 text-yellow-800",
+    timeout: "bg-orange-100 text-orange-700",
+  };
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${classes[status] ?? "bg-muted text-muted-foreground"}`}>
+      {status}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+type KpiCardProps = {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  eurHint?: string;
+  sub?: string;
+};
+function KpiCard({ icon: Icon, label, value, eurHint, sub }: KpiCardProps) {
+  return (
+    <Card className="glass-card">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2 shrink-0">
+            <Icon className="h-5 w-5 text-primary" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground font-medium truncate">{label}</p>
+            <div className="flex flex-wrap items-baseline gap-x-2 mt-0.5">
+              <span className="text-xl font-serif font-bold">{value}</span>
+              {eurHint && (
+                <span className="text-sm font-semibold text-emerald-700/90 dark:text-emerald-400/90 whitespace-nowrap">
+                  {eurHint}
+                </span>
+              )}
+            </div>
+            {sub && <p className="text-xs text-muted-foreground mt-0.5 truncate">{sub}</p>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type FiltersBarProps = {
+  filters: CostFilters;
+  options: CostSelectOptions;
+  onChange: (filters: CostFilters) => void;
+  onReset: () => void;
+  loading: boolean;
+};
+function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBarProps) {
+  const { t } = useTranslation("settings");
+
+  function set(key: keyof CostFilters, value: string) {
+    onChange({ ...filters, [key]: value });
+  }
+
+  const inputClass =
+    "block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  const labelClass = "block text-xs font-medium text-muted-foreground mb-1";
+
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/60 p-4 backdrop-blur-sm">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {/* Date début */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_date_from")}</label>
+          <input
+            type="date" value={filters.dateFrom ?? ""} max={filters.dateTo || TODAY}
+            onChange={(e) => {
+              const v = e.target.value;
+              set("dateFrom", v);
+              if (filters.dateTo && v > filters.dateTo) onChange({ ...filters, dateFrom: v, dateTo: "" });
+            }}
+            className={inputClass}
+          />
+        </div>
+
+        {/* Date fin */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_date_to")}</label>
+          <input
+            type="date" value={filters.dateTo ?? ""} min={filters.dateFrom || undefined} max={TODAY}
+            onChange={(e) => set("dateTo", e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        {/* Type d'outil */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_tool_type")}</label>
+          <select value={filters.toolType ?? ""} onChange={(e) => set("toolType", e.target.value)} className={inputClass}>
+            <option value="">{t("couts.filter_all")}</option>
+            {options.toolTypes.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        {/* Fournisseur */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_provider")}</label>
+          <select value={filters.provider ?? ""} onChange={(e) => set("provider", e.target.value)} className={inputClass}>
+            <option value="">{t("couts.filter_all")}</option>
+            {options.providers.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        {/* Modèle */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_model")}</label>
+          <select value={filters.modelName ?? ""} onChange={(e) => set("modelName", e.target.value)} className={inputClass}>
+            <option value="">{t("couts.filter_all")}</option>
+            {options.modelNames.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        {/* Statut */}
+        <div>
+          <label className={labelClass}>{t("couts.filter_status")}</label>
+          <select value={filters.status ?? ""} onChange={(e) => set("status", e.target.value)} className={inputClass}>
+            <option value="">{t("couts.filter_all")}</option>
+            {options.statuses.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+
+        {/* Bouton reset */}
+        <div className="flex items-end">
+          <Button
+            type="button" variant="outline" size="sm" onClick={onReset} disabled={loading}
+            className="w-full gap-2"
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+            {t("couts.filter_reset")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type CostsTableProps = {
+  events: CostEvent[];
+  loading: boolean;
+  error: string | null;
+  page: number;
+  total: number;
+  onPageChange: (p: number) => void;
+  onExport: () => void;
+  currency: string;
+};
+function CostsTable({ events, loading, error, page, total, onPageChange, onExport, currency }: CostsTableProps) {
+  const { t } = useTranslation("settings");
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary mr-3" aria-hidden />
+        <span className="text-sm text-muted-foreground">{t("settings_loading")}</span>
+      </div>
+    );
+  }
+
+  if (!loading && events.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <Euro className="h-10 w-10 text-muted-foreground/30 mb-3" aria-hidden />
+        <p className="font-medium text-muted-foreground">{t("couts.empty_title")}</p>
+        <p className="text-sm text-muted-foreground mt-1">{t("couts.empty_sub")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-muted-foreground">
+          {total.toLocaleString("fr-FR")} {t("couts.events_count")}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={onExport} className="gap-2">
+          <Download className="h-3.5 w-3.5" aria-hidden />
+          {t("couts.btn_export_csv")}
+        </Button>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-border/50">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/50 bg-muted/40">
+              {[
+                t("couts.col_date"), t("couts.col_tool_type"), t("couts.col_provider"),
+                t("couts.col_model"), t("couts.col_operation"), t("couts.col_cost"),
+                t("couts.col_units_in"), t("couts.col_units_out"), t("couts.col_unit_type"),
+                t("couts.col_status"), t("couts.col_source"),
+              ].map((h) => (
+                <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((e, i) => (
+              <tr
+                key={e.id}
+                className={`border-b border-border/30 transition-colors hover:bg-muted/20 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
+              >
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground font-mono">
+                  {frDate(e.created_at)}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
+                    {e.tool_type}
+                  </span>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap font-medium">{e.provider}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{e.model_name ?? "—"}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs">{e.operation_name ?? "—"}</td>
+                <td className="px-3 py-2 whitespace-nowrap font-mono font-semibold text-primary">
+                  {formatCost(e.cost_estimated, e.currency, 6)}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-mono">
+                  {e.input_units != null ? e.input_units.toLocaleString("fr-FR") : "—"}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-mono">
+                  {e.output_units != null ? e.output_units.toLocaleString("fr-FR") : "—"}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{e.unit_type ?? "—"}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{statusBadge(e.status)}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground max-w-[120px] truncate">
+                  {e.source ?? "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <Button
+            variant="outline" size="sm" disabled={page === 0}
+            onClick={() => onPageChange(page - 1)}
+          >
+            ‹ Préc.
+          </Button>
+          <span className="text-sm text-muted-foreground px-2">
+            {page + 1} / {totalPages}
+          </span>
+          <Button
+            variant="outline" size="sm" disabled={page >= totalPages - 1}
+            onClick={() => onPageChange(page + 1)}
+          >
+            Suiv. ›
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+// ProvidersSection
+// ---------------------------------------------------------------------------
+
+function providerStatusBadge(status: string) {
+  const cfg: Record<string, { cls: string; icon: React.ElementType; label: string }> = {
+    active:                    { cls: "bg-green-100 text-green-800",    icon: CheckCircle2, label: "Actif" },
+    configured_not_used:       { cls: "bg-orange-100 text-orange-700",  icon: AlertCircle,  label: "Non utilisé" },
+    inactive:                  { cls: "bg-gray-100 text-gray-600",      icon: XCircle,      label: "Inactif" },
+    unknown:                   { cls: "bg-gray-100 text-gray-500",      icon: HelpCircle,   label: "Inconnu" },
+    error:                     { cls: "bg-red-100 text-red-700",        icon: XCircle,      label: "Erreur" },
+    detected_not_configured:   { cls: "bg-yellow-100 text-yellow-800",  icon: AlertCircle,  label: "Non configuré" },
+    not_implemented:           { cls: "bg-blue-100 text-blue-700",      icon: HelpCircle,   label: "Non impl." },
+    success:                   { cls: "bg-green-100 text-green-800",    icon: CheckCircle2, label: "OK" },
+    partial:                   { cls: "bg-orange-100 text-orange-700",  icon: AlertCircle,  label: "Partiel" },
+    skipped:                   { cls: "bg-gray-100 text-gray-500",      icon: HelpCircle,   label: "Ignoré" },
+  };
+  const c = cfg[status] ?? cfg.unknown;
+  const Icon = c.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ${c.cls}`}>
+      <Icon className="h-3 w-3" aria-hidden /> {c.label}
+    </span>
+  );
+}
+
+type ProviderBackfillDialogProps = {
+  providerKey: BackfillProviderKey | null;
+  onOpenChange: (open: boolean) => void;
+  loading: boolean;
+  onSubmit: (providerKey: BackfillProviderKey, dateFrom: string, dateTo: string) => void;
+};
+
+function ProviderBackfillDialog({ providerKey, onOpenChange, loading, onSubmit }: ProviderBackfillDialogProps) {
+  const { t } = useTranslation("settings");
+  const open = providerKey !== null;
+  const [preset, setPreset] = useState<BackfillPreset>("90d");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState(TODAY);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !providerKey) return;
+    const range = presetDateRange("90d");
+    setPreset("90d");
+    setDateFrom(range.from);
+    setDateTo(range.to);
+    setValidationError(null);
+  }, [open, providerKey]);
+
+  const applyPreset = (p: BackfillPreset) => {
+    setPreset(p);
+    setValidationError(null);
+    if (p === "custom") return;
+    const range = presetDateRange(p);
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
+  const handleSubmit = () => {
+    if (!dateFrom || !dateTo) {
+      setValidationError(t("providers.backfill_error_dates_required"));
+      return;
+    }
+    if (dateFrom > dateTo) {
+      setValidationError(t("providers.backfill_error_invalid_range"));
+      return;
+    }
+    setValidationError(null);
+    if (providerKey) onSubmit(providerKey, dateFrom, dateTo);
+  };
+
+  const titleKey = providerKey === "google_gemini"
+    ? "providers.backfill_title_gemini"
+    : "providers.backfill_title";
+  const descKey = providerKey === "google_gemini"
+    ? "providers.backfill_desc_gemini"
+    : "providers.backfill_desc";
+
+  const presetBtnCls = (p: BackfillPreset) =>
+    `rounded-md px-3 py-1.5 text-xs font-medium border transition-colors ${
+      preset === p
+        ? "border-primary bg-primary/10 text-primary"
+        : "border-border bg-background text-muted-foreground hover:bg-muted/50"
+    }`;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" hideCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{t(titleKey)}</DialogTitle>
+          <DialogDescription>{t(descKey)}</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted-foreground">{t("providers.backfill_preset_label")}</span>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={presetBtnCls("7d")} onClick={() => applyPreset("7d")}>
+                {t("providers.backfill_preset_7d")}
+              </button>
+              <button type="button" className={presetBtnCls("30d")} onClick={() => applyPreset("30d")}>
+                {t("providers.backfill_preset_30d")}
+              </button>
+              <button type="button" className={presetBtnCls("90d")} onClick={() => applyPreset("90d")}>
+                {t("providers.backfill_preset_90d")}
+              </button>
+              <button type="button" className={presetBtnCls("custom")} onClick={() => applyPreset("custom")}>
+                {t("providers.backfill_preset_custom")}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-row gap-3">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <Label htmlFor="groq-backfill-from" className="text-xs">{t("providers.backfill_date_from")}</Label>
+              <input
+                id="groq-backfill-from"
+                type="date"
+                className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                value={dateFrom}
+                max={dateTo || TODAY}
+                onChange={(e) => {
+                  setPreset("custom");
+                  setDateFrom(e.target.value);
+                  setValidationError(null);
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <Label htmlFor="groq-backfill-to" className="text-xs">{t("providers.backfill_date_to")}</Label>
+              <input
+                id="groq-backfill-to"
+                type="date"
+                className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                value={dateTo}
+                min={dateFrom || undefined}
+                max={TODAY}
+                onChange={(e) => {
+                  setPreset("custom");
+                  setDateTo(e.target.value);
+                  setValidationError(null);
+                }}
+              />
+            </div>
+          </div>
+
+          {validationError && (
+            <p className="text-xs text-red-600" role="alert">{validationError}</p>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
+            {t("providers.backfill_cancel")}
+          </Button>
+          <Button type="button" disabled={loading} className="gap-2" onClick={handleSubmit}>
+            {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {t("providers.backfill_submit")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ProvidersSectionProps = {
+  onCostsRefresh?: () => void;
+};
+
+function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
+  const { t } = useTranslation("settings");
+
+  const [providers, setProviders] = useState<CostProvider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillProviderKey, setBackfillProviderKey] = useState<BackfillProviderKey | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showMsg = useCallback((type: "success" | "error" | "warning", text: string) => {
+    setActionMsg({ type, text });
+    if (msgTimerRef.current) clearTimeout(msgTimerRef.current);
+    msgTimerRef.current = setTimeout(() => setActionMsg(null), 8000);
+  }, []);
+
+  const loadProviders = useCallback(async () => {
+    setLoadingProviders(true);
+    const { data, error } = await supabase
+      .from("cost_providers")
+      .select("*")
+      .in("provider_key", [...COST_SYNC_PROVIDER_KEYS])
+      .neq("status", "inactive")
+      .order("provider_name", { ascending: true });
+    setLoadingProviders(false);
+    if (!error && Array.isArray(data)) setProviders(data as CostProvider[]);
+  }, []);
+
+  useEffect(() => {
+    void loadProviders();
+    return () => { if (msgTimerRef.current) clearTimeout(msgTimerRef.current); };
+  }, [loadProviders]);
+
+  const handleAnalyze = useCallback(async () => {
+    setAnalyzeLoading(true);
+    setActionMsg(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("providers-analyze", { body: {} });
+      if (error) {
+        // Extraire le vrai message depuis le body de la réponse HTTP
+        let detail = error.message;
+        try {
+          const ctx = (error as { context?: Response }).context;
+          if (ctx?.json) {
+            const body = await ctx.json() as Record<string, string>;
+            detail = body?.details || body?.error || body?.message || error.message;
+          }
+        } catch { /* ignore */ }
+        throw new Error(detail);
+      }
+      const analyzed = (data as { analyzed?: number })?.analyzed ?? 0;
+      showMsg("success", t("providers.analyze_success", { count: analyzed }));
+      await loadProviders();
+    } catch (err) {
+      showMsg("error", t("providers.analyze_error") + " — " + String(err));
+    } finally {
+      setAnalyzeLoading(false);
+    }
+  }, [loadProviders, showMsg, t]);
+
+  const handleSync = useCallback(async (providerKey?: string) => {
+    setSyncLoading(true);
+    setActionMsg(null);
+    try {
+      const data = await invokeProvidersSyncCosts({
+        ...(providerKey ? { provider_key: providerKey } : {}),
+        mode: "incremental",
+        days: 7,
+      });
+      const synced = data.synced ?? 0;
+      showMsg("success", t("providers.sync_success", { count: synced }));
+      await loadProviders();
+      onCostsRefresh?.();
+    } catch (err) {
+      showMsg("error", t("providers.sync_error") + " — " + String(err));
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [loadProviders, onCostsRefresh, showMsg, t]);
+
+  const handleProviderBackfill = useCallback(async (
+    providerKey: BackfillProviderKey,
+    dateFrom: string,
+    dateTo: string,
+  ) => {
+    setBackfillLoading(true);
+    setActionMsg(null);
+    try {
+      const data = await invokeProvidersSyncCosts({
+        provider_key: providerKey,
+        mode: "backfill",
+        date_from: dateFrom,
+        date_to: dateTo,
+      });
+      const result = data.results?.find((r) => r.provider_key === providerKey);
+      const msg = result?.message ?? data.message ?? t("providers.backfill_done");
+
+      const isEmptyGroq = providerKey === "groq" && /aucun log groq/i.test(msg);
+      const isEmptyGemini = providerKey === "google_gemini" && (
+        /0 ligne\(s\) mappée/i.test(msg) ||
+        /,\s*0 mappée/i.test(msg) ||
+        /gemini=0/i.test(msg)
+      );
+      const isGcpMissing = result?.status === "not_implemented" || /prérequis google billing manquants/i.test(msg);
+
+      if (isGcpMissing) {
+        showMsg("warning", t("providers.gcp_config_required") + " — " + msg);
+      } else if (result?.status === "success" && (isEmptyGroq || isEmptyGemini)) {
+        showMsg("warning", t("providers.backfill_empty", { from: dateFrom, to: dateTo }) + " — " + msg);
+      } else if (result?.status === "error") {
+        showMsg("error", t("providers.backfill_error") + " — " + msg);
+      } else {
+        showMsg("success", msg);
+        setBackfillProviderKey(null);
+      }
+
+      await loadProviders();
+      onCostsRefresh?.();
+    } catch (err) {
+      showMsg("error", t("providers.backfill_error") + " — " + String(err));
+    } finally {
+      setBackfillLoading(false);
+    }
+  }, [loadProviders, onCostsRefresh, showMsg, t]);
+
+  const frDateShort = (iso: string | null) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return iso; }
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-sm font-medium">{t("providers.section_title")}</CardTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={handleAnalyze} disabled={analyzeLoading || syncLoading || backfillLoading}
+              className="gap-2"
+            >
+              {analyzeLoading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                : <Search className="h-3.5 w-3.5" aria-hidden />}
+              {t("providers.btn_analyze")}
+            </Button>
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={() => void handleSync()} disabled={analyzeLoading || syncLoading || backfillLoading}
+              className="gap-2"
+            >
+              {syncLoading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                : <RefreshCw className="h-3.5 w-3.5" aria-hidden />}
+              {t("providers.btn_sync")}
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">{t("providers.section_sub")}</p>
+        <p className="text-xs text-muted-foreground/80 mt-1">{t("providers.section_sub_costs")}</p>
+      </CardHeader>
+
+      <CardContent>
+        {/* Message retour action */}
+        {actionMsg && (
+          <Alert
+            variant={actionMsg.type === "error" ? "destructive" : "default"}
+            className={`mb-4 ${actionMsg.type === "warning" ? "border-orange-300 bg-orange-50 text-orange-900" : ""}`}
+          >
+            <AlertDescription className="text-sm">{actionMsg.text}</AlertDescription>
+          </Alert>
+        )}
+
+        <ProviderBackfillDialog
+          providerKey={backfillProviderKey}
+          onOpenChange={(o) => { if (!o) setBackfillProviderKey(null); }}
+          loading={backfillLoading}
+          onSubmit={(key, from, to) => void handleProviderBackfill(key, from, to)}
+        />
+
+        {/* Loading */}
+        {loadingProviders && (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin text-primary mr-3" aria-hidden />
+            <span className="text-sm text-muted-foreground">{t("settings_loading")}</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loadingProviders && providers.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Search className="h-8 w-8 text-muted-foreground/30 mb-3" aria-hidden />
+            <p className="font-medium text-muted-foreground">{t("providers.empty_title")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("providers.empty_sub")}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-4 gap-2" onClick={handleAnalyze} disabled={analyzeLoading}>
+              {analyzeLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Search className="h-3.5 w-3.5" aria-hidden />}
+              {t("providers.btn_analyze")}
+            </Button>
+          </div>
+        )}
+
+        {/* Liste fournisseurs — cartes compactes (pas de scroll horizontal) */}
+        {!loadingProviders && providers.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {providers.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-border/50 bg-muted/5 p-4 space-y-3"
+              >
+                {/* En-tête : identité + action */}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-sm">{p.provider_name}</span>
+                      <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">{p.provider_key}</code>
+                      {p.category && (
+                        <span className="rounded bg-muted/80 px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase">
+                          {p.category}
+                        </span>
+                      )}
+                    </div>
+                    {p.notes && (
+                      <p className="text-[11px] text-muted-foreground leading-snug">{p.notes}</p>
+                    )}
+                    {p.provider_key === "google_tts" && (
+                      <p className="text-[11px] text-orange-700/90 leading-snug font-medium">
+                        {t("providers.tts_web_speech_note")}
+                      </p>
+                    )}
+                    {p.provider_key === "google_gemini" && !p.cost_import_supported && (
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800">
+                          {t("providers.gcp_config_required")}
+                        </span>
+                        <a
+                          href={GCP_BILLING_DOC_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" aria-hidden />
+                          {t("providers.gcp_doc_link")}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {(BACKFILL_PROVIDER_KEYS as readonly string[]).includes(p.provider_key) && (
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={syncLoading || backfillLoading}
+                        onClick={() => setBackfillProviderKey(p.provider_key as BackfillProviderKey)}
+                      >
+                        <History className="h-3.5 w-3.5" aria-hidden />
+                        {t("providers.action_backfill")}
+                      </Button>
+                    )}
+                    {p.cost_import_supported && (
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={syncLoading || backfillLoading}
+                        onClick={() => void handleSync(p.provider_key)}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                        {t("providers.action_resync")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Indicateurs — grille responsive */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3 pt-1 border-t border-border/40">
+                  <ProviderStatCell label={t("providers.col_configured")}>
+                    <BoolIcon ok={p.configured} okLabel="Configuré" noLabel="Non configuré" />
+                  </ProviderStatCell>
+                  <ProviderStatCell label={t("providers.col_actively_used")}>
+                    <BoolIcon ok={p.actively_used} okLabel="Utilisé" noLabel="Non utilisé" />
+                  </ProviderStatCell>
+                  <ProviderStatCell label={t("providers.col_billing_mode")}>
+                    <span className="text-muted-foreground leading-snug">{billingModeLabel(p, t)}</span>
+                  </ProviderStatCell>
+                  <ProviderStatCell label={t("providers.col_sync")}>
+                    <BoolIcon ok={p.cost_import_supported} okLabel="Import supporté" noLabel="Non supporté" />
+                  </ProviderStatCell>
+                  <ProviderStatCell label={t("providers.col_status")}>
+                    {providerStatusBadge(p.status)}
+                  </ProviderStatCell>
+                  <ProviderStatCell label={t("providers.col_sync_status")}>
+                    {p.last_sync_status
+                      ? providerStatusBadge(p.last_sync_status)
+                      : <span className="text-muted-foreground">—</span>}
+                  </ProviderStatCell>
+                </div>
+
+                {/* Dates + erreur sync */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-muted-foreground font-mono border-t border-border/30 pt-2">
+                  <span>
+                    <span className="font-sans font-semibold text-muted-foreground/80 mr-1">
+                      {t("providers.col_last_detected")} :
+                    </span>
+                    {frDateShort(p.last_detected_at)}
+                  </span>
+                  <span>
+                    <span className="font-sans font-semibold text-muted-foreground/80 mr-1">
+                      {t("providers.col_last_synced")} :
+                    </span>
+                    {frDateShort(p.last_synced_at)}
+                  </span>
+                </div>
+                {p.last_sync_error && (
+                  <p className="text-xs text-red-600 leading-snug" title={p.last_sync_error}>
+                    {p.last_sync_error}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+export default function SettingsCouts() {
+  const { t } = useTranslation("settings");
+
+  // ---- State ----
+  const [filters, setFilters] = useState<CostFilters>(EMPTY_FILTERS);
+  const [page, setPage] = useState(0);
+
+  const [events,  setEvents]  = useState<CostEvent[]>([]);
+  const [total,   setTotal]   = useState(0);
+  const [summary, setSummary] = useState<CostSummary | null>(null);
+  const [byProvider, setByProvider] = useState<CostBreakdownItem[]>([]);
+  const [timeSeries, setTimeSeries] = useState<CostTimeSeriesPoint[]>([]);
+  const [options,  setOptions]  = useState<CostSelectOptions>({
+    toolTypes: [], providers: [], apiNames: [], modelNames: [], statuses: [], currencies: [],
+  });
+
+  const [loadingEvents,  setLoadingEvents]  = useState(true);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingCharts,  setLoadingCharts]  = useState(true);
+  const [errorEvents,    setErrorEvents]    = useState<string | null>(null);
+  const [costsRefreshKey, setCostsRefreshKey] = useState(0);
+  const [usdEurRate, setUsdEurRate] = useState<number | null>(null);
+
+  const refreshCostData = useCallback(() => {
+    setCostsRefreshKey((k) => k + 1);
+  }, []);
+
+  // ---- Chargement options filtres (une seule fois) ----
+  useEffect(() => {
+    getCostSelectOptions().then(setOptions).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getUsdToEurRate().then((rate) => {
+      if (!cancelled) setUsdEurRate(rate);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ---- Chargement événements ----
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingEvents(true);
+    setErrorEvents(null);
+
+    getCostEvents(filters, page, PAGE_SIZE).then(({ data, count, error }) => {
+      if (cancelled) return;
+      setLoadingEvents(false);
+      if (error) { setErrorEvents(error); return; }
+      setEvents(data);
+      setTotal(count);
+    }).catch((e) => {
+      if (!cancelled) { setLoadingEvents(false); setErrorEvents(String(e)); }
+    });
+
+    return () => { cancelled = true; };
+  }, [filters, page, costsRefreshKey]);
+
+  // ---- Chargement KPIs ----
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingSummary(true);
+
+    getCostSummary(filters).then((s) => {
+      if (!cancelled) { setSummary(s); setLoadingSummary(false); }
+    }).catch(() => {
+      if (!cancelled) setLoadingSummary(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [filters, costsRefreshKey]);
+
+  // ---- Chargement graphiques ----
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingCharts(true);
+
+    Promise.all([getCostBreakdownByProvider(filters), getCostTimeSeries(filters)])
+      .then(([bp, ts]) => {
+        if (cancelled) return;
+        setByProvider(bp);
+        setTimeSeries(ts);
+        setLoadingCharts(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingCharts(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [filters, costsRefreshKey]);
+
+  // ---- Handlers ----
+  const handleFiltersChange = useCallback((f: CostFilters) => {
+    setFilters(f);
+    setPage(0);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setFilters(EMPTY_FILTERS);
+    setPage(0);
+  }, []);
+
+  const handleExport = useCallback(() => {
+    exportCostsCsv(events);
+  }, [events]);
+
+  // ---- KPI cards ----
+  const currency = summary?.currency ?? "EUR";
+  const isUsd = currency.toUpperCase() === "USD";
+  const fxSub = isUsd && usdEurRate
+    ? t("couts.fx_rate_hint", { rate: usdEurRate.toFixed(4) })
+    : undefined;
+
+  const kpis = useMemo(() => {
+    if (!summary) return [];
+    const eurTotal = isUsd && usdEurRate
+      ? formatUsdToEurHint(summary.totalCost, usdEurRate, 4)
+      : undefined;
+    const eurAvg = isUsd && usdEurRate
+      ? formatUsdToEurHint(summary.avgCostPerCall, usdEurRate, 6)
+      : undefined;
+    return [
+      {
+        icon: Euro,
+        label: t("couts.kpi_total_cost"),
+        value: formatCost(summary.totalCost, currency, 4),
+        eurHint: eurTotal,
+        sub: fxSub ?? currency,
+      },
+      {
+        icon: Activity,
+        label: t("couts.kpi_call_count"),
+        value: summary.callCount.toLocaleString("fr-FR"),
+        sub: t("couts.kpi_call_count_sub"),
+      },
+      {
+        icon: TrendingUp,
+        label: t("couts.kpi_avg_cost"),
+        value: formatCost(summary.avgCostPerCall, currency, 6),
+        eurHint: eurAvg,
+        sub: t("couts.kpi_avg_cost_sub"),
+      },
+      {
+        icon: Award,
+        label: t("couts.kpi_top_provider"),
+        value: summary.topProvider ?? "—",
+        sub: summary.topTool ? `outil : ${summary.topTool}` : undefined,
+      },
+    ];
+  }, [summary, currency, isUsd, usdEurRate, fxSub, t]);
+
+  // ---- Chart data ----
+  const providerChartData = byProvider.slice(0, 8).map((item) => ({
+    name: item.label,
+    coût: parseFloat(item.totalCost.toFixed(6)),
+    appels: item.callCount,
+  }));
+
+  const timeSeriesChartData = timeSeries.slice(-60).map((p) => ({
+    date: chartDateFr(p.date),
+    coût: parseFloat(p.totalCost.toFixed(6)),
+    appels: p.callCount,
+  }));
+
+  // ---- Render ----
+  return (
+    <div className="container py-8 space-y-6">
+
+      {/* En-tête */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-3 w-3" aria-hidden />
+              {t("couts.back_settings")}
+            </Link>
+          </div>
+          <h1 className="text-2xl font-serif font-bold tracking-tight">{t("couts.page_title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("couts.page_sub")}</p>
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <FiltersBar
+        filters={filters}
+        options={options}
+        onChange={handleFiltersChange}
+        onReset={handleReset}
+        loading={loadingEvents}
+      />
+
+      {/* KPI Cards */}
+      {loadingSummary ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i} className="glass-card animate-pulse">
+              <CardContent className="p-5 h-20 bg-muted/30 rounded-xl" />
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.label} {...kpi} />
+          ))}
+        </div>
+      )}
+
+      {/* Graphiques */}
+      <div className="grid lg:grid-cols-2 gap-6">
+
+        {/* Série temporelle */}
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t("couts.chart_timeline_title")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingCharts ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
+              </div>
+            ) : timeSeriesChartData.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+                {t("settings_no_data")}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={timeSeriesChartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value} ${currency}`, "Coût"]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                  <Bar dataKey="coût" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Répartition par fournisseur */}
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t("couts.chart_provider_title")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingCharts ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
+              </div>
+            ) : providerChartData.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+                {t("settings_no_data")}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={providerChartData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={60} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value} ${currency}`, "Coût"]}
+                    contentStyle={{ fontSize: 12 }}
+                  />
+                  <Bar dataKey="coût" fill="#E63946" radius={[0, 3, 3, 0]} maxBarSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table détaillée */}
+      <Card className="glass-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">{t("couts.table_title")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CostsTable
+            events={events}
+            loading={loadingEvents}
+            error={errorEvents}
+            page={page}
+            total={total}
+            onPageChange={setPage}
+            onExport={handleExport}
+            currency={currency}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Section Fournisseurs */}
+      <ProvidersSection onCostsRefresh={refreshCostData} />
+    </div>
+  );
+}

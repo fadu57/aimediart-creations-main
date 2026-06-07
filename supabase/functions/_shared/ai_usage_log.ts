@@ -19,6 +19,7 @@ export type InsertAiUsageLogInput = {
   completion_tokens?: number | null;
   total_tokens?: number | null;
   artwork_id?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 function looksLikeGeminiUsageMetadataShape(o: Record<string, unknown>): boolean {
@@ -282,7 +283,7 @@ export async function insertAiUsageLog(
   }
   const totalTokens = Math.max(0, Math.round(Number(total)));
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     model_id: modelId,
     provider: row.provider,
     prompt_tokens: Math.max(0, Math.round(pt)),
@@ -290,6 +291,9 @@ export async function insertAiUsageLog(
     total_tokens: totalTokens,
     artwork_id: row.artwork_id ?? null,
   };
+  if (row.metadata && Object.keys(row.metadata).length > 0) {
+    payload.metadata = row.metadata;
+  }
 
   const { error } = await admin.from("ai_usage_logs").insert(payload);
 

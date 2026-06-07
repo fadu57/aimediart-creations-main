@@ -93,5 +93,13 @@
   "tableau_warning": "ATENCIÓN - La eliminación es definitiva. Elimine con el máximo discernimiento, de lo contrario arriesga problemas con su aplicación",
   "tableau_cancel": "Cancelar",
   "tableau_confirm": "Eliminar",
-  "tableau_archiving": "Archivando..."
+  "tableau_archiving": "Archivando...",
+
+  "btn_report_error": "Informar de un error",
+  "btn_report_error_title": "Informar de una información errónea al equipo aimediart",
+  "btn_report_error_email_subject": "Ficha artista: información errónea",
+  "bio_regen": "✨ Regenerar (IA)",
+  "bio_new": "✏️ Nueva bio",
+  "info_shared_profiles": "Las fichas de artistas son compartidas por todos. Pueden completarse (información faltante) pero no eliminarse. En caso de error en la información ya ingresada, haga clic en «\u00a0Informar de un error\u00a0» en la ficha.",
+  "info_bio_only": "Solo la biografía puede reescribirse para adaptarse a su organización."
 }

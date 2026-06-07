@@ -26,3 +26,13 @@ entrypoint = "./functions/ai-create-job/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/ai-create-job/*.html" ]
+
+[functions.providers-analyze]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/providers-analyze/index.ts"
+
+[functions.providers-sync-costs]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/providers-sync-costs/index.ts"

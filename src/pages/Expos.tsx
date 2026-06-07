@@ -233,6 +233,7 @@ const Expos = () => {
   const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [orgSearchTerm, setOrgSearchTerm] = useState("");
   const [descriptionPopup, setDescriptionPopup] = useState<string | null>(null);
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
@@ -381,26 +382,44 @@ const Expos = () => {
   const showScopeHint = !authLoading && scope.mode === "none";
 
   const sorted = useMemo(() => [...rows].sort((a, b) => expoTitle(a).localeCompare(expoTitle(b), "fr")), [rows]);
-  const searchSuggestions = useMemo(
-    () => [...new Set(sorted.map((ex) => expoTitle(ex).trim()).filter(Boolean))],
-    [sorted],
-  );
+  const searchSuggestions = useMemo(() => {
+    const orgQ = orgSearchTerm.trim().toLowerCase();
+    const base = orgQ
+      ? sorted.filter((ex) => {
+          const agencyLinked = ex.agency_id ?? null;
+          const agencyLabel = agencyLinked ? (agencyNameById[agencyLinked] ?? agencyLinked) : "";
+          return agencyLabel.toLowerCase().includes(orgQ);
+        })
+      : sorted;
+    return [...new Set(base.map((ex) => expoTitle(ex).trim()).filter(Boolean))];
+  }, [sorted, orgSearchTerm, agencyNameById]);
   const filteredExpos = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter((ex) => {
-      const title = expoTitle(ex).toLowerCase();
-      const agencyLinked = ex.agency_id ?? null;
-      const agencyLabel = agencyLinked ? (agencyNameById[agencyLinked] ?? agencyLinked) : "";
-      const curatorFirst = (ex.curator_firstname ?? "").toLowerCase();
-      const curatorLast = (ex.curator_name ?? "").toLowerCase();
-      return (
-        title.includes(q) ||
-        agencyLabel.toLowerCase().includes(q) ||
-        `${curatorFirst} ${curatorLast}`.trim().includes(q)
-      );
-    });
-  }, [sorted, searchTerm, agencyNameById]);
+    const orgQ = orgSearchTerm.trim().toLowerCase();
+    let result = sorted;
+    if (q) {
+      result = result.filter((ex) => {
+        const title = expoTitle(ex).toLowerCase();
+        const agencyLinked = ex.agency_id ?? null;
+        const agencyLabel = agencyLinked ? (agencyNameById[agencyLinked] ?? agencyLinked) : "";
+        const curatorFirst = (ex.curator_firstname ?? "").toLowerCase();
+        const curatorLast = (ex.curator_name ?? "").toLowerCase();
+        return (
+          title.includes(q) ||
+          agencyLabel.toLowerCase().includes(q) ||
+          `${curatorFirst} ${curatorLast}`.trim().includes(q)
+        );
+      });
+    }
+    if (orgQ) {
+      result = result.filter((ex) => {
+        const agencyLinked = ex.agency_id ?? null;
+        const agencyLabel = agencyLinked ? (agencyNameById[agencyLinked] ?? agencyLinked) : "";
+        return agencyLabel.toLowerCase().includes(orgQ);
+      });
+    }
+    return result;
+  }, [sorted, searchTerm, orgSearchTerm, agencyNameById]);
   const scopedExpoLabel = useMemo(() => {
     const scopedId = scope.expoId?.trim() || "";
     if (!scopedId) return "";
@@ -616,31 +635,61 @@ const Expos = () => {
             <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
           )}
         </div>
-        <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-          <Input
-            type="text"
-            list="expo-search-suggestions"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={t("page.search")}
-            className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
-          />
-          {searchTerm.trim().length > 0 && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-              aria-label={t("page.clearSearch")}
-              title={t("page.clear")}
-            >
-              <X className="h-3.5 w-3.5" aria-hidden />
-            </button>
+        <div className="flex flex-row items-center gap-2">
+          {typeof role_id === "number" && role_id < 4 && (
+            <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
+              <Input
+                type="text"
+                list="org-search-suggestions"
+                value={orgSearchTerm}
+                onChange={(e) => setOrgSearchTerm(e.target.value)}
+                placeholder={t("page.searchOrg")}
+                className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
+              />
+              {orgSearchTerm.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOrgSearchTerm("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                  aria-label={t("page.clearSearchOrg")}
+                  title={t("page.clear")}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              )}
+              <datalist id="org-search-suggestions">
+                {Object.values(agencyNameById).map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </div>
           )}
-          <datalist id="expo-search-suggestions">
-            {searchSuggestions.map((label) => (
-              <option key={label} value={label} />
-            ))}
-          </datalist>
+          <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
+            <Input
+              type="text"
+              list="expo-search-suggestions"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t("page.search")}
+              className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
+            />
+            {searchTerm.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                aria-label={t("page.clearSearch")}
+                title={t("page.clear")}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
+            <datalist id="expo-search-suggestions">
+              {searchSuggestions.map((label) => (
+                <option key={label} value={label} />
+              ))}
+            </datalist>
+          </div>
         </div>
         </div>
         <BackofficeStickyAgencyLogoSlot />

@@ -74,17 +74,20 @@ export function useArtistBios(artistId: string | null, agencyId: string | null) 
         const missingLanguages = ARTIST_BIO_LANGUAGES.filter((lang) => !merged[lang].trim());
 
         if (missingLanguages.length > 0) {
-          const { data: globalRows, error: globalError } = await supabase
+          // Fallback : bio la plus récemment sauvegardée, toutes agences confondues
+          const { data: recentRows, error: recentError } = await supabase
             .from("artist_bios")
-            .select("language,bio_text")
+            .select("language,bio_text,updated_at")
             .eq("artist_id", artistId)
-            .is("agency_id", null);
+            .in("language", missingLanguages)
+            .order("updated_at", { ascending: false });
 
-          if (globalError) {
-            throw globalError;
+          if (recentError) {
+            throw recentError;
           }
 
-          for (const row of (globalRows ?? []) as Array<{ language?: string | null; bio_text?: string | null }>) {
+          // On prend la première occurrence par langue (la plus récente grâce au tri)
+          for (const row of (recentRows ?? []) as Array<{ language?: string | null; bio_text?: string | null; updated_at?: string | null }>) {
             const lang = normalizeLang(row.language);
             if (!lang) continue;
             if (merged[lang].trim()) continue;

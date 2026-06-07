@@ -93,5 +93,13 @@
   "tableau_warning": "ATTENZIONE - L'eliminazione è definitiva. Elimina con il massimo discernimento altrimenti rischi problemi con la tua applicazione",
   "tableau_cancel": "Annulla",
   "tableau_confirm": "Elimina",
-  "tableau_archiving": "Archiviazione..."
+  "tableau_archiving": "Archiviazione...",
+
+  "btn_report_error": "Segnala un'informazione errata",
+  "btn_report_error_title": "Segnala un'informazione errata al team aimediart",
+  "btn_report_error_email_subject": "Scheda artista: informazione/i errata/e",
+  "bio_regen": "✨ Rigenera (IA)",
+  "bio_new": "✏️ Nuova bio",
+  "info_shared_profiles": "Le schede degli artisti sono condivise da tutti. Possono essere completate (informazioni mancanti) ma non eliminate. In caso di errore nelle informazioni già inserite, fare clic su «\u00a0Segnala un'informazione errata\u00a0» nella scheda.",
+  "info_bio_only": "Solo la biografia può essere riscritta per adattarsi alla vostra organizzazione."
 }

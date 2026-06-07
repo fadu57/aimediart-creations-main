@@ -3,6 +3,9 @@
     "title": "Ausstellungen",
     "search": "Ausstellung suchen...",
     "clearSearch": "Suche löschen",
+    "searchOrg": "Nach Organisation suchen...",
+    "clearSearchOrg": "Organisationsfilter löschen",
+    "noOrgFound": "Keine Organisation gefunden.",
     "clear": "Löschen",
     "create": "Neue Ausstellung",
     "tableau": "Ausstellungsliste",
@@ -37,6 +40,9 @@
   "panel": {
     "chooseFormat": "Wählen Sie das zu druckende Tabellenformat",
     "cancel": "Abbrechen"
+  },
+  "form": {
+    "navTypeLabel": "Für den Besucher, Navigationstyp"
   },
   "tableau": {
     "title": "Ausstellungen — Vollständige Tabelle",

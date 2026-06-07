@@ -95,5 +95,13 @@
   "tableau_warning": "WARNING - Deletion is permanent. Delete with maximum discernment otherwise you risk problems with your application",
   "tableau_cancel": "Cancel",
   "tableau_confirm": "Delete",
-  "tableau_archiving": "Archiving..."
+  "tableau_archiving": "Archiving...",
+
+  "btn_report_error": "Report incorrect information",
+  "btn_report_error_title": "Report incorrect information to the aimediart team",
+  "btn_report_error_email_subject": "Artist profile: incorrect information",
+  "bio_regen": "✨ Regenerate (AI)",
+  "bio_new": "✏️ New bio",
+  "info_shared_profiles": "Artist profiles are shared across all organisations. They can be completed (missing information) but not deleted. If an error is found in existing information, please click «\u00a0Report incorrect information\u00a0» in the profile.",
+  "info_bio_only": "Only the biography can be rewritten to match your organisation."
 }

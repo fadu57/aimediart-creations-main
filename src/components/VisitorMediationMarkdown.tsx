@@ -25,7 +25,7 @@ export function VisitorMediationMarkdown({ text, verseMode = false, className }:
   return (
     <div
       className={cn(
-        "visitor-mediation-markdown text-sm leading-relaxed text-[#F0F0F0]/90",
+        "visitor-mediation-markdown text-sm leading-5 text-[#F0F0F0]/90",
         "[&_p]:mb-3 [&_p:last-child]:mb-0",
         "[&_strong]:font-semibold [&_em]:italic",
         className,
@@ -36,7 +36,7 @@ export function VisitorMediationMarkdown({ text, verseMode = false, className }:
         components={{
           pre: () => null,
           p: ({ children }) => (
-            <p className="text-sm leading-relaxed text-[#F0F0F0]/90">{children}</p>
+            <p className="text-sm leading-5 text-[#F0F0F0]/90" style={{ letterSpacing: "-0.3px" }}>{children}</p>
           ),
           code: ({ children }) => <span className="font-normal">{children}</span>,
           a: ({ href, children }) => (

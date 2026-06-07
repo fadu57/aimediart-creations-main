@@ -119,7 +119,7 @@ type AgencyOption = { id: string; name: string };
 type CuratorOption = { id: string; label: string; email: string };
 
 export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, onSuccess, canPickAgency = false }: ExpoFormDialogProps) {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation("expos");
   const { role_id } = useAuthUser();
   const canTriggerTranslation = typeof role_id === "number" && role_id < 6 && mode === "edit" && !!expoId;
   const [translating, setTranslating] = useState(false);
@@ -140,7 +140,10 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const [pendingCuratorLabel, setPendingCuratorLabel] = useState<string>("");
   const [horaires, setHoraires] = useState<ExpoHoraires>({ ...HORAIRES_VIDE });
   const [initialHoraires, setInitialHoraires] = useState<ExpoHoraires>({ ...HORAIRES_VIDE });
-  const [sponsorLogos, setSponsorLogos] = useState<{ url: string; nom: string }[]>([]);
+  const [typeNavigation, setTypeNavigation] = useState<boolean>(false);
+  const [initialTypeNavigation, setInitialTypeNavigation] = useState<boolean>(false);
+  const [sponsorLogos, setSponsorLogos] = useState<{ id: string; url: string; nom: string }[]>([]);
+  const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
   /** Fichier image choisi pour un champ logo (avant enregistrement). */
@@ -160,7 +163,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       .select("id, name_agency")
       .order("name_agency", { ascending: true })
       .then(({ data }) => {
-        setAgencies((data ?? []).map((a) => ({ id: a.id as string, name: a.name_agency as string })));
+        setAgencies(((data ?? []) as Array<{ id: string; name_agency: string }>).map((a) => ({ id: a.id, name: a.name_agency })));
       });
   }, [canPickAgency, open]);
 
@@ -169,7 +172,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
     if (!open || mode !== "edit" || !expoId) { setSponsorLogos([]); return; }
     supabase
       .from("sponsors")
-      .select("nom_sponsor, url_logo_sponsor")
+      .select("id, nom_sponsor, url_logo_sponsor")
       .eq("id_expo", expoId)
       .not("url_logo_sponsor", "is", null)
       .then(({ data }) => {
@@ -177,6 +180,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
           (data ?? [])
             .filter((s) => (s as { url_logo_sponsor?: string }).url_logo_sponsor)
             .map((s) => ({
+              id: (s as { id: string }).id,
               url: (s as { url_logo_sponsor: string }).url_logo_sponsor,
               nom: (s as { nom_sponsor: string }).nom_sponsor ?? "",
             })),
@@ -267,6 +271,10 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       const loadedHoraires = parseExpoHoraires(row.expo_horaires);
       setHoraires(loadedHoraires);
       setInitialHoraires(loadedHoraires);
+      // Charger type_navigation
+      const loadedTypeNav = row.type_navigation === true;
+      setTypeNavigation(loadedTypeNav);
+      setInitialTypeNavigation(loadedTypeNav);
     } catch (e) {
       toast.error(getErrorMessage(e, "Impossible de charger l’exposition."));
       onOpenChange(false);
@@ -303,6 +311,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       const emptyHoraires = { ...HORAIRES_VIDE };
       setHoraires(emptyHoraires);
       setInitialHoraires(emptyHoraires);
+      setTypeNavigation(false);
+      setInitialTypeNavigation(false);
       return;
     }
     void loadRow();
@@ -351,6 +361,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         if (curatorName) payload.curator_name = curatorName;
         payload.curator = null;
         payload.expo_horaires = horaires;
+        payload.type_navigation = typeNavigation;
 
         for (const k of sortedKeys) {
           if (k === "id") continue;
@@ -361,7 +372,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
           if (parsed !== null && parsed !== "") payload[k] = parsed;
         }
 
-        const { error } = await supabase.from("expos").insert(payload);
+        const { error } = await supabase.from("expos").insert(payload as never);
         if (error) throw error;
         toast.success("Exposition créée.");
       } else {
@@ -371,13 +382,14 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         payload.curator_name = curatorName;
         payload.curator = null;
         payload.expo_horaires = horaires;
+        payload.type_navigation = typeNavigation;
         for (const k of Object.keys(mergedValues)) {
           if (k === "id" || k.endsWith("_id") || k === "created_at" || k === "updated_at") continue;
           const raw = mergedValues[k] ?? "";
           const t = raw.trim();
           payload[k] = t === "" ? null : parseInputForKey(k, raw);
         }
-        const { error } = await supabase.from("expos").update(payload).eq("id", expoId);
+        const { error } = await supabase.from("expos").update(payload as never).eq("id", expoId);
         if (error) throw error;
         toast.success("Exposition mise à jour.");
       }
@@ -387,6 +399,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       setInitialSelectedAgencyId(selectedAgencyId);
       setInitialSelectedCuratorId(selectedCuratorId);
       setInitialHoraires(horaires);
+      setInitialTypeNavigation(typeNavigation);
       setLogoFileByKey({});
       onOpenChange(false);
     } catch (e) {
@@ -437,7 +450,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         try {
           const result = await invokeAiWorker(jobId);
           if (!result.ok) {
-            console.warn(`[triggerExpoTranslation] worker ${lang}:`, result.message);
+            console.warn(`[triggerExpoTranslation] worker ${lang}:`, (result as Extract<typeof result, { ok: false }>).message);
           }
           // Recharge le JSONB depuis la DB pour mettre à jour les badges immédiatement
           if (expoId) {
@@ -474,7 +487,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
     Object.values(logoFileByKey).some((file) => file !== null) ||
     (canPickAgency && selectedAgencyId !== initialSelectedAgencyId) ||
     selectedCuratorId !== initialSelectedCuratorId ||
-    JSON.stringify(horaires) !== JSON.stringify(initialHoraires);
+    JSON.stringify(horaires) !== JSON.stringify(initialHoraires) ||
+    typeNavigation !== initialTypeNavigation;
   const requestClose = () => {
     if (mode === "edit" && hasFormChanges) {
       setShowCloseConfirm(true);
@@ -495,7 +509,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       }}
     >
       <DialogContent
-        className="max-h-[92vh] max-w-lg overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:max-w-xl"
+        className="max-h-[92vh] max-w-lg overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:max-w-2xl"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{mode === "create" ? "Nouvelle exposition" : "Fiche de l'exposition"}</DialogTitle>
@@ -653,7 +667,64 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               // date_expo_au est rendu dans le bloc de date_expo_du — on le saute ici
               if (key === "date_expo_au" && sortedKeys.includes("date_expo_du")) return null;
 
-              // Rendu côte à côte des deux champs date
+              // date_expo_du est rendu dans le bloc expo_name — on le saute ici
+              if (
+                key === "date_expo_du" &&
+                sortedKeys.includes("expo_name") &&
+                sortedKeys.includes("date_expo_au")
+              ) return null;
+
+              // expo_name : si les deux dates sont présentes, les rendre à droite sur la même ligne
+              if (
+                key === "expo_name" &&
+                sortedKeys.includes("date_expo_du") &&
+                sortedKeys.includes("date_expo_au")
+              ) {
+                const nameRo = isReadonlyExpoKey("expo_name", mode);
+                const nameV = values["expo_name"] ?? "";
+                const dateKeys = ["date_expo_du", "date_expo_au"] as const;
+                return (
+                  <div key="name-dates" className="flex gap-3 items-end">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <Label htmlFor="expo-field-expo_name" className="text-xs font-medium">
+                        {fieldLabel("expo_name")}
+                      </Label>
+                      <Input
+                        id="expo-field-expo_name"
+                        name="expo_expo_name"
+                        value={nameV}
+                        readOnly={nameRo || !canEditFields}
+                        className={cn("shadow-none", nameRo ? "bg-muted/50" : "")}
+                        onChange={(e) => setValues((prev) => ({ ...prev, expo_name: e.target.value }))}
+                      />
+                    </div>
+                    {dateKeys.map((dk) => {
+                      const dv = values[dk] ?? "";
+                      const dReadonly = isReadonlyExpoKey(dk, mode);
+                      const dHidden = mode === "create" && skipKeyOnInsert(dk);
+                      if (dHidden) return null;
+                      return (
+                        <div key={dk} className="space-y-1.5 w-[130px] shrink-0">
+                          <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
+                            {fieldLabel(dk)}
+                          </Label>
+                          <Input
+                            id={`expo-field-${dk}`}
+                            name={`expo_${dk}`}
+                            type="date"
+                            value={dv ? dv.slice(0, 10) : ""}
+                            readOnly={dReadonly || !canEditFields}
+                            className={cn("shadow-none w-[130px] px-0", dReadonly ? "bg-muted/50" : "")}
+                            onChange={(e) => setValues((prev) => ({ ...prev, [dk]: e.target.value }))}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              // Rendu côte à côte des deux champs date (fallback sans expo_name)
               if (key === "date_expo_du" && sortedKeys.includes("date_expo_au")) {
                 const dateKeys = ["date_expo_du", "date_expo_au"] as const;
                 return (
@@ -664,7 +735,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       const dHidden = mode === "create" && skipKeyOnInsert(dk);
                       if (dHidden) return null;
                       return (
-                        <div key={dk} className="space-y-1.5 w-[150px]">
+                        <div key={dk} className="space-y-1.5 w-[130px]">
                           <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
                             {fieldLabel(dk)}
                           </Label>
@@ -674,7 +745,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             type="date"
                             value={dv ? dv.slice(0, 10) : ""}
                             readOnly={dReadonly || !canEditFields}
-                            className={cn("shadow-none w-auto", dReadonly ? "bg-muted/50" : "")}
+                            className={cn("shadow-none w-[130px] px-0", dReadonly ? "bg-muted/50" : "")}
                             onChange={(e) => setValues((prev) => ({ ...prev, [dk]: e.target.value }))}
                           />
                         </div>
@@ -684,17 +755,17 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 );
               }
 
-              // zip_expo est rendu dans le bloc lieu_expo — on le saute ici
-              if (key === "zip_expo" && sortedKeys.includes("lieu_expo")) return null;
+              // city_expo est rendu dans le bloc zip_expo — on le saute ici
+              if (key === "city_expo" && sortedKeys.includes("zip_expo")) return null;
 
-              // lieu_expo : rendu côte à côte avec zip_expo (zip à gauche, w-150px)
-              if (key === "lieu_expo" && sortedKeys.includes("zip_expo")) {
+              // zip_expo : rendu côte à côte avec city_expo (zip à gauche w-150px, ville flex-1)
+              if (key === "zip_expo" && sortedKeys.includes("city_expo")) {
                 const zipV = values["zip_expo"] ?? "";
-                const lieuV = values["lieu_expo"] ?? "";
+                const cityV = values["city_expo"] ?? "";
                 const zipRo = isReadonlyExpoKey("zip_expo", mode);
-                const lieuRo = isReadonlyExpoKey("lieu_expo", mode);
+                const cityRo = isReadonlyExpoKey("city_expo", mode);
                 return (
-                  <div key="zip-lieu" className="flex gap-3 items-end">
+                  <div key="zip-city" className="flex gap-3 items-end">
                     <div className="space-y-1.5 w-[150px] shrink-0">
                       <Label htmlFor="expo-field-zip_expo" className="text-xs font-medium">
                         {fieldLabel("zip_expo")}
@@ -709,16 +780,57 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       />
                     </div>
                     <div className="space-y-1.5 flex-1 min-w-0">
-                      <Label htmlFor="expo-field-lieu_expo" className="text-xs font-medium">
-                        {fieldLabel("lieu_expo")}
+                      <Label htmlFor="expo-field-city_expo" className="text-xs font-medium">
+                        {fieldLabel("city_expo")}
                       </Label>
                       <Input
-                        id="expo-field-lieu_expo"
-                        name="expo_lieu_expo"
-                        value={lieuV}
-                        readOnly={lieuRo || !canEditFields}
-                        className={cn("shadow-none", lieuRo ? "bg-muted/50" : "")}
-                        onChange={(e) => setValues((prev) => ({ ...prev, lieu_expo: e.target.value }))}
+                        id="expo-field-city_expo"
+                        name="expo_city_expo"
+                        value={cityV}
+                        readOnly={cityRo || !canEditFields}
+                        className={cn("shadow-none", cityRo ? "bg-muted/50" : "")}
+                        onChange={(e) => setValues((prev) => ({ ...prev, city_expo: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                );
+              }
+
+              // tel_ref_expo est rendu dans le bloc ref_expo — on le saute ici
+              if (key === "tel_ref_expo" && sortedKeys.includes("ref_expo")) return null;
+
+              // ref_expo : rendu côte à côte avec tel_ref_expo (ref flex-1, tél flex-1)
+              if (key === "ref_expo" && sortedKeys.includes("tel_ref_expo")) {
+                const refV = values["ref_expo"] ?? "";
+                const telV = values["tel_ref_expo"] ?? "";
+                const refRo = isReadonlyExpoKey("ref_expo", mode);
+                const telRo = isReadonlyExpoKey("tel_ref_expo", mode);
+                return (
+                  <div key="ref-tel" className="flex gap-3 items-end">
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <Label htmlFor="expo-field-ref_expo" className="text-xs font-medium">
+                        {fieldLabel("ref_expo")}
+                      </Label>
+                      <Input
+                        id="expo-field-ref_expo"
+                        name="expo_ref_expo"
+                        value={refV}
+                        readOnly={refRo || !canEditFields}
+                        className={cn("shadow-none", refRo ? "bg-muted/50" : "")}
+                        onChange={(e) => setValues((prev) => ({ ...prev, ref_expo: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <Label htmlFor="expo-field-tel_ref_expo" className="text-xs font-medium">
+                        {fieldLabel("tel_ref_expo")}
+                      </Label>
+                      <Input
+                        id="expo-field-tel_ref_expo"
+                        name="expo_tel_ref_expo"
+                        value={telV}
+                        readOnly={telRo || !canEditFields}
+                        className={cn("shadow-none", telRo ? "bg-muted/50" : "")}
+                        onChange={(e) => setValues((prev) => ({ ...prev, tel_ref_expo: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -839,7 +951,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                           type="file"
                           accept="image/*"
                           disabled={readonly || saving || !canEditFields}
-                          className="cursor-pointer shadow-none file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+                          className="cursor-pointer shadow-none text-transparent file:text-foreground file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
                           onChange={(e) => {
                             const file = e.target.files?.[0] ?? null;
                             e.target.value = "";
@@ -858,55 +970,40 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             });
                           }}
                         />
-                        {!readonly && canEditFields && (v.trim() || logoFileByKey[key]) && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 px-2 text-xs"
-                            disabled={saving}
-                            onClick={() => {
-                              setValues((prev) => ({ ...prev, [key]: "" }));
-                              setLogoFileByKey((prev) => ({ ...prev, [key]: null }));
-                              setLogoPreviewByKey((prev) => {
-                                const u = prev[key];
-                                if (u) URL.revokeObjectURL(u);
-                                const { [key]: _, ...rest } = prev;
-                                return rest;
-                              });
-                            }}
-                          >
-                            Retirer le logo
-                          </Button>
-                        )}
                       </div>
-                      {sponsorLogos.length > 0 && (
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                            Sponsors / Mécènes
-                          </p>
-                          <Carousel opts={{ align: "start", loop: false }} className="w-full">
-                            <CarouselContent className="-ml-2">
-                              {sponsorLogos.map((s, i) => (
-                                <CarouselItem key={i} className="pl-2 basis-1/3">
-                                  <div
-                                    className="flex h-16 items-center justify-center rounded-md border border-border bg-muted/20 p-1"
-                                    title={s.nom}
-                                  >
-                                    <img src={s.url} alt={s.nom} className="max-h-full max-w-full object-contain" />
-                                  </div>
-                                </CarouselItem>
-                              ))}
-                            </CarouselContent>
-                            {sponsorLogos.length > 3 && (
-                              <>
-                                <CarouselPrevious className="left-0" />
-                                <CarouselNext className="right-0" />
-                              </>
-                            )}
-                          </Carousel>
+                      {/* Navigation des œuvres — à droite du logo */}
+                      <div className="shrink-0 space-y-2 w-[430px]">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {t("form.navTypeLabel")}
+                        </p>
+                        <div className="space-y-1.5">
+                          <label className="flex cursor-pointer items-start gap-2 text-sm">
+                            <input
+                              type="radio"
+                              name="type_navigation"
+                              value="false"
+                              checked={!typeNavigation}
+                              onChange={() => setTypeNavigation(false)}
+                              disabled={saving}
+                              className="mt-0.5 accent-primary"
+                            />
+                            <span className="flex-1">Une œuvre scannée donne toutes les œuvres du même artiste</span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-2 text-sm">
+                            <input
+                              type="radio"
+                              name="type_navigation"
+                              value="true"
+                              checked={typeNavigation}
+                              onChange={() => setTypeNavigation(true)}
+                              disabled={saving}
+                              className="mt-0.5 accent-primary"
+                            />
+                            <span>Œuvres scannées l'une après l'autre</span>
+                          </label>
                         </div>
-                      )}
+                      </div>
+
                     </div>
                   </div>
                 );
@@ -959,16 +1056,50 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
             </div>
           )}
 
-          {/* Horaires d'ouverture */}
+          {/* Horaires d'ouverture + Sponsors côte-à-côte */}
           {!loadingRow && (
-            <div className="pt-3 border-t border-border mt-1 space-y-1.5">
-              <Label className="text-xs font-medium">Horaires d'ouverture</Label>
-              <ExpoHorairesEditor
-                value={horaires}
-                onChange={setHoraires}
-                disabled={saving}
-                readonly={!canEditFields}
-              />
+            <div className="pt-3 border-t border-border mt-1 flex items-start gap-6">
+              <div className="space-y-1.5 w-[350px] shrink-0">
+                <Label className="text-xs font-medium">Horaires d'ouverture</Label>
+                <ExpoHorairesEditor
+                  value={horaires}
+                  onChange={setHoraires}
+                  disabled={saving}
+                  readonly={!canEditFields}
+                />
+              </div>
+              {sponsorLogos.length > 0 && (
+                <div className="flex-1 min-w-0 space-y-2">
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Sponsors / Mécènes
+                  </p>
+                  <Carousel
+                    orientation="vertical"
+                    opts={{ align: "start", loop: true }}
+                    className="w-full h-[200px]"
+                  >
+                    <CarouselContent className="-mt-2">
+                      {sponsorLogos.map((s, i) => (
+                        <CarouselItem key={i} className="pt-2 basis-1/2">
+                          <div
+                            className="flex h-16 items-center justify-center rounded-md border border-border bg-muted/20 p-1 cursor-pointer hover:border-primary hover:bg-muted/40 transition-colors"
+                            title={`${s.nom} — cliquer pour modifier`}
+                            onClick={() => { setSelectedSponsorId(s.id); setShowSponsorDialog(true); }}
+                          >
+                            <img src={s.url} alt={s.nom} className="max-h-full max-w-full object-contain" />
+                          </div>
+                        </CarouselItem>
+                      ))}
+                    </CarouselContent>
+                    {sponsorLogos.length > 2 && (
+                      <>
+                        <CarouselPrevious />
+                        <CarouselNext />
+                      </>
+                    )}
+                  </Carousel>
+                </div>
+              )}
             </div>
           )}
 
@@ -990,9 +1121,10 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       </DialogContent>
       <SponsorDialog
         open={showSponsorDialog}
-        onOpenChange={setShowSponsorDialog}
+        onOpenChange={(v) => { setShowSponsorDialog(v); if (!v) setSelectedSponsorId(null); }}
         expoId={expoId}
         expoName={values["expo_name"] ?? ""}
+        initialSponsorId={selectedSponsorId}
       />
 
       <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>

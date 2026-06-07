@@ -1,0 +1,54 @@
+{
+  "title": {
+    "listExpo": "Sponsor / Mecenati — {{name}}",
+    "listAll": "Sponsor / Mecenati — tutte le esposizioni",
+    "edit": "Modifica scheda sponsor / mecenate",
+    "new": "Nuovo sponsor / mecenate"
+  },
+  "list": {
+    "empty": "Nessuno sponsor registrato.",
+    "emptyExpo": "Nessuno sponsor registrato per questa esposizione.",
+    "editTitle": "Modifica",
+    "addBtn": "Aggiungi uno sponsor / mecenate"
+  },
+  "form": {
+    "changeLogo": "Cambia il logo",
+    "uploadLogo": "Carica un logo",
+    "logoHint": "PNG, JPG, WebP o SVG · max 2 MB",
+    "nameLabel": "Nome dello sponsor",
+    "namePlaceholder": "Nome dell'organizzazione…",
+    "contactLabel": "Contatto",
+    "contactPlaceholder": "Nome del contatto",
+    "phoneLabel": "Telefono",
+    "emailLabel": "Email",
+    "addressLabel": "Indirizzo",
+    "zipLabel": "Codice postale",
+    "cityLabel": "Città",
+    "amountLabel": "Importo impegnato",
+    "currencyLabel": "Valuta",
+    "descLabel": "Descrizione / presentazione",
+    "descPlaceholder": "Presentazione dello sponsor, natura del sostegno…",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "save": "Salva",
+    "add": "Aggiungi"
+  },
+  "errors": {
+    "nameRequired": "Il nome dello sponsor è obbligatorio.",
+    "amountInvalid": "L'importo deve essere un numero positivo.",
+    "loadFailed": "Impossibile caricare gli sponsor.",
+    "saveFailed": "Errore durante il salvataggio.",
+    "deleteFailed": "Errore durante l'eliminazione dello sponsor."
+  },
+  "toast": {
+    "updated": "Sponsor aggiornato.",
+    "added": "Sponsor aggiunto.",
+    "deleted": "Sponsor eliminato."
+  },
+  "deleteConfirm": {
+    "title": "Eliminare questo sponsor?",
+    "description": "L'eliminazione di «\u00a0{{name}}\u00a0» è definitiva. Questa azione non può essere annullata.",
+    "cancel": "Annulla",
+    "confirm": "Elimina"
+  }
+}
