@@ -91,6 +91,38 @@ export const DEFAULT_COST_SORT: CostSort = {
   ascending: false,
 };
 
+/** Fournisseurs connus de la page coûts (toujours proposés dans les filtres). */
+export const KNOWN_COST_PROVIDER_KEYS = [
+  "groq",
+  "google_gemini",
+  "google_tts",
+  "cursor",
+  "huggingface",
+  "supabase",
+  "vercel",
+  "ovh",
+] as const;
+
+export type KnownCostProviderKey = (typeof KNOWN_COST_PROVIDER_KEYS)[number];
+
+export const COST_PROVIDER_DISPLAY_NAMES: Record<KnownCostProviderKey, string> = {
+  groq: "Groq",
+  google_gemini: "Google Gemini",
+  google_tts: "Google Cloud TTS Neural2",
+  cursor: "Cursor",
+  huggingface: "HuggingFace",
+  supabase: "Supabase",
+  vercel: "Vercel",
+  ovh: "OVH",
+};
+
+export function costProviderDisplayName(providerKey: string): string {
+  return (
+    COST_PROVIDER_DISPLAY_NAMES[providerKey as KnownCostProviderKey] ??
+    providerKey
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers internes
 // ---------------------------------------------------------------------------
@@ -269,7 +301,7 @@ export async function getCostSelectOptions(): Promise<CostSelectOptions> {
 
   return {
     toolTypes:  uniq(rows.map((r) => r.tool_type)),
-    providers:  uniq(rows.map((r) => r.provider)),
+    providers:  uniq([...KNOWN_COST_PROVIDER_KEYS, ...rows.map((r) => r.provider)]),
     apiNames:   uniq(rows.map((r) => r.api_name)),
     modelNames: uniq(rows.map((r) => r.model_name)),
     statuses:   uniq(rows.map((r) => r.status)),

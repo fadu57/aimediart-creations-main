@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
   getCostTimeSeries, getCostSelectOptions, exportCostsCsv, formatCost, formatUsdToEurHint,
-  DEFAULT_COST_SORT,
+  DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName,
   type CostEvent, type CostFilters, type CostSummary,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
   type CostSort, type CostSortColumn,
@@ -85,7 +85,7 @@ type CostProvider = {
 };
 
 /** Fournisseurs affichés dans la section coûts. */
-const COST_PROVIDER_KEYS = ["groq", "google_gemini", "google_tts", "cursor", "huggingface", "supabase", "vercel", "ovh"] as const;
+const COST_PROVIDER_KEYS = KNOWN_COST_PROVIDER_KEYS;
 
 const PROVIDER_FALLBACK: Record<
   typeof COST_PROVIDER_KEYS[number],
@@ -390,7 +390,9 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
           <label className={labelClass}>{t("couts.filter_provider")}</label>
           <select value={filters.provider ?? ""} onChange={(e) => set("provider", e.target.value)} className={inputClass}>
             <option value="">{t("couts.filter_all")}</option>
-            {options.providers.map((v) => <option key={v} value={v}>{v}</option>)}
+            {options.providers.map((v) => (
+              <option key={v} value={v}>{costProviderDisplayName(v)}</option>
+            ))}
           </select>
         </div>
 
