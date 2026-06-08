@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ExpoFormDialog } from "@/components/ExpoFormDialog";
-import { SponsorDialog } from "@/components/SponsorDialog";
+import { SponsorDialog, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
@@ -26,12 +26,14 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
+import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { QR_CODE_STORAGE_OPTIONS, qrCodePrintOptions } from "@/lib/qrCodeScanFriendly";
+import { formatExpoDate, formatExpoDatesLabel } from "@/lib/expoDates";
 
 const EXPO_QR_CACHE_KEY = "aimediart-expo-qr-cache-v1";
 
@@ -115,7 +117,7 @@ function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | nul
 
   return (
     <div
-      className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/40"
+      className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border-4 border-[rgba(212,146,39,0.7)] bg-[rgba(255,255,255,0.4)] shadow-none backdrop-blur-[12px]"
       title={title}
     >
       {showImg ? (
@@ -123,7 +125,7 @@ function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | nul
           src={displaySrc}
           alt=""
           wrapperClassName="h-full w-full"
-          className="h-full w-full object-contain p-1.5"
+          className="h-full w-full object-contain border border-black p-1.5 shadow-[0_4px_12px_0_rgba(0,0,0,0.15)]"
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
@@ -190,14 +192,6 @@ function expoQrRawFromRow(row: Record<string, unknown>): string | null {
   return null;
 }
 
-function formatExpoDate(value: string | null | undefined): string {
-  const raw = (value ?? "").trim();
-  if (!raw) return "";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString("fr-FR");
-}
-
 const Expos = () => {
   const { t, i18n } = useTranslation("expos");
   const [searchParams] = useSearchParams();
@@ -234,7 +228,11 @@ const Expos = () => {
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [orgSearchTerm, setOrgSearchTerm] = useState("");
-  const [descriptionPopup, setDescriptionPopup] = useState<string | null>(null);
+  const [descriptionPopup, setDescriptionPopup] = useState<{
+    text: string;
+    name: string;
+    logo: string | null;
+  } | null>(null);
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useAuthUser();
@@ -356,28 +354,36 @@ const Expos = () => {
     };
   }, [rows]);
 
-  useEffect(() => {
-    if (!rows.length) return;
-    let cancelled = false;
-    void (async () => {
-      const expoIds = rows.map((r) => r.id).filter(Boolean);
-      const { data } = await supabase
-        .from("sponsors")
-        .select("id_expo, url_logo_sponsor")
-        .in("id_expo", expoIds)
-        .not("url_logo_sponsor", "is", null);
-      if (cancelled) return;
-      const map: Record<string, string[]> = {};
-      for (const row of ((data as Array<{ id_expo: string; url_logo_sponsor: string | null }> | null) ?? [])) {
-        if (!row.id_expo || !row.url_logo_sponsor) continue;
-        if (!map[row.id_expo]) map[row.id_expo] = [];
-        map[row.id_expo].push(row.url_logo_sponsor);
-      }
-      console.debug("[Expos] sponsorLogosByExpoId →", map);
-      setSponsorLogosByExpoId(map);
-    })();
-    return () => { cancelled = true; };
+  const applySponsorLogosForExpo = useCallback((expoId: string, logos: SponsorLogoEntry[]) => {
+    setSponsorLogosByExpoId((prev) => ({
+      ...prev,
+      [expoId]: logos.map((l) => l.url),
+    }));
+  }, []);
+
+  const loadSponsorLogos = useCallback(async () => {
+    const expoIds = rows.map((r) => r.id).filter(Boolean);
+    if (!expoIds.length) {
+      setSponsorLogosByExpoId({});
+      return;
+    }
+    const { data } = await supabase
+      .from("sponsors")
+      .select("id_expo, url_logo_sponsor")
+      .in("id_expo", expoIds)
+      .not("url_logo_sponsor", "is", null);
+    const map: Record<string, string[]> = {};
+    for (const row of ((data as Array<{ id_expo: string; url_logo_sponsor: string | null }> | null) ?? [])) {
+      if (!row.id_expo || !row.url_logo_sponsor) continue;
+      if (!map[row.id_expo]) map[row.id_expo] = [];
+      map[row.id_expo].push(row.url_logo_sponsor);
+    }
+    setSponsorLogosByExpoId(map);
   }, [rows]);
+
+  useEffect(() => {
+    void loadSponsorLogos();
+  }, [loadSponsorLogos]);
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
@@ -690,14 +696,11 @@ const Expos = () => {
             <Button type="button" variant="outline" className="gap-2" asChild>
               <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              onClick={() => setSponsorExpo({ id: "", name: "" })}
-            >
-              <Building2 className="h-4 w-4" aria-hidden />
-              {t("page.sponsors", "Sponsors")}
+            <Button type="button" variant="outline" className="gap-2" asChild>
+              <Link to="/expos/sponsors">
+                <Building2 className="h-4 w-4" aria-hidden />
+                {t("page.sponsorsList", "Liste des sponsors")}
+              </Link>
             </Button>
           </div>
         )}
@@ -772,12 +775,23 @@ const Expos = () => {
                       <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                         Sponsors / Mécènes
                       </span>
-                      <SponsorCarousel logos={sponsorLogosByExpoId[ex.id]} />
+                      <SponsorCarousel
+                        key={(sponsorLogosByExpoId[ex.id] ?? []).join("|")}
+                        logos={sponsorLogosByExpoId[ex.id]}
+                      />
                     </>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-serif font-bold text-lg">{expoTitle(ex)}</h3>
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="font-serif font-bold text-lg min-w-0">{expoTitle(ex)}</h3>
+                    <p className="shrink-0 text-sm text-muted-foreground text-right">
+                      {formatExpoDatesLabel(ex.date_expo_du, ex.date_expo_au, i18n.language, t, {
+                        range: "card.dateRange",
+                        permanent: "card.permanentExpo",
+                      })}
+                    </p>
+                  </div>
                   {curatorLabel && (
                     <p className="mt-1 text-sm text-muted-foreground">
                       {t("card.curatorLabel", { name: curatorLabel })}
@@ -812,15 +826,20 @@ const Expos = () => {
                       } catch { text = raw; }
                     }
                     if (!text?.trim()) return null;
+                    const cleanText = sanitizeTranslationOutput(text);
+                    if (!cleanText) return null;
                     return (
                       <div className="mt-2">
-                        <p className="text-sm text-muted-foreground line-clamp-5 h-[120px]">
-                          {text}
+                        <p className="text-sm text-muted-foreground line-clamp-4 h-[80px]">
+                          {cleanText}
                         </p>
                         <button
                           type="button"
                           className="mt-1 text-xs text-primary hover:underline underline-offset-2"
-                          onClick={(e) => { e.stopPropagation(); setDescriptionPopup(text); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDescriptionPopup({ text: cleanText, name: expoTitle(ex), logo: logoRaw });
+                          }}
                         >
                           Lire la suite…
                         </button>
@@ -829,18 +848,6 @@ const Expos = () => {
                   })()}
                 </div>
                 <div className="flex w-full flex-col gap-2 md:w-[190px] shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(`/scan?expo_id=${encodeURIComponent(ex.id)}`, "_blank");
-                    }}
-                  >
-                    {t("card.testQr")}
-                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -893,9 +900,15 @@ const Expos = () => {
       {sponsorExpo !== null && (
         <SponsorDialog
           open
-          onOpenChange={(o) => { if (!o) setSponsorExpo(null); }}
+          onOpenChange={(o) => {
+            if (!o) setSponsorExpo(null);
+          }}
           expoId={sponsorExpo.id || null}
           expoName={sponsorExpo.name}
+          onSponsorsChange={(logos, scopeExpoId) => {
+            if (scopeExpoId) applySponsorLogosForExpo(scopeExpoId, logos);
+            else void loadSponsorLogos();
+          }}
         />
       )}
       <ExpoFormDialog
@@ -905,6 +918,9 @@ const Expos = () => {
         expoId={formMode === "edit" ? editingExpoId : null}
         fieldKeys={expoFieldKeys}
         onSuccess={() => void load()}
+        onSponsorsChange={(logos, scopeExpoId) => {
+          if (scopeExpoId) applySponsorLogosForExpo(scopeExpoId, logos);
+        }}
         canPickAgency={typeof role_id === "number" && role_id < 4}
       />
       {panelFormatExpo && (
@@ -991,9 +1007,22 @@ const Expos = () => {
       {/* Popup description complète */}
       <Dialog open={!!descriptionPopup} onOpenChange={(o) => { if (!o) setDescriptionPopup(null); }}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogTitle className="font-serif text-lg">Description</DialogTitle>
+          <DialogTitle className="flex items-center gap-3 font-serif text-lg pr-8">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/70 bg-muted/40">
+              {descriptionPopup?.logo?.trim() ? (
+                <img
+                  src={resolveExpoLogoImgSrc(descriptionPopup.logo)}
+                  alt=""
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                <Images className="h-7 w-7 text-muted-foreground" aria-hidden />
+              )}
+            </div>
+            <span className="min-w-0 leading-tight">{descriptionPopup?.name}</span>
+          </DialogTitle>
           <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-            {descriptionPopup}
+            {descriptionPopup?.text}
           </p>
         </DialogContent>
       </Dialog>

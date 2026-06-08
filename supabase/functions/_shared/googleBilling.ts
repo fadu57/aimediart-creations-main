@@ -371,10 +371,9 @@ export async function updateGoogleProviderSyncStatus(
     last_stats: stats ?? null,
   };
 
-  for (const key of ["google_gemini", "google_tts"] as const) {
-    const notes = key === "google_tts"
-      ? "Coûts Cloud TTS via export billing. TTS visiteur = Web Speech API (gratuit côté GCP)."
-      : "Coûts Gemini via export billing BigQuery (si facturation liée au projet exporté).";
+  for (const key of ["google_gemini"] as const) {
+    const notes =
+      "Coûts Gemini via export billing BigQuery (si facturation liée au projet exporté).";
 
     await admin.from("cost_providers").update({
       last_synced_at: now,

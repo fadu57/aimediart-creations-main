@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { getStoredFingerprintJsId, loadOrCreateFingerprintJsId } from "@/lib/fingerprintConsent";
+import { buildDeviceFingerprint } from "@/lib/visitorDeviceFingerprint";
 import { getOrCreateVisitorUuid, getVisitorLocaleMetadata } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import { supabase } from "@/lib/supabase";
@@ -200,6 +201,7 @@ const ScanWelcome = () => {
         p_device_type: null,
         p_country: null,
         p_city: null,
+        p_device_fingerprint: buildDeviceFingerprint() || null,
       });
 
       if (regError) {

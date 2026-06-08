@@ -1,4 +1,18 @@
 {
+  "page": {
+    "title": "Lista de patrocinadores / mecenas",
+    "subtitle": "Patrocinadores y mecenas de su organización.",
+    "back": "Volver a exposiciones",
+    "searchOrg": "Filtrar por organización…",
+    "searchExpo": "Filtrar por exposición…",
+    "clearSearchOrg": "Borrar filtro de organización",
+    "clearSearchExpo": "Borrar filtro de exposición",
+    "empty": "Ningún patrocinador en este ámbito.",
+    "count": "{{count}} patrocinador(es)",
+    "addForExpo": "Añadir — {{name}}",
+    "addSponsor": "Añadir patrocinador / mecenas",
+    "pickExpoFirst": "Seleccione una exposición en el filtro antes de añadir un patrocinador."
+  },
   "title": {
     "listExpo": "Patrocinadores / Mecenas — {{name}}",
     "listAll": "Patrocinadores / Mecenas — todas las exposiciones",

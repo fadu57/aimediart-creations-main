@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -36,11 +36,7 @@ type ArtistRow = {
   artist_id: string | number;
   artist_prenom?: string | null;
   artist_name?: string | null;
-  artist_bio?: string | null;
   artist_photo_url?: string | null;
-  artist_agency_details?: Array<{
-    agency_specific_bio?: string | null;
-  }> | null;
 };
 
 type ArtworkRow = {
@@ -75,7 +71,7 @@ const Oeuvre = () => {
   const [emotionSelectionnee, setEmotionSelectionnee] = useState<string | null>(null);
   const [note, setNote] = useState(0);
   const [artistName, setArtistName] = useState<string>("");
-  const [artistBio, setArtistBio] = useState<string>("");
+  const [artistBioByLang, setArtistBioByLang] = useState<Record<string, string>>({});
   const [artistPhotoUrl, setArtistPhotoUrl] = useState<string>("");
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
@@ -167,11 +163,7 @@ const Oeuvre = () => {
           artist_id,
           artist_prenom,
           artist_name,
-          artist_bio,
-          artist_photo_url,
-          artist_agency_details (
-            agency_specific_bio
-          )
+          artist_photo_url
         `)
         .eq("artist_id", selectedArtistId);
 
@@ -184,7 +176,7 @@ const Oeuvre = () => {
 
       if (error) {
         setArtistName("");
-        setArtistBio("");
+        setArtistBioByLang({});
         setArtistPhotoUrl("");
         return;
       }
@@ -192,9 +184,23 @@ const Oeuvre = () => {
       const first = (data as ArtistRow | null) ?? null;
       const prenom = first?.artist_prenom?.trim() ?? "";
       const nom = first?.artist_name?.trim() ?? "";
-      const bioToDisplay = first?.artist_agency_details?.[0]?.agency_specific_bio || first?.artist_bio;
+
+      const { data: artistBioRows } = await supabase
+        .from("artist_bios")
+        .select("language, bio_text")
+        .eq("artist_id", selectedArtistId);
+      const bioByLang: Record<string, string> = {};
+      for (const row of (artistBioRows ?? []) as Array<{
+        language?: string | null;
+        bio_text?: string | null;
+      }>) {
+        const lang = (row.language ?? "").trim().toLowerCase().slice(0, 2);
+        if (!lang) continue;
+        bioByLang[lang] = (row.bio_text ?? "").trim();
+      }
+      setArtistBioByLang(bioByLang);
+
       setArtistName([prenom, nom].filter(Boolean).join(" "));
-      setArtistBio((bioToDisplay ?? "").trim());
       setArtistPhotoUrl(first?.artist_photo_url?.trim() ?? "");
     };
 
@@ -226,7 +232,7 @@ const Oeuvre = () => {
         setArtworkNotFound(false);
         setArtworkLoadError(error.message || "Impossible de charger cette œuvre.");
         setArtistName("");
-        setArtistBio("");
+        setArtistBioByLang({});
         setArtistPhotoUrl("");
         return;
       }
@@ -236,7 +242,7 @@ const Oeuvre = () => {
         setArtwork(null);
         setArtworkNotFound(true);
         setArtistName("");
-        setArtistBio("");
+        setArtistBioByLang({});
         setArtistPhotoUrl("");
         return;
       }
@@ -254,7 +260,7 @@ const Oeuvre = () => {
         await chargerArtisteParId(artistId);
       } else {
         setArtistName("");
-        setArtistBio("");
+        setArtistBioByLang({});
         setArtistPhotoUrl("");
       }
     };
@@ -298,6 +304,12 @@ const Oeuvre = () => {
   };
 
   const colonnesEmotions = Math.min(4, Math.max(1, Math.ceil(emotions.length / 2)));
+  const currentLocale = i18n.language.split(/[-_]/)[0];
+  const artistBio = useMemo(() => {
+    return (
+      (artistBioByLang[currentLocale] ?? "").trim() || (artistBioByLang.fr ?? "").trim()
+    );
+  }, [artistBioByLang, currentLocale]);
   const artistBioLimited = (() => {
     const bio = (artistBio ?? "").trim();
     if (!bio) return "Biographie de l'artiste indisponible pour le moment.";

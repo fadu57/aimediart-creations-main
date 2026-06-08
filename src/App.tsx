@@ -33,6 +33,8 @@ import CatalogueCorbeille from "./pages/CatalogueCorbeille";
 import Statistics from "./pages/Statistics";
 import SettingsPage from "./pages/Settings";
 import SettingsCouts from "./pages/SettingsCouts";
+import SettingsSuiviTemps from "./pages/SettingsSuiviTemps";
+import SettingsSuiviTokens from "./pages/SettingsSuiviTokens";
 import Agencies from "./pages/Agencies";
 import Agencies2 from "./pages/Agencies2";
 import AgenciesCorbeille from "./pages/AgenciesCorbeille";
@@ -40,6 +42,8 @@ import Expos from "./pages/Expos";
 import Expos2 from "./pages/Expos2";
 import ExposVisitors from "./pages/ExposVisitors";
 import ExposVisitorDetail from "./pages/ExposVisitorDetail";
+import ExposSponsors from "./pages/ExposSponsors";
+import VisiteursCorbeille from "./pages/VisiteursCorbeille";
 import ExposCorbeille from "./pages/ExposCorbeille";
 import Users from "./pages/Users";
 import Utilisateurs from "./pages/Utilisateurs";
@@ -290,11 +294,14 @@ const AppRoutes = () => (
           <Route path="user" element={<Users />} />
           <Route path="user/utilisateurs" element={<Utilisateurs />} />
           <Route path="user/users-corbeille" element={<UtilisateursCorbeille />} />
+          <Route path="user/utilisateurs-corbeille" element={<Navigate to="/utilisateurs-corbeille" replace />} />
           <Route path="utilisateurs-corbeille" element={<UtilisateursCorbeille />} />
           <Route path="expos" element={<Expos />} />
           <Route path="expos/expos2" element={<Expos2 />} />
           <Route path="expos/visitors" element={<ExposVisitors />} />
           <Route path="expos/visitors/:id" element={<ExposVisitorDetail />} />
+          <Route path="expos/sponsors" element={<ExposSponsors />} />
+          <Route path="visiteurs-corbeille" element={<VisiteursCorbeille />} />
           <Route path="expos-corbeille" element={<ExposCorbeille />} />
           <Route path="prompts" element={<Prompts />} />
           <Route path="catalogue-corbeille" element={<CatalogueCorbeille />} />
@@ -302,6 +309,8 @@ const AppRoutes = () => (
           <Route path="statistiques" element={<Statistics />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/couts" element={<SettingsCouts />} />
+          <Route path="suivi_temps" element={<SettingsSuiviTemps />} />
+          <Route path="suivi_tokens" element={<SettingsSuiviTokens />} />
           <Route path="setting" element={<Navigate to="/settings" replace />} />
           <Route path="*" element={<NotFound />} />
         </Route>

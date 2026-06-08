@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { ArchiveRestore, Eye, Loader2, Trash2 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +44,19 @@ function formatDate(value: string | null | undefined): string {
   return d.toLocaleDateString("fr-FR");
 }
 
+const DATE_FILTER_INPUT_CLASS =
+  "relative h-7 w-[112px] shrink-0 cursor-pointer items-center justify-start px-1.5 text-xs [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
+
+function openDatePickerOnClick(e: React.MouseEvent<HTMLInputElement>) {
+  const input = e.currentTarget;
+  if (typeof input.showPicker !== "function") return;
+  try {
+    input.showPicker();
+  } catch {
+    // ignore (déjà ouvert ou navigateur non compatible)
+  }
+}
+
 export default function ExposVisitors() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -56,8 +79,7 @@ export default function ExposVisitors() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo]     = useState("");
 
-  // Corbeille
-  const [showDeleted, setShowDeleted] = useState(false);
+  const [deleteConfirmRow, setDeleteConfirmRow] = useState<VisitorRow | null>(null);
   const canRestore = typeof currentRoleId === "number" && currentRoleId < 4;
 
   const agencyById = useMemo(
@@ -100,7 +122,7 @@ export default function ExposVisitors() {
       deleted_at?: string | null;
     };
     const anonRows: VisitorRow[] = ((anonData ?? []) as AnonRow[])
-      .filter((v) => v.id)
+      .filter((v) => v.id && !v.deleted_at)
       .map((v) => ({
         id: String(v.id),
         source: "visitors" as const,
@@ -113,6 +135,16 @@ export default function ExposVisitors() {
         created_at: v.last_seen_at ?? null,
         deleted_at: v.deleted_at ?? null,
       }));
+
+    const { data: deletedProfiles } = await supabase
+      .from("profiles")
+      .select("id")
+      .not("deleted_at", "is", null);
+    const deletedProfileIds = new Set(
+      ((deletedProfiles ?? []) as Array<{ id?: string | null }>)
+        .map((p) => p.id?.trim())
+        .filter(Boolean) as string[],
+    );
 
     // ── 2. Tente le RPC global (utilisateurs enregistrés) ────────────────────
     const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
@@ -142,7 +174,7 @@ export default function ExposVisitors() {
           expo_id: r.expo_id ?? null,
           created_at: r.created_at ?? null,
         }))
-        .filter((r) => r.id);
+        .filter((r) => r.id && !deletedProfileIds.has(r.id));
 
       if (currentRoleId === 4 && currentAgencyId) {
         registered = registered.filter((r) => r.agency_id?.trim() === currentAgencyId.trim());
@@ -184,7 +216,7 @@ export default function ExposVisitors() {
       agency_id: null,
       expo_id: null,
       created_at: null,
-    })).filter((r) => r.id);
+    })).filter((r) => r.id && !deletedProfileIds.has(r.id));
 
     // Fusionner profiles + anonymes (dédupliqué)
     const seen = new Set<string>(profileRows.map((r) => r.id));
@@ -194,35 +226,19 @@ export default function ExposVisitors() {
   }, [canAccess, currentRoleId, currentAgencyId]);
 
   const softDelete = async (row: VisitorRow) => {
-    if (!confirm(`Supprimer ce visiteur ? Cette action est réversible${canRestore ? "" : " (réservé au niveau 1-3)"}.`)) return;
     const table = row.source === "visitors" ? "visitors" : "profiles";
-    const idCol = row.source === "visitors" ? "id" : "id";
     const { error: err } = await supabase
       .from(table)
       .update({ deleted_at: new Date().toISOString() })
-      .eq(idCol, row.id);
-    if (err) { alert(`Erreur : ${err.message}`); return; }
-    setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, deleted_at: new Date().toISOString() } : r));
-  };
-
-  const restore = async (row: VisitorRow) => {
-    const table = row.source === "visitors" ? "visitors" : "profiles";
-    const { error: err } = await supabase
-      .from(table)
-      .update({ deleted_at: null })
       .eq("id", row.id);
     if (err) { alert(`Erreur : ${err.message}`); return; }
-    setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, deleted_at: null } : r));
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
   useEffect(() => { void load(); }, [load]);
 
   const filteredRows = useMemo(() => {
-    let list = rows;
-    // Corbeille ou actifs
-    list = showDeleted
-      ? list.filter((r) => !!r.deleted_at)
-      : list.filter((r) => !r.deleted_at);
+    let list = rows.filter((r) => !r.deleted_at);
     // Filtre expo depuis URL (?expo_id=...)
     if (filterExpoId) {
       list = list.filter((r) => r.expo_id?.trim() === filterExpoId);
@@ -249,7 +265,7 @@ export default function ExposVisitors() {
       list = list.filter((r) => r.created_at && r.created_at <= end);
     }
     return list;
-  }, [rows, showDeleted, filterExpoId, filterName, filterPseudo, filterExpoFilter, filterDateFrom, filterDateTo]);
+  }, [rows, filterExpoId, filterName, filterPseudo, filterExpoFilter, filterDateFrom, filterDateTo]);
 
   const sortedRows = useMemo(() => {
     const list = [...filteredRows];
@@ -309,21 +325,15 @@ export default function ExposVisitors() {
           <CardTitle>
             {filterExpoId
               ? `Visiteurs — ${expoById.get(filterExpoId) ?? filterExpoId}`
-              : showDeleted ? "Visiteurs supprimés" : "Visiteurs inscrits"}
+              : "Visiteurs inscrits"}
           </CardTitle>
           <div className="flex items-center gap-2">
-            {canRestore && (
-              <Button
-                type="button"
-                variant={showDeleted ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => setShowDeleted((v) => !v)}
-                className="h-7 gap-1 text-xs"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {showDeleted ? "Actifs" : "Corbeille"}
-              </Button>
-            )}
+            <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs" asChild>
+              <Link to="/visiteurs-corbeille">
+                <ArchiveRestore className="h-3.5 w-3.5" />
+                Corbeille
+              </Link>
+            </Button>
             <span className="text-sm text-muted-foreground whitespace-nowrap">
               {sortedRows.length} visiteur{sortedRows.length !== 1 ? "s" : ""}
             </span>
@@ -343,7 +353,9 @@ export default function ExposVisitors() {
                   <th className="w-36 px-2 py-1">Pseudo <SortButtons column="pseudo" /></th>
                   <th className="w-52 px-2 py-1">Email <SortButtons column="email" /></th>
                   <th className="w-36 px-2 py-1">Exposition <SortButtons column="expo" /></th>
-                  <th className="w-36 px-2 py-1">Inscription <SortButtons column="created_at" /></th>
+                  <th className="w-52 px-2 py-1 text-center">
+                    Inscription du … au <SortButtons column="created_at" />
+                  </th>
                   <th className="w-8 px-1 py-1" />
                 </tr>
                 <tr className="border-b bg-muted/20">
@@ -380,20 +392,22 @@ export default function ExposVisitors() {
                     </select>
                   </td>
                   <td className="px-2 py-1">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-row items-center gap-1">
                       <Input
                         type="date"
                         value={filterDateFrom}
                         onChange={(e) => setFilterDateFrom(e.target.value)}
+                        onClick={openDatePickerOnClick}
                         title="Du"
-                        className="h-7 text-xs"
+                        className={DATE_FILTER_INPUT_CLASS}
                       />
                       <Input
                         type="date"
                         value={filterDateTo}
                         onChange={(e) => setFilterDateTo(e.target.value)}
+                        onClick={openDatePickerOnClick}
                         title="Au"
-                        className="h-7 text-xs"
+                        className={DATE_FILTER_INPUT_CLASS}
                       />
                     </div>
                   </td>
@@ -405,12 +419,11 @@ export default function ExposVisitors() {
                   const name   = `${row.first_name || ""} ${row.last_name || ""}`.trim() || "—";
                   const pseudo = row.pseudo?.trim() || "—";
                   const expo   = (row.expo_id && expoById.get(row.expo_id)) || "—";
-                  const isDeleted = !!row.deleted_at;
                   const goDetail = () => navigate(`/expos/visitors/${row.id}?source=${row.source}`);
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b cursor-pointer hover:bg-muted/30 ${isDeleted ? "opacity-50" : ""}`}
+                      className="border-b cursor-pointer hover:bg-muted/30"
                       onClick={goDetail}
                     >
                       {/* Œil — gauche */}
@@ -424,29 +437,16 @@ export default function ExposVisitors() {
                       <td className="px-2 py-1 truncate" title={row.email || ""}>{row.email || "—"}</td>
                       <td className="px-2 py-1 truncate" title={expo}>{expo}</td>
                       <td className="px-2 py-1 whitespace-nowrap">{formatDate(row.created_at)}</td>
-                      {/* Corbeille / Restaurer — droite */}
+                      {/* Supprimer — droite */}
                       <td className="px-1 py-1 text-center" onClick={(e) => e.stopPropagation()}>
-                        {isDeleted ? (
-                          canRestore ? (
-                            <button
-                              type="button"
-                              title="Restaurer"
-                              onClick={() => restore(row)}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-green-500"
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </button>
-                          ) : null
-                        ) : (
-                          <button
-                            type="button"
-                            title="Supprimer"
-                            onClick={() => softDelete(row)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          title="Supprimer"
+                          onClick={() => setDeleteConfirmRow(row)}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -454,7 +454,7 @@ export default function ExposVisitors() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-2 py-2 text-muted-foreground">
-                      {showDeleted ? "Aucun visiteur supprimé." : "Aucun visiteur inscrit."}
+                      Aucun visiteur inscrit.
                     </td>
                   </tr>
                 )}
@@ -463,6 +463,58 @@ export default function ExposVisitors() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={Boolean(deleteConfirmRow)}
+        onOpenChange={(open) => !open && setDeleteConfirmRow(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce visiteur ?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Vous allez supprimer{" "}
+                  <span className="font-medium text-foreground">
+                    {deleteConfirmRow
+                      ? `${deleteConfirmRow.first_name || ""} ${deleteConfirmRow.last_name || ""}`.trim()
+                        || deleteConfirmRow.pseudo?.trim()
+                        || "ce visiteur"
+                      : "ce visiteur"}
+                  </span>
+                  .
+                </p>
+                <p className="font-semibold text-destructive">
+                  Cette suppression n&apos;est pas définitive.
+                </p>
+                <p>
+                  Le visiteur sera déplacé dans la{" "}
+                  <Link to="/visiteurs-corbeille" className="font-medium text-foreground underline underline-offset-2">
+                    corbeille visiteurs
+                  </Link>
+                  {" "}et pourra être restauré
+                  {canRestore
+                    ? " depuis cette page."
+                    : " par un administrateur (niveaux 1 à 3)."}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!deleteConfirmRow) return;
+                void softDelete(deleteConfirmRow);
+                setDeleteConfirmRow(null);
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useFormState, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -18,6 +18,7 @@ import {
   type SocialLinkType,
 } from "@/lib/artistFormConstants";
 import { generateMultilingualBiographyWithGrok } from "@/lib/grokBio";
+import { clampLocalDay, coerceFormDate, computeArtistAgeYears, parseDateOnlyString, resolveArtistBirthDate, startOfLocalDay } from "@/lib/artistAge";
 import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { removeSupabaseStorageObjectByPublicUrl } from "@/lib/supabaseStorage";
@@ -27,13 +28,11 @@ import {
   ARTIST_BIO_LANGUAGES,
   EMPTY_BIOS,
   hasAnyBioText,
+  loadArtistBiosForForm,
   upsertArtistBioRow,
-  useArtistBios,
   type Language,
 } from "@/hooks/useArtistBios";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { hasFullDataAccess } from "@/lib/authUser";
-import { normalizeArtistBioForStorage } from "@/lib/artistBio";
 import {
   normalizePostalCode,
   postalPlaceholderForCountryLabel,
@@ -67,6 +66,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -88,13 +88,29 @@ function RequiredAsterisk() {
   );
 }
 
+function normalizePickerDate(date: Date | undefined): Date | undefined {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
+function ArtistAgeDisplay({ ageYears, missingText, yearsText }: {
+  ageYears: number | null;
+  missingText: string;
+  yearsText: string;
+}) {
+  return (
+    <p className="text-sm font-black text-center text-muted-foreground tabular-nums">
+      {ageYears === null ? missingText : yearsText}
+    </p>
+  );
+}
+
 const socialSchema = z.record(z.string());
 
 const artistFormSchemaBase = z.object({
   artist_firstname: z.string().min(1, "Le prénom est obligatoire.").trim(),
   artist_lastname: z.string().min(1, "Le nom est obligatoire.").trim(),
   artist_typ: z.array(z.string()).min(1, "Sélectionnez au moins un type d’art."),
-  artist_bio: z.string().trim().default(""),
   country: z.string().optional(),
   addressLine1: z.string().optional(),
   addressLine2: z.string().optional(),
@@ -105,10 +121,47 @@ const artistFormSchemaBase = z.object({
   email: z.union([z.literal(""), z.string().email("Format d’e-mail invalide.")]).optional(),
   phone: z.string().optional(),
   birth_date: z.date().optional().nullable(),
+  death_date: z.date().optional().nullable(),
+  artist_vivant: z.boolean().default(true),
   social: socialSchema.optional(),
 });
 
 const artistFormSchema = artistFormSchemaBase.superRefine((data, ctx) => {
+  const today = startOfLocalDay(new Date());
+  const birth = coerceFormDate(data.birth_date);
+  const death = coerceFormDate(data.death_date);
+
+  if (birth && birth > today) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["birth_date"],
+      message: "La date de naissance ne peut pas être postérieure à aujourd’hui.",
+    });
+  }
+
+  if (data.artist_vivant === false) {
+    if (death && death > today) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["death_date"],
+        message: "La date de décès ne peut pas être postérieure à aujourd’hui.",
+      });
+    }
+    if (birth && death && death < birth) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["birth_date"],
+        message: "La date de naissance doit être antérieure à la date de décès.",
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["death_date"],
+        message: "La date de décès doit être postérieure à la date de naissance.",
+      });
+    }
+    return;
+  }
+
   const normalizedPostal = normalizePostalCode(data.postalCode ?? "");
   if (!normalizedPostal) return;
 
@@ -141,20 +194,15 @@ type DbArtistRow = {
   artist_zipcode?: string | null;
   artist_city?: string | null;
   artist_nickname?: string | null;
-  artist_bio?: string | null;
   artist_photo_url?: string | null;
   artist_email?: string | null;
   artist_phone?: string | null;
   artist_birth_date?: string | null;
+  artist_death_date?: string | null;
+  artist_vivant?: boolean | null;
   artist_typ?: string | string[] | null;
   artist_control?: string | null;
   initiale_artist?: string | null;
-};
-
-type ArtistAgencyDetailsRow = {
-  artist_id: string;
-  agency_id: string;
-  agency_specific_bio?: string | null;
 };
 
 function parseArtistTypFromDb(raw: unknown): string[] {
@@ -168,6 +216,16 @@ function parseArtistTypFromDb(raw: unknown): string[] {
   return [];
 }
 
+const ART_TYPES_PREVIEW_MAX = 2;
+
+function formatArtTypesButtonLabel(types: string[], moreLabel: (count: number) => string): string {
+  if (!types.length) return "";
+  const head = types.slice(0, ART_TYPES_PREVIEW_MAX).join(", ");
+  const rest = types.length - ART_TYPES_PREVIEW_MAX;
+  if (rest > 0) return `${head} ${moreLabel(rest)}`;
+  return head;
+}
+
 function getDefaultValues(): ArtistFormInput {
   return {
     artist_firstname: "",
@@ -178,21 +236,54 @@ function getDefaultValues(): ArtistFormInput {
     postalCode: "",
     city: "",
     artist_nickname: "",
-    artist_bio: "",
     artist_photo_url: "",
     email: "",
     phone: "",
     birth_date: undefined,
+    death_date: undefined,
+    artist_vivant: true,
     artist_typ: [],
     social: emptySocialRecord(),
   };
 }
+
+/** Empreinte stable des champs RHF pour détecter toute modification (hors bios / agence / photo). */
+function serializeArtistFormSnapshot(values: ArtistFormInput): string {
+  const birth = coerceFormDate(values.birth_date);
+  const death = coerceFormDate(values.death_date);
+  const social = values.social ?? emptySocialRecord();
+
+  return JSON.stringify({
+    artist_firstname: (values.artist_firstname ?? "").trim(),
+    artist_lastname: (values.artist_lastname ?? "").trim(),
+    artist_typ: [...(values.artist_typ ?? [])].sort(),
+    country: values.country ?? "",
+    addressLine1: (values.addressLine1 ?? "").trim(),
+    addressLine2: (values.addressLine2 ?? "").trim(),
+    postalCode: normalizePostalCode(values.postalCode ?? ""),
+    city: (values.city ?? "").trim(),
+    artist_nickname: (values.artist_nickname ?? "").trim(),
+    artist_photo_url: (values.artist_photo_url ?? "").trim(),
+    email: (values.email ?? "").trim(),
+    phone: (values.phone ?? "").trim(),
+    birth_date: birth ? format(birth, "yyyy-MM-dd") : null,
+    death_date: death ? format(death, "yyyy-MM-dd") : null,
+    artist_vivant: values.artist_vivant !== false,
+    social: Object.fromEntries(
+      SOCIAL_LINK_TYPES.map((type) => [type, (social[type] ?? "").trim()] as const),
+    ),
+  });
+}
+
+const ARTIST_BIRTH_YEAR_MIN = 1800;
 
 export type AddArtistDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (artistId: string) => void;
   artistId?: string | null;
+  /** Page /artist/edit : ouvrir directement en mode édition (pas lecture seule). */
+  initialEditMode?: boolean;
 };
 
 export function AddArtistDialog({
@@ -200,15 +291,22 @@ export function AddArtistDialog({
   onOpenChange,
   onSuccess,
   artistId: artistIdProp,
+  initialEditMode = false,
 }: AddArtistDialogProps) {
   const { t } = useTranslation("artists");
-  const { user, role_name, role_id, agency_id } = useAuthUser();
+  const { user, agency_id } = useAuthUser();
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const bypassCloseConfirmRef = useRef(false);
   const pendingPhotoFileRef = useRef<File | null>(null);
   const photoDirtyRef = useRef(false);
-  const biosDraftRef = useRef<Record<Language, string>>({ ...EMPTY_BIOS });
-  const biosRef = useRef<Partial<Record<Language, string>>>({});
+  const artistBiosRef = useRef<Record<Language, string>>({ ...EMPTY_BIOS });
+  const artistBiosFromDbRef = useRef<Record<Language, string>>({ ...EMPTY_BIOS });
+  /** Agence enregistrée au chargement de la fiche (hors react-hook-form). */
+  const savedAgencyIdRef = useRef("");
+  /** Valeurs RHF au dernier chargement / enregistrement réussi. */
+  const initialFormSnapshotRef = useRef("");
+  /** `artist_bios` chargées depuis la base (évite d’écraser les bios si save avant fin de load). */
+  const biosLoadedRef = useRef(false);
   const editingArtistIdRef = useRef<string | null>(null);
   const loadArtistIntoFormRef = useRef<(row: DbArtistRow) => Promise<void>>(async () => {});
   const initialLoadDoneRef = useRef<string | null>(null);
@@ -246,6 +344,7 @@ export function AddArtistDialog({
   const [editingArtistId, setEditingArtistId] = useState<string | null>(null);
   const [ficheReadOnly, setFicheReadOnly] = useState(false);
   const [duplicateRow, setDuplicateRow] = useState<DbArtistRow | null>(null);
+  const [duplicateBioFr, setDuplicateBioFr] = useState("");
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [forceCreateDespiteDuplicate, setForceCreateDespiteDuplicate] = useState(false);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
@@ -258,34 +357,118 @@ export function AddArtistDialog({
   const [internalOpen, setInternalOpen] = useState(open);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const previewObjectUrlRef = useRef<string | null>(null);
-  const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
-  /** Agence unique pour lecture / écriture des bios (session > détail fiche > picker). */
+  /** Agence pour lecture / écriture des bios (session > détail fiche > agency_users). */
   const [resolvedArtistAgencyId, setResolvedArtistAgencyId] = useState("");
-  const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
-  const [loadingAgencies, setLoadingAgencies] = useState(false);
   const [phoneValid, setPhoneValid] = useState(true);
   const [activeLanguage, setActiveLanguage] = useState<Language>("fr");
-  const [biosDraft, setBiosDraft] = useState<Record<Language, string>>(() => ({ ...EMPTY_BIOS }));
+  /** Contenu des textarea — chargé depuis `artist_bios`, modifié localement ensuite. */
+  const [artistBios, setArtistBios] = useState<Record<Language, string>>(() => ({ ...EMPTY_BIOS }));
+  const [biosLoading, setBiosLoading] = useState(false);
 
   const form = useForm<ArtistFormInput>({
     resolver: zodResolver(artistFormSchema),
     defaultValues: getDefaultValues(),
   });
 
+  const { isDirty } = useFormState({ control: form.control });
+  const watchedFormValues = useWatch({ control: form.control });
+
   const firstname = useWatch({ control: form.control, name: "artist_firstname" });
   const lastname = useWatch({ control: form.control, name: "artist_lastname" });
   const artistTyp = useWatch({ control: form.control, name: "artist_typ" });
   const country = useWatch({ control: form.control, name: "country" });
+  const artistVivant = useWatch({ control: form.control, name: "artist_vivant" });
+  const [birthDateWatched, deathDateWatched] = form.watch(["birth_date", "death_date"]);
   const photoUrl = useWatch({ control: form.control, name: "artist_photo_url" });
 
-  const agencyForBiosHook = useMemo(() => {
-    const sessionA = (agency_id ?? "").trim();
-    const resolvedA = resolvedArtistAgencyId.trim();
-    const pickedA = selectedAgencyId.trim();
-    return sessionA || resolvedA || pickedA || null;
-  }, [agency_id, resolvedArtistAgencyId, selectedAgencyId]);
+  const artistAgeYears = computeArtistAgeYears(
+    birthDateWatched,
+    deathDateWatched,
+    artistVivant !== false,
+  );
 
-  const { bios, loading: biosLoading } = useArtistBios(open ? editingArtistId : null, agencyForBiosHook);
+  const today = startOfLocalDay(new Date());
+  const birthDateBound = coerceFormDate(birthDateWatched);
+  const deathDateBound = coerceFormDate(deathDateWatched);
+  const birthPickerMin = useMemo(() => new Date(ARTIST_BIRTH_YEAR_MIN, 0, 1), []);
+  const birthPickerMax =
+    artistVivant === false && deathDateBound
+      ? deathDateBound < today
+        ? deathDateBound
+        : today
+      : today;
+  const deathPickerMin = birthDateBound ?? birthPickerMin;
+  const deathPickerMax = today;
+
+  useEffect(() => {
+    if (artistVivant !== false) return;
+
+    const birth = coerceFormDate(form.getValues("birth_date"));
+    const death = coerceFormDate(form.getValues("death_date"));
+    if (!birth || !death) return;
+
+    const maxBirth = death < today ? death : today;
+    if (birth > maxBirth) {
+      form.setValue("birth_date", maxBirth, {
+        shouldDirty: true,
+        shouldValidate: true,
+        shouldNotify: true,
+      });
+    } else if (death < birth) {
+      form.setValue("death_date", birth, {
+        shouldDirty: true,
+        shouldValidate: true,
+        shouldNotify: true,
+      });
+    }
+  }, [artistVivant, birthDateWatched, deathDateWatched, form, today]);
+
+  const bioArtistId = useMemo(() => {
+    const id = (artistIdProp ?? editingArtistId ?? "").trim();
+    return id || null;
+  }, [artistIdProp, editingArtistId]);
+
+  /** Une seule requête `artist_bios` par artist_id — aucune autre table, aucun re-fetch agence. */
+  useEffect(() => {
+    if (!bioArtistId) {
+      setArtistBios({ ...EMPTY_BIOS });
+      artistBiosFromDbRef.current = { ...EMPTY_BIOS };
+      biosLoadedRef.current = true;
+      setBiosLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBiosLoading(true);
+    biosLoadedRef.current = false;
+
+    void (async () => {
+      try {
+        const loaded = await loadArtistBiosForForm(bioArtistId);
+        if (cancelled) return;
+        setArtistBios(loaded);
+        artistBiosFromDbRef.current = loaded;
+        biosLoadedRef.current = true;
+        if (import.meta.env.DEV) {
+          console.debug("[AddArtistDialog] artist_bios", bioArtistId, loaded);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        const msg = error instanceof Error ? error.message : "Chargement impossible.";
+        toast.error(`artist_bios : ${msg}`);
+        console.warn("[AddArtistDialog] artist_bios", msg);
+        biosLoadedRef.current = false;
+      } finally {
+        if (!cancelled) {
+          setBiosLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bioArtistId]);
 
   useEffect(() => {
     if (open) {
@@ -320,42 +503,15 @@ export function AddArtistDialog({
     };
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    if (!editingArtistId) {
-      setBiosDraft({ ...EMPTY_BIOS });
-      setActiveLanguage("fr");
-      return;
-    }
-
-    if (biosLoading) return;
-
-    if (
-      editingArtistId &&
-      !hasAnyBioText(bios) &&
-      !(agency_id ?? "").trim() &&
-      !resolvedArtistAgencyId.trim() &&
-      !selectedAgencyId.trim()
-    ) {
-      return;
-    }
-
-    if (hasAnyBioText(bios)) {
-      setBiosDraft({ ...EMPTY_BIOS, ...bios });
-    } else {
-      setBiosDraft((prev) => {
-        if (hasAnyBioText(prev)) return prev;
-        return { ...EMPTY_BIOS };
-      });
-    }
-  }, [open, editingArtistId, biosLoading, bios, agency_id, resolvedArtistAgencyId, selectedAgencyId]);
-
   const resetAll = useCallback(() => {
-    form.reset(getDefaultValues());
+    const defaults = getDefaultValues();
+    form.reset(defaults);
+    initialFormSnapshotRef.current = serializeArtistFormSnapshot(defaults);
+    biosLoadedRef.current = true;
     setEditingArtistId(null);
     setFicheReadOnly(false);
     setDuplicateRow(null);
+    setDuplicateBioFr("");
     setIsDuplicateModalOpen(false);
     setForceCreateDespiteDuplicate(false);
     clearPendingPhotoState();
@@ -363,10 +519,8 @@ export function AddArtistDialog({
     setCheckingDuplicate(false);
     setGeneratingBio(false);
     setActiveLanguage("fr");
-    setBiosDraft({ ...EMPTY_BIOS });
-    setSelectedAgencyId("");
     setResolvedArtistAgencyId("");
-    setAgencyOptions([]);
+    savedAgencyIdRef.current = "";
     setPhoneValid(true);
     if (previewObjectUrlRef.current) {
       URL.revokeObjectURL(previewObjectUrlRef.current);
@@ -394,6 +548,7 @@ export function AddArtistDialog({
   useEffect(() => {
     if (!open || !hasTripleRequired || ficheReadOnly) {
       setDuplicateRow(null);
+      setDuplicateBioFr("");
       setIsDuplicateModalOpen(false);
       return;
     }
@@ -421,6 +576,7 @@ export function AddArtistDialog({
         if (error) {
           console.warn("Doublon :", error.message);
           setDuplicateRow(null);
+          setDuplicateBioFr("");
           return;
         }
 
@@ -440,6 +596,17 @@ export function AddArtistDialog({
           ) ?? null;
 
         setDuplicateRow(match);
+        if (!match?.artist_id) {
+          setDuplicateBioFr("");
+          return;
+        }
+
+        try {
+          const bios = await loadArtistBiosForForm(match.artist_id);
+          if (!cancelled) setDuplicateBioFr((bios.fr ?? "").trim());
+        } catch {
+          if (!cancelled) setDuplicateBioFr("");
+        }
       })();
     }, 450);
 
@@ -451,32 +618,37 @@ export function AddArtistDialog({
 
   const canShowGenerateBio = !ficheReadOnly;
 
-  /** Verrou champ : toujours bloqué en lecture seule, ET bloqué si la valeur est déjà remplie en mode édition. */
-  const isLocked = (value: unknown) =>
-    ficheReadOnly ||
-    (Boolean(editingArtistId) &&
-      value !== "" &&
-      value !== null &&
-      value !== undefined &&
-      !(Array.isArray(value) && value.length === 0));
-
   pendingPhotoFileRef.current = pendingPhotoFile;
   photoDirtyRef.current = photoDirty;
-  biosDraftRef.current = biosDraft;
-  biosRef.current = bios;
+  artistBiosRef.current = artistBios;
   editingArtistIdRef.current = editingArtistId;
+
+  const formFieldsChanged = useMemo(() => {
+    const snapshot = initialFormSnapshotRef.current;
+    if (!snapshot) return isDirty;
+    const merged = { ...getDefaultValues(), ...watchedFormValues } as ArtistFormInput;
+    return serializeArtistFormSnapshot(merged) !== snapshot;
+  }, [isDirty, watchedFormValues]);
+
+  const biosChanged = useMemo(
+    () =>
+      ARTIST_BIO_LANGUAGES.some(
+        (lang) =>
+          (artistBios[lang] ?? "").trim() !== (artistBiosFromDbRef.current[lang] ?? "").trim(),
+      ),
+    [artistBios],
+  );
 
   const hasUnsavedChanges = useMemo(() => {
     const hasPendingPhoto = Boolean(pendingPhotoFile || photoDirty || photoChangeTokenRef.current > 0);
 
     if (editingArtistId) {
-      const biosChanged = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "") !== (bios[lang] ?? ""));
-      return Boolean(form.formState.isDirty || hasPendingPhoto || biosChanged);
+      return Boolean(formFieldsChanged || hasPendingPhoto || biosChanged);
     }
 
-    const hasBio = ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim().length > 0);
-    return Boolean(form.formState.isDirty || hasPendingPhoto || hasBio);
-  }, [bios, biosDraft, editingArtistId, form.formState.isDirty, pendingPhotoFile, photoDirty]);
+    const hasBio = ARTIST_BIO_LANGUAGES.some((lang) => (artistBios[lang] ?? "").trim().length > 0);
+    return Boolean(formFieldsChanged || hasPendingPhoto || hasBio);
+  }, [artistBios, biosChanged, editingArtistId, formFieldsChanged, pendingPhotoFile, photoDirty]);
 
   const hasArtistChanges = hasUnsavedChanges;
 
@@ -522,23 +694,9 @@ export function AddArtistDialog({
     [attemptClose, hasUnsavedChanges],
   );
 
-  const needsAgencyPicker = useMemo(() => {
-    if ((agency_id ?? "").trim()) return false;
-    if (hasFullDataAccess(role_name)) return true;
-    if (role_id === 1 || role_id === 2 || role_id === 3) return true;
-    return false;
-  }, [agency_id, role_id, role_name]);
-
-  const agencySelectionOk = !needsAgencyPicker || selectedAgencyId.trim().length > 0;
-
-  const canShowSaveButton = editingArtistId
-    ? !ficheReadOnly &&
-      hasTripleRequired &&
-      hasArtistChanges &&
-      !generatingBio &&
-      !biosLoading &&
-      agencySelectionOk
-    : !ficheReadOnly && hasTripleRequired && !generatingBio && agencySelectionOk;
+  const canSave = editingArtistId
+    ? !ficheReadOnly && hasTripleRequired && hasArtistChanges && !generatingBio
+    : !ficheReadOnly && hasTripleRequired && !generatingBio;
 
   const resolveCurrentAgencyId = useCallback(async (): Promise<string | null> => {
     const agencyFromSession = (agency_id ?? "").trim();
@@ -583,12 +741,9 @@ export function AddArtistDialog({
       const detailAgency =
         (((agencyRow as { agency_id?: string | null } | null)?.agency_id ?? "") as string).trim();
 
-      const picked = selectedAgencyId.trim();
-      const effectivePicked = needsAgencyPicker && !picked && detailAgency ? detailAgency : picked;
-      setResolvedArtistAgencyId(sessionAgency || detailAgency || effectivePicked);
-      if (needsAgencyPicker && !picked && detailAgency) {
-        setSelectedAgencyId(detailAgency);
-      }
+      const agencyAtLoad = sessionAgency || detailAgency || "";
+      setResolvedArtistAgencyId(agencyAtLoad);
+      savedAgencyIdRef.current = agencyAtLoad;
 
       const social = emptySocialRecord();
       const { data: links } = await supabase
@@ -614,7 +769,15 @@ export function AddArtistDialog({
       const line1 = (row.artist_adresse ?? "").trim() || (row.artist_address ?? "").trim();
       const cityVal = (row.artist_ville ?? "").trim() || (row.artist_city ?? "").trim();
 
-      form.reset({
+      const deathDate = parseDateOnlyString(row.artist_death_date ?? "");
+      const isLiving = row.artist_vivant !== false;
+      const birthDate = resolveArtistBirthDate(
+        parseDateOnlyString(row.artist_birth_date ?? ""),
+        deathDate,
+        isLiving,
+      );
+
+      const loadedValues: ArtistFormInput = {
         artist_firstname: row.artist_firstname ?? "",
         artist_lastname: row.artist_lastname ?? "",
         country: countryValue,
@@ -623,75 +786,34 @@ export function AddArtistDialog({
         postalCode: row.artist_zipcode ?? "",
         city: cityVal,
         artist_nickname: row.artist_nickname ?? "",
-        artist_bio: "",
         artist_photo_url: row.artist_photo_url ?? "",
         email: row.artist_email ?? "",
         phone: row.artist_phone ?? "",
-        birth_date: (() => {
-          const raw = (row.artist_birth_date ?? "").trim();
-          if (!raw) return undefined;
-          const d = new Date(raw);
-          return Number.isNaN(d.getTime()) ? undefined : d;
-        })(),
+        birth_date: birthDate,
+        death_date: deathDate,
+        artist_vivant: isLiving,
         artist_typ: parseArtistTypFromDb(row.artist_typ),
         social,
-      });
+      };
+
+      form.reset(loadedValues);
+      initialFormSnapshotRef.current = serializeArtistFormSnapshot(loadedValues);
 
       setEditingArtistId(row.artist_id);
       setDuplicateRow(null);
+      setDuplicateBioFr("");
     },
-    [agency_id, form, needsAgencyPicker, selectedAgencyId],
+    [agency_id, form],
   );
 
   loadArtistIntoFormRef.current = loadArtistIntoForm;
 
   useEffect(() => {
-    if (!open || !needsAgencyPicker) {
-      if (!open) {
-        setLoadingAgencies(false);
-      }
-      return;
+    if (artistIdProp && initialLoadDoneRef.current && initialLoadDoneRef.current !== artistIdProp) {
+      initialLoadDoneRef.current = null;
+      artistLoadInFlightRef.current = null;
     }
-
-    let cancelled = false;
-    void (async () => {
-      setLoadingAgencies(true);
-
-      const { data, error } = await supabase
-        .from("agencies")
-        .select("id, name_agency")
-        .order("name_agency", {
-          ascending: true,
-          nullsFirst: false,
-        });
-
-      if (cancelled) return;
-
-      if (error) {
-        toast.error(error.message);
-        setAgencyOptions([]);
-        setLoadingAgencies(false);
-        return;
-      }
-
-      const mapped =
-        ((data as Array<{ id?: string | null; name_agency?: string | null }> | null) ?? [])
-          .filter((a) => typeof a.id === "string" && a.id.trim())
-          .map((a) => ({ id: String(a.id), name: a.name_agency?.trim() || String(a.id) })) ?? [];
-
-      setAgencyOptions(mapped);
-      setSelectedAgencyId((prev) => {
-        if (prev.trim()) return prev;
-        if (mapped.length === 1) return mapped[0].id;
-        return "";
-      });
-      setLoadingAgencies(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, needsAgencyPicker]);
+  }, [artistIdProp]);
 
   useEffect(() => {
     if (!open) {
@@ -710,7 +832,7 @@ export function AddArtistDialog({
       artistLoadInFlightRef.current = id;
       let cancelled = false;
       void (async () => {
-        const { data, error } = await supabase.from("artists").select("*").eq("artist_id", id).single();
+        const { data, error } = await supabase.from("artists").select("*").eq("artist_id", id).maybeSingle();
 
         if (cancelled) return;
 
@@ -724,7 +846,7 @@ export function AddArtistDialog({
         await loadArtistIntoFormRef.current(data as DbArtistRow);
         if (cancelled) return;
 
-        setFicheReadOnly(true);
+        setFicheReadOnly(!initialEditMode);
         initialLoadDoneRef.current = id;
         artistLoadInFlightRef.current = null;
       })();
@@ -738,7 +860,7 @@ export function AddArtistDialog({
     artistLoadInFlightRef.current = null;
     resetAll();
     setFicheReadOnly(false);
-  }, [open, artistIdProp, resetAll]);
+  }, [open, artistIdProp, initialEditMode, resetAll]);
 
   const handleUseExistingArtistFiche = () => {
     if (!duplicateRow) return;
@@ -774,20 +896,13 @@ export function AddArtistDialog({
         name: n,
         artTypes: types,
       });
-  
-      setBiosDraft((prev) => ({
-        ...prev,
+
+      setArtistBios({
         fr: generated.fr,
         en: generated.en,
         es: generated.es,
         de: generated.de,
         it: generated.it,
-      }));
-
-      form.setValue("artist_bio", generated.fr, {
-        shouldDirty: true,
-        shouldTouch: true,
-        shouldValidate: true,
       });
 
       setActiveLanguage("fr");
@@ -871,7 +986,13 @@ export function AddArtistDialog({
       return;
     }
 
-    if (!ARTIST_BIO_LANGUAGES.some((lang) => (biosDraft[lang] ?? "").trim())) {
+    const shouldPersistBios =
+      !editingArtistId || biosLoadedRef.current || biosChanged || hasAnyBioText(artistBios);
+
+    if (
+      shouldPersistBios &&
+      !ARTIST_BIO_LANGUAGES.some((lang) => (artistBios[lang] ?? "").trim())
+    ) {
       toast.error("La biographie est requise avant l’enregistrement.");
       return;
     }
@@ -881,17 +1002,14 @@ export function AddArtistDialog({
       return;
     }
 
-    const frBioStored = normalizeArtistBioForStorage(biosDraft.fr ?? "");
-
     setIsSubmitting(true);
     try {
       const sessionAgency = (agency_id ?? "").trim();
       const resolvedStable = resolvedArtistAgencyId.trim();
-      const pickedAgency = selectedAgencyId.trim();
       const resolved = await resolveCurrentAgencyId();
 
       let fallbackArtistAgency = "";
-      if (!sessionAgency && !resolvedStable && !pickedAgency && !resolved && editingArtistId) {
+      if (!sessionAgency && !resolvedStable && !resolved && editingArtistId) {
         const { data: agencyRow } = await supabase
           .from("artist_agency_details")
           .select("agency_id")
@@ -905,15 +1023,10 @@ export function AddArtistDialog({
       }
 
       const currentAgencyId =
-        sessionAgency || resolvedStable || pickedAgency || resolved || fallbackArtistAgency;
+        sessionAgency || resolvedStable || resolved || fallbackArtistAgency;
 
       if (!currentAgencyId) {
-        if (needsAgencyPicker) {
-          toast.error("Sélectionnez l’agence concernée par cet artiste.");
-        } else {
-          throw new Error("Impossible de déterminer l'agence de l'utilisateur connecté.");
-        }
-        return;
+        throw new Error("Impossible de déterminer l'agence de l'utilisateur connecté.");
       }
 
       let photoPublicUrl: string | null = null;
@@ -922,14 +1035,17 @@ export function AddArtistDialog({
       }
 
       const phoneStored = (values.phone ?? "").trim();
+      const isLiving = values.artist_vivant !== false;
       const birthStored = values.birth_date ? format(values.birth_date, "yyyy-MM-dd") : null;
+      const deathStored =
+        !isLiving && values.death_date ? format(values.death_date, "yyyy-MM-dd") : null;
       const controlStored = computeArtistControl(values.artist_firstname, values.artist_lastname, values.artist_typ);
 
-      const addr1 = (values.addressLine1 ?? "").trim();
-      const addr2 = (values.addressLine2 ?? "").trim();
-      const cityStored = (values.city ?? "").trim();
-      const countryStored = (values.country ?? "").trim();
-      const postalNormalized = normalizePostalCode(values.postalCode ?? "");
+      const addr1 = isLiving ? (values.addressLine1 ?? "").trim() : "";
+      const addr2 = isLiving ? (values.addressLine2 ?? "").trim() : "";
+      const cityStored = isLiving ? (values.city ?? "").trim() : "";
+      const countryStored = isLiving ? (values.country ?? "").trim() : "";
+      const postalNormalized = isLiving ? normalizePostalCode(values.postalCode ?? "") : "";
 
       const addressDbPayload = {
         artist_pays: countryStored || null,
@@ -945,11 +1061,12 @@ export function AddArtistDialog({
         artist_firstname: values.artist_firstname,
         artist_lastname: values.artist_lastname,
         artist_typ: values.artist_typ.join(" | "),
-        artist_bio: frBioStored || null,
         artist_control: controlStored,
-        artist_email: (values.email ?? "").trim() || null,
-        artist_phone: phoneStored || null,
+        artist_vivant: isLiving,
+        artist_email: isLiving ? (values.email ?? "").trim() || null : null,
+        artist_phone: isLiving ? phoneStored || null : null,
         artist_birth_date: birthStored,
+        artist_death_date: deathStored,
         ...addressDbPayload,
       };
 
@@ -1029,29 +1146,35 @@ export function AddArtistDialog({
         throw new Error("artist_id introuvable après sauvegarde.");
       }
 
-      const agencyBioPayload: ArtistAgencyDetailsRow = {
-        artist_id: savedArtistId,
-        agency_id: currentAgencyId,
-        agency_specific_bio: frBioStored || null,
-      };
+      if (shouldPersistBios) {
+        const { error: agencyLinkError } = await supabase
+          .from("artist_agency_details")
+          .upsert(
+            { artist_id: savedArtistId, agency_id: currentAgencyId },
+            { onConflict: "artist_id,agency_id" },
+          );
 
-      const { error: agencyBioError } = await supabase
-        .from("artist_agency_details")
-        .upsert(agencyBioPayload, {
-          onConflict: "artist_id,agency_id",
-        });
+        if (agencyLinkError) {
+          throw new Error(`Liaison agence : ${agencyLinkError.message}`);
+        }
 
-      if (agencyBioError) {
-        throw new Error(`Bio agence : ${agencyBioError.message}`);
+        for (const lang of ARTIST_BIO_LANGUAGES) {
+          await upsertArtistBioRow(savedArtistId, lang, artistBios[lang]);
+        }
       }
 
-      for (const lang of ARTIST_BIO_LANGUAGES) {
-        await upsertArtistBioRow(savedArtistId, currentAgencyId, lang, biosDraft[lang]);
+      if (isLiving) {
+        await persistSocialLinks(savedArtistId);
+      } else {
+        await supabase.from("social_links").delete().eq("artist_id", savedArtistId);
       }
-
-      await persistSocialLinks(savedArtistId);
 
       clearPendingPhotoState();
+      initialFormSnapshotRef.current = serializeArtistFormSnapshot(values);
+      form.reset(values);
+      artistBiosFromDbRef.current = { ...artistBios };
+      savedAgencyIdRef.current =
+        (agency_id ?? "").trim() || resolvedArtistAgencyId.trim() || savedAgencyIdRef.current;
       setForceCreateDespiteDuplicate(false);
       bypassCloseConfirmRef.current = true;
       setDiscardDialogOpen(false);
@@ -1069,7 +1192,7 @@ export function AddArtistDialog({
   const toggleArtistType = (value: string, checked: boolean) => {
     const current = form.getValues("artist_typ");
     const next = checked ? [...current, value] : current.filter((v) => v !== value);
-    form.setValue("artist_typ", next, { shouldValidate: true });
+    form.setValue("artist_typ", next, { shouldValidate: true, shouldDirty: true });
   };
 
   const artistTitleName = [form.watch("artist_firstname"), form.watch("artist_lastname")]
@@ -1154,15 +1277,11 @@ export function AddArtistDialog({
                   {!ficheReadOnly && (
                     <Button
                       type="submit"
-                      disabled={!canShowSaveButton || isSubmitting || processingPhoto}
+                      disabled={!canSave || isSubmitting || processingPhoto}
                       className={
                         editingArtistId
-                          ? `h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] ${
-                              !canShowSaveButton ? "invisible pointer-events-none" : ""
-                            }`
-                          : `h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground ${
-                              !canShowSaveButton ? "invisible pointer-events-none" : ""
-                            }`
+                          ? "h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] disabled:opacity-50"
+                          : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground disabled:opacity-50"
                       }
                     >
                       {isSubmitting
@@ -1197,7 +1316,7 @@ export function AddArtistDialog({
                         <Input
                           placeholder={t("form_firstname_placeholder")}
                           {...field}
-                          disabled={ficheReadOnly || Boolean(editingArtistId)}
+                          disabled={ficheReadOnly}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1218,7 +1337,7 @@ export function AddArtistDialog({
                         <Input
                           placeholder={t("form_lastname_placeholder")}
                           {...field}
-                          disabled={ficheReadOnly || Boolean(editingArtistId)}
+                          disabled={ficheReadOnly}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1233,7 +1352,7 @@ export function AddArtistDialog({
                     <FormItem>
                       <FormLabel>{t("form_nickname_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={isLocked(field.value)} />
+                        <Input placeholder={t("form_nickname_placeholder")} {...field} disabled={ficheReadOnly} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1264,15 +1383,19 @@ export function AddArtistDialog({
                               <Button
                                 type="button"
                                 variant="outline"
-                                disabled={isLocked(artistTyp)}
+                                disabled={ficheReadOnly}
                                 className={cn(
-                                  "h-10 w-full justify-between font-normal",
+                                  "h-10 w-full justify-between gap-2 font-normal",
                                   !artistTyp?.length && "text-muted-foreground",
                                 )}
                               >
-                                {artistTyp?.length
-                                  ? t("form_art_types_count", { count: artistTyp.length })
-                                  : t("form_art_types_empty")}
+                                <span className="min-w-0 truncate text-left">
+                                  {artistTyp?.length
+                                    ? formatArtTypesButtonLabel(artistTyp, (count) =>
+                                        t("form_art_types_preview_more", { count }),
+                                      )
+                                    : t("form_art_types_empty")}
+                                </span>
                                 <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
                               </Button>
                             </FormControl>
@@ -1290,7 +1413,7 @@ export function AddArtistDialog({
                                       id={`add-artist-type-${idx}`}
                                       name={`artist_type_${idx}`}
                                       checked={artistTyp?.includes(opt)}
-                                      disabled={isLocked(artistTyp)}
+                                      disabled={ficheReadOnly}
                                       onCheckedChange={(c) => toggleArtistType(opt, c === true)}
                                     />
                                     <span className="leading-snug">{opt}</span>
@@ -1307,11 +1430,13 @@ export function AddArtistDialog({
                   />
                 </div>
 
-                <div className="min-w-0 w-full max-w-[280px]">
+                <div className="flex w-fit shrink-0 flex-col gap-3">
                   <FormField
                     control={form.control}
                     name="birth_date"
-                    render={({ field }) => (
+                    render={({ field }) => {
+                      const birthDisplay = coerceFormDate(field.value);
+                      return (
                       <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
                         <FormLabel className="min-h-[1.25rem]">{t("form_birthdate_label")}</FormLabel>
                         <Popover>
@@ -1320,16 +1445,16 @@ export function AddArtistDialog({
                               <Button
                                 type="button"
                                 variant="outline"
-                                disabled={isLocked(field.value)}
+                                disabled={ficheReadOnly}
                                 className={cn(
-                                  "h-10 w-full pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground",
+                                  "h-10 w-[180px] max-w-full pl-3 pr-2 text-left text-sm font-normal",
+                                  !birthDisplay && "text-muted-foreground",
                                 )}
                               >
-                                {field.value ? (
-                                  format(field.value, "PPP", { locale: fr })
+                                {birthDisplay ? (
+                                  format(birthDisplay, "PPP", { locale: fr })
                                 ) : (
-                                  <span>{t("form_birthdate_placeholder")}</span>
+                                  <span className="truncate">{t("form_birthdate_placeholder")}</span>
                                 )}
                                 <CalendarIcon className="ml-auto h-4 w-4 shrink-0 opacity-60" />
                               </Button>
@@ -1338,23 +1463,145 @@ export function AddArtistDialog({
 
                           <PopoverContent className="w-auto p-0" align="start">
                             <BirthDatePickerFr
-                              selected={field.value ?? undefined}
-                              onSelect={field.onChange}
-                              fromYear={1920}
-                              toYear={new Date().getFullYear()}
+                              selected={birthDisplay}
+                              minDate={birthPickerMin}
+                              maxDate={birthPickerMax}
+                              onSelect={(date) => {
+                                const next = date
+                                  ? clampLocalDay(normalizePickerDate(date)!, birthPickerMin, birthPickerMax)
+                                  : null;
+                                field.onChange(next);
+                                form.setValue("birth_date", next, {
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                  shouldValidate: true,
+                                  shouldNotify: true,
+                                });
+                              }}
+                              fromYear={ARTIST_BIRTH_YEAR_MIN}
+                              toYear={birthPickerMax.getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
                       </FormItem>
+                    );
+                    }}
+                  />
+
+                  {artistVivant === false && (
+                    <FormField
+                      control={form.control}
+                      name="death_date"
+                      render={({ field }) => {
+                        const deathDisplay = coerceFormDate(field.value);
+                        return (
+                        <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
+                          <FormLabel className="min-h-[1.25rem]">{t("form_deathdate_label")}</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={ficheReadOnly}
+                                  className={cn(
+                                    "h-10 w-[180px] max-w-full pl-3 pr-2 text-left text-sm font-normal",
+                                    !deathDisplay && "text-muted-foreground",
+                                  )}
+                                >
+                                  {deathDisplay ? (
+                                    format(deathDisplay, "PPP", { locale: fr })
+                                  ) : (
+                                    <span className="truncate">{t("form_deathdate_placeholder")}</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 shrink-0 opacity-60" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <BirthDatePickerFr
+                                selected={deathDisplay}
+                                minDate={deathPickerMin}
+                                maxDate={deathPickerMax}
+                                onSelect={(date) => {
+                                  const next = date
+                                    ? clampLocalDay(normalizePickerDate(date)!, deathPickerMin, deathPickerMax)
+                                    : null;
+                                  field.onChange(next);
+                                  form.setValue("death_date", next, {
+                                    shouldDirty: true,
+                                    shouldTouch: true,
+                                    shouldValidate: true,
+                                    shouldNotify: true,
+                                  });
+                                }}
+                                fromYear={deathPickerMin.getFullYear()}
+                                toYear={deathPickerMax.getFullYear()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                      }}
+                    />
+                  )}
+                </div>
+
+                <div className="flex min-w-0 shrink-0 flex-col gap-3">
+                  <FormField
+                    control={form.control}
+                    name="artist_vivant"
+                    render={({ field }) => (
+                      <FormItem className="flex w-full flex-col gap-[5px] space-y-0">
+                        <FormControl>
+                          <RadioGroup
+                            value={field.value === false ? "deceased" : "alive"}
+                            onValueChange={(v) => {
+                              const alive = v === "alive";
+                              field.onChange(alive);
+                              form.setValue("artist_vivant", alive, {
+                                shouldDirty: true,
+                                shouldValidate: true,
+                              });
+                              if (alive) {
+                                form.setValue("death_date", null, { shouldDirty: true, shouldValidate: false });
+                              }
+                            }}
+                            disabled={ficheReadOnly}
+                            className="flex flex-col gap-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="alive" id="artist-living-alive" />
+                              <Label htmlFor="artist-living-alive" className="cursor-pointer text-sm font-normal">
+                                {t("form_living_alive")}
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="deceased" id="artist-living-deceased" />
+                              <Label htmlFor="artist-living-deceased" className="cursor-pointer text-sm font-normal">
+                                {t("form_living_deceased")}
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
+                  />
+                  <ArtistAgeDisplay
+                    ageYears={artistAgeYears}
+                    missingText={t("form_age_missing")}
+                    yearsText={t("form_age_years", { count: artistAgeYears ?? 0 })}
                   />
                 </div>
               </div>
 
-              <div className="relative flex h-[194px] flex-col gap-4 min-[726px]:flex-row min-[726px]:flex-nowrap min-[726px]:items-start">
+              <div className="relative flex h-[170px] flex-col gap-4 min-[726px]:flex-row min-[726px]:flex-nowrap min-[726px]:items-start">
                 <div className="absolute left-[180px] flex h-full min-h-0 min-w-0 w-full max-w-[550px] flex-col gap-2 sm:w-[550px] sm:max-w-none sm:shrink-0">
-                {biosLoading && editingArtistId ? (
+                {biosLoading && bioArtistId ? (
                   <>
                     <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
@@ -1392,7 +1639,7 @@ export function AddArtistDialog({
                       <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
                       {canShowGenerateBio && (
                         <>
-                          {biosDraft[activeLanguage]?.trim() ? (
+                          {artistBios[activeLanguage]?.trim() ? (
                             <>
                               {/* Bio existante : 3 actions */}
                               <Button
@@ -1416,9 +1663,9 @@ export function AddArtistDialog({
                                 type="button"
                                 variant="default"
                                 className="h-8 shrink-0 gap-1.5 border border-amber-500 bg-white px-2.5 text-xs font-semibold text-amber-600 shadow-none hover:bg-amber-50"
-                                onClick={() =>
-                                  setBiosDraft((prev) => ({ ...prev, [activeLanguage]: "" }))
-                                }
+                                onClick={() => {
+                                  setArtistBios((prev) => ({ ...prev, [activeLanguage]: "" }));
+                                }}
                               >
                                 {t("bio_new")}
                               </Button>
@@ -1457,7 +1704,7 @@ export function AddArtistDialog({
                       </TabsList>
                     </div>
 
-                    <div className="mt-2 h-[150px] w-[530px] shrink-0">
+                    <div className="mt-2 h-[115px] w-[540px] shrink-0">
                       {ARTIST_BIO_LANGUAGES.map((lang) => (
                         <TabsContent
                           key={lang}
@@ -1465,18 +1712,15 @@ export function AddArtistDialog({
                           className="mt-0 h-full data-[state=inactive]:hidden"
                         >
                           <Textarea
-                            value={biosDraft[lang]}
-                            onChange={(e) =>
-                              setBiosDraft((prev) => ({
-                                ...prev,
-                                [lang]: e.target.value,
-                              }))
-                            }
+                            value={artistBios[lang] ?? ""}
+                            onChange={(e) => {
+                              setArtistBios((prev) => ({ ...prev, [lang]: e.target.value }));
+                            }}
                             placeholder={`Bio en ${lang.toUpperCase()}… (spécifique à votre organisation)`}
                             disabled={ficheReadOnly}
                             spellCheck
                             lang={lang}
-                            className="h-[150px] min-h-[150px] w-[530px] min-w-[530px] resize-none overflow-y-auto p-2 text-xs leading-snug shadow-none"
+                            className="h-[115px] min-h-[115px] w-[540px] min-w-[540px] resize-none overflow-y-auto p-2 text-xs leading-snug shadow-none"
                           />
                         </TabsContent>
                       ))}
@@ -1555,39 +1799,6 @@ export function AddArtistDialog({
                 </div>
               </div>
 
-              {needsAgencyPicker && (
-                <div className="w-[550px] space-y-1.5 rounded-md border border-border/60 bg-muted/20 p-3">
-                  <Label htmlFor="artist-target-agency" className="inline-flex items-center">
-                    {t("agency_label")}
-                    {!ficheReadOnly && <RequiredAsterisk />}
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground leading-snug">{t("agency_hint")}</p>
-
-                  {loadingAgencies ? (
-                    <p className="text-xs text-muted-foreground">{t("agency_loading")}</p>
-                  ) : (
-                    <Select
-                      value={selectedAgencyId}
-                      onValueChange={(v) => setSelectedAgencyId(v)}
-                      disabled={ficheReadOnly || agencyOptions.length === 0}
-                    >
-                      <SelectTrigger id="artist-target-agency" disabled={ficheReadOnly || agencyOptions.length === 0}>
-                        <SelectValue
-                          placeholder={agencyOptions.length ? t("agency_select_placeholder") : t("agency_select_empty")}
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {agencyOptions.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              )}
-
               {checkingDuplicate && (
                 <p className="text-xs text-muted-foreground flex items-center gap-2">
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -1595,6 +1806,7 @@ export function AddArtistDialog({
                 </p>
               )}
 
+              {artistVivant !== false && (
               <div className="grid gap-3 sm:grid-cols-10">
                 <div className="sm:col-span-10">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
@@ -1609,7 +1821,7 @@ export function AddArtistDialog({
                               <Input
                                 placeholder={t("form_address_line2_placeholder")}
                                 {...field}
-                                disabled={isLocked(field.value)}
+                                disabled={ficheReadOnly}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1628,7 +1840,7 @@ export function AddArtistDialog({
                               <Input
                                 placeholder={t("form_address_placeholder")}
                                 {...field}
-                                disabled={isLocked(field.value)}
+                                disabled={ficheReadOnly}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1645,9 +1857,9 @@ export function AddArtistDialog({
                   render={({ field }) => (
                     <FormItem className="w-[100px] max-w-full justify-self-start space-y-[5px] sm:col-span-1">
                       <FormLabel>{t("form_country_label")}</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isLocked(field.value)}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={ficheReadOnly}>
                         <FormControl>
-                          <SelectTrigger disabled={isLocked(field.value)}>
+                          <SelectTrigger disabled={ficheReadOnly}>
                             <SelectValue placeholder={t("form_country_placeholder")} />
                           </SelectTrigger>
                         </FormControl>
@@ -1674,7 +1886,7 @@ export function AddArtistDialog({
                     <FormItem className="w-[115px] max-w-full justify-self-start space-y-[5px] sm:col-span-2">
                       <FormLabel>{t("form_zipcode_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={postalPlaceholder} {...field} disabled={isLocked(field.value)} />
+                        <Input placeholder={postalPlaceholder} {...field} disabled={ficheReadOnly} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1688,14 +1900,16 @@ export function AddArtistDialog({
                     <FormItem className="space-y-[5px] sm:col-span-7">
                       <FormLabel>{t("form_city_label")}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={isLocked(field.value)} />
+                        <Input placeholder={t("form_city_placeholder")} {...field} disabled={ficheReadOnly} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              )}
 
+              {artistVivant !== false && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -1715,7 +1929,7 @@ export function AddArtistDialog({
                           onCountryNameChange={(name) =>
                             form.setValue("country", name, { shouldDirty: true, shouldValidate: true })
                           }
-                          disabled={isLocked(field.value)}
+                          disabled={ficheReadOnly}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1730,13 +1944,14 @@ export function AddArtistDialog({
                     <FormItem>
                       <FormLabel>{t("form_email_label")}</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder={t("form_email_placeholder")} {...field} disabled={isLocked(field.value)} />
+                        <Input type="email" placeholder={t("form_email_placeholder")} {...field} disabled={ficheReadOnly} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              )}
             </div>
           </form>
         </Form>
@@ -1785,8 +2000,8 @@ export function AddArtistDialog({
                     {(duplicateRow.artist_email ?? "").trim() && (
                       <p className="mt-1 truncate text-muted-foreground">{duplicateRow.artist_email}</p>
                     )}
-                    {(duplicateRow.artist_bio ?? "").trim() && (
-                      <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{duplicateRow.artist_bio}</p>
+                    {duplicateBioFr && (
+                      <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{duplicateBioFr}</p>
                     )}
                   </div>
                 </div>

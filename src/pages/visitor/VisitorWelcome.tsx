@@ -18,6 +18,7 @@ import { VisitorLinkCodeDialog } from "@/components/visitor/VisitorLinkCodeDialo
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { supabase } from "@/lib/supabase";
+import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import {
   fetchExpoRowForVisitor,
   mapExpoRowToInfo,
@@ -85,7 +86,7 @@ function resolveExpoDescriptionText(
     }
   }
   if (!text?.trim()) return null;
-  return text.trim();
+  return sanitizeTranslationOutput(text.trim());
 }
 
 function truncateExpoDescription(text: string, maxChars = 1000): string {

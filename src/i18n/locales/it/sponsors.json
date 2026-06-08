@@ -1,4 +1,18 @@
 {
+  "page": {
+    "title": "Elenco sponsor / mecenati",
+    "subtitle": "Sponsor e mecenati della vostra organizzazione.",
+    "back": "Torna alle esposizioni",
+    "searchOrg": "Filtra per organizzazione…",
+    "searchExpo": "Filtra per esposizione…",
+    "clearSearchOrg": "Cancella filtro organizzazione",
+    "clearSearchExpo": "Cancella filtro esposizione",
+    "empty": "Nessuno sponsor in questo ambito.",
+    "count": "{{count}} sponsor",
+    "addForExpo": "Aggiungi — {{name}}",
+    "addSponsor": "Aggiungi sponsor / mecenate",
+    "pickExpoFirst": "Seleziona un'esposizione nel filtro prima di aggiungere uno sponsor."
+  },
   "title": {
     "listExpo": "Sponsor / Mecenati — {{name}}",
     "listAll": "Sponsor / Mecenati — tutte le esposizioni",

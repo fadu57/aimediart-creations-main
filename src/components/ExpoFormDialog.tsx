@@ -50,9 +50,10 @@ import {
   sortExpoFieldKeys,
   valueToInputString,
 } from "@/lib/expoFormUtils";
+import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { SponsorDialog } from "@/components/SponsorDialog";
+import { SponsorDialog, type Sponsor, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import {
   ExpoHorairesEditor,
   type ExpoHoraires,
@@ -70,6 +71,8 @@ export type ExpoFormDialogProps = {
   /** Colonnes connues (sans `*_id`), issues d’un `select * limit 1` ou repli minimal. */
   fieldKeys: string[];
   onSuccess: () => void;
+  /** Propagation des logos sponsors vers la page parente (cartes expo). */
+  onSponsorsChange?: (logos: SponsorLogoEntry[], scopeExpoId: string | null, sponsors: Sponsor[]) => void;
   /** Vrai pour les admins globaux (role_id < 4) — affiche le sélecteur d'agence. */
   canPickAgency?: boolean;
 };
@@ -118,12 +121,32 @@ function revokeLogoPreviews(urls: Record<string, string>) {
 type AgencyOption = { id: string; name: string };
 type CuratorOption = { id: string; label: string; email: string };
 
-export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, onSuccess, canPickAgency = false }: ExpoFormDialogProps) {
+const DESCRIPT_LANGS = ["fr", "en", "de", "es", "it"] as const;
+
+function parseExpoDescriptI18n(raw: string): Record<string, string> {
+  try {
+    const p = JSON.parse(raw || "{}") as unknown;
+    if (typeof p === "object" && p !== null) {
+      const { source_lang: _, ...rest } = p as Record<string, string>;
+      const cleaned: Record<string, string> = {};
+      for (const [lang, value] of Object.entries(rest)) {
+        if (typeof value === "string") cleaned[lang] = sanitizeTranslationOutput(value);
+      }
+      return cleaned;
+    }
+  } catch {
+    if (raw.trim()) return { fr: sanitizeTranslationOutput(raw.trim()) };
+  }
+  return {};
+}
+
+export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, onSuccess, onSponsorsChange, canPickAgency = false }: ExpoFormDialogProps) {
   const { i18n, t } = useTranslation("expos");
   const { role_id } = useAuthUser();
   const canTriggerTranslation = typeof role_id === "number" && role_id < 6 && mode === "edit" && !!expoId;
   const [translating, setTranslating] = useState(false);
   const [translatingLangs, setTranslatingLangs] = useState<Set<string>>(new Set());
+  const [descriptLang, setDescriptLang] = useState<string>("fr");
   const [loadingRow, setLoadingRow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -142,7 +165,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const [initialHoraires, setInitialHoraires] = useState<ExpoHoraires>({ ...HORAIRES_VIDE });
   const [typeNavigation, setTypeNavigation] = useState<boolean>(false);
   const [initialTypeNavigation, setInitialTypeNavigation] = useState<boolean>(false);
-  const [sponsorLogos, setSponsorLogos] = useState<{ id: string; url: string; nom: string }[]>([]);
+  const [sponsorLogos, setSponsorLogos] = useState<SponsorLogoEntry[]>([]);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [initialValues, setInitialValues] = useState<Record<string, string>>({});
@@ -167,26 +190,41 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       });
   }, [canPickAgency, open]);
 
+  const applySponsorLogos = useCallback((logos: SponsorLogoEntry[]) => {
+    setSponsorLogos([...logos]);
+  }, []);
+
   // Chargement des logos sponsors de l'expo (mode édition uniquement)
-  useEffect(() => {
-    if (!open || mode !== "edit" || !expoId) { setSponsorLogos([]); return; }
-    supabase
+  const loadSponsorLogos = useCallback(async () => {
+    if (mode !== "edit" || !expoId) {
+      setSponsorLogos([]);
+      return;
+    }
+    const { data, error } = await supabase
       .from("sponsors")
       .select("id, nom_sponsor, url_logo_sponsor")
       .eq("id_expo", expoId)
       .not("url_logo_sponsor", "is", null)
-      .then(({ data }) => {
-        setSponsorLogos(
-          (data ?? [])
-            .filter((s) => (s as { url_logo_sponsor?: string }).url_logo_sponsor)
-            .map((s) => ({
-              id: (s as { id: string }).id,
-              url: (s as { url_logo_sponsor: string }).url_logo_sponsor,
-              nom: (s as { nom_sponsor: string }).nom_sponsor ?? "",
-            })),
-        );
-      });
-  }, [open, mode, expoId]);
+      .order("created_at", { ascending: true });
+    if (error) {
+      console.error("[ExpoFormDialog] loadSponsorLogos:", error.message);
+      return;
+    }
+    applySponsorLogos(
+      (data ?? [])
+        .filter((s) => (s as { url_logo_sponsor?: string }).url_logo_sponsor)
+        .map((s) => ({
+          id: (s as { id: string }).id,
+          url: (s as { url_logo_sponsor: string }).url_logo_sponsor,
+          nom: (s as { nom_sponsor: string }).nom_sponsor ?? "",
+        })),
+    );
+  }, [mode, expoId, applySponsorLogos]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadSponsorLogos();
+  }, [open, loadSponsorLogos]);
 
   // Chargement des members de l'agence pour le picker curator
   useEffect(() => {
@@ -285,6 +323,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
 
   useEffect(() => {
     if (!open) return;
+    setDescriptLang(i18n.language?.slice(0, 2) || "fr");
     if (mode === "create") {
       setLogoFileByKey({});
       setLogoPreviewByKey((prev) => {
@@ -414,15 +453,48 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
    * puis exécute les workers UN PAR UN pour éviter le rate-limit Groq.
    * Après chaque langue réussie, recharge expo_descript_i18n depuis la DB.
    */
+  const reloadExpoDescriptFromDb = async () => {
+    if (!expoId) return;
+    const { data: expoRow } = await supabase
+      .from("expos")
+      .select("expo_descript_i18n")
+      .eq("id", expoId)
+      .single();
+    if (!expoRow) return;
+    const raw = (expoRow as { expo_descript_i18n?: unknown }).expo_descript_i18n;
+    const str = typeof raw === "string" ? raw : JSON.stringify(raw ?? {});
+    setValues((prev) => ({ ...prev, expo_descript_i18n: str }));
+    setInitialValues((prev) => ({ ...prev, expo_descript_i18n: str }));
+  };
+
   const triggerExpoTranslation = async (sourceText: string, sourceLang: string) => {
-    if (!canTriggerTranslation || !sourceText.trim()) return;
-    const targetLangs = (["fr", "en", "de", "es", "it"] as const).filter((l) => l !== sourceLang);
+    if (!canTriggerTranslation || !expoId) return;
+    if (!sourceText.trim()) {
+      toast.error("Saisissez un texte dans la langue sélectionnée avant de traduire.");
+      return;
+    }
+    const targetLangs = DESCRIPT_LANGS.filter((l) => l !== sourceLang);
     setTranslating(true);
     setTranslatingLangs(new Set(targetLangs));
+    let okCount = 0;
+    let failCount = 0;
     try {
+      const parsed = parseExpoDescriptI18n(values.expo_descript_i18n ?? "");
+      const updatedSource = { ...parsed, [sourceLang]: sourceText.trim() };
+      const serialized = JSON.stringify(updatedSource);
+      setValues((prev) => ({ ...prev, expo_descript_i18n: serialized }));
+
+      const { error: saveErr } = await supabase
+        .from("expos")
+        .update({ expo_descript_i18n: updatedSource })
+        .eq("id", expoId);
+      if (saveErr) {
+        toast.error(`Impossible d'enregistrer le texte source : ${saveErr.message}`);
+        return;
+      }
+
       const { invokeAiWorker } = await import("@/lib/aiJobs/invokeAiWorker");
 
-      // 1. Créer tous les jobs en parallèle (simples inserts DB, très rapides)
       const jobEntries = await Promise.all(
         targetLangs.map(async (targetLang) => {
           const { data, error } = await supabase.functions.invoke("ai-create-job", {
@@ -441,36 +513,36 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         }),
       );
 
-      // 2. Exécuter les workers séquentiellement (évite le rate-limit Groq 429)
       for (const { lang, jobId } of jobEntries) {
         if (!jobId) {
+          failCount += 1;
           setTranslatingLangs((prev) => { const s = new Set(prev); s.delete(lang); return s; });
           continue;
         }
         try {
           const result = await invokeAiWorker(jobId);
           if (!result.ok) {
-            console.warn(`[triggerExpoTranslation] worker ${lang}:`, (result as Extract<typeof result, { ok: false }>).message);
+            failCount += 1;
+            console.warn(`[triggerExpoTranslation] worker ${lang}:`, result.message);
+          } else {
+            okCount += 1;
+            await reloadExpoDescriptFromDb();
           }
-          // Recharge le JSONB depuis la DB pour mettre à jour les badges immédiatement
-          if (expoId) {
-            const { data: expoRow } = await supabase
-              .from("expos")
-              .select("expo_descript_i18n")
-              .eq("id", expoId)
-              .single();
-            if (expoRow) {
-              const raw = (expoRow as { expo_descript_i18n?: unknown }).expo_descript_i18n;
-              const str = typeof raw === "string" ? raw : JSON.stringify(raw ?? {});
-              setValues((prev) => ({ ...prev, expo_descript_i18n: str }));
-            }
-          }
+        } catch (workerErr) {
+          failCount += 1;
+          console.warn(`[triggerExpoTranslation] worker ${lang}:`, workerErr);
         } finally {
           setTranslatingLangs((prev) => { const s = new Set(prev); s.delete(lang); return s; });
         }
       }
 
-      toast.success("Traductions terminées !");
+      if (okCount > 0 && failCount === 0) {
+        toast.success("Traductions terminées !");
+      } else if (okCount > 0) {
+        toast.warning(`${okCount} traduction(s) réussie(s), ${failCount} échec(s).`);
+      } else {
+        toast.error("Aucune traduction n'a abouti. Vérifiez la configuration IA (Groq / Edge Functions).");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erreur lors de la traduction.");
     } finally {
@@ -840,31 +912,21 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               // expo_descript_i18n : même pattern que VisitorWelcome.extractExpoDescription
               // Structure JSONB : { "fr": "...", "en": "...", "de": "...", "es": "...", "it": "..." }
               if (key === "expo_descript_i18n") {
-                const currentLang = i18n.language?.slice(0, 2) || "fr";
-                let parsed: Record<string, string> = {};
-                try {
-                  const p = JSON.parse(v || "{}") as unknown;
-                  if (typeof p === "object" && p !== null) {
-                    // Filtrer source_lang si présent (migration depuis ancienne structure)
-                    const { source_lang: _, ...rest } = p as Record<string, string>;
-                    parsed = rest;
-                  }
-                } catch {
-                  // texte brut legacy → stocker sous la langue courante
-                  if (v.trim()) parsed = { [currentLang]: v.trim() };
-                }
-                // Afficher : langue courante → fr → premier dispo
-                const displayText = parsed[currentLang] ?? parsed["fr"] ?? Object.values(parsed)[0] ?? "";
-                const LANGS = ["fr", "en", "de", "es", "it"] as const;
+                const parsed = parseExpoDescriptI18n(v);
+                const displayText = parsed[descriptLang] ?? "";
                 const getLangStatus = (l: string) =>
                   (parsed[l] ?? "").trim() ? "filled" : "empty";
+                const translateTargets = DESCRIPT_LANGS
+                  .filter((l) => l !== descriptLang)
+                  .map((l) => l.toUpperCase())
+                  .join("/");
                 return (
                   <div key={key} className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <Label htmlFor="expo-field-expo_descript_i18n" className="text-xs font-medium">
                         {fieldLabel(key)}
                         <span className="ml-1.5 text-[10px] font-normal uppercase text-muted-foreground">
-                          ({currentLang})
+                          ({descriptLang})
                         </span>
                       </Label>
                       {canTriggerTranslation && (
@@ -874,12 +936,12 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                           size="sm"
                           className="h-7 gap-1 px-2 text-xs shrink-0"
                           disabled={translating || !displayText.trim()}
-                          onClick={() => void triggerExpoTranslation(displayText, currentLang)}
+                          onClick={() => void triggerExpoTranslation(displayText, descriptLang)}
                         >
                           {translating
                             ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
                             : <Languages className="h-3 w-3" aria-hidden />}
-                          Traduire (EN/DE/ES/IT)
+                          {`Traduire (${translateTargets})`}
                         </Button>
                       )}
                     </div>
@@ -889,39 +951,42 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       className={cn("shadow-none min-h-[100px] resize-none", (!canEditFields || readonly) && "bg-muted/50")}
                       value={displayText}
                       readOnly={readonly || !canEditFields}
-                      placeholder="Descriptif de l'exposition…"
+                      placeholder={`Descriptif de l'exposition (${descriptLang.toUpperCase()})…`}
                       onChange={(e) => {
-                        const updated = { ...parsed, [currentLang]: e.target.value };
+                        const updated = { ...parsed, [descriptLang]: e.target.value };
                         setValues((prev) => ({ ...prev, expo_descript_i18n: JSON.stringify(updated) }));
                       }}
                     />
-                    {/* Badges de statut par langue : vert=traduit, amber=en cours, gris=vide */}
                     <div className="flex items-center gap-1.5">
-                      {LANGS.map((l) => {
+                      {DESCRIPT_LANGS.map((l) => {
                         const status = getLangStatus(l);
                         const isRunning = translatingLangs.has(l);
-                        const isCurrent = l === currentLang;
+                        const isCurrent = l === descriptLang;
                         return (
-                          <span
+                          <button
                             key={l}
+                            type="button"
+                            onClick={() => setDescriptLang(l)}
                             title={
                               isRunning ? `${l.toUpperCase()} : traduction en cours…`
-                              : status === "filled" ? `${l.toUpperCase()} : traduit`
-                              : `${l.toUpperCase()} : manquant`
+                              : status === "filled" ? `${l.toUpperCase()} : traduit — cliquer pour éditer`
+                              : `${l.toUpperCase()} : manquant — cliquer pour saisir`
                             }
                             className={cn(
-                              "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide border",
+                              "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide border transition-colors",
                               isRunning
                                 ? "bg-amber-400/20 text-amber-700 border-amber-400/40 dark:text-amber-300"
                                 : status === "filled"
                                 ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-400"
                                 : "bg-muted text-muted-foreground border-border/50",
-                              isCurrent && "ring-1 ring-offset-1 ring-primary/60",
+                              isCurrent
+                                ? "ring-1 ring-offset-1 ring-primary/60"
+                                : "hover:bg-accent hover:text-accent-foreground",
                             )}
                           >
                             {isRunning && <Loader2 className="h-2 w-2 animate-spin" aria-hidden />}
                             {l}
-                          </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -1074,19 +1139,20 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                     Sponsors / Mécènes
                   </p>
                   <Carousel
+                    key={sponsorLogos.map((s) => s.id).join(",")}
                     orientation="vertical"
                     opts={{ align: "start", loop: true }}
                     className="w-full h-[200px]"
                   >
                     <CarouselContent className="-mt-2">
-                      {sponsorLogos.map((s, i) => (
-                        <CarouselItem key={i} className="pt-2 basis-1/2">
+                      {sponsorLogos.map((s) => (
+                        <CarouselItem key={s.id} className="pt-2 basis-1/2">
                           <div
                             className="flex h-16 items-center justify-center rounded-md border border-border bg-muted/20 p-1 cursor-pointer hover:border-primary hover:bg-muted/40 transition-colors"
                             title={`${s.nom} — cliquer pour modifier`}
                             onClick={() => { setSelectedSponsorId(s.id); setShowSponsorDialog(true); }}
                           >
-                            <img src={s.url} alt={s.nom} className="max-h-full max-w-full object-contain" />
+                            <img key={`${s.id}-${s.url}`} src={s.url} alt={s.nom} className="max-h-full max-w-full object-contain" />
                           </div>
                         </CarouselItem>
                       ))}
@@ -1121,10 +1187,17 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       </DialogContent>
       <SponsorDialog
         open={showSponsorDialog}
-        onOpenChange={(v) => { setShowSponsorDialog(v); if (!v) setSelectedSponsorId(null); }}
+        onOpenChange={(v) => {
+          setShowSponsorDialog(v);
+          if (!v) setSelectedSponsorId(null);
+        }}
         expoId={expoId}
         expoName={values["expo_name"] ?? ""}
         initialSponsorId={selectedSponsorId}
+        onSponsorsChange={(logos, scopeExpoId) => {
+          applySponsorLogos(logos);
+          onSponsorsChange?.(logos, scopeExpoId);
+        }}
       />
 
       <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>

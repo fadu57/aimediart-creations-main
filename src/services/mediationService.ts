@@ -1,6 +1,11 @@
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { dispatchAiUsageRefresh } from "@/lib/aiUsageRefresh";
+import {
+  extractAIRateLimitFromBody,
+  getAIRateLimitUserMessage,
+  parseAIRateLimitPayload,
+} from "@/lib/aiGuard";
 import i18n from "@/i18n/config";
 
 export type MediationStyleRequest = {
@@ -75,10 +80,16 @@ function toReadableErrorMessage(raw: unknown, fallback = "Impossible d'appeler g
 }
 
 function messageFromFunctionBody(body: unknown): string | null {
+  const rateLimit = extractAIRateLimitFromBody(body);
+  if (rateLimit) return getAIRateLimitUserMessage(rateLimit);
+
   if (!body || typeof body !== "object") return null;
   const b = body as { error?: unknown; details?: unknown; message?: unknown };
   const err = typeof b.error === "string" ? b.error.trim() : "";
   const details = typeof b.details === "string" ? b.details.trim() : "";
+  if (err === "rate_limit_exceeded") {
+    return getAIRateLimitUserMessage(extractAIRateLimitFromBody(b));
+  }
   if (err && details) return `${err} ${details}`;
   if (err) return err;
   if (typeof b.message === "string" && b.message.trim()) return b.message.trim();
@@ -89,6 +100,13 @@ function messageFromFunctionBody(body: unknown): string | null {
 async function readInvokeErrorMessage(error: unknown): Promise<string> {
   if (error instanceof FunctionsHttpError) {
     const ctx = error.context as unknown;
+    if (ctx && typeof (ctx as Response).status === "number" && (ctx as Response).status === 429) {
+      if (typeof (ctx as Response).text === "function") {
+        const text = await (ctx as Response).text().catch(() => "");
+        const payload = parseAIRateLimitPayload(text);
+        if (payload) return getAIRateLimitUserMessage(payload);
+      }
+    }
     if (ctx && typeof (ctx as Response).text === "function") {
       const text = await (ctx as Response).text().catch(() => "");
       if (text) {
@@ -97,6 +115,8 @@ async function readInvokeErrorMessage(error: unknown): Promise<string> {
           const direct = messageFromFunctionBody(json);
           if (direct) return direct;
         } catch {
+          const payload = parseAIRateLimitPayload(text);
+          if (payload) return getAIRateLimitUserMessage(payload);
           const direct = toReadableErrorMessage(text);
           if (direct) return direct;
         }

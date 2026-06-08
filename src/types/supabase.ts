@@ -188,11 +188,12 @@ export interface Database {
           artist_lastname?: string | null;
           artist_nickname?: string | null;
           artist_typ?: string | null;
-          artist_bio?: string | null;
           artist_control?: string | null;
           artist_email?: string | null;
           artist_phone?: string | null;
           artist_birth_date?: string | null;
+          artist_death_date?: string | null;
+          artist_vivant?: boolean;
           artist_photo_url?: string | null;
           artist_image?: string | null;
         };
@@ -202,11 +203,12 @@ export interface Database {
           artist_lastname?: string | null;
           artist_nickname?: string | null;
           artist_typ?: string | null;
-          artist_bio?: string | null;
           artist_control?: string | null;
           artist_email?: string | null;
           artist_phone?: string | null;
           artist_birth_date?: string | null;
+          artist_death_date?: string | null;
+          artist_vivant?: boolean;
           artist_photo_url?: string | null;
           artist_image?: string | null;
         };
@@ -215,11 +217,12 @@ export interface Database {
           artist_lastname?: string | null;
           artist_nickname?: string | null;
           artist_typ?: string | null;
-          artist_bio?: string | null;
           artist_control?: string | null;
           artist_email?: string | null;
           artist_phone?: string | null;
           artist_birth_date?: string | null;
+          artist_death_date?: string | null;
+          artist_vivant?: boolean;
           artist_photo_url?: string | null;
           artist_image?: string | null;
         };
@@ -299,15 +302,14 @@ export interface Database {
         Row: {
           artist_id: string;
           agency_id: string;
-          agency_specific_bio?: string | null;
         };
         Insert: {
           artist_id: string;
           agency_id: string;
-          agency_specific_bio?: string | null;
         };
         Update: {
-          agency_specific_bio?: string | null;
+          artist_id?: string;
+          agency_id?: string;
         };
         Relationships: [];
       };
@@ -339,7 +341,6 @@ export interface Database {
         Row: {
           id?: string;
           artist_id: string;
-          agency_id?: string | null;
           language: string;
           bio_text?: string | null;
           created_at?: string | null;
@@ -348,14 +349,12 @@ export interface Database {
         Insert: {
           id?: string;
           artist_id: string;
-          agency_id?: string | null;
           language: string;
           bio_text?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
         Update: {
-          agency_id?: string | null;
           language?: string;
           bio_text?: string | null;
           updated_at?: string | null;
@@ -397,6 +396,86 @@ export interface Database {
         };
         Relationships: [];
       };
+      ai_provider_limits: {
+        Row: {
+          id: string;
+          provider: string;
+          model: string | null;
+          limit_type: string;
+          limit_value_observed: number | null;
+          limit_value_manual: number | null;
+          alert_threshold_warning: number;
+          alert_threshold_critical: number;
+          is_active: boolean;
+          observed_at: string | null;
+          observed_source: string | null;
+          manual_updated_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          provider: string;
+          model?: string | null;
+          limit_type: string;
+          limit_value_observed?: number | null;
+          limit_value_manual?: number | null;
+          alert_threshold_warning?: number;
+          alert_threshold_critical?: number;
+          is_active?: boolean;
+          observed_at?: string | null;
+          observed_source?: string | null;
+          manual_updated_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          provider?: string;
+          model?: string | null;
+          limit_type?: string;
+          limit_value_observed?: number | null;
+          limit_value_manual?: number | null;
+          alert_threshold_warning?: number;
+          alert_threshold_critical?: number;
+          is_active?: boolean;
+          observed_at?: string | null;
+          observed_source?: string | null;
+          manual_updated_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      ai_limit_alerts: {
+        Row: {
+          id: string;
+          provider: string;
+          model: string | null;
+          limit_type: string;
+          usage_pct: number;
+          alert_level: string;
+          sent_at: string;
+          notified_email: boolean;
+        };
+        Insert: {
+          id?: string;
+          provider: string;
+          model?: string | null;
+          limit_type: string;
+          usage_pct: number;
+          alert_level: string;
+          sent_at?: string;
+          notified_email?: boolean;
+        };
+        Update: {
+          provider?: string;
+          model?: string | null;
+          limit_type?: string;
+          usage_pct?: number;
+          alert_level?: string;
+          notified_email?: boolean;
+        };
+        Relationships: [];
+      };
       expo_user_role: {
         Row: {
           id: string;
@@ -422,7 +501,30 @@ export interface Database {
         ];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      ai_usage_vs_limits: {
+        Row: {
+          limit_id: string;
+          provider: string;
+          model: string | null;
+          limit_type: string;
+          limit_value: number | null;
+          limit_value_observed: number | null;
+          limit_value_manual: number | null;
+          limit_source: string;
+          alert_threshold_warning: number;
+          alert_threshold_critical: number;
+          is_active: boolean;
+          current_usage: number;
+          usage_pct: number | null;
+          status: string;
+          observed_at: string | null;
+          observed_source: string | null;
+          manual_updated_at: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       /** SECURITY DEFINER — visiteurs anonymes (fingerprints + liaison client_uuid). */
       register_anonymous_visitor: {

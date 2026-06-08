@@ -96,20 +96,20 @@ export const PROVIDER_REGISTRY: ProviderDefinition[] = [
   },
 
   // ---- Google TTS ----
-  // TTS visiteur = Web Speech API navigateur uniquement (pas Cloud Text-to-Speech serveur).
+  // TTS visiteur via Edge Function google-tts (Cloud Text-to-Speech Neural2).
   {
     key: "google_tts",
     name: "Google TTS",
     category: "tts",
     detectConfiguration: () => ({
-      configured: true,
+      configured: Boolean(Deno.env.get("GOOGLE_TTS_API_KEY")),
       meta: {
-        billing_mode: "no_server_cost",
-        app_tts_engine: "web_speech_api",
-        note: "TTS visiteur = Web Speech API navigateur, pas Cloud TTS.",
+        billing_mode: "api_per_character",
+        app_tts_engine: "google_cloud_tts",
+        note: "TTS visiteur via Cloud Text-to-Speech Neural2 (Edge Function google-tts). Coûts estimés depuis ai_usage_logs.",
       },
     }),
-    supportsCostSync: false,
+    supportsCostSync: true,
   },
 
   // ---- HuggingFace (inférence image — scripts avatars, crédits payants) ----

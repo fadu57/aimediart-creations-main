@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ArchiveRestore, ChevronDown, Euro, Settings } from "lucide-react";
+import { ArchiveRestore, ChevronDown, Clock, Coins, Euro, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -31,7 +31,10 @@ export function SettingsMenuDropdown({
 }: SettingsMenuDropdownProps) {
   const { t } = useTranslation("header");
   const location = useLocation();
-  const settingsActive = location.pathname.startsWith("/settings");
+  const settingsActive =
+    location.pathname.startsWith("/settings")
+    || location.pathname.startsWith("/suivi_temps")
+    || location.pathname.startsWith("/suivi_tokens");
   const trashActive = SETTINGS_TRASH_MENU_LINKS.some((link) => location.pathname.startsWith(link.to));
 
   if (variant === "fab") {
@@ -52,6 +55,22 @@ export function SettingsMenuDropdown({
         >
           <Euro className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span>{t("settings_submenu_couts")}</span>
+        </NavLink>
+        <NavLink
+          to="/suivi_temps"
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted/60"
+          onClick={onNavigate}
+        >
+          <Clock className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span>{t("settings_submenu_suivi_temps")}</span>
+        </NavLink>
+        <NavLink
+          to="/suivi_tokens"
+          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted/60"
+          onClick={onNavigate}
+        >
+          <Coins className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span>{t("settings_submenu_suivi_tokens")}</span>
         </NavLink>
         <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {t("settings_submenu_trash")}
@@ -98,6 +117,18 @@ export function SettingsMenuDropdown({
           <Link to="/settings/couts" className="flex items-center gap-2">
             <Euro className="h-4 w-4 opacity-70" aria-hidden />
             {t("settings_submenu_couts")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/suivi_temps" className="flex items-center gap-2">
+            <Clock className="h-4 w-4 opacity-70" aria-hidden />
+            {t("settings_submenu_suivi_temps")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/suivi_tokens" className="flex items-center gap-2">
+            <Coins className="h-4 w-4 opacity-70" aria-hidden />
+            {t("settings_submenu_suivi_tokens")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

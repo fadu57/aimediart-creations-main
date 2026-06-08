@@ -11,13 +11,16 @@
   "nav_stats": "Statistiken",
   "settings": "Einstellungen",
   "settings_submenu_params": "Allgemeine Einstellungen",
-  "settings_submenu_couts": "KI-Kosten",
+  "settings_submenu_couts": "Kostenverfolgung",
+  "settings_submenu_suivi_temps": "Zeiterfassung",
+  "settings_submenu_suivi_tokens": "Token-Verfolgung",
   "settings_submenu_trash": "Papierkorb",
   "settings_submenu_trash_users": "Benutzer",
   "settings_submenu_trash_agencies": "Organisationen",
   "settings_submenu_trash_artists": "Künstler",
   "settings_submenu_trash_catalogue": "Katalog",
   "settings_submenu_trash_expos": "Ausstellungen",
+  "settings_submenu_trash_visitors": "Besucher",
   "logout": "Abmelden",
   "login": "Anmelden"
 }

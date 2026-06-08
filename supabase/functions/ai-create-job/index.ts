@@ -4,6 +4,10 @@ import {
   corsPreflightResponse,
   jsonResponse,
 } from '../_shared/cors.ts';
+import {
+  aiGuardBlockedResponse,
+  checkAILimitBeforeCall,
+} from '../_shared/aiGuard.ts';
 import { getRequestUserId, getServiceRoleClient } from '../_shared/supabaseAdmin.ts';
 
 type JobType = 'generate_fiche' | 'translate_fiche';
@@ -63,10 +67,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const createdBy = await getRequestUserId(req);
 
+  const effectiveModel = model || 'llama-3.1-8b-instant';
+  const guard = await checkAILimitBeforeCall(admin, 'groq', effectiveModel);
+  if (!guard.allowed) {
+    return aiGuardBlockedResponse(guard);
+  }
+
   const baseRow: Record<string, unknown> = {
     job_type,
     payload,
-    model: model || 'llama-3.1-8b-instant',
+    model: effectiveModel,
     status: 'pending',
     next_run_at: new Date().toISOString(),
   };

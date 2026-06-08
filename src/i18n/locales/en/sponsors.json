@@ -1,4 +1,18 @@
 {
+  "page": {
+    "title": "Sponsors / patrons list",
+    "subtitle": "Sponsors and patrons in your organisation.",
+    "back": "Back to exhibitions",
+    "searchOrg": "Filter by organisation…",
+    "searchExpo": "Filter by exhibition…",
+    "clearSearchOrg": "Clear organisation filter",
+    "clearSearchExpo": "Clear exhibition filter",
+    "empty": "No sponsor in this scope.",
+    "count": "{{count}} sponsor(s)",
+    "addForExpo": "Add — {{name}}",
+    "addSponsor": "Add a sponsor / patron",
+    "pickExpoFirst": "Select an exhibition in the filter before adding a sponsor."
+  },
   "title": {
     "listExpo": "Sponsors / Patrons — {{name}}",
     "listAll": "Sponsors / Patrons — all exhibitions",

@@ -1,4 +1,18 @@
 {
+  "page": {
+    "title": "Liste der Sponsoren / Mäzene",
+    "subtitle": "Sponsoren und Mäzene Ihrer Organisation.",
+    "back": "Zurück zu Ausstellungen",
+    "searchOrg": "Nach Organisation filtern…",
+    "searchExpo": "Nach Ausstellung filtern…",
+    "clearSearchOrg": "Organisationsfilter löschen",
+    "clearSearchExpo": "Ausstellungsfilter löschen",
+    "empty": "Kein Sponsor in diesem Bereich.",
+    "count": "{{count}} Sponsor(en)",
+    "addForExpo": "Hinzufügen — {{name}}",
+    "addSponsor": "Sponsor / Mäzen hinzufügen",
+    "pickExpoFirst": "Wählen Sie zuerst eine Ausstellung im Filter aus."
+  },
   "title": {
     "listExpo": "Sponsoren / Mäzene — {{name}}",
     "listAll": "Sponsoren / Mäzene — alle Ausstellungen",

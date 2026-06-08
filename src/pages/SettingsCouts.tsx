@@ -45,6 +45,12 @@ import {
   parseVercelPlan,
 } from "@/lib/vercelPlan";
 import { formatOvhAmountEur, OVH_IMPORT_FROM_DATE } from "@/lib/ovhCost";
+import {
+  estimateGoogleTtsCostUsdForLogs,
+  GOOGLE_TTS_FREE_CHARS_PER_MONTH,
+  GOOGLE_TTS_USD_PER_MILLION_CHARS,
+} from "@/lib/ttsCostEstimator";
+import { formatTokenCount } from "@/lib/aiTokenUsage";
 import { formatProjectDate, PROJECT_CREATED_DATE } from "@/lib/projectMeta";
 import {
   formatActivityDateTime,
@@ -87,7 +93,7 @@ const PROVIDER_FALLBACK: Record<
 > = {
   groq: { provider_name: "Groq", category: "llm" },
   google_gemini: { provider_name: "Google Gemini", category: "llm" },
-  google_tts: { provider_name: "Google TTS", category: "tts" },
+  google_tts: { provider_name: "Google Cloud TTS Neural2", category: "tts" },
   cursor: { provider_name: "Cursor", category: "other", metadata: { cost_mode: "fixed_monthly" } },
   huggingface: { provider_name: "HuggingFace", category: "image" },
   supabase: { provider_name: "Supabase", category: "other", metadata: { cost_mode: "fixed_monthly" } },
@@ -215,10 +221,11 @@ function billingModeLabel(p: CostProvider, t: (k: string) => string): string {
       : t("providers.billing_gcp_missing");
   }
   if (p.provider_key === "google_tts") {
-    if (p.metadata?.billing_mode === "no_server_cost" || p.metadata?.app_tts_engine === "web_speech_api") {
-      return t("providers.billing_tts_web_speech");
+    if (mode === "api_per_character" || p.metadata?.app_tts_engine === "google_cloud_tts") {
+      return t("providers.billing_api_per_character");
     }
-    return t("providers.billing_tts_web_speech");
+    if (mode === "estimated_from_logs") return t("providers.billing_estimated");
+    return t("providers.billing_api_per_character");
   }
   if (p.provider_key === "cursor" && p.metadata?.cost_mode === "fixed_monthly") {
     return t("providers.billing_fixed_monthly");
@@ -1147,6 +1154,101 @@ function VercelPlanToggle({ provider, onUpdated }: VercelPlanToggleProps) {
 
 type OvhInvoiceSummaryProps = { refreshKey: number };
 
+function currentCalendarMonthStartLocal(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01T00:00:00.000`;
+}
+
+type GoogleTtsMonthlyEstimateProps = { refreshKey: number };
+
+function GoogleTtsMonthlyEstimate({ refreshKey }: GoogleTtsMonthlyEstimateProps) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(true);
+  const [charsUsed, setCharsUsed] = useState(0);
+  const [costUsd, setCostUsd] = useState(0);
+  const [callCount, setCallCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      const monthStart = currentCalendarMonthStartLocal();
+      const { data, error } = await supabase
+        .from("ai_usage_logs")
+        .select("completion_tokens, total_tokens, created_at")
+        .eq("provider", "google_tts")
+        .gte("created_at", monthStart);
+
+      if (cancelled) return;
+
+      if (error || !data?.length) {
+        setCharsUsed(0);
+        setCostUsd(0);
+        setCallCount(0);
+      } else {
+        const logs = data
+          .map((row) => {
+            const ct = Math.max(0, Number(row.completion_tokens ?? 0));
+            const chars = ct > 0 ? ct : Math.max(0, Number(row.total_tokens ?? 0));
+            return {
+              characterCount: chars,
+              created_at: String(row.created_at ?? ""),
+            };
+          })
+          .filter((log) => log.characterCount > 0 && log.created_at);
+
+        const totalChars = logs.reduce((sum, log) => sum + log.characterCount, 0);
+        setCharsUsed(totalChars);
+        setCostUsd(estimateGoogleTtsCostUsdForLogs(logs));
+        setCallCount(logs.length);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  const quotaRemaining = Math.max(0, GOOGLE_TTS_FREE_CHARS_PER_MONTH - charsUsed);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+        {t("providers.tts_cloud_loading")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2 text-[11px] leading-snug">
+      <p className="text-muted-foreground">{t("providers.tts_cloud_note")}</p>
+      <div className="grid gap-1 sm:grid-cols-2">
+        <p className="text-muted-foreground">
+          {t("providers.tts_cloud_rate", { price: GOOGLE_TTS_USD_PER_MILLION_CHARS })}
+        </p>
+        <p className="text-muted-foreground">
+          {t("providers.tts_cloud_free_quota", {
+            quota: formatTokenCount(GOOGLE_TTS_FREE_CHARS_PER_MONTH),
+          })}
+        </p>
+      </div>
+      {callCount === 0 ? (
+        <p className="text-muted-foreground">{t("providers.tts_cloud_month_empty")}</p>
+      ) : (
+        <p className="font-medium text-foreground/90">
+          {t("providers.tts_cloud_month_stats", {
+            cost: formatCost(costUsd, "USD", 4),
+            chars: formatTokenCount(charsUsed),
+            remaining: formatTokenCount(quotaRemaining),
+            count: callCount,
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function OvhInvoiceSummary({ refreshKey }: OvhInvoiceSummaryProps) {
   const { t } = useTranslation("settings");
   const [count, setCount] = useState(0);
@@ -1467,6 +1569,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillProviderKey, setBackfillProviderKey] = useState<BackfillProviderKey | null>(null);
   const [ovhRefreshKey, setOvhRefreshKey] = useState(0);
+  const [ttsRefreshKey, setTtsRefreshKey] = useState(0);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1514,6 +1617,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
       const analyzed = (data as { analyzed?: number })?.analyzed ?? 0;
       showMsg("success", t("providers.analyze_success", { count: analyzed }));
       await loadProviders();
+      setTtsRefreshKey((k) => k + 1);
     } catch (err) {
       showMsg("error", t("providers.analyze_error") + " — " + String(err));
     } finally {
@@ -1533,6 +1637,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
       const synced = data.synced ?? 0;
       showMsg("success", t("providers.sync_success", { count: synced }));
       await loadProviders();
+      setTtsRefreshKey((k) => k + 1);
       onCostsRefresh?.();
     } catch (err) {
       showMsg("error", t("providers.sync_error") + " — " + String(err));
@@ -1676,7 +1781,11 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-sm">{p.provider_name}</span>
+                      <span className="font-medium text-sm">
+                        {p.provider_key === "google_tts"
+                          ? t("providers.tts_cloud_title")
+                          : p.provider_name}
+                      </span>
                       <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">{p.provider_key}</code>
                       {p.category && (
                         <span className="rounded bg-muted/80 px-1.5 py-0.5 text-[10px] text-muted-foreground uppercase">
@@ -1693,9 +1802,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                       <p className="text-[11px] text-muted-foreground leading-snug">{p.notes}</p>
                     )}
                     {p.provider_key === "google_tts" && (
-                      <p className="text-[11px] text-orange-700/90 leading-snug font-medium">
-                        {t("providers.tts_web_speech_note")}
-                      </p>
+                      <GoogleTtsMonthlyEstimate refreshKey={ttsRefreshKey} />
                     )}
                     {p.provider_key === "google_gemini" && !p.cost_import_supported && (
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">

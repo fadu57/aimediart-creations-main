@@ -11,13 +11,16 @@
   "nav_stats": "Estadísticas",
   "settings": "Configuración",
   "settings_submenu_params": "Ajustes generales",
-  "settings_submenu_couts": "Costes IA",
+  "settings_submenu_couts": "Seguimiento de costes",
+  "settings_submenu_suivi_temps": "Seguimiento del tiempo",
+  "settings_submenu_suivi_tokens": "Seguimiento de tokens",
   "settings_submenu_trash": "Papelera",
   "settings_submenu_trash_users": "Usuarios",
   "settings_submenu_trash_agencies": "Organizaciones",
   "settings_submenu_trash_artists": "Artistas",
   "settings_submenu_trash_catalogue": "Catálogo",
   "settings_submenu_trash_expos": "Exposiciones",
+  "settings_submenu_trash_visitors": "Visitantes",
   "logout": "Cerrar sesión",
   "login": "Iniciar sesión"
 }

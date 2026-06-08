@@ -27,8 +27,6 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type Sponsor = {
   id: string;
   id_expo: string;
@@ -45,6 +43,10 @@ type Sponsor = {
   amount: number | null;
   currency: string;
 };
+
+export type { Sponsor };
+
+// ─── Types (form) ─────────────────────────────────────────────────────────────
 
 type FormValues = {
   nom_sponsor: string;
@@ -76,6 +78,20 @@ const EMPTY_FORM: FormValues = {
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF"] as const;
 
+export type SponsorLogoEntry = { id: string; url: string; nom: string };
+
+export function sponsorsToLogoEntries(
+  sponsors: Array<{ id: string; nom_sponsor: string; url_logo_sponsor: string | null }>,
+): SponsorLogoEntry[] {
+  return sponsors
+    .filter((s) => s.url_logo_sponsor?.trim())
+    .map((s) => ({
+      id: s.id,
+      url: s.url_logo_sponsor!.trim(),
+      nom: s.nom_sponsor ?? "",
+    }));
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export type SponsorDialogProps = {
@@ -86,19 +102,28 @@ export type SponsorDialogProps = {
   expoName?: string;
   /** Si fourni, ouvre directement la fiche de ce sponsor */
   initialSponsorId?: string | null;
+  /** Ouvre directement le formulaire d'ajout (nécessite expoId) */
+  openInForm?: boolean;
+  /** Appelé après création, modification ou suppression (logos + liste complète) */
+  onSponsorsChange?: (logos: SponsorLogoEntry[], scopeExpoId: string | null, sponsors: Sponsor[]) => void;
 };
 
 // ─── Upload logo ─────────────────────────────────────────────────────────────
+
+function bustLogoUrl(url: string): string {
+  const base = url.split("?")[0];
+  return `${base}?v=${Date.now()}`;
+}
 
 async function uploadSponsorLogo(file: File, sponsorId: string): Promise<string> {
   const ext = file.name.split(".").pop()?.toLowerCase() || "webp";
   const path = `${sponsorId}.${ext}`;
   const { error } = await supabase.storage
     .from("sponsors")
-    .upload(path, file, { upsert: true, cacheControl: "3600" });
+    .upload(path, file, { upsert: true, cacheControl: "60" });
   if (error) throw new Error(error.message);
   const { data } = supabase.storage.from("sponsors").getPublicUrl(path);
-  return data.publicUrl;
+  return bustLogoUrl(data.publicUrl);
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
@@ -109,6 +134,8 @@ export function SponsorDialog({
   expoId = null,
   expoName = "",
   initialSponsorId = null,
+  openInForm = false,
+  onSponsorsChange,
 }: SponsorDialogProps) {
   const { t } = useTranslation("sponsors");
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -124,28 +151,74 @@ export function SponsorDialog({
   const [pendingDelete, setPendingDelete] = useState<{ id: string; nom: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handledInitialRef = useRef<string | null>(null);
+  const onSponsorsChangeRef = useRef(onSponsorsChange);
+  const sponsorsRef = useRef(sponsors);
+
+  useEffect(() => {
+    onSponsorsChangeRef.current = onSponsorsChange;
+  }, [onSponsorsChange]);
+
+  useEffect(() => {
+    sponsorsRef.current = sponsors;
+  }, [sponsors]);
 
   // ── Chargement ─────────────────────────────────────────────
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Sponsor[]> => {
     setLoading(true);
     try {
       let q = supabase.from("sponsors").select("*").order("created_at", { ascending: true });
       if (expoId) q = q.eq("id_expo", expoId);
       const { data, error } = await q;
       if (error) throw error;
-      setSponsors((data as Sponsor[]) ?? []);
+      const list = (data as Sponsor[]) ?? [];
+      setSponsors(list);
+      return list;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("errors.loadFailed"));
+      return [];
     } finally {
       setLoading(false);
     }
-  }, [expoId]);
+  }, [expoId, t]);
+
+  const notifySponsorsChange = useCallback(
+    (list: Sponsor[]) => {
+      onSponsorsChangeRef.current?.(sponsorsToLogoEntries(list), expoId ?? null, list);
+    },
+    [expoId],
+  );
+
+  const applySponsorsList = useCallback(
+    (list: Sponsor[]) => {
+      sponsorsRef.current = list;
+      setSponsors(list);
+      notifySponsorsChange(list);
+    },
+    [notifySponsorsChange],
+  );
 
   useEffect(() => {
-    if (!open) return;
-    setView("list");
+    if (!open) {
+      handledInitialRef.current = null;
+      setLogoPreview((prev) => {
+        if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+        return "";
+      });
+      setLogoFile(null);
+      return;
+    }
     void load();
-  }, [open, load]);
+    if (initialSponsorId) return;
+    if (openInForm && expoId) {
+      setEditingId(null);
+      setForm(EMPTY_FORM);
+      setLogoFile(null);
+      setLogoPreview("");
+      setView("form");
+      return;
+    }
+    setView("list");
+  }, [open, load, openInForm, expoId, initialSponsorId]);
 
   // Ouvre directement la fiche sponsor quand initialSponsorId est fourni et les données chargées
   useEffect(() => {
@@ -194,9 +267,13 @@ export function SponsorDialog({
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     setLogoFile(file);
-    setLogoPreview(URL.createObjectURL(file));
+    setLogoPreview((prev) => {
+      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   };
 
   // ── Sauvegarde ─────────────────────────────────────────────
@@ -234,6 +311,12 @@ export function SponsorDialog({
           .eq("id", editingId);
         if (error) throw error;
         toast.success(t("toast.updated"));
+        const merged = sponsorsRef.current.map((s) =>
+          s.id === editingId
+            ? { ...s, ...payload, url_logo_sponsor: logoUrl }
+            : s,
+        );
+        applySponsorsList(merged);
       } else {
         const newId = crypto.randomUUID();
         if (logoFile) logoUrl = await uploadSponsorLogo(logoFile, newId);
@@ -246,8 +329,25 @@ export function SponsorDialog({
         });
         if (error) throw error;
         toast.success(t("toast.added"));
+        const created: Sponsor = {
+          id: newId,
+          id_expo: expoId ?? "",
+          nom_expo: expoName || null,
+          nom_sponsor: payload.nom_sponsor,
+          contact_sponsor: payload.contact_sponsor,
+          mail_sponsor: payload.mail_sponsor,
+          tel_sponsor: payload.tel_sponsor,
+          adresse_sponsor: payload.adresse_sponsor,
+          zipcode_sponsor: payload.zipcode_sponsor,
+          city_sponsor: payload.city_sponsor,
+          url_logo_sponsor: logoUrl,
+          descrip_sponsor: payload.descrip_sponsor,
+          amount: payload.amount,
+          currency: payload.currency,
+        };
+        applySponsorsList([...sponsorsRef.current, created]);
       }
-      await load();
+      setLogoFile(null);
       setView("list");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -265,7 +365,7 @@ export function SponsorDialog({
       const { error } = await supabase.from("sponsors").delete().eq("id", id);
       if (error) throw error;
       toast.success(t("toast.deleted"));
-      await load();
+      applySponsorsList(sponsorsRef.current.filter((s) => s.id !== id));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("errors.deleteFailed"));
     } finally {
@@ -312,6 +412,7 @@ export function SponsorDialog({
                     <li key={s.id} className="flex items-center gap-3 px-3 py-2.5">
                       {s.url_logo_sponsor ? (
                         <img
+                          key={`${s.id}-${s.url_logo_sponsor}`}
                           src={s.url_logo_sponsor}
                           alt={s.nom_sponsor}
                           className="h-10 w-16 shrink-0 object-contain"
@@ -387,7 +488,7 @@ export function SponsorDialog({
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted/30">
                   {logoPreview ? (
-                    <img src={logoPreview} alt="Logo" className="h-full w-full object-contain" />
+                    <img key={logoPreview} src={logoPreview} alt="Logo" className="h-full w-full object-contain" />
                   ) : (
                     <Building2 className="h-6 w-6 text-muted-foreground" />
                   )}

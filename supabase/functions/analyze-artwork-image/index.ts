@@ -3,6 +3,10 @@ import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "https://esm.sh/@google/genai@0.14.1";
 import {
+  aiGuardBlockedResponse,
+  checkAILimitBeforeCall,
+} from "../_shared/aiGuard.ts";
+import {
   extractGeminiUsageMetadataFromResponse,
   insertAiUsageLog,
   tokensFromAnyGeminiUsageLike,
@@ -512,13 +516,31 @@ serve(async (req: Request) => {
     thinkingConfig: { thinkingBudget: 0 },
   };
 
-  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
   const preferredModels = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
   ];
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (supabaseUrl && serviceRoleKey) {
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const guard = await checkAILimitBeforeCall(
+      admin,
+      "gemini",
+      preferredModels[0],
+      maxOutputTokens,
+    );
+    if (!guard.allowed) {
+      return aiGuardBlockedResponse(guard);
+    }
+  }
+
+  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
   let lastErrorMessage = "";
   let modelUsed = preferredModels[0];
   let geminiJson: unknown = null;

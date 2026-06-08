@@ -16,6 +16,15 @@
     "scopeExpo": "Agency linked to exhibition {{expoId}}.",
     "noName": "Unnamed"
   },
+  "expos": {
+    "ongoing": "Ongoing",
+    "upcoming": "Upcoming",
+    "finished": "Ended",
+    "permanent": "Permanent",
+    "dateRange": "From {{from}} to {{to}}",
+    "permanentExpo": "Permanent exhibition",
+    "none": "No exhibition"
+  },
   "tableau": {
     "title": "Organisations — Full table",
     "back": "Back",

@@ -7,10 +7,13 @@ import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAge
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { canCreateArtist } from "@/lib/authUser";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
+import { computeArtistAgeYears } from "@/lib/artistAge";
+import { getMissingArtistFieldItems } from "@/lib/artistMissingFields";
 import { supabase } from "@/lib/supabase";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslation } from "react-i18next";
 
 type ArtistRow = {
@@ -21,6 +24,19 @@ type ArtistRow = {
   artist_photo_url?: string | null;
   artist_specialty?: string | null;
   artist_typ?: string | null;
+  artist_birth_date?: string | null;
+  artist_death_date?: string | null;
+  artist_vivant?: boolean | null;
+  artist_pays?: string | null;
+  pays?: string | null;
+  artist_adresse?: string | null;
+  artist_adresse2?: string | null;
+  artist_address?: string | null;
+  artist_zipcode?: string | null;
+  artist_ville?: string | null;
+  artist_city?: string | null;
+  artist_email?: string | null;
+  artist_phone?: string | null;
   deleted_at?: string | null;
 };
 
@@ -220,6 +236,14 @@ const Artists = () => {
           const label = (artist?.artist_nickname ?? "").trim() || fullName;
           const typLine = formatArtistTyp(artist?.artist_specialty ?? artist?.artist_typ ?? null);
           const photoSrc = (artist?.artist_photo_url ?? "").trim() || ARTIST_PHOTO_PLACEHOLDER;
+          const ageYears = computeArtistAgeYears(
+            artist.artist_birth_date,
+            artist.artist_death_date,
+            artist.artist_vivant !== false,
+          );
+          const ageLabel =
+            ageYears === null ? t("form_age_missing") : t("form_age_years", { count: ageYears });
+          const missingFields = getMissingArtistFieldItems(artist, t);
           return (
             <Card
               key={artist?.artist_id}
@@ -230,7 +254,7 @@ const Artists = () => {
                   to={`/artist/edit/${artist?.artist_id}`}
                   className="flex gap-4 p-4 cursor-pointer text-inherit no-underline outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
                 >
-                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl ring-2 ring-border bg-muted/30">
+                  <div className="h-[100px] w-[100px] shrink-0 overflow-hidden rounded-2xl ring-2 ring-border bg-muted/30">
                     <img
                       src={photoSrc}
                       alt=""
@@ -239,9 +263,43 @@ const Artists = () => {
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-serif font-bold leading-tight">{label}</h3>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="min-w-0 text-lg font-serif font-bold leading-tight">{label}</h3>
+                      <span
+                        className={
+                          ageYears === null
+                            ? "shrink-0 text-sm font-black tabular-nums italic text-destructive"
+                            : "shrink-0 text-sm font-black tabular-nums text-muted-foreground"
+                        }
+                      >
+                        {ageLabel}
+                      </span>
+                    </div>
                     {typLine ? (
                       <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{typLine}</p>
+                    ) : null}
+                    {artist.artist_vivant !== false && missingFields.length > 0 ? (
+                      <p className="mt-1 text-xs leading-snug">
+                        {missingFields.map((field, index) => (
+                          <span key={field.id}>
+                            {index > 0 ? ", " : null}
+                            {field.hintKey ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="italic text-destructive underline decoration-dotted decoration-destructive/60 cursor-help">
+                                    {field.label}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[280px] text-xs leading-snug">
+                                  {t(field.hintKey)}
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="italic text-destructive">{field.label}</span>
+                            )}
+                          </span>
+                        ))}
+                      </p>
                     ) : null}
                   </div>
                 </Link>

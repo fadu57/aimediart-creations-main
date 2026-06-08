@@ -2,12 +2,17 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "https://esm.sh/@google/genai@2.3.0";
 import {
+  aiGuardBlockedResponse,
+  checkAILimitBeforeCall,
+} from "../_shared/aiGuard.ts";
+import {
   extractGeminiUsageMetadataFromResponse,
   insertAiUsageLog,
   interactionUsageIsEffectivelyEmpty,
   tokensFromAnyGeminiUsageLike,
   tokensFromGroqOpenAiUsage,
 } from "../_shared/ai_usage_log.ts";
+import { ingestGroqRateLimitHeaders } from "../_shared/groqObservedLimits.ts";
 
 const SELECTED_MODEL_KEY = "selected_ai_model";
 
@@ -555,6 +560,7 @@ function parseGroqRetrySecondsFromBody(text: string): number | null {
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 async function callGroqMediationJson(params: {
+  admin: ReturnType<typeof createClient>;
   apiKey: string;
   model: string;
   system: string;
@@ -585,17 +591,22 @@ async function callGroqMediationJson(params: {
       },
       body: JSON.stringify(body),
     });
-    const txt = await res.text();
     if (res.status === 429 && attempt < 3) {
-      const wait = parseGroqRetrySecondsFromBody(txt) ?? 2 + attempt * 2;
+      const txt429 = await res.text();
+      const wait = parseGroqRetrySecondsFromBody(txt429) ?? 2 + attempt * 2;
       console.warn(`[generate-mediation] Groq rate limit — attente ${wait}s (tentative ${attempt + 1}/4).`);
       await sleep(wait * 1000);
       continue;
     }
     if (!res.ok) {
-      lastErr = txt.slice(0, 1_200) || `Groq HTTP ${res.status}`;
+      const txtErr = await res.text();
+      lastErr = txtErr.slice(0, 1_200) || `Groq HTTP ${res.status}`;
       throw new Error(lastErr);
     }
+
+    ingestGroqRateLimitHeaders(params.admin, params.model, res);
+
+    const txt = await res.text();
     const json = JSON.parse(txt) as {
       choices?: Array<{ message?: { content?: string } }>;
       usage?: unknown;
@@ -745,6 +756,19 @@ serve(async (req: Request) => {
   console.log(
     `[generate-mediation] Modèle configuré: "${configuredModelId}" → effectif: "${effectiveModelId}" (${useGemini ? "Gemini" : "Groq"})`,
   );
+
+  const guardProvider = useGemini ? "gemini" : "groq";
+  const estimatedTokens = estimateTextTokens(sourceText)
+    + (useGemini ? 4096 : groqMediationMaxOutputTokens(styles));
+  const guard = await checkAILimitBeforeCall(
+    admin,
+    guardProvider,
+    effectiveModelId,
+    estimatedTokens,
+  );
+  if (!guard.allowed) {
+    return aiGuardBlockedResponse(guard);
+  }
 
   const userPromptPrefix = [
     langInstruction,
@@ -920,6 +944,7 @@ serve(async (req: Request) => {
     let groqRes: { content: string; usage: unknown };
     try {
       groqRes = await callGroqMediationJson({
+        admin,
         apiKey: groqApiKey,
         model: configuredModelId,
         system: SYSTEM_INSTRUCTION,

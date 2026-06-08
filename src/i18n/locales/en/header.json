@@ -11,13 +11,16 @@
   "nav_stats": "Statistics",
   "settings": "Settings",
   "settings_submenu_params": "General settings",
-  "settings_submenu_couts": "AI Costs",
+  "settings_submenu_couts": "Cost tracking",
+  "settings_submenu_suivi_temps": "Time tracking",
+  "settings_submenu_suivi_tokens": "Token tracking",
   "settings_submenu_trash": "Trash",
   "settings_submenu_trash_users": "Users",
   "settings_submenu_trash_agencies": "Organizations",
   "settings_submenu_trash_artists": "Artists",
   "settings_submenu_trash_catalogue": "Catalogue",
   "settings_submenu_trash_expos": "Exhibitions",
+  "settings_submenu_trash_visitors": "Visitors",
   "logout": "Log out",
   "login": "Log in"
 }

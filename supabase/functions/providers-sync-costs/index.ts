@@ -29,8 +29,12 @@ import {
   syncGroqEstimatedCosts,
   updateGroqProviderSyncStatus,
 } from "../_shared/groqCostEstimator.ts";
+import {
+  syncGoogleTtsEstimatedCosts,
+  updateGoogleTtsProviderSyncStatus,
+} from "../_shared/ttsCostEstimator.ts";
 
-const GOOGLE_PROVIDER_KEYS = ["google_gemini", "google_tts"] as const;
+const GOOGLE_GEMINI_PROVIDER_KEY = "google_gemini";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   console.log("[providers-sync-costs]", req.method);
@@ -78,22 +82,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const syncResults: Array<{ provider_key: string; status: string; message: string }> = [];
 
   try {
-    // --- Google (une seule requête BigQuery pour gemini + tts) ---
-    const googleTargets = keysToSync.filter((k): k is typeof GOOGLE_PROVIDER_KEYS[number] =>
-      (GOOGLE_PROVIDER_KEYS as readonly string[]).includes(k),
-    );
-
-    if (googleTargets.length > 0) {
-      const googleResult = await syncGoogleBillingCosts(ctx, [...googleTargets]);
+    // --- Google Gemini (export billing BigQuery) ---
+    if (keysToSync.includes(GOOGLE_GEMINI_PROVIDER_KEY)) {
+      const googleResult = await syncGoogleBillingCosts(ctx, [GOOGLE_GEMINI_PROVIDER_KEY]);
       await updateGoogleProviderSyncStatus(admin, googleResult, googleResult.stats);
 
-      for (const key of googleTargets) {
-        syncResults.push({
-          provider_key: key,
-          status: googleResult.status,
-          message: googleResult.message,
-        });
-      }
+      syncResults.push({
+        provider_key: GOOGLE_GEMINI_PROVIDER_KEY,
+        status: googleResult.status,
+        message: googleResult.message,
+      });
+    }
+
+    // --- Google TTS (estimation depuis ai_usage_logs) ---
+    if (keysToSync.includes("google_tts")) {
+      const ttsResult = await syncGoogleTtsEstimatedCosts(ctx);
+      await updateGoogleTtsProviderSyncStatus(admin, ttsResult);
+      syncResults.push({
+        provider_key: "google_tts",
+        status: ttsResult.status,
+        message: ttsResult.message,
+      });
     }
 
     // --- Groq (estimation depuis ai_usage_logs) ---

@@ -2,12 +2,10 @@
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { TtsPlayButton } from "@/components/TtsPlayButton";
-import { TtsConsentModal } from "@/components/TtsConsentModal";
-import { VoiceSelector } from "@/components/VoiceSelector";
-import { useTextToSpeechWithVoices } from "@/hooks/useTextToSpeechWithVoices";
+import { useGoogleTts } from "@/hooks/useGoogleTts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { BarChart3, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
+import { BarChart3, BookOpen, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
 import type { Swiper as SwiperInstance } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -18,11 +16,13 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
+import { rowCanonicalMediationStyle } from "@/lib/mediationVisitorStyles";
 import {
-  resolveVisitorMediationText,
-  rowCanonicalMediationStyle,
-} from "@/lib/mediationVisitorStyles";
-import { getMediationFilledUiLangs, normalizeMediationStyleKeyForLookup } from "@/lib/artworkDescriptionI18n";
+  getMediationLangBucketFromRaw,
+  MEDIATION_UI_LANGS,
+  normalizeMediationStyleKeyForLookup,
+  type MediationUiLang,
+} from "@/lib/artworkDescriptionI18n";
 import {
   expandSlidesForInfiniteCarousel,
   mediationCarouselLogicalIndex,
@@ -69,7 +69,6 @@ type ArtistRow = {
   artist_name?: string | null;
   artist_firstname?: string | null;
   artist_lastname?: string | null;
-  artist_bio?: string | null;
   artist_photo_url?: string | null;
   artist_image?: string | null;
 };
@@ -163,6 +162,14 @@ const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: 
   { value: "it", label: "IT", flagClass: "fi fi-it" },
 ];
 
+function mediationStyleTextForLang(raw: unknown, styleKey: string, lang: MediationUiLang): string {
+  const bucket = getMediationLangBucketFromRaw(raw, lang);
+  const nk = normalizeMediationStyleKeyForLookup(styleKey);
+  if (!nk) return "";
+  const v = bucket[nk];
+  return typeof v === "string" ? v.trim() : "";
+}
+
 const VisitorView = () => {
   const { t } = useTranslation("visitor");
   const { t: tHeader } = useTranslation("header");
@@ -184,11 +191,11 @@ const VisitorView = () => {
   const { session, loading: authLoading, role_id, role_name, first_name } = useAuthUser();
   const { language, setLanguage } = useUiLanguage();
   const { can, loading: navMatrixLoading } = useNavigationMatrix();
-  const tts = useTextToSpeechWithVoices();
+  const tts = useGoogleTts();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const [artist, setArtist] = useState<ArtistRow | null>(null);
-  const [artistAgencyBio, setArtistAgencyBio] = useState("");
+  const [artistBioByLang, setArtistBioByLang] = useState<Record<string, string>>({});
   const [emotionsDb, setEmotionsDb] = useState<EmotionRow[]>([]);
   const [emotionsError, setEmotionsError] = useState<string | null>(null);
   const [loadingArtwork, setLoadingArtwork] = useState(true);
@@ -379,7 +386,7 @@ const VisitorView = () => {
           firstArtwork?.artwork_artisi_id?.trim() ||
           "";
         if (!artistId) {
-          setArtistAgencyBio("");
+          setArtistBioByLang({});
           setArtist(joinedArtist);
           return;
         }
@@ -388,7 +395,6 @@ const VisitorView = () => {
         let fetchedArtist: ArtistRow | null = joinedArtist;
         const needsArtistEnrichment = Boolean(
           !joinedArtist ||
-            !joinedArtist.artist_bio?.trim() ||
             !((joinedArtist.artist_photo_url ?? joinedArtist.artist_image ?? "").trim()),
         );
 
@@ -413,27 +419,27 @@ const VisitorView = () => {
         if (cancelled) return;
         setArtist(fetchedArtist);
 
-        const agencyIdForBio = firstArtwork?.artwork_agency_id?.trim() || "";
-        if (agencyIdForBio) {
-          const { data: agencyBioData } = await supabase
-            .from("artist_agency_details")
-            .select("agency_specific_bio")
-            .eq("artist_id", artistId)
-            .eq("agency_id", agencyIdForBio)
-            .limit(1)
-            .maybeSingle();
-          if (!cancelled) {
-            const row = agencyBioData as { agency_specific_bio?: string | null } | null;
-            setArtistAgencyBio(row?.agency_specific_bio?.trim() || "");
+        const { data: artistBioRows } = await supabase
+          .from("artist_bios")
+          .select("language, bio_text")
+          .eq("artist_id", artistId);
+        if (!cancelled) {
+          const bioByLang: Record<string, string> = {};
+          for (const row of (artistBioRows ?? []) as Array<{
+            language?: string | null;
+            bio_text?: string | null;
+          }>) {
+            const lang = (row.language ?? "").trim().toLowerCase().slice(0, 2);
+            if (!lang) continue;
+            bioByLang[lang] = (row.bio_text ?? "").trim();
           }
-        } else {
-          setArtistAgencyBio("");
+          setArtistBioByLang(bioByLang);
         }
       } catch (e) {
         console.error("VisitorView loadArtworkAndArtist:", e);
         setArtwork(null);
         setArtist(null);
-        setArtistAgencyBio("");
+        setArtistBioByLang({});
       } finally {
         if (!cancelled) setLoadingArtwork(false);
       }
@@ -533,15 +539,7 @@ const VisitorView = () => {
     [artwork?.artwork_description_i18n],
   );
 
-  const availableMediationLangs = useMemo(
-    () => getMediationFilledUiLangs(artworkDescriptionResolved),
-    [artworkDescriptionResolved],
-  );
-
-  const languageOptionsForArtwork = useMemo(() => {
-    const filtered = UI_LANGUAGE_OPTIONS.filter((o) => availableMediationLangs.includes(o.value));
-    return filtered.length > 0 ? filtered : [UI_LANGUAGE_OPTIONS[0]];
-  }, [availableMediationLangs]);
+  const languageOptionsForArtwork = UI_LANGUAGE_OPTIONS;
 
   const aiSlides = useMemo((): MediationAiSlide[] => {
     const ordered = [...promptStylesDb].sort((a, b) => {
@@ -568,9 +566,16 @@ const VisitorView = () => {
       const label = getStyleLabelFromDb(row, language).trim() || sid;
       const icon = (row.icon ?? "").trim();
 
-      // Texte : `artworks.artwork_description_i18n` pour `artwork_id` courant et langue `language` (repli `fr` déjà géré dans mediationTextForStyleCodeAndLang).
-      const rawText = resolveVisitorMediationText(artworkDescriptionResolved, jsonLookupKey, language, row).trim();
-      const text = rawText || t("mediation_text_missing");
+      const textInCurrent = mediationStyleTextForLang(artworkDescriptionResolved, jsonLookupKey, language);
+      let text: string;
+      if (textInCurrent) {
+        text = textInCurrent;
+      } else {
+        const hasTextAnyLang = MEDIATION_UI_LANGS.some((L) =>
+          mediationStyleTextForLang(artworkDescriptionResolved, jsonLookupKey, L),
+        );
+        text = hasTextAnyLang ? t("mediation_not_available_in_lang") : t("mediation_text_missing");
+      }
 
       return {
         sid,
@@ -650,7 +655,11 @@ const VisitorView = () => {
   })();
   const canShowArtistPhoto = Boolean(normalizedArtistPhotoUrl) && !artistPhotoError;
   const artworkImageUrl = artwork?.artwork_photo_url?.trim() || artwork?.artwork_image_url?.trim() || "";
-  const artistBioText = artistAgencyBio || artist?.artist_bio?.trim() || "";
+  const artistBioText = useMemo(() => {
+    const fromTable =
+      (artistBioByLang[language] ?? "").trim() || (artistBioByLang.fr ?? "").trim();
+    return fromTable;
+  }, [artistBioByLang, language]);
   const agencyThanksName = (
     Array.isArray(artwork?.agencies)
       ? artwork?.agencies?.[0]?.name_agency
@@ -716,13 +725,6 @@ const VisitorView = () => {
     };
   }, [isAuthenticated, session?.user?.id, session?.user?.user_metadata]);
   const expoId = searchParams.get("expo_id")?.trim() || "";
-
-  useEffect(() => {
-    if (!artwork || availableMediationLangs.length === 0) return;
-    if (!availableMediationLangs.includes(language)) {
-      setLanguage(availableMediationLangs[0]);
-    }
-  }, [artwork, availableMediationLangs, language, setLanguage]);
 
   useEffect(() => {
     if (!canSubmitFeedback) return;
@@ -1259,17 +1261,25 @@ const VisitorView = () => {
             </div>
           </div>
         )}
-        {/* Artwork title */}
-        <div className="œuvre-full-width-box px-5 text-right -mt-1 mb-[10px]">
-          <h2 className="m-0 text-xl font-bold leading-tight text-[#F0F0F0]">{artworkTitle}</h2>
-          <div className="mt-1 flex items-center justify-end gap-2">
-            <span className="text-[11px] italic text-[#E63946]">{t("see_artist_bio")}</span>
+        {/* Artwork title + artiste (bio au clic) */}
+        <div className="œuvre-full-width-box -mt-1 mb-[10px] px-5">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="m-0 min-w-0 flex-1 text-left text-xl font-bold leading-tight text-[#F0F0F0]">
+              {artworkTitle}
+            </h2>
             <button
               type="button"
-              className="m-0 border-0 bg-transparent p-0 italic leading-none text-[#F0F0F0] underline decoration-[#E63946] underline-offset-2 shadow-none"
+              className="m-0 flex shrink-0 items-center gap-1.5 border-0 bg-transparent p-0 italic leading-none text-[#F0F0F0] underline decoration-[#E63946] underline-offset-2 shadow-none"
               onClick={openArtistPhotoModal}
+              aria-label={t("see_artist_bio")}
+              title={t("see_artist_bio")}
             >
-              {artistDisplayName}
+              <span className="max-w-[140px] truncate text-right text-sm">{artistDisplayName}</span>
+              <BookOpen
+                className="h-3.5 w-3.5 shrink-0 text-[#E63946]"
+                strokeWidth={2.25}
+                aria-hidden
+              />
             </button>
           </div>
         </div>
@@ -1329,15 +1339,6 @@ const VisitorView = () => {
             <span className="text-xl">📖</span>
             <h3 className="font-bold text-[14px] text-[#F0F0F0]">{t("ai_select_style")}</h3>
           </div>
-          {tts.supported && !tts.isLoadingVoices && (
-            <VoiceSelector
-              lang={language}
-              voices={tts.availableVoices}
-              preferredVoiceName={tts.preferredVoices[language.split(/[-_]/)[0]]}
-              onChange={(name) => tts.setPreferredVoice(language, name)}
-              className="mb-2 px-5"
-            />
-          )}
           {stylesQueryError ? (
             <p className="mb-2 text-center text-xs text-red-600">{stylesQueryError}</p>
           ) : null}
@@ -1400,8 +1401,9 @@ const VisitorView = () => {
                               </div>
                               <TtsPlayButton
                                 isPlaying={tts.isSpeaking && tts.speakingText === slide.text}
-                                onPress={() => tts.speak(slide.text, language)}
-                                supported={tts.supported}
+                                isLoading={tts.isLoading && tts.speakingText === slide.text}
+                                onPress={() => void tts.speak(slide.text, language)}
+                                supported
                               />
                             </div>
                             <VisitorMediationMarkdown
@@ -1787,12 +1789,6 @@ const VisitorView = () => {
         </div>
       )}
 
-      {tts.showConsentModal && (
-        <TtsConsentModal
-          onGrant={tts.grantConsent}
-          onDismiss={tts.dismissConsent}
-        />
-      )}
     </div>
   );
 };

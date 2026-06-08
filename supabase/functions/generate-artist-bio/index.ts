@@ -1,19 +1,22 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { GoogleGenAI } from "https://esm.sh/@google/genai@0.14.1";
+import {
+  aiGuardBlockedResponse,
+  checkAILimitBeforeCall,
+} from "../_shared/aiGuard.ts";
 import {
   extractGeminiUsageMetadataFromResponse,
   insertAiUsageLog,
   tokensFromAnyGeminiUsageLike,
   tokensFromGroqOpenAiUsage,
 } from "../_shared/ai_usage_log.ts";
+import { ingestGroqRateLimitHeaders } from "../_shared/groqObservedLimits.ts";
 
 const SELECTED_MODEL_KEY = "selected_ai_model";
 
 /** Même clé que le tableau de bord IA (`AiModelControlPanel`). */
-async function resolveSelectedModelId(
-  admin: ReturnType<typeof createClient>,
-): Promise<string> {
+async function resolveSelectedModelId(admin: SupabaseClient): Promise<string> {
   const { data } = await admin
     .from("app_settings")
     .select("value")
@@ -51,25 +54,111 @@ function extractGeminiText(geminiJson: unknown): string {
 type RequestBody = {
   prenom?: string;
   nom?: string;
+  /** Alias legacy envoyé par le front (`grokBio.ts`). */
+  name?: string;
   art_types?: string[];
+  /** Alias legacy envoyé par le front (`grokBio.ts`). */
+  artTypes?: string[];
   /** Code de langue BCP-47 court (fr, en, de, es, it). Optionnel — sans valeur, le comportement par défaut (français) est conservé. */
   lang?: string;
+  /** Bio source (français) à traduire — évite 5 générations indépendantes de longueurs incohérentes. */
+  source_bio?: string;
 };
 
-const LANG_NAMES: Record<string, string> = {
-  fr: "français",
-  en: "English",
-  de: "Deutsch",
-  es: "español",
-  it: "italiano",
+const DEFAULT_FR_LENGTH_LINE =
+  "Rédige une biographie courte en français (4 à 6 phrases, maximum 550 caractères).";
+
+const BIO_LANG_META: Record<string, { lengthLine: string; lockLine: string }> = {
+  fr: {
+    lengthLine: DEFAULT_FR_LENGTH_LINE,
+    lockLine: "Rédige UNIQUEMENT en français.",
+  },
+  en: {
+    lengthLine: "Write a short biography in English (4 to 6 sentences, maximum 550 characters).",
+    lockLine: "Write ONLY in English.",
+  },
+  de: {
+    lengthLine: "Verfasse eine kurze Biografie auf Deutsch (4 bis 6 Sätze, maximal 550 Zeichen).",
+    lockLine: "Schreibe NUR auf Deutsch.",
+  },
+  es: {
+    lengthLine: "Redacta una biografía corta en español (4 a 6 frases, máximo 550 caracteres).",
+    lockLine: "Escribe ÚNICAMENTE en español.",
+  },
+  it: {
+    lengthLine: "Scrivi una breve biografia in italiano (4-6 frasi, massimo 550 caratteri).",
+    lockLine: "Scrivi SOLO in italiano.",
+  },
 };
 
-/** Retourne une instruction de langue à appendre au prompt, ou null si langue inconnue/non fournie. */
-function buildLangInstruction(lang: string | undefined): string | null {
-  if (!lang) return null;
-  const name = LANG_NAMES[lang.toLowerCase().slice(0, 2)];
-  if (!name) return null;
-  return `IMPORTANT: Tu dois rédiger la biographie UNIQUEMENT en ${name}. N'utilise aucune autre langue.`;
+function resolveLangCode(lang: string | undefined): string {
+  const code = (lang ?? "fr").toLowerCase().slice(0, 2);
+  return BIO_LANG_META[code] ? code : "fr";
+}
+
+/** Adapte le template (FR par défaut) à la langue cible. */
+function buildPromptForLang(template: string, lang: string | undefined): string {
+  const code = resolveLangCode(lang);
+  if (code === "fr") return template;
+
+  const meta = BIO_LANG_META[code];
+  const withLength = template.replace(
+    /Rédige une biographie courte en français \(4 à 6 phrases, maximum 550 caractères\)\./i,
+    meta.lengthLine,
+  );
+  return `${withLength}\n\n${meta.lockLine}`;
+}
+
+const TRANSLATION_TARGET_LABEL: Record<string, string> = {
+  en: "anglais",
+  de: "allemand",
+  es: "espagnol",
+  it: "italien",
+};
+
+/** Traduit une bio FR validée vers une autre langue (longueur homogène). */
+function buildTranslationPrompt(sourceBio: string, lang: string | undefined): string {
+  const code = resolveLangCode(lang);
+  const target = TRANSLATION_TARGET_LABEL[code] ?? code;
+  const meta = BIO_LANG_META[code];
+  return [
+    "Tu es traducteur culturel spécialisé dans les biographies d'artistes.",
+    `Traduis la biographie ci-dessous en ${target}.`,
+    meta.lengthLine,
+    "Contraintes:",
+    "- conserver le même niveau de détail et le même ton que le texte source",
+    "- ne pas inventer de faits précis absents du texte source",
+    "- ne pas utiliser de liste à puces",
+    meta.lockLine,
+    "Retourne uniquement le paragraphe traduit.",
+    "",
+    sourceBio,
+  ].join("\n");
+}
+
+function extractGroqAssistantText(
+  choice: { message?: { content?: unknown } } | undefined,
+): string {
+  const raw = choice?.message?.content;
+  if (typeof raw === "string") return raw.trim();
+  if (Array.isArray(raw)) {
+    return raw
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (
+          part &&
+          typeof part === "object" &&
+          "text" in part &&
+          typeof (part as { text?: unknown }).text === "string"
+        ) {
+          return (part as { text: string }).text;
+        }
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+  return "";
 }
 
 const CORS_HEADERS = {
@@ -80,7 +169,7 @@ const CORS_HEADERS = {
 
 const DEFAULT_PROMPT_TEMPLATE = [
   "Tu es rédacteur culturel.",
-  "Rédige une biographie courte en français (4 à 6 phrases, maximum 550 caractères).",
+  DEFAULT_FR_LENGTH_LINE,
   "Artiste: {{prenom}} {{nom}}.",
   "Type(s) d'art: {{art_types}}.",
   "Contraintes:",
@@ -143,8 +232,11 @@ serve(async (req: Request) => {
   }
 
   const prenom = body.prenom?.trim() ?? "";
-  const nom = body.nom?.trim() ?? "";
-  const artTypes = Array.isArray(body.art_types) ? body.art_types.map((t) => t?.trim() ?? "").filter(Boolean) : [];
+  const nom = (body.nom ?? body.name)?.trim() ?? "";
+  const artTypesSource = Array.isArray(body.art_types) ? body.art_types : body.artTypes;
+  const artTypes = Array.isArray(artTypesSource)
+    ? artTypesSource.map((t) => t?.trim() ?? "").filter(Boolean)
+    : [];
   if (!prenom || !nom || artTypes.length === 0) {
     return jsonResponse(400, { error: "prenom, nom et art_types sont requis." });
   }
@@ -170,14 +262,18 @@ serve(async (req: Request) => {
     art_types: artTypes.join(", "),
   });
 
-  const langName = body.lang ? (LANG_NAMES[body.lang.toLowerCase().slice(0, 2)] ?? null) : null;
-  const langInstruction = buildLangInstruction(body.lang);
+  const langCode = resolveLangCode(body.lang);
+  const sourceBio = body.source_bio?.trim() ?? "";
+  const prompt =
+    sourceBio && langCode !== "fr"
+      ? buildTranslationPrompt(sourceBio, body.lang)
+      : buildPromptForLang(renderedPrompt, body.lang);
 
-  const adjustedPrompt = langName
-    ? renderedPrompt.replace(/\ben\s+fran[çc]ais\b/gi, `en ${langName}`)
-    : renderedPrompt;
-
-  const prompt = langInstruction ? `${adjustedPrompt}\n${langInstruction}` : adjustedPrompt;
+  const guardProvider = shouldUseGemini(modelId) ? "gemini" : "groq";
+  const guard = await checkAILimitBeforeCall(admin, guardProvider, modelId, 640);
+  if (!guard.allowed) {
+    return aiGuardBlockedResponse(guard);
+  }
 
   if (shouldUseGemini(modelId)) {
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim();
@@ -195,8 +291,9 @@ serve(async (req: Request) => {
         model: modelId,
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
-          maxOutputTokens: 640,
+          maxOutputTokens: 1024,
           temperature: 0.5,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
     } catch (e) {
@@ -245,7 +342,7 @@ serve(async (req: Request) => {
       model: modelId,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
-      max_tokens: 320,
+      max_tokens: 1024,
     }),
   });
 
@@ -258,11 +355,28 @@ serve(async (req: Request) => {
     });
   }
 
-  const groqJson = (await groqResp.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+  const groqRaw = await groqResp.text();
+  ingestGroqRateLimitHeaders(admin, modelId, groqResp);
+
+  let groqJson: {
+    choices?: Array<{ message?: { content?: unknown }; finish_reason?: string }>;
     usage?: unknown;
   };
-  const bio = groqJson.choices?.[0]?.message?.content?.trim() ?? "";
+  try {
+    groqJson = JSON.parse(groqRaw) as typeof groqJson;
+  } catch {
+    return jsonResponse(502, {
+      error: "Réponse Groq invalide (JSON).",
+      details: groqRaw.slice(0, 500),
+      model_used: modelId,
+    });
+  }
+
+  const bio = extractGroqAssistantText(groqJson.choices?.[0]);
+  const finishReason = groqJson.choices?.[0]?.finish_reason;
+  if (finishReason === "length") {
+    console.warn(`[generate-artist-bio] Groq finish_reason=length model=${modelId} lang=${body.lang ?? "fr"}`);
+  }
   if (!bio) {
     return jsonResponse(502, { error: "Réponse vide de Groq.", model_used: modelId });
   }

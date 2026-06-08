@@ -7,9 +7,15 @@ import {
 } from '../_shared/cors.ts';
 import { getServiceRoleClient } from '../_shared/supabaseAdmin.ts';
 import {
+  aiGuardBlockedResponse,
+  checkAILimitBeforeCall,
+} from '../_shared/aiGuard.ts';
+import {
   insertAiUsageLog,
   tokensFromGroqOpenAiUsage,
 } from '../_shared/ai_usage_log.ts';
+import { ingestGroqRateLimitHeaders } from '../_shared/groqObservedLimits.ts';
+import { sanitizeTranslationOutput } from '../_shared/sanitizeTranslation.ts';
 
 type AiJob = {
   id: string;
@@ -28,6 +34,70 @@ type AiJob = {
 type WorkerBody = {
   job_id?: string;
 };
+
+type GroqChatMessage = { role: 'system' | 'user'; content: string };
+
+type GroqChatCompletion = {
+  choices?: Array<{ message?: { content?: string | null } }>;
+  model?: string;
+  usage?: unknown;
+};
+
+type GroqChatCreateParams = {
+  model: string;
+  messages: GroqChatMessage[];
+  max_tokens: number;
+  temperature: number;
+};
+
+type GroqApiPromiseWithResponse = {
+  withResponse: () => Promise<{ data: GroqChatCompletion; response: Response }>;
+};
+
+const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+/**
+ * groq-sdk expose les headers via `.withResponse()` (Response Web fetch native).
+ * Repli : fetch natif avec le même payload JSON si `.withResponse` est absent.
+ */
+async function createGroqChatCompletion(params: {
+  apiKey: string;
+  supabase: NonNullable<ReturnType<typeof getServiceRoleClient>>;
+  request: GroqChatCreateParams;
+}): Promise<GroqChatCompletion> {
+  const groq = new Groq({ apiKey: params.apiKey });
+  const pending = groq.chat.completions.create(params.request);
+
+  const withResponse = (pending as unknown as Partial<GroqApiPromiseWithResponse>).withResponse;
+  if (typeof withResponse === 'function') {
+    const { data, response } = await withResponse.call(pending);
+    if (response.ok) {
+      ingestGroqRateLimitHeaders(params.supabase, params.request.model, response);
+    }
+    return data;
+  }
+
+  console.warn('[ai-worker] groq-sdk sans .withResponse() — repli fetch natif pour headers rate limit');
+
+  const res = await fetch(GROQ_CHAT_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(params.request),
+  });
+
+  if (!res.ok) {
+    const details = await res.text();
+    const err = new Error(details || `Groq HTTP ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+
+  ingestGroqRateLimitHeaders(params.supabase, params.request.model, res);
+  return (await res.json()) as GroqChatCompletion;
+}
 
 /** Journalise la consommation Groq sans bloquer le job principal. */
 async function logGroqUsageSafe(
@@ -84,13 +154,13 @@ async function logGroqUsageSafe(
   }
 }
 
-function getGroqClient(): Groq | null {
+function getGroqApiKey(): string | null {
   const apiKey = Deno.env.get('GROQ_API_KEY')?.trim();
   if (!apiKey) {
     console.error('[ai-worker] GROQ_API_KEY is not set');
     return null;
   }
-  return new Groq({ apiKey });
+  return apiKey;
 }
 
 async function parseBody(req: Request): Promise<WorkerBody> {
@@ -234,8 +304,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       systemPrompt = "Tu es un assistant qui génère des fiches d'œuvres d'art.";
       userPrompt = `Génère une fiche en ${payload.langue} pour cette œuvre :\n\n${payload.contenuSource}`;
     } else if (job.job_type === 'translate_fiche') {
-      systemPrompt = 'Tu es un traducteur professionnel.';
-      userPrompt = `Traduis ce texte du ${payload.sourceLang} vers le ${payload.targetLang} :\n\n${payload.texteSource}`;
+      const langLabels: Record<string, string> = {
+        fr: 'français',
+        en: 'anglais',
+        de: 'allemand',
+        es: 'espagnol',
+        it: 'italien',
+      };
+      const sourceLabel = langLabels[String(payload.sourceLang ?? '')] ?? String(payload.sourceLang ?? '');
+      const targetLabel = langLabels[String(payload.targetLang ?? '')] ?? String(payload.targetLang ?? '');
+      systemPrompt =
+        'Tu es un traducteur professionnel. Réponds UNIQUEMENT avec le texte traduit, sans introduction, sans guillemets, sans commentaire et sans phrase du type « Voici la traduction ».';
+      userPrompt =
+        `Traduis le texte suivant du ${sourceLabel} vers le ${targetLabel}. ` +
+        `Réponds uniquement avec la traduction, rien d'autre.\n\n${payload.texteSource}`;
     } else {
       await supabase
         .from('ai_jobs')
@@ -252,8 +334,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const groq = getGroqClient();
-    if (!groq) {
+    const groqApiKey = getGroqApiKey();
+    if (!groqApiKey) {
       await supabase
         .from('ai_jobs')
         .update({
@@ -269,18 +351,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    const guard = await checkAILimitBeforeCall(supabase, 'groq', job.model);
+    if (!guard.allowed) {
+      console.warn('[ai-worker] blocked by aiGuard', guard);
+      return aiGuardBlockedResponse(guard);
+    }
+
     console.log(`[ai-worker] calling Groq model=${job.model}`);
 
-    let completion;
+    let completion: GroqChatCompletion;
     try {
-      completion = await groq.chat.completions.create({
-        model: job.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 600,
-        temperature: 0.4,
+      completion = await createGroqChatCompletion({
+        apiKey: groqApiKey,
+        supabase,
+        request: {
+          model: job.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          max_tokens: 600,
+          temperature: 0.4,
+        },
       });
     } catch (e: unknown) {
       const err = e as { message?: string; status?: number };
@@ -339,7 +431,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const text = completion.choices[0]?.message?.content ?? '';
+    const rawText = completion.choices?.[0]?.message?.content ?? '';
+    const text =
+      job.job_type === 'translate_fiche'
+        ? sanitizeTranslationOutput(rawText)
+        : rawText;
     console.log(
       `[ai-worker] Groq done job=${job.id} textLen=${text.length}`,
     );

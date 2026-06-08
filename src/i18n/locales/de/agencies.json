@@ -16,6 +16,15 @@
     "scopeExpo": "Agentur verknüpft mit Ausstellung {{expoId}}.",
     "noName": "Ohne Namen"
   },
+  "expos": {
+    "ongoing": "Laufend",
+    "upcoming": "Bevorstehend",
+    "finished": "Beendet",
+    "permanent": "Dauerhaft",
+    "dateRange": "Vom {{from}} bis {{to}}",
+    "permanentExpo": "Dauerhafte Ausstellung",
+    "none": "Keine Ausstellung"
+  },
   "tableau": {
     "title": "Organisationen — Vollständige Tabelle",
     "back": "Zurück",

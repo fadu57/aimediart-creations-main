@@ -6,9 +6,10 @@ export type TrashMenuLink = {
 };
 
 export const SETTINGS_TRASH_MENU_LINKS: TrashMenuLink[] = [
-  { id: "users", to: "/user/utilisateurs-corbeille", labelKey: "settings_submenu_trash_users" },
+  { id: "users", to: "/utilisateurs-corbeille", labelKey: "settings_submenu_trash_users" },
   { id: "agencies", to: "/agencies-corbeille", labelKey: "settings_submenu_trash_agencies" },
   { id: "artists", to: "/artistes-corbeille", labelKey: "settings_submenu_trash_artists" },
   { id: "catalogue", to: "/catalogue-corbeille", labelKey: "settings_submenu_trash_catalogue" },
   { id: "expos", to: "/expos-corbeille", labelKey: "settings_submenu_trash_expos" },
+  { id: "visitors", to: "/visiteurs-corbeille", labelKey: "settings_submenu_trash_visitors" },
 ];

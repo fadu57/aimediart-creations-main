@@ -13,12 +13,27 @@ import { sortAgencyFieldKeys } from "@/lib/agencyFormUtils";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { useTranslation } from "react-i18next";
+import { formatExpoDatesLabel } from "@/lib/expoDates";
+import { cn } from "@/lib/utils";
+import {
+  EXPO_TIMING_CATEGORY_ORDER,
+  groupExposByTimingCategory,
+  type ExpoTimingCategory,
+} from "@/lib/expoTimingStatus";
 
 type AgencyRow = {
   id: string;
   name_agency?: string | null;
   logo_agency?: string | null;
   deleted_at?: string | null;
+};
+
+type ExpoBrief = {
+  id: string;
+  expo_name?: string | null;
+  agency_id?: string | null;
+  date_expo_du?: string | null;
+  date_expo_au?: string | null;
 };
 
 function agencyLabel(row: AgencyRow): string {
@@ -50,11 +65,67 @@ function AgencyLogoThumb({ logoUrl, title }: { logoUrl: string | null | undefine
   );
 }
 
+function AgencyExpoList({ expos }: { expos: ExpoBrief[] }) {
+  const { t, i18n } = useTranslation("agencies");
+  const grouped = useMemo(() => groupExposByTimingCategory(expos), [expos]);
+  const hasAny = EXPO_TIMING_CATEGORY_ORDER.some((cat) => grouped[cat].length > 0);
+  if (!hasAny) {
+    return <p className="mt-2 text-sm text-muted-foreground">{t("expos.none")}</p>;
+  }
+
+  const labelKey: Record<ExpoTimingCategory, string> = {
+    upcoming: "expos.upcoming",
+    ongoing: "expos.ongoing",
+    finished: "expos.finished",
+    permanent: "expos.permanent",
+  };
+
+  const badgeClass: Record<ExpoTimingCategory, string> = {
+    upcoming: "border-sky-300 bg-sky-50 text-sky-700",
+    ongoing: "border-emerald-300 bg-emerald-50 text-emerald-700",
+    finished: "border-gray-300 bg-gray-100 text-gray-600",
+    permanent: "border-violet-300 bg-violet-50 text-violet-700",
+  };
+
+  return (
+    <ul className="mt-2 space-y-1 text-sm pointer-events-auto">
+      {EXPO_TIMING_CATEGORY_ORDER.flatMap((cat) =>
+        grouped[cat].map((ex) => (
+          <li key={ex.id} className="flex items-center gap-3 min-w-0">
+            <span
+              className={cn(
+                "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                badgeClass[cat],
+              )}
+            >
+              {t(labelKey[cat])}
+            </span>
+            <Link
+              to={`/expos?expo=${encodeURIComponent(ex.id)}`}
+              className="min-w-0 flex-1 text-primary underline-offset-2 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {ex.expo_name?.trim() || ex.id}
+            </Link>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {formatExpoDatesLabel(ex.date_expo_du, ex.date_expo_au, i18n.language, t, {
+                range: "expos.dateRange",
+                permanent: "expos.permanentExpo",
+              })}
+            </span>
+          </li>
+        )),
+      )}
+    </ul>
+  );
+}
+
 const Agencies = () => {
   const { t } = useTranslation("agencies");
   const [searchParams] = useSearchParams();
   const agencyPopupId = searchParams.get("agency")?.trim() || "";
   const [rows, setRows] = useState<AgencyRow[]>([]);
+  const [exposByAgencyId, setExposByAgencyId] = useState<Record<string, ExpoBrief[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [agencyFieldKeys, setAgencyFieldKeys] = useState<string[]>(["id", "name_agency", "logo_agency"]);
@@ -64,7 +135,7 @@ const Agencies = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
-  const { role_id, agency_id: userAgencyId, role_name } = useAuthUser();
+  const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useAuthUser();
 
   useEffect(() => {
     let cancelled = false;
@@ -114,11 +185,48 @@ const Agencies = () => {
     if (qErr) {
       setError(qErr.message);
       setRows([]);
+      setExposByAgencyId({});
     } else {
-      setRows(((data as AgencyRow[] | null) ?? []).filter((r) => r.id));
+      const agencyList = ((data as AgencyRow[] | null) ?? []).filter((r) => r.id);
+      setRows(agencyList);
+
+      const applyExpoScope = (query: ReturnType<typeof supabase.from>) => {
+        let scoped = query as ReturnType<typeof supabase.from>;
+        if ((role_id === 5 || role_id === 6) && userExpoId) {
+          scoped = scoped.eq("id", userExpoId);
+        } else if (scope.mode === "expo" && scope.expoId) {
+          scoped = scoped.eq("id", scope.expoId);
+        } else if (role_id === 4 && userAgencyId) {
+          scoped = scoped.eq("agency_id", userAgencyId);
+        } else if (scope.mode === "agency" && scope.agencyId) {
+          scoped = scoped.eq("agency_id", scope.agencyId);
+        }
+        return scoped;
+      };
+
+      const expoBase = applyExpoScope(
+        supabase
+          .from("expos")
+          .select("id, expo_name, agency_id, date_expo_du, date_expo_au")
+          .is("deleted_at", null)
+          .order("expo_name", { ascending: true, nullsFirst: false }),
+      );
+      const { data: expoData, error: expoErr } = await expoBase;
+      if (expoErr) {
+        setExposByAgencyId({});
+      } else {
+        const byAgency: Record<string, ExpoBrief[]> = {};
+        for (const ex of ((expoData as ExpoBrief[] | null) ?? []).filter((r) => r.id)) {
+          const aid = ex.agency_id?.trim();
+          if (!aid) continue;
+          if (!byAgency[aid]) byAgency[aid] = [];
+          byAgency[aid].push(ex);
+        }
+        setExposByAgencyId(byAgency);
+      }
     }
     setLoading(false);
-  }, [role_id, userAgencyId, scope.mode, scope.agencyId, scope.expoId]);
+  }, [role_id, userAgencyId, userExpoId, scope.mode, scope.agencyId, scope.expoId]);
 
   useEffect(() => {
     void load();
@@ -270,13 +378,14 @@ const Agencies = () => {
                   </div>
                   <div className="flex-1 min-w-0 pointer-events-none">
                     <h3 className="font-serif font-bold text-lg">{ag.name_agency?.trim() || t("page.noName")}</h3>
+                    <AgencyExpoList expos={exposByAgencyId[ag.id] ?? []} />
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 p-4 w-full md:w-auto md:items-center shrink-0 md:max-w-[min(100%,22rem)] bg-muted/20 md:bg-transparent">
-                  <Button type="button" variant="outline" size="sm" className="w-full sm:w-44 justify-center" asChild>
+                <div className="flex flex-col gap-2 p-4 w-full md:w-auto shrink-0 md:max-w-[min(100%,22rem)] bg-muted/20 md:bg-transparent">
+                  <Button type="button" variant="outline" size="sm" className="w-full justify-center" asChild>
                     <Link to={`/expos?agency=${encodeURIComponent(ag.id)}`}>{t("page.viewExpos")}</Link>
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="w-full sm:w-44 justify-center" asChild>
+                  <Button type="button" variant="outline" size="sm" className="w-full justify-center" asChild>
                     <Link to="/catalogue">{t("page.viewCatalogue")}</Link>
                   </Button>
                 </div>
