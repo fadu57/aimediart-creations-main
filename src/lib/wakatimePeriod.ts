@@ -2,7 +2,10 @@
 
 export type WakaPeriod = "day" | "week" | "month" | "quarter" | "year";
 
-export const WAKA_PERIODS: WakaPeriod[] = ["day", "week", "month", "quarter", "year"];
+/** Filtre appliqué à l'ouverture de /suivi_temps. */
+export const DEFAULT_WAKA_PERIOD: WakaPeriod = "week";
+
+export const WAKA_PERIODS: WakaPeriod[] = ["week", "day", "month", "quarter", "year"];
 
 export type WakaPeriodRange = {
   dateFrom: string;

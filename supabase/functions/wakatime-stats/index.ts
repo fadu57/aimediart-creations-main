@@ -27,14 +27,95 @@ type WakaHeartbeat = {
 const HEARTBEAT_TIMEOUT_SEC = 15 * 60;
 const WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+function isoDateLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return isoDateLocal(d);
 }
 
 function addDaysIso(iso: string, days: number): string {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + days);
-  return isoDate(d);
+  return isoDateLocal(d);
+}
+
+function clampIsoDate(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function buildStatsFromDaily(
+  daily: Array<{ date: string; seconds: number; label: string }>,
+  dateFrom: string,
+  dateTo: string,
+): Record<string, unknown> {
+  const total_seconds = daily.reduce((sum, d) => sum + d.seconds, 0);
+  const spanDays = Math.max(
+    1,
+    Math.round(
+      (new Date(`${dateTo}T12:00:00`).getTime() - new Date(`${dateFrom}T12:00:00`).getTime())
+        / (24 * 3600 * 1000),
+    ) + 1,
+  );
+  const daily_average = total_seconds / spanDays;
+  const best = daily.reduce<{ date: string; seconds: number; label: string } | null>(
+    (bestDay, d) => (!bestDay || d.seconds > bestDay.seconds ? d : bestDay),
+    null,
+  );
+
+  const formatDuration = (sec: number): string => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.round((sec % 3600) / 60);
+    if (h === 0) return `${m} mins`;
+    if (m === 0) return `${h} hrs`;
+    return `${h} hrs ${m} mins`;
+  };
+
+  return {
+    total_seconds,
+    human_readable_total: formatDuration(total_seconds),
+    daily_average,
+    human_readable_daily_average: formatDuration(daily_average),
+    best_day: best && best.seconds > 0
+      ? { date: best.date, total_seconds: best.seconds, text: best.label || formatDuration(best.seconds) }
+      : null,
+    range: `${dateFrom} → ${dateTo}`,
+    human_readable_range: `${dateFrom} → ${dateTo}`,
+  };
+}
+
+async function fetchWakaStats(
+  apiKey: string,
+  dateFrom: string,
+  dateTo: string,
+): Promise<Record<string, unknown>> {
+  if (dateFrom === dateTo) {
+    try {
+      const dayRes = await wakaGet<{ data?: Record<string, unknown> }>(
+        apiKey,
+        `/users/current/stats/day/${dateFrom}`,
+      );
+      if (dayRes.data) return dayRes.data;
+    } catch (err) {
+      console.warn("[wakatime-stats] stats/day échoué", err);
+    }
+  }
+
+  try {
+    const rangeRes = await wakaGet<{ data?: Record<string, unknown> }>(
+      apiKey,
+      `/users/current/stats/range/${dateFrom}/${dateTo}`,
+    );
+    if (rangeRes.data) return rangeRes.data;
+  } catch (err) {
+    console.warn("[wakatime-stats] stats/range échoué", err);
+  }
+
+  return {};
 }
 
 function toLocalMinute(unixSec: number): number {
@@ -211,31 +292,52 @@ Deno.serve(async (req) => {
     }
 
     const today = new Date();
-    const todayIso = isoDate(today);
-    const dateTo = (body.dateTo ?? todayIso).slice(0, 10);
-    const dateFrom = (body.dateFrom ?? addDaysIso(dateTo, -6)).slice(0, 10);
+    const todayIso = isoDateLocal(today);
+    let dateTo = clampIsoDate(body.dateTo ?? todayIso);
+    let dateFrom = clampIsoDate(body.dateFrom ?? addDaysIso(dateTo, -6));
+    if (dateFrom > dateTo) {
+      const tmp = dateFrom;
+      dateFrom = dateTo;
+      dateTo = tmp;
+    }
     const isSingleDay = dateFrom === dateTo;
 
-    const [statsRangeRes, summariesRes, heartbeatsRes] = await Promise.all([
-      wakaGet<{ data?: Record<string, unknown> }>(
-        apiKey,
-        `/users/current/stats/range/${dateFrom}/${dateTo}`,
-      ),
-      wakaGet<{ data?: Array<Record<string, unknown>> }>(
-        apiKey,
-        `/users/current/summaries?start=${dateFrom}&end=${dateTo}`,
-      ),
-      isSingleDay
-        ? wakaGet<{ data?: WakaHeartbeat[] }>(
-          apiKey,
-          `/users/current/heartbeats?date=${dateFrom}`,
-        ).catch(() => ({ data: [] as WakaHeartbeat[] }))
-        : Promise.resolve({ data: [] as WakaHeartbeat[] }),
-    ]);
+    const summariesRes = await wakaGet<{ data?: Array<Record<string, unknown>> }>(
+      apiKey,
+      `/users/current/summaries?start=${dateFrom}&end=${dateTo}`,
+    ).catch((err) => {
+      console.warn("[wakatime-stats] summaries échoué", err);
+      return { data: [] as Array<Record<string, unknown>> };
+    });
 
-    const statsRange = statsRangeRes.data ?? {};
+    const heartbeatsRes = isSingleDay
+      ? await wakaGet<{ data?: WakaHeartbeat[] }>(
+        apiKey,
+        `/users/current/heartbeats?date=${dateFrom}`,
+      ).catch(() => ({ data: [] as WakaHeartbeat[] }))
+      : { data: [] as WakaHeartbeat[] };
+
     const summariesRaw = summariesRes.data ?? [];
     const heartbeats = heartbeatsRes.data ?? [];
+
+    const daily = summariesRaw.map((day) => {
+      const range = day.range as { date?: string } | undefined;
+      const grand = day.grand_total as { total_seconds?: number; text?: string } | undefined;
+      const seconds = Number(grand?.total_seconds ?? 0);
+      const dayDate = range?.date ?? "";
+      if (!dayDate || dayDate < dateFrom || dayDate > dateTo) return null;
+      return {
+        date: dayDate,
+        seconds,
+        hours: Math.round((seconds / 3600) * 100) / 100,
+        label: grand?.text ?? "",
+      };
+    }).filter((d): d is { date: string; seconds: number; hours: number; label: string } => d !== null);
+
+    let statsRange = await fetchWakaStats(apiKey, dateFrom, dateTo);
+    if (!Number(statsRange.total_seconds ?? 0) && daily.length > 0) {
+      statsRange = { ...statsRange, ...buildStatsFromDaily(daily, dateFrom, dateTo) };
+    }
 
     const languages = pickEntities(
       mapEntities(statsRange.languages as WakaEntityInput[]),
@@ -279,20 +381,6 @@ Deno.serve(async (req) => {
       dateFrom,
       dateTo,
     );
-
-    const daily = summariesRaw.map((day) => {
-      const range = day.range as { date?: string } | undefined;
-      const grand = day.grand_total as { total_seconds?: number; text?: string } | undefined;
-      const seconds = Number(grand?.total_seconds ?? 0);
-      const dayDate = range?.date ?? "";
-      if (!dayDate || dayDate < dateFrom || dayDate > dateTo) return null;
-      return {
-        date: dayDate,
-        seconds,
-        hours: Math.round((seconds / 3600) * 100) / 100,
-        label: grand?.text ?? "",
-      };
-    }).filter((d): d is { date: string; seconds: number; hours: number; label: string } => d !== null);
 
     const dayTotal = isSingleDay
       ? daily.find((d) => d.date === dateFrom)

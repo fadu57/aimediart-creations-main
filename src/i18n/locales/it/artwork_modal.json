@@ -97,7 +97,7 @@
   "toast_error_artist_generate": "Seleziona un artista prima di generare.",
   "toast_error_source_required": "Compila il materiale sorgente prima di generare.",
   "toast_error_source_persist": "Impossibile salvare il materiale sorgente. Le mediazioni potrebbero usare un testo obsoleto.",
-  "toast_mediation_generated": "Mediazioni generate: 8 stili × 5 lingue (FR, EN, DE, ES, IT).",
+  "toast_mediation_generated": "Mediazioni generate: {{personas}} persona ({{langs}}).",
   "toast_error_generate": "Generazione IA fallita.",
   "toast_error_artwork_load": "Opera non trovata.",
   "toast_image_uploaded": "Immagine caricata.",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
 
@@ -104,14 +104,40 @@ function groupByProvider(rows: AILimitRow[]): Record<string, AILimitRow[]> {
   return map;
 }
 
+/** Empreinte stable pour comparer deux chargements successifs. */
+function limitsFingerprint(rows: AILimitRow[]): string {
+  return JSON.stringify(
+    rows.map((r) => ({
+      id: r.limit_id,
+      usage: r.current_usage,
+      pct: r.usage_pct,
+      limit: r.limit_value,
+      observed: r.limit_value_observed,
+      manual: r.limit_value_manual,
+      status: r.status,
+    })),
+  );
+}
+
 export function useAILimits(options: UseAILimitsOptions = {}) {
   const { provider, pollIntervalMs = DEFAULT_POLL_MS } = options;
 
   const [limits, setLimits] = useState<AILimitRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const prevLimitsFingerprintRef = useRef<string | null>(null);
 
   const loadLimits = useCallback(async (silent = false) => {
+    const queryDesc = provider
+      ? `ai_usage_vs_limits?provider=eq.${provider}`
+      : "ai_usage_vs_limits (sans filtre provider)";
+    console.log("[useAILimits] loadLimits start", {
+      silent,
+      provider: provider ?? "(aucun)",
+      query: queryDesc,
+      at: new Date().toISOString(),
+    });
+
     if (!silent) {
       setIsLoading(true);
       setError(null);
@@ -125,6 +151,21 @@ export function useAILimits(options: UseAILimitsOptions = {}) {
 
     const { data, error: err } = await q;
 
+    console.log("[useAILimits] loadLimits response", {
+      silent,
+      rowCount: data?.length ?? 0,
+      error: err?.message ?? null,
+      sample: (data ?? []).slice(0, 2).map((r) => ({
+        id: r.limit_id,
+        provider: r.provider,
+        type: r.limit_type,
+        usage: r.current_usage,
+        limit: r.limit_value,
+        observed: r.limit_value_observed,
+        source: r.limit_source,
+      })),
+    });
+
     if (!silent) setIsLoading(false);
 
     if (err) {
@@ -136,6 +177,16 @@ export function useAILimits(options: UseAILimitsOptions = {}) {
     const rows = sortLimits(
       (data ?? []).map((r) => mapLimitRow(r as Record<string, unknown>)),
     );
+    const fingerprint = limitsFingerprint(rows);
+    const identicalToPrevious =
+      prevLimitsFingerprintRef.current != null && fingerprint === prevLimitsFingerprintRef.current;
+    console.log("[useAILimits] setLimits", {
+      count: rows.length,
+      ids: rows.map((r) => r.limit_id),
+      identicalToPrevious,
+      silent,
+    });
+    prevLimitsFingerprintRef.current = fingerprint;
     setLimits(rows);
     if (!silent) setError(null);
   }, [provider]);

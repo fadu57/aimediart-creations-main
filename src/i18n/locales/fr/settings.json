@@ -381,7 +381,7 @@
   "wakatime": {
     "back_settings": "Paramètres",
     "page_title": "Suivi du temps (WakaTime)",
-    "page_sub": "Temps de codage enregistré par l'extension WakaTime — réservé aux administrateurs.",
+    "page_sub": "Temps de codage enregistré par l'extension WakaTime.",
     "refresh": "Actualiser",
     "fetched_at": "Dernière mise à jour : {{at}}",
     "config_hint": "Ajoutez le secret WAKATIME_API_KEY dans Supabase (Edge Functions → Secrets), puis redéployez wakatime-stats.",
@@ -438,7 +438,7 @@
   "tokens": {
     "back_settings": "Paramètres",
     "page_title": "Suivi des tokens IA",
-    "page_sub": "Consommation de tokens enregistrée par Groq, Gemini, Google TTS et les Edge Functions — réservé aux administrateurs.",
+    "page_sub": "Consommation de tokens enregistrée par Groq, Gemini, Google TTS et les Edge Functions.",
     "refresh": "Actualiser",
     "empty": "Aucune consommation enregistrée pour cette période.",
     "rls_hint": "Si les totaux restent à zéro, vérifiez la politique RLS SELECT sur ai_usage_logs pour les utilisateurs authentifiés.",

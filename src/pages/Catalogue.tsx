@@ -32,7 +32,10 @@ import { cartelExplorationLines } from "@/lib/cartelExplorationText";
 import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
 import { CartelFormatDialog } from "@/components/CartelFormatDialog";
 import { cn } from "@/lib/utils";
-import { countMaxMediationStylesAcrossLangs } from "@/lib/artworkDescriptionI18n";
+import {
+  countMaxMediationStylesAcrossLangs,
+  getMediationFilledUiLangs,
+} from "@/lib/artworkDescriptionI18n";
 import { useTranslation } from "react-i18next";
 type ArtworkRow = {
   artwork_id: string;
@@ -76,6 +79,15 @@ function artworkArtistFromRow(aw: Pick<ArtworkRow, "artists">): ArtistRow | unde
 
 function artworkExpoRef(aw: Pick<ArtworkRow, "artwork_expo_id" | "expo_id">): string {
   return (aw.artwork_expo_id ?? aw.expo_id ?? "").trim();
+}
+
+function artworkStatusLabel(raw: string, t: (key: string) => string): string {
+  const key = raw.trim().toLowerCase();
+  if (!key) return t("status_empty");
+  if (key === "active") return t("status_active");
+  if (key === "inactive") return t("status_inactive");
+  if (key === "draft") return t("status_draft");
+  return raw;
 }
 
 /** Correspondance artwork ↔ expo (id primaire ou legacy expo_id). */
@@ -808,10 +820,13 @@ const Catalogue = () => {
           const artworkImage = aw.artwork_image_url || aw.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
           const currentStatusRaw = (aw.artwork_status ?? "").trim();
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
-          const statusLabel = currentStatusRaw || t("status_empty");
+          const statusLabel = artworkStatusLabel(currentStatusRaw, t);
           const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
           const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description_i18n);
           const hasGeneratedMediation = generatedTextsCount > 0;
+          const mediationLangsLabel = getMediationFilledUiLangs(aw.artwork_description_i18n)
+            .map((lang) => lang.toUpperCase())
+            .join(" - ");
 
           return (
             <Card key={aw.artwork_id} className="glass-card hover:shadow-lg transition-all duration-300 overflow-hidden">
@@ -836,11 +851,14 @@ const Catalogue = () => {
                     />
                   </div>
                   <div
-                    className="w-full max-w-[150px]"
+                    className="flex w-full max-w-[150px] flex-col gap-1"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
+                    <span className="text-[10px] leading-tight text-muted-foreground text-center">
+                      {t("expo_selector_move_label")}
+                    </span>
                     <Select
                       value={selectedExpoValue}
                       onValueChange={(value) => {
@@ -909,22 +927,6 @@ const Catalogue = () => {
                       className="w-full justify-center"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const q = new URLSearchParams();
-                        q.set("artwork_id", aw.artwork_id);
-                        const ex = (aw.expo_id ?? aw.artwork_expo_id)?.trim();
-                        if (ex) q.set("expo_id", ex);
-                        navigate(`/scan-work2?${q.toString()}`);
-                      }}
-                    >
-                      {t("btn_test_qr")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-center"
-                      onClick={(e) => {
-                        e.stopPropagation();
                         openCartelFormatDialog(aw);
                       }}
                       disabled={!aw.artwork_qrcode_image && !aw.artwork_qr_code_url}
@@ -968,7 +970,10 @@ const Catalogue = () => {
                           : "border-[#E63946] bg-[#E63946] text-white",
                       )}
                     >
-                      {t("badge_ia_mediation", { count: generatedTextsCount })}
+                      {t("badge_ia_mediation", {
+                        count: generatedTextsCount,
+                        langs: mediationLangsLabel,
+                      })}
                     </span>
                     </div>
                   </div>

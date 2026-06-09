@@ -97,7 +97,7 @@
   "toast_error_artist_generate": "Please select an artist before generating.",
   "toast_error_source_required": "Please fill in the source material before generating.",
   "toast_error_source_persist": "Could not save source material to the database. Mediations may use outdated text.",
-  "toast_mediation_generated": "Mediations generated: 8 styles × 5 languages (FR, EN, DE, ES, IT).",
+  "toast_mediation_generated": "Mediations generated: {{personas}} personas ({{langs}}).",
   "toast_error_generate": "AI generation failed.",
   "toast_error_artwork_load": "Artwork not found.",
   "toast_image_uploaded": "Image uploaded.",

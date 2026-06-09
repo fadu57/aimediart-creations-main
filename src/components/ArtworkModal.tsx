@@ -1255,7 +1255,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         percent: MEDIATION_GENERATION_PROGRESS.save.start,
         detail: t("mediation_progress_save"),
       });
-      await persistMediationToArtwork(base, "toast_mediation_generated");
+      await persistMediationToArtwork(base, "toast_mediation_generated", {
+        personas: stylesPayload.length,
+        langs: langsToGenerate.map(langCodeForProgress).join(" - "),
+      });
       setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
       await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {

@@ -97,7 +97,7 @@
   "toast_error_artist_generate": "Bitte einen Künstler vor der Generierung auswählen.",
   "toast_error_source_required": "Bitte Quellmaterial vor der Generierung ausfüllen.",
   "toast_error_source_persist": "Quellmaterial konnte nicht gespeichert werden. Mediationen nutzen evtl. alten Text.",
-  "toast_mediation_generated": "Mediationen generiert: 8 Stile × 5 Sprachen (FR, EN, DE, ES, IT).",
+  "toast_mediation_generated": "Mediationen generiert: {{personas}} Personas ({{langs}}).",
   "toast_error_generate": "KI-Generierung fehlgeschlagen.",
   "toast_error_artwork_load": "Kunstwerk nicht gefunden.",
   "toast_image_uploaded": "Bild hochgeladen.",

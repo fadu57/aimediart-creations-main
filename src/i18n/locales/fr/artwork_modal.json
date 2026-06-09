@@ -98,7 +98,7 @@
   "toast_error_artist_generate": "Sélectionnez un artiste avant la génération.",
   "toast_error_source_required": "Renseignez la matière brute avant la génération.",
   "toast_error_source_persist": "Impossible d'enregistrer le matériau source en base. Les médiations pourraient utiliser un ancien texte.",
-  "toast_mediation_generated": "Médiations générées : 8 styles × 5 langues (FR, EN, DE, ES, IT).",
+  "toast_mediation_generated": "Médiations générées : {{personas}} personas ({{langs}}).",
   "toast_error_generate": "Génération IA impossible.",
   "toast_error_artwork_load": "Œuvre introuvable.",
   "toast_image_uploaded": "Image envoyée.",

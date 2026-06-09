@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,6 +22,7 @@ import {
   formatTokenCount,
   listDistinctProviders,
   formatTokenUsageDate,
+  formatTokenChartDayLabel,
   formatUsageTableCell,
   getTokenChartRange,
   getTokenFetchRange,
@@ -44,6 +45,14 @@ function dateLocale(lang: string): string {
   return map[code] ?? "fr-FR";
 }
 
+/** Filtre tokens → filtre limites (ai_provider_limits : groq / gemini uniquement). */
+function limitsProviderFromTokenFilter(filter: string): string | undefined {
+  if (filter === ALL_PROVIDERS) return undefined;
+  if (filter === "google_gemini") return "gemini";
+  if (filter === "google_tts") return undefined;
+  return filter;
+}
+
 
 export default function SettingsSuiviTokens() {
   const { t, i18n } = useTranslation("settings");
@@ -57,6 +66,7 @@ export default function SettingsSuiviTokens() {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchTokenUsageLogs>>["data"]>([]);
   const [dataEarliest, setDataEarliest] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState(ALL_PROVIDERS);
+  const limitsRefetchRef = useRef<(() => void) | null>(null);
 
   const range = useMemo(
     () => getTokenPeriodRange(period, periodOffset),
@@ -131,12 +141,12 @@ export default function SettingsSuiviTokens() {
   const byModel = useMemo(() => breakdownByModel(periodRows), [periodRows]);
   const series = useMemo(
     () => tokenTimeSeries(filteredRows, chartRange).map((p) => ({
-      date: formatTokenUsageDate(p.date, locale),
+      date: formatTokenChartDayLabel(p.date),
       total: p.totalTokens,
       prompt: p.promptTokens,
       completion: p.completionTokens,
     })),
-    [filteredRows, chartRange, locale],
+    [filteredRows, chartRange],
   );
 
   const xAxisInterval = series.length > 14 ? Math.max(0, Math.ceil(series.length / 8) - 1) : 0;
@@ -201,7 +211,21 @@ export default function SettingsSuiviTokens() {
           size="sm"
           className="gap-2 shrink-0"
           disabled={loading}
-          onClick={() => void load()}
+          onClick={() => {
+            const limitsProvider = limitsProviderFromTokenFilter(providerFilter);
+            console.log("[suivi_tokens] header refresh click", {
+              fetchRange,
+              providerFilter,
+              limitsProvider: limitsProvider ?? "(aucun)",
+              limitsRefetchRegistered: typeof limitsRefetchRef.current === "function",
+            });
+            void load();
+            if (limitsRefetchRef.current) {
+              limitsRefetchRef.current();
+            } else {
+              console.warn("[suivi_tokens] limitsRefetchRef NULL — refetch limites non déclenché");
+            }
+          }}
         >
           {loading
             ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -464,7 +488,10 @@ export default function SettingsSuiviTokens() {
         aria-labelledby="limites-ia-heading"
       >
         <AILimitsMonitor
-          provider={providerFilter === ALL_PROVIDERS ? undefined : providerFilter}
+          provider={limitsProviderFromTokenFilter(providerFilter)}
+          onRefetchRegister={(fn) => {
+            limitsRefetchRef.current = fn;
+          }}
         />
       </section>
     </div>

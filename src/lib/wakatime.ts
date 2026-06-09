@@ -143,3 +143,10 @@ export function chartDateFr(iso: string): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 }
+
+/** Libellé axe graphique activité (jj/mm). */
+export function formatWakaChartDayLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}`;
+}

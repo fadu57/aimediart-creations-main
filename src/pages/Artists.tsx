@@ -7,13 +7,13 @@ import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAge
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { canCreateArtist } from "@/lib/authUser";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
-import { computeArtistAgeYears } from "@/lib/artistAge";
+import { computeArtistAgeYears, getDaysUntilNextBirthday } from "@/lib/artistAge";
 import { getMissingArtistFieldItems } from "@/lib/artistMissingFields";
 import { supabase } from "@/lib/supabase";
 import { Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MissingArtistFieldHint } from "@/components/MissingArtistFieldHint";
 import { useTranslation } from "react-i18next";
 
 type ArtistRow = {
@@ -243,6 +243,18 @@ const Artists = () => {
           );
           const ageLabel =
             ageYears === null ? t("form_age_missing") : t("form_age_years", { count: ageYears });
+          const daysUntilBirthday = getDaysUntilNextBirthday(
+            artist.artist_birth_date,
+            artist.artist_vivant !== false,
+          );
+          const birthdayLabel =
+            daysUntilBirthday === null
+              ? null
+              : daysUntilBirthday === 0
+                ? t("birthday_today")
+                : daysUntilBirthday === 1
+                  ? t("birthday_in_one_day")
+                  : t("birthday_in_days", { count: daysUntilBirthday });
           const missingFields = getMissingArtistFieldItems(artist, t);
           return (
             <Card
@@ -252,7 +264,9 @@ const Artists = () => {
               <CardContent className="relative p-0">
                 <Link
                   to={`/artist/edit/${artist?.artist_id}`}
-                  className="flex gap-4 p-4 cursor-pointer text-inherit no-underline outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
+                  className={`flex gap-4 p-4 cursor-pointer text-inherit no-underline outline-none transition-colors hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl ${
+                    artist.artist_vivant !== false && missingFields.length > 0 ? "pb-2" : ""
+                  }`}
                 >
                   <div className="h-[100px] w-[100px] shrink-0 overflow-hidden rounded-2xl ring-2 ring-border bg-muted/30">
                     <img
@@ -265,44 +279,46 @@ const Artists = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="min-w-0 text-lg font-serif font-bold leading-tight">{label}</h3>
-                      <span
-                        className={
-                          ageYears === null
-                            ? "shrink-0 text-sm font-black tabular-nums italic text-destructive"
-                            : "shrink-0 text-sm font-black tabular-nums text-muted-foreground"
-                        }
-                      >
-                        {ageLabel}
-                      </span>
+                      <div className="flex shrink-0 flex-col items-end gap-0.5">
+                        <span
+                          className={
+                            ageYears === null
+                              ? "text-sm font-black tabular-nums italic text-destructive"
+                              : "text-sm font-black tabular-nums text-muted-foreground"
+                          }
+                        >
+                          {ageLabel}
+                        </span>
+                        {birthdayLabel ? (
+                          <span className="text-[11px] font-medium leading-tight text-amber-500 text-right">
+                            {birthdayLabel}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     {typLine ? (
                       <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{typLine}</p>
                     ) : null}
-                    {artist.artist_vivant !== false && missingFields.length > 0 ? (
-                      <p className="mt-1 text-xs leading-snug">
-                        {missingFields.map((field, index) => (
-                          <span key={field.id}>
-                            {index > 0 ? ", " : null}
-                            {field.hintKey ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="italic text-destructive underline decoration-dotted decoration-destructive/60 cursor-help">
-                                    {field.label}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-[280px] text-xs leading-snug">
-                                  {t(field.hintKey)}
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <span className="italic text-destructive">{field.label}</span>
-                            )}
-                          </span>
-                        ))}
-                      </p>
-                    ) : null}
                   </div>
                 </Link>
+                {artist.artist_vivant !== false && missingFields.length > 0 ? (
+                  <div className="px-4 pb-4 pt-0 text-xs leading-snug">
+                    {missingFields.map((field, index) => (
+                      <span key={field.id}>
+                        {index > 0 ? ", " : null}
+                        {field.hintKey ? (
+                          <MissingArtistFieldHint
+                            label={field.label}
+                            hint={t(field.hintKey)}
+                            learnWhyLabel={t("missing_field_learn_why", { field: field.label })}
+                          />
+                        ) : (
+                          <span className="italic text-destructive">{field.label}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           );

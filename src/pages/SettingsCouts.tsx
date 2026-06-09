@@ -57,6 +57,7 @@ import {
   formatActivityDay,
   type ProjectActivityScanResult,
 } from "@/lib/projectActivityScan";
+import { GoogleBillingCard } from "@/components/admin/GoogleBillingCard";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -2322,6 +2323,9 @@ export default function SettingsCouts() {
           />
         </CardContent>
       </Card>
+
+      {/* Budgets Google Cloud (cache Budget API) */}
+      <GoogleBillingCard />
 
       {/* Section Fournisseurs */}
       <ProvidersSection onCostsRefresh={refreshCostData} />

@@ -230,7 +230,7 @@
   "wakatime": {
     "back_settings": "Einstellungen",
     "page_title": "Zeiterfassung (WakaTime)",
-    "page_sub": "Vom WakaTime-Plugin erfasste Coding-Zeit — nur für Admins.",
+    "page_sub": "Vom WakaTime-Plugin erfasste Coding-Zeit.",
     "refresh": "Aktualisieren",
     "fetched_at": "Zuletzt aktualisiert: {{at}}",
     "config_hint": "Secret WAKATIME_API_KEY in Supabase hinzufügen und wakatime-stats neu deployen.",
@@ -287,7 +287,7 @@
   "tokens": {
     "back_settings": "Einstellungen",
     "page_title": "KI-Token-Verfolgung",
-    "page_sub": "Token-Verbrauch von Groq, Gemini, Google TTS und Edge Functions — nur für Administratoren.",
+    "page_sub": "Token-Verbrauch von Groq, Gemini, Google TTS und Edge Functions.",
     "refresh": "Aktualisieren",
     "empty": "Kein Verbrauch für diesen Zeitraum.",
     "rls_hint": "Bleiben die Summen bei null, prüfen Sie die RLS-SELECT-Richtlinie auf ai_usage_logs.",

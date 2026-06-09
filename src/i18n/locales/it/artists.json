@@ -68,6 +68,9 @@
   "form_living_deceased": "Deceduto(a)",
   "form_age_missing": "Età indeterminata",
   "form_age_years": "{{count}} anni",
+  "birthday_today": "🎂 Compleanno oggi!",
+  "birthday_in_one_day": "🎂 Compleanno tra 1 giorno",
+  "birthday_in_days": "🎂 Compleanno tra {{count}} giorni",
   "form_deathdate_label": "Data di morte",
   "form_deathdate_placeholder": "Scegli una data",
   "form_address_label": "Indirizzo",
@@ -85,6 +88,7 @@
   "form_email_placeholder": "contatto@…",
   "missing_field_hint_birthdate": "Non sarà possibile augurargli/le buon compleanno!",
   "missing_field_hint_email": "I visitatori non potranno inviargli/le e-mail e non potranno essergli/le inviate le statistiche delle visite alle sue opere.",
+  "missing_field_learn_why": "Scopri di più: {{field}}",
   "form_social_label": "Link e social media",
 
   "tableau_title": "Artisti — Tabella completa",

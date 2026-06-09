@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw } from "lucide-react";
 
@@ -16,6 +16,7 @@ import {
 } from "@/lib/wakatime";
 import {
   formatWakaPeriodDate,
+  DEFAULT_WAKA_PERIOD,
   getWakaPeriodRange,
   WAKA_PERIODS,
   type WakaPeriod,
@@ -32,10 +33,11 @@ function dateLocale(lang: string): string {
 
 export default function SettingsSuiviTemps() {
   const { t, i18n } = useTranslation("settings");
+  const location = useLocation();
   const { loading: authLoading, role_id } = useAuthUser();
   const canAccess = role_id === 1 || role_id === 2 || role_id === 3;
 
-  const [period, setPeriod] = useState<WakaPeriod>("week");
+  const [period, setPeriod] = useState<WakaPeriod>(DEFAULT_WAKA_PERIOD);
   const [periodOffset, setPeriodOffset] = useState(0);
   const [data, setData] = useState<WakaTimeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,11 @@ export default function SettingsSuiviTemps() {
   );
 
   const locale = dateLocale(i18n.language);
+
+  useEffect(() => {
+    setPeriod(DEFAULT_WAKA_PERIOD);
+    setPeriodOffset(0);
+  }, [location.key]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -250,7 +257,7 @@ export default function SettingsSuiviTemps() {
             ))}
           </div>
 
-          <WakaTimeDashboardCharts data={data} period={period} t={t} />
+          <WakaTimeDashboardCharts data={data} t={t} />
         </>
       ) : null}
     </div>

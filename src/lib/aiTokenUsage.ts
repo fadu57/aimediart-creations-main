@@ -85,6 +85,13 @@ export function formatTokenUsageDate(iso: string, locale = "fr-FR"): string {
   return `${m[3]} ${month} ${m[1]}`;
 }
 
+/** Axe graphique évolution tokens : jj/mm. */
+export function formatTokenChartDayLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}`;
+}
+
 /** Plage de chargement : en mode jour, inclut J-3…J pour le graphique. */
 export function getTokenFetchRange(
   period: TokenPeriod,

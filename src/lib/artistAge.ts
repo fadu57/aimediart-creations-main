@@ -1,4 +1,4 @@
-import { differenceInYears } from "date-fns";
+import { differenceInCalendarDays, differenceInYears } from "date-fns";
 
 /** Date locale à minuit (comparaisons jour par jour). */
 export function startOfLocalDay(date: Date): Date {
@@ -61,4 +61,32 @@ export function computeArtistAgeYears(
 
   const years = differenceInYears(endDate, birth);
   return years >= 0 ? years : null;
+}
+
+/** Fenêtre d’affichage : J-8 à J (anniversaire de l’année en cours, puis rien après J). */
+const BIRTHDAY_COUNTDOWN_DAYS = 8;
+
+/**
+ * Jours restants avant l’anniversaire de l’année en cours (0 = aujourd’hui).
+ * null si hors fenêtre J-8…J ou si l’anniversaire est déjà passé cette année.
+ */
+export function getDaysUntilNextBirthday(
+  birthDate: unknown,
+  isLiving: boolean,
+): number | null {
+  if (!isLiving) return null;
+
+  const birth = resolveArtistBirthDate(birthDate, null, true);
+  if (!birth) return null;
+
+  const today = startOfLocalDay(new Date());
+  const thisYearBirthday = startOfLocalDay(
+    new Date(today.getFullYear(), birth.getMonth(), birth.getDate()),
+  );
+
+  if (thisYearBirthday < today) return null;
+
+  const days = differenceInCalendarDays(thisYearBirthday, today);
+  if (days > BIRTHDAY_COUNTDOWN_DAYS) return null;
+  return days;
 }

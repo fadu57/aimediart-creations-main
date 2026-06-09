@@ -445,6 +445,58 @@ export interface Database {
         };
         Relationships: [];
       };
+      google_billing_cache: {
+        Row: {
+          id: string;
+          budget_name: string;
+          budget_id: string;
+          billing_account: string;
+          budget_amount: number;
+          budget_currency: string;
+          cost_amount: number;
+          cost_currency: string;
+          usage_pct: number | null;
+          period_start: string | null;
+          period_end: string | null;
+          last_fetched_at: string;
+          raw_data: Record<string, unknown> | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          budget_name: string;
+          budget_id: string;
+          billing_account: string;
+          budget_amount: number;
+          budget_currency?: string;
+          cost_amount?: number;
+          cost_currency?: string;
+          usage_pct?: number | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          last_fetched_at?: string;
+          raw_data?: Record<string, unknown> | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          budget_name?: string;
+          budget_id?: string;
+          billing_account?: string;
+          budget_amount?: number;
+          budget_currency?: string;
+          cost_amount?: number;
+          cost_currency?: string;
+          usage_pct?: number | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          last_fetched_at?: string;
+          raw_data?: Record<string, unknown> | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ai_limit_alerts: {
         Row: {
           id: string;

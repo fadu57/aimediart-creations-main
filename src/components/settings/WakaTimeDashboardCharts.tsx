@@ -10,10 +10,8 @@ import {
   timelineHourLabels, weekdayBarData, WAKA_CHART_COLORS,
 } from "@/lib/wakatimeCharts";
 import {
-  formatWakaSeconds, type WakaEntity, type WakaTimelineRow, type WakaTimeDashboard,
+  formatWakaSeconds, formatWakaChartDayLabel, type WakaEntity, type WakaTimelineRow, type WakaTimeDashboard,
 } from "@/lib/wakatime";
-import type { WakaPeriod } from "@/lib/wakatimePeriod";
-
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 function EmptyChart({ text }: { text: string }) {
@@ -170,8 +168,8 @@ function TimelineCard({
               </div>
             ))}
             <div className="flex justify-between pt-1 text-[10px] text-muted-foreground">
-              {hours.map((h) => (
-                <span key={h}>{h}</span>
+              {hours.map((h, i) => (
+                <span key={`timeline-hour-${i}`}>{h}</span>
               ))}
             </div>
           </div>
@@ -238,10 +236,9 @@ function DailyGaugeCard({
 }
 
 export function WakaTimeDashboardCharts({
-  data, period, t,
+  data, t,
 }: {
   data: WakaTimeDashboard;
-  period: WakaPeriod;
   t: TFn;
 }) {
   const empty = t("wakatime.empty");
@@ -266,12 +263,10 @@ export function WakaTimeDashboardCharts({
 
   const dailyChart = useMemo(
     () => (data.daily ?? []).map((d) => ({
-      date: period === "year" || (data.daily?.length ?? 0) > 31
-        ? d.date.slice(2)
-        : d.date.slice(5),
+      date: formatWakaChartDayLabel(d.date),
       heures: d.hours,
     })),
-    [data.daily, period],
+    [data.daily],
   );
 
   const gaugeSeconds = isSingleDay ? data.today.total_seconds : stats.total_seconds;
