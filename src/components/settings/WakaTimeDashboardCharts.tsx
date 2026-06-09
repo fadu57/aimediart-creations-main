@@ -12,6 +12,7 @@ import {
 import {
   formatWakaSeconds, type WakaEntity, type WakaTimelineRow, type WakaTimeDashboard,
 } from "@/lib/wakatime";
+import type { WakaPeriod } from "@/lib/wakatimePeriod";
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -236,12 +237,20 @@ function DailyGaugeCard({
   );
 }
 
-export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; t: TFn }) {
+export function WakaTimeDashboardCharts({
+  data, period, t,
+}: {
+  data: WakaTimeDashboard;
+  period: WakaPeriod;
+  t: TFn;
+}) {
   const empty = t("wakatime.empty");
   const hoursLabel = t("wakatime.hours");
+  const isSingleDay = data.range.dateFrom === data.range.dateTo;
+  const stats = data.stats;
 
-  const projectBar = useMemo(() => entityBarData(data.stats7.projects ?? []), [data]);
-  const categoryBar = useMemo(() => entityBarData(data.categories ?? []), [data]);
+  const projectBar = useMemo(() => entityBarData(stats.projects ?? []), [stats.projects]);
+  const categoryBar = useMemo(() => entityBarData(data.categories ?? []), [data.categories]);
   const weekdayChart = useMemo(
     () => weekdayBarData(data.weekdays ?? [], {
       Monday: t("wakatime.weekday_mon"),
@@ -252,27 +261,37 @@ export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; 
       Saturday: t("wakatime.weekday_sat"),
       Sunday: t("wakatime.weekday_sun"),
     }),
-    [data, t],
+    [data.weekdays, t],
   );
 
-  const daily7 = useMemo(
-    () => (data.daily ?? []).slice(-7).map((d) => ({
-      date: d.date.slice(5),
+  const dailyChart = useMemo(
+    () => (data.daily ?? []).map((d) => ({
+      date: period === "year" || (data.daily?.length ?? 0) > 31
+        ? d.date.slice(2)
+        : d.date.slice(5),
       heures: d.hours,
     })),
-    [data],
+    [data.daily, period],
   );
 
-  const todayLabel = data.today.human_readable_total || formatWakaSeconds(data.today.total_seconds);
+  const gaugeSeconds = isSingleDay ? data.today.total_seconds : stats.total_seconds;
+  const gaugeLabel = isSingleDay
+    ? (data.today.human_readable_total || formatWakaSeconds(data.today.total_seconds))
+    : (stats.human_readable_total || formatWakaSeconds(stats.total_seconds));
+  const gaugeCaption = isSingleDay
+    ? t("wakatime.kpi_today_sub")
+    : t("wakatime.kpi_total_sub");
   const avgLabel = t("wakatime.gauge_avg", {
-    value: data.stats7.human_readable_daily_average || formatWakaSeconds(data.stats7.daily_average_seconds),
+    value: stats.human_readable_daily_average || formatWakaSeconds(stats.daily_average_seconds),
   });
   const bestLabel = t("wakatime.gauge_best", {
-    value: data.stats7.best_day?.text
-      ?? (data.stats7.best_day?.total_seconds
-        ? formatWakaSeconds(Number(data.stats7.best_day.total_seconds))
+    value: stats.best_day?.text
+      ?? (stats.best_day?.total_seconds
+        ? formatWakaSeconds(Number(stats.best_day.total_seconds))
         : "—"),
   });
+
+  const xAxisInterval = dailyChart.length > 14 ? Math.max(0, Math.ceil(dailyChart.length / 8) - 1) : 0;
 
   return (
     <div className="space-y-4">
@@ -281,11 +300,11 @@ export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; 
           <CardTitle className="text-sm font-medium">{t("wakatime.chart_activity_title")}</CardTitle>
         </CardHeader>
         <CardContent className="h-[200px]">
-          {daily7.length === 0 ? (
+          {dailyChart.length === 0 ? (
             <EmptyChart text={empty} />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={daily7} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+              <AreaChart data={dailyChart} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
                 <defs>
                   <linearGradient id="wakaArea" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.45} />
@@ -293,7 +312,7 @@ export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; 
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={xAxisInterval} />
                 <YAxis tick={{ fontSize: 10 }} width={32} />
                 <Tooltip formatter={(v: number) => [`${v} h`, hoursLabel]} />
                 <Area type="monotone" dataKey="heures" stroke="#3b82f6" fill="url(#wakaArea)" strokeWidth={2} />
@@ -320,31 +339,33 @@ export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; 
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <TimelineCard
-          title={t("wakatime.chart_project_timeline_title")}
-          rows={data.project_timeline ?? []}
-          emptyText={t("wakatime.empty_today")}
-        />
-        <TimelineCard
-          title={t("wakatime.chart_language_timeline_title")}
-          rows={data.language_timeline ?? []}
-          emptyText={t("wakatime.empty_today")}
-        />
-      </div>
+      {isSingleDay && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <TimelineCard
+            title={t("wakatime.chart_project_timeline_title")}
+            rows={data.project_timeline ?? []}
+            emptyText={t("wakatime.empty_today")}
+          />
+          <TimelineCard
+            title={t("wakatime.chart_language_timeline_title")}
+            rows={data.language_timeline ?? []}
+            emptyText={t("wakatime.empty_today")}
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DonutCard title={t("wakatime.chart_editors_title")} items={data.stats7.editors ?? []} emptyText={empty} hoursLabel={hoursLabel} />
-        <DonutCard title={t("wakatime.chart_languages_title")} items={data.stats7.languages ?? []} emptyText={empty} hoursLabel={hoursLabel} />
+        <DonutCard title={t("wakatime.chart_editors_title")} items={stats.editors ?? []} emptyText={empty} hoursLabel={hoursLabel} />
+        <DonutCard title={t("wakatime.chart_languages_title")} items={stats.languages ?? []} emptyText={empty} hoursLabel={hoursLabel} />
         <DonutCard
           title={t("wakatime.chart_os_title")}
-          items={data.stats7.operating_systems ?? data.operating_systems ?? []}
+          items={stats.operating_systems ?? data.operating_systems ?? []}
           emptyText={empty}
           hoursLabel={hoursLabel}
         />
         <DonutCard
           title={t("wakatime.chart_machines_title")}
-          items={data.stats7.machines ?? data.machines ?? []}
+          items={stats.machines ?? data.machines ?? []}
           emptyText={empty}
           hoursLabel={hoursLabel}
         />
@@ -352,13 +373,13 @@ export function WakaTimeDashboardCharts({ data, t }: { data: WakaTimeDashboard; 
 
       <div className="grid gap-4 lg:grid-cols-2">
         <DailyGaugeCard
-          title={t("wakatime.chart_daily_summary_title")}
-          todaySeconds={data.today.total_seconds}
-          todayLabel={todayLabel}
-          todayCaption={t("wakatime.kpi_today_sub")}
+          title={isSingleDay ? t("wakatime.chart_daily_summary_title") : t("wakatime.kpi_total")}
+          todaySeconds={gaugeSeconds}
+          todayLabel={gaugeLabel}
+          todayCaption={gaugeCaption}
           avgLabel={avgLabel}
           bestLabel={bestLabel}
-          emptyText={t("wakatime.empty_today")}
+          emptyText={empty}
         />
         <Card className="glass-card">
           <CardHeader className="pb-2">

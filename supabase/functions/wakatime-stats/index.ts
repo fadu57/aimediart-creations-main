@@ -31,6 +31,12 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + days);
+  return isoDate(d);
+}
+
 function toLocalMinute(unixSec: number): number {
   const d = new Date(unixSec * 1000);
   return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
@@ -85,8 +91,7 @@ function buildTimelineRows(heartbeats: WakaHeartbeat[], field: "project" | "lang
 
 function computeWeekdays(daily: Array<{ date: string; seconds: number }>): Array<{ name: string; total_seconds: number }> {
   const totals = new Map<string, number>();
-  const last7 = daily.slice(-7);
-  for (const day of last7) {
+  for (const day of daily) {
     const d = new Date(`${day.date}T12:00:00`);
     if (Number.isNaN(d.getTime())) continue;
     const key = d.toLocaleDateString("en-US", { weekday: "long" });
@@ -198,129 +203,128 @@ Deno.serve(async (req) => {
       }, 503);
     }
 
+    let body: { dateFrom?: string; dateTo?: string } = {};
+    try {
+      body = (await req.json()) as { dateFrom?: string; dateTo?: string };
+    } catch {
+      body = {};
+    }
+
     const today = new Date();
-    const start30 = new Date(today);
-    start30.setDate(start30.getDate() - 29);
-
     const todayIso = isoDate(today);
+    const dateTo = (body.dateTo ?? todayIso).slice(0, 10);
+    const dateFrom = (body.dateFrom ?? addDaysIso(dateTo, -6)).slice(0, 10);
+    const isSingleDay = dateFrom === dateTo;
 
-    const [stats7Res, stats30Res, summariesRes, statsTodayRes, heartbeatsRes] = await Promise.all([
-      wakaGet<{ data?: Record<string, unknown> }>(apiKey, "/users/current/stats/last_7_days"),
-      wakaGet<{ data?: Record<string, unknown> }>(apiKey, "/users/current/stats/last_30_days"),
+    const [statsRangeRes, summariesRes, heartbeatsRes] = await Promise.all([
+      wakaGet<{ data?: Record<string, unknown> }>(
+        apiKey,
+        `/users/current/stats/range/${dateFrom}/${dateTo}`,
+      ),
       wakaGet<{ data?: Array<Record<string, unknown>> }>(
         apiKey,
-        `/users/current/summaries?start=${isoDate(start30)}&end=${todayIso}`,
+        `/users/current/summaries?start=${dateFrom}&end=${dateTo}`,
       ),
-      wakaGet<{ data?: Record<string, unknown> }>(apiKey, "/users/current/stats/today").catch(() => ({ data: {} })),
-      wakaGet<{ data?: WakaHeartbeat[] }>(apiKey, `/users/current/heartbeats?date=${todayIso}`).catch(() => ({ data: [] })),
+      isSingleDay
+        ? wakaGet<{ data?: WakaHeartbeat[] }>(
+          apiKey,
+          `/users/current/heartbeats?date=${dateFrom}`,
+        ).catch(() => ({ data: [] as WakaHeartbeat[] }))
+        : Promise.resolve({ data: [] as WakaHeartbeat[] }),
     ]);
 
-    const stats7 = stats7Res.data ?? {};
-    const stats30 = stats30Res.data ?? {};
+    const statsRange = statsRangeRes.data ?? {};
     const summariesRaw = summariesRes.data ?? [];
+    const heartbeats = heartbeatsRes.data ?? [];
 
-    const start7 = new Date(today);
-    start7.setDate(start7.getDate() - 6);
-    const start7Iso = isoDate(start7);
-
-    const languages7 = pickEntities(
-      mapEntities(stats7.languages as WakaEntityInput[]),
+    const languages = pickEntities(
+      mapEntities(statsRange.languages as WakaEntityInput[]),
       summariesRaw,
       "languages",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
-    const editors7 = pickEntities(
-      mapEntities(stats7.editors as WakaEntityInput[]),
+    const editors = pickEntities(
+      mapEntities(statsRange.editors as WakaEntityInput[]),
       summariesRaw,
       "editors",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
-    const projects7 = pickEntities(
-      mapEntities(stats7.projects as WakaEntityInput[]),
+    const projects = pickEntities(
+      mapEntities(statsRange.projects as WakaEntityInput[]),
       summariesRaw,
       "projects",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
-    const categories7 = pickEntities(
-      mapEntities(stats7.categories as WakaEntityInput[]),
+    const categories = pickEntities(
+      mapEntities(statsRange.categories as WakaEntityInput[]),
       summariesRaw,
       "categories",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
-    const os7 = pickEntities(
-      mapEntities(stats7.operating_systems as WakaEntityInput[]),
+    const osList = pickEntities(
+      mapEntities(statsRange.operating_systems as WakaEntityInput[]),
       summariesRaw,
       "operating_systems",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
-    const machines7 = pickEntities(
-      mapEntities(stats7.machines as WakaEntityInput[]),
+    const machines = pickEntities(
+      mapEntities(statsRange.machines as WakaEntityInput[]),
       summariesRaw,
       "machines",
-      start7Iso,
-      todayIso,
+      dateFrom,
+      dateTo,
     );
 
     const daily = summariesRaw.map((day) => {
       const range = day.range as { date?: string } | undefined;
       const grand = day.grand_total as { total_seconds?: number; text?: string } | undefined;
       const seconds = Number(grand?.total_seconds ?? 0);
+      const dayDate = range?.date ?? "";
+      if (!dayDate || dayDate < dateFrom || dayDate > dateTo) return null;
       return {
-        date: range?.date ?? "",
+        date: dayDate,
         seconds,
         hours: Math.round((seconds / 3600) * 100) / 100,
         label: grand?.text ?? "",
       };
-    }).filter((d) => d.date);
+    }).filter((d): d is { date: string; seconds: number; hours: number; label: string } => d !== null);
 
-    const statsToday = statsTodayRes.data ?? {};
-    const heartbeats = heartbeatsRes.data ?? [];
-    const todayFromDaily = daily.find((d) => d.date === todayIso);
+    const dayTotal = isSingleDay
+      ? daily.find((d) => d.date === dateFrom)
+      : null;
 
     return jsonResponse({
-      stats7: {
-        total_seconds: Number(stats7.total_seconds ?? 0),
-        human_readable_total: String(stats7.human_readable_total ?? ""),
-        daily_average_seconds: Number(stats7.daily_average ?? 0),
-        human_readable_daily_average: String(stats7.human_readable_daily_average ?? ""),
-        best_day: stats7.best_day ?? null,
-        range: stats7.human_readable_range ?? stats7.range ?? "7 derniers jours",
-        languages: languages7,
-        projects: projects7,
-        editors: editors7,
-        categories: categories7,
-        operating_systems: os7,
-        machines: machines7,
-      },
-      stats30: {
-        total_seconds: Number(stats30.total_seconds ?? 0),
-        human_readable_total: String(stats30.human_readable_total ?? ""),
-        daily_average_seconds: Number(stats30.daily_average ?? 0),
-        human_readable_daily_average: String(stats30.human_readable_daily_average ?? ""),
-        best_day: stats30.best_day ?? null,
-        range: stats30.human_readable_range ?? stats30.range ?? "30 derniers jours",
-        languages: mapEntities(stats30.languages as Array<{ name?: string; total_seconds?: number }>),
-        projects: mapEntities(stats30.projects as Array<{ name?: string; total_seconds?: number }>),
-        editors: mapEntities(stats30.editors as Array<{ name?: string; total_seconds?: number }>),
+      stats: {
+        total_seconds: Number(statsRange.total_seconds ?? 0),
+        human_readable_total: String(statsRange.human_readable_total ?? ""),
+        daily_average_seconds: Number(statsRange.daily_average ?? 0),
+        human_readable_daily_average: String(statsRange.human_readable_daily_average ?? ""),
+        best_day: statsRange.best_day ?? null,
+        range: String(statsRange.human_readable_range ?? statsRange.range ?? `${dateFrom} → ${dateTo}`),
+        languages,
+        projects,
+        editors,
+        categories,
+        operating_systems: osList,
+        machines,
       },
       daily,
       today: {
-        total_seconds: Number(statsToday.total_seconds ?? todayFromDaily?.seconds ?? 0),
-        human_readable_total: String(
-          statsToday.human_readable_total ?? todayFromDaily?.label ?? "",
-        ),
+        total_seconds: Number(dayTotal?.seconds ?? 0),
+        human_readable_total: String(dayTotal?.label ?? ""),
       },
-      categories: categories7,
-      operating_systems: os7,
-      machines: machines7,
+      categories,
+      operating_systems: osList,
+      machines,
       weekdays: computeWeekdays(daily),
-      project_timeline: buildTimelineRows(heartbeats, "project"),
-      language_timeline: buildTimelineRows(heartbeats, "language"),
+      project_timeline: isSingleDay ? buildTimelineRows(heartbeats, "project") : [],
+      language_timeline: isSingleDay ? buildTimelineRows(heartbeats, "language") : [],
+      range: { dateFrom, dateTo },
       fetched_at: new Date().toISOString(),
     });
   } catch (err) {

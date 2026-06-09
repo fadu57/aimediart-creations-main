@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw } from "lucide-react";
 
 import { WakaTimeDashboardCharts } from "@/components/settings/WakaTimeDashboardCharts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,20 +14,47 @@ import {
   formatWakaSeconds,
   type WakaTimeDashboard,
 } from "@/lib/wakatime";
+import {
+  formatWakaPeriodDate,
+  getWakaPeriodRange,
+  WAKA_PERIODS,
+  type WakaPeriod,
+} from "@/lib/wakatimePeriod";
+import { cn } from "@/lib/utils";
+
+function dateLocale(lang: string): string {
+  const code = (lang ?? "fr").slice(0, 2);
+  const map: Record<string, string> = {
+    fr: "fr-FR", en: "en-GB", de: "de-DE", es: "es-ES", it: "it-IT",
+  };
+  return map[code] ?? "fr-FR";
+}
 
 export default function SettingsSuiviTemps() {
-  const { t } = useTranslation("settings");
+  const { t, i18n } = useTranslation("settings");
   const { loading: authLoading, role_id } = useAuthUser();
   const canAccess = role_id === 1 || role_id === 2 || role_id === 3;
 
+  const [period, setPeriod] = useState<WakaPeriod>("week");
+  const [periodOffset, setPeriodOffset] = useState(0);
   const [data, setData] = useState<WakaTimeDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const range = useMemo(
+    () => getWakaPeriodRange(period, periodOffset),
+    [period, periodOffset],
+  );
+
+  const locale = dateLocale(i18n.language);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data: dash, error: err } = await fetchWakaTimeDashboard();
+    const { data: dash, error: err } = await fetchWakaTimeDashboard({
+      dateFrom: range.dateFrom,
+      dateTo: range.dateTo,
+    });
     setLoading(false);
     if (err) {
       setError(err);
@@ -35,7 +62,7 @@ export default function SettingsSuiviTemps() {
       return;
     }
     setData(dash);
-  }, []);
+  }, [range.dateFrom, range.dateTo]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -51,35 +78,47 @@ export default function SettingsSuiviTemps() {
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
-  const kpis = data
+  const stats = data?.stats;
+  const activeDays = data?.daily.filter((d) => d.seconds > 0).length ?? 0;
+
+  const kpis = stats
     ? [
       {
-        label: t("wakatime.kpi_7d"),
-        value: data.stats7.human_readable_total || formatWakaSeconds(data.stats7.total_seconds),
-        sub: data.stats7.range,
-      },
-      {
-        label: t("wakatime.kpi_today"),
-        value: data.today.human_readable_total || formatWakaSeconds(data.today.total_seconds),
-        sub: t("wakatime.kpi_today_sub"),
+        label: t("wakatime.kpi_total"),
+        value: stats.human_readable_total || formatWakaSeconds(stats.total_seconds),
+        sub: range.dateFrom === range.dateTo
+          ? formatWakaPeriodDate(range.dateFrom, locale)
+          : t("wakatime.kpi_total_sub"),
       },
       {
         label: t("wakatime.kpi_avg"),
-        value: data.stats7.human_readable_daily_average || formatWakaSeconds(data.stats7.daily_average_seconds),
+        value: stats.human_readable_daily_average || formatWakaSeconds(stats.daily_average_seconds),
         sub: t("wakatime.kpi_avg_sub"),
       },
       {
         label: t("wakatime.kpi_best"),
-        value: data.stats7.best_day?.text
-          ?? (data.stats7.best_day?.total_seconds
-            ? formatWakaSeconds(Number(data.stats7.best_day.total_seconds))
+        value: stats.best_day?.text
+          ?? (stats.best_day?.total_seconds
+            ? formatWakaSeconds(Number(stats.best_day.total_seconds))
             : "—"),
-        sub: data.stats7.best_day?.date
-          ? chartDateFr(String(data.stats7.best_day.date))
+        sub: stats.best_day?.date
+          ? chartDateFr(String(stats.best_day.date))
           : t("wakatime.kpi_best_sub"),
+      },
+      {
+        label: t("wakatime.kpi_active_days"),
+        value: String(activeDays),
+        sub: t("wakatime.kpi_active_days_sub"),
       },
     ]
     : [];
+
+  const rangeLabel = range.dateFrom === range.dateTo
+    ? formatWakaPeriodDate(range.dateFrom, locale)
+    : t("wakatime.range_label", {
+      from: formatWakaPeriodDate(range.dateFrom, locale),
+      to: formatWakaPeriodDate(range.dateTo, locale),
+    });
 
   return (
     <div className="container py-8 space-y-6">
@@ -102,7 +141,7 @@ export default function SettingsSuiviTemps() {
           {data?.fetched_at && (
             <p className="text-xs text-muted-foreground/80 mt-1">
               {t("wakatime.fetched_at", {
-                at: new Date(data.fetched_at).toLocaleString("fr-FR"),
+                at: new Date(data.fetched_at).toLocaleString(locale),
               })}
             </p>
           )}
@@ -120,6 +159,64 @@ export default function SettingsSuiviTemps() {
             : <RefreshCw className="h-4 w-4" aria-hidden />}
           {t("wakatime.refresh")}
         </Button>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          {WAKA_PERIODS.map((p) => (
+            <Button
+              key={p}
+              type="button"
+              size="sm"
+              variant={period === p ? "default" : "outline"}
+              className={cn(period === p && "bg-[#E63946] hover:bg-[#c92f3b]")}
+              onClick={() => {
+                setPeriod(p);
+                setPeriodOffset(0);
+              }}
+            >
+              {t(`wakatime.period_${p}`)}
+            </Button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-8 w-8 shrink-0"
+            aria-label={t("wakatime.period_prev")}
+            onClick={() => setPeriodOffset((o) => o - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+          </Button>
+          <span className="min-w-[12rem] text-center text-xs text-muted-foreground">
+            {rangeLabel}
+          </span>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-8 w-8 shrink-0"
+            aria-label={t("wakatime.period_next")}
+            disabled={!range.canGoNext}
+            onClick={() => setPeriodOffset((o) => o + 1)}
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden />
+          </Button>
+          {periodOffset !== 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => setPeriodOffset(0)}
+            >
+              {t("wakatime.period_current")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -153,7 +250,7 @@ export default function SettingsSuiviTemps() {
             ))}
           </div>
 
-          <WakaTimeDashboardCharts data={data} t={t} />
+          <WakaTimeDashboardCharts data={data} period={period} t={t} />
         </>
       ) : null}
     </div>

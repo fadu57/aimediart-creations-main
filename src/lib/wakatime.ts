@@ -46,8 +46,7 @@ export type WakaWeekdayPoint = {
 };
 
 export type WakaTimeDashboard = {
-  stats7: WakaStatsBlock;
-  stats30: WakaStatsBlock;
+  stats: WakaStatsBlock;
   daily: WakaDailyPoint[];
   today: WakaTodayBlock;
   categories: WakaEntity[];
@@ -56,6 +55,7 @@ export type WakaTimeDashboard = {
   weekdays: WakaWeekdayPoint[];
   project_timeline: WakaTimelineRow[];
   language_timeline: WakaTimelineRow[];
+  range: { dateFrom: string; dateTo: string };
   fetched_at: string;
 };
 
@@ -81,10 +81,12 @@ async function parseInvokeError(error: unknown): Promise<string> {
   return "Erreur lors de l'appel WakaTime.";
 }
 
-export async function fetchWakaTimeDashboard(): Promise<{ data: WakaTimeDashboard | null; error: string | null }> {
+export async function fetchWakaTimeDashboard(
+  range: { dateFrom: string; dateTo: string },
+): Promise<{ data: WakaTimeDashboard | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke("wakatime-stats", {
     method: "POST",
-    body: {},
+    body: { dateFrom: range.dateFrom, dateTo: range.dateTo },
   });
   if (error) {
     return { data: null, error: await parseInvokeError(error) };
@@ -101,15 +103,27 @@ export async function fetchWakaTimeDashboard(): Promise<{ data: WakaTimeDashboar
   return {
     data: {
       ...dash,
+      stats: dash.stats ?? {
+        total_seconds: 0,
+        human_readable_total: "",
+        daily_average_seconds: 0,
+        human_readable_daily_average: "",
+        best_day: null,
+        range: "",
+        languages: [],
+        projects: [],
+        editors: [],
+      },
       today: dash.today ?? { total_seconds: 0, human_readable_total: "" },
-      categories: dash.categories?.length ? dash.categories : (dash.stats7?.categories ?? []),
+      categories: dash.categories?.length ? dash.categories : (dash.stats?.categories ?? []),
       operating_systems: dash.operating_systems?.length
         ? dash.operating_systems
-        : (dash.stats7?.operating_systems ?? []),
-      machines: dash.machines?.length ? dash.machines : (dash.stats7?.machines ?? []),
+        : (dash.stats?.operating_systems ?? []),
+      machines: dash.machines?.length ? dash.machines : (dash.stats?.machines ?? []),
       weekdays: dash.weekdays ?? [],
       project_timeline: dash.project_timeline ?? [],
       language_timeline: dash.language_timeline ?? [],
+      range: dash.range ?? { dateFrom: range.dateFrom, dateTo: range.dateTo },
     },
     error: null,
   };
