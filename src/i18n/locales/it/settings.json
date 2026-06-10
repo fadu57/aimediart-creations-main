@@ -318,5 +318,38 @@
     "col_completion": "Uscita",
     "col_total": "Totale",
     "operation_tts_synthesize": "Sintesi TTS"
+  },
+  "visitor_errors": {
+    "back_settings": "Impostazioni",
+    "page_title": "Log errori visitatori",
+    "page_sub": "Errori JavaScript, toast di errore e guasti funzionali (scan QR, fotocamera, moduli…) su tutto il percorso visitatore.",
+    "client_id": "Visitatore"
+  },
+  "organizer_errors": {
+    "back_settings": "Impostazioni",
+    "page_title": "Log errori organizzatori",
+    "page_sub": "Errori JavaScript, toast di errore e guasti funzionali su tutto il backoffice organizzatore.",
+    "client_id": "Utente"
+  },
+  "error_logs": {
+    "refresh": "Aggiorna",
+    "filters_title": "Filtri",
+    "filter_date_mode": "Periodo",
+    "filter_date_mode_day": "Giorno",
+    "filter_date_mode_range": "Intervallo",
+    "filter_date": "Data",
+    "filter_date_from": "Da",
+    "filter_date_to": "A",
+    "filter_time_from": "Ora da",
+    "filter_time_to": "Ora a",
+    "filter_error_type": "Tipo di errore",
+    "filter_all_types": "Tutti i tipi",
+    "apply_filters": "Applica",
+    "sessions_title": "{{count}} errore/i nel periodo",
+    "error_count_one": "{{count}} errore",
+    "error_count_other": "{{count}} errori",
+    "session_open": "sessione aperta",
+    "last_page": "Ultima pagina",
+    "empty": "Nessun errore per questi filtri."
   }
 }

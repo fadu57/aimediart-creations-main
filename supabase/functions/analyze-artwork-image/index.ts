@@ -18,6 +18,8 @@ type RequestBody = {
   image_mime_type?: string | null;
   artist_name?: string;
   artwork_name?: string;
+  /** Langue de sortie : fr | en | de | es | it (défaut fr). */
+  output_lang?: string | null;
   /** Optionnel — pour lier la consommation à une œuvre dans ai_usage_logs */
   artwork_id?: string | null;
 };
@@ -92,17 +94,69 @@ type LoadAnalysisPromptResult = {
   source: string;
 };
 
-/** Ajouté à tout prompt `app_settings` : fiche courte pour alimenter les médiations (pas une dissertation). */
-const MEDIATION_SOURCE_OUTPUT_SUFFIX = [
-  "",
-  "---",
-  "FORMAT DE SORTIE — FICHE MÉDIATION (obligatoire) :",
-  "Ce texte sert UNIQUEMENT de matière première pour générer ensuite des médiations IA (plusieurs personas).",
-  "Rédige une FICHE SOURCE DENSE en français (Markdown léger : titres courts, puces ou paragraphes brefs).",
-  "Longueur cible : 700 à 1000 mots maximum. Pas de dissertation, pas de paragraphes encyclopédiques.",
-  "Pour chaque section demandée ci-dessus : 2 à 4 phrases percutantes OU puces courtes (faits visuels, symboles, émotions).",
-  "N'utilise pas de JSON, pas de crochets [] ni d'accolades {}. Pas de préambule « En tant que… ».",
-].join("\n");
+const OUTPUT_LANG_LABELS: Record<string, string> = {
+  fr: "français",
+  en: "English",
+  de: "Deutsch",
+  es: "español",
+  it: "italiano",
+};
+
+const SUPPORTED_OUTPUT_LANGS = new Set(Object.keys(OUTPUT_LANG_LABELS));
+
+function resolveOutputLang(raw: string | null | undefined): string {
+  const code = (raw ?? "fr").split("-")[0].toLowerCase();
+  return SUPPORTED_OUTPUT_LANGS.has(code) ? code : "fr";
+}
+
+function outputLangLabel(code: string): string {
+  return OUTPUT_LANG_LABELS[code] ?? OUTPUT_LANG_LABELS.fr;
+}
+
+/** Remplace les mentions « en français » par la langue demandée dans le prompt. */
+function applyOutputLangToPrompt(template: string, langCode: string): string {
+  const label = outputLangLabel(langCode);
+  if (langCode === "fr") return template;
+  return template
+    .replace(/répondre en français/gi, `répondre en ${label}`)
+    .replace(/FICHE SOURCE DENSE en français/gi, `FICHE SOURCE DENSE en ${label}`)
+    .replace(/\ben français\b/gi, `en ${label}`);
+}
+
+/** Préfixe impératif — prime sur le prompt app_settings (souvent rédigé en français). */
+function wrapPromptWithOutputLang(prompt: string, langCode: string): string {
+  const label = outputLangLabel(langCode);
+  return [
+    `=== LANGUE DE SORTIE OBLIGATOIRE ===`,
+    `Code langue : ${langCode}`,
+    `Libellé : ${label}`,
+    `Consigne : rédige TOUTE ta réponse (titres, puces, labels, paragraphes) exclusivement en ${label}.`,
+    langCode !== "fr"
+      ? `N'utilise pas le français (sauf noms propres d'artistes ou d'œuvres).`
+      : `Utilise le français pour l'intégralité du texte.`,
+    `=== FIN CONSIGNE LANGUE ===`,
+    "",
+    prompt,
+    "",
+    `RAPPEL FINAL : réponse intégralement en ${label}.`,
+  ].join("\n");
+}
+
+function buildMediationSourceOutputSuffix(langCode: string): string {
+  const label = outputLangLabel(langCode);
+  return [
+    "",
+    "---",
+    "FORMAT DE SORTIE — FICHE MÉDIATION (obligatoire) :",
+    "Ce texte sert UNIQUEMENT de matière première pour générer ensuite des médiations IA (plusieurs personas).",
+    `Rédige une FICHE SOURCE DENSE en ${label} (Markdown léger : titres courts, puces ou paragraphes brefs).`,
+    "Longueur cible : 700 à 1000 mots maximum. Pas de dissertation, pas de paragraphes encyclopédiques.",
+    "Pour chaque section demandée ci-dessus : 2 à 4 phrases percutantes OU puces courtes (faits visuels, symboles, émotions).",
+    "N'utilise pas de JSON, pas de crochets [] ni d'accolades {}. Pas de préambule « En tant que… ».",
+    "",
+    `IMPORTANT : Rédige l'intégralité de ta réponse en ${label}.`,
+  ].join("\n");
+}
 
 const OUTPUT_FORMAT_MARKERS = [
   "FORMAT DE SORTIE — FICHE MÉDIATION",
@@ -110,8 +164,8 @@ const OUTPUT_FORMAT_MARKERS = [
   "FORMAT DE SORTIE :",
 ] as const;
 
-function buildAnalysisPromptText(template: string): string {
-  let base = template.trim();
+function buildAnalysisPromptText(template: string, langCode = "fr"): string {
+  let base = applyOutputLangToPrompt(template.trim(), langCode);
   if (!base) return base;
   for (const marker of OUTPUT_FORMAT_MARKERS) {
     const i = base.indexOf(marker);
@@ -120,19 +174,20 @@ function buildAnalysisPromptText(template: string): string {
       break;
     }
   }
+  const suffix = buildMediationSourceOutputSuffix(langCode);
   if (base.includes("FORMAT DE SORTIE — FICHE MÉDIATION")) return base;
-  return `${base}\n${MEDIATION_SOURCE_OUTPUT_SUFFIX}`;
+  return `${base}\n${suffix}`;
 }
 
 /**
  * Source unique : `app_settings` (clé « Analyse de l'image » puis legacy `analysis_prompt`).
  * `prompt_style` sert aux médiations (personas), pas à ce bouton.
  */
-async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
+async function loadAnalysisPrompt(langCode = "fr"): Promise<LoadAnalysisPromptResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const fallback: LoadAnalysisPromptResult = {
-    template: buildAnalysisPromptText(DEFAULT_ANALYSIS_PROMPT),
+    template: buildAnalysisPromptText(DEFAULT_ANALYSIS_PROMPT, langCode),
     maxOutputTokens: 1200,
     source: "default_constant",
   };
@@ -167,7 +222,7 @@ async function loadAnalysisPrompt(): Promise<LoadAnalysisPromptResult> {
           ? clampGeminiMaxOutputTokens(mt)
           : 1200;
       const result = {
-        template: buildAnalysisPromptText(trimmed),
+        template: buildAnalysisPromptText(trimmed, langCode),
         maxOutputTokens: tokens,
         source: `app_settings:${k}`,
       };
@@ -439,6 +494,7 @@ serve(async (req: Request) => {
   const inlineMime = body.image_mime_type?.trim() ?? "";
   const artistName = body.artist_name?.trim() ?? "";
   const artworkName = body.artwork_name?.trim() ?? "";
+  const outputLang = resolveOutputLang(body.output_lang);
   const artworkId =
     typeof body.artwork_id === "string" && body.artwork_id.trim() ? body.artwork_id.trim() : null;
   if (!imageUrl && !inlineBase64) return jsonResponse(400, { error: "image_url ou image_base64 est requis." });
@@ -477,14 +533,19 @@ serve(async (req: Request) => {
     }
   }
 
-  const { template: promptTemplate, maxOutputTokens, source: promptSource } = await loadAnalysisPrompt();
-  const prompt = renderPrompt(promptTemplate, {
-    artist_name: artistName || "inconnu",
-    artwork_name: artworkName,
-  });
+  const { template: promptTemplate, maxOutputTokens, source: promptSource } = await loadAnalysisPrompt(outputLang);
+  const prompt = wrapPromptWithOutputLang(
+    renderPrompt(promptTemplate, {
+      artist_name: artistName || "inconnu",
+      artwork_name: artworkName,
+    }),
+    outputLang,
+  );
   console.log(
     "[analyze-artwork-image] prompt:",
     promptSource,
+    "output_lang:",
+    outputLang,
     "maxOutputTokens:",
     maxOutputTokens,
     "artist:",
@@ -635,8 +696,6 @@ serve(async (req: Request) => {
   const notesOut = text.trim();
   console.log("[analyze-artwork-image] réponse texte brut, longueur:", notesOut.length);
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (supabaseUrl && serviceRoleKey) {
     const admin = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -653,6 +712,7 @@ serve(async (req: Request) => {
 
   return jsonResponse(200, {
     notes: notesOut,
+    output_lang: outputLang,
     model_used: modelUsed,
     finish_reason: finishReason,
     usage_metadata: usageMetadata,

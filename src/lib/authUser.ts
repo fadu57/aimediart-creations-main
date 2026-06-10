@@ -86,6 +86,17 @@ export function isVisitorRole(
   return normalizeRoleName(role_name) === normalizeRoleName(ROLE_VISITEUR);
 }
 
+/** Cible après connexion selon le rôle (admins globaux → vitrine /organisation). */
+export function resolveAuthenticatedHomePath(
+  role_name: string | null | undefined,
+  role_id: number | null | undefined,
+): string {
+  if (isVisitorRole(role_name, role_id)) return "/scan-work1";
+  if (role_id === 4) return "/expos";
+  if (typeof role_id === "number" && role_id < 4) return "/organisation";
+  return "/dashboard";
+}
+
 export function canCreateArtist(role_name: string | null | undefined): boolean {
   return hasRoleInSet(role_name, ROLES_CAN_CREATE_ARTIST);
 }

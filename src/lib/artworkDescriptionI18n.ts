@@ -109,7 +109,7 @@ export function serializeMediationDraftFingerprint(
   for (const L of MEDIATION_UI_LANGS) {
     sorted[L] = {};
     for (const k of [...MEDIATION_DESCRIPTION_KEYS].sort()) {
-      sorted[L][k] = (byLang[L][k] ?? "").trim();
+      sorted[L][k] = byLang[L][k] ?? "";
     }
   }
   return JSON.stringify(sorted);

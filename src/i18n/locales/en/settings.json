@@ -325,5 +325,38 @@
     "col_completion": "Output",
     "col_total": "Total",
     "operation_tts_synthesize": "TTS synthesis"
+  },
+  "visitor_errors": {
+    "back_settings": "Settings",
+    "page_title": "Visitor error logs",
+    "page_sub": "JavaScript errors, error toasts and functional failures (QR scan, camera, forms…) across the full visitor journey.",
+    "client_id": "Visitor"
+  },
+  "organizer_errors": {
+    "back_settings": "Settings",
+    "page_title": "Organizer error logs",
+    "page_sub": "JavaScript errors, error toasts and functional failures across the organizer backoffice.",
+    "client_id": "User"
+  },
+  "error_logs": {
+    "refresh": "Refresh",
+    "filters_title": "Filters",
+    "filter_date_mode": "Period",
+    "filter_date_mode_day": "Day",
+    "filter_date_mode_range": "Range",
+    "filter_date": "Date",
+    "filter_date_from": "From",
+    "filter_date_to": "To",
+    "filter_time_from": "Time from",
+    "filter_time_to": "Time to",
+    "filter_error_type": "Error type",
+    "filter_all_types": "All types",
+    "apply_filters": "Apply",
+    "sessions_title": "{{count}} error(s) in period",
+    "error_count_one": "{{count}} error",
+    "error_count_other": "{{count}} errors",
+    "session_open": "session open",
+    "last_page": "Last page",
+    "empty": "No errors for these filters."
   }
 }

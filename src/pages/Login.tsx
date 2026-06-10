@@ -9,6 +9,7 @@ import { buildSignupTrackingPayload } from "@/lib/signupTrackingFromLogin";
 import { clearLoginTrackerSession } from "@/lib/visitorTracking";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { resolveAuthenticatedHomePath } from "@/lib/authUser";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,7 @@ const getRedirectAfterLoginPath = (): string | null => {
 const Login = () => {
   const { t } = useTranslation("auth");
   const [searchParams] = useSearchParams();
-  const { session, loading: authLoading, agency_id } = useAuthUser();
+  const { session, loading: authLoading, role_name, role_id, agency_id } = useAuthUser();
   const expoIdFromUrl = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {
@@ -61,7 +62,7 @@ const Login = () => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("redirectAfterLogin");
     }
-    const target = redirectAfterLoginPath || "/";
+    const target = redirectAfterLoginPath || resolveAuthenticatedHomePath(role_name, role_id);
     return <Navigate to={target} replace />;
   }
 

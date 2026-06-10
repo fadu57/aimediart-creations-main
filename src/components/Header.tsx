@@ -168,12 +168,10 @@ export default function Header() {
     };
   }, [session?.user, agency_id, showGreetingAgency]);
 
-  const handleLogout = async () => {
-    // Déconnexion tolérante hors-ligne: évite l'appel réseau `logout?scope=global`
-    // qui échoue avec `ERR_INTERNET_DISCONNECTED`.
-    await supabase.auth.signOut({ scope: "local" });
-    // Après déconnexion : page d'accueil visiteur (évite le repli /organisation).
-    window.location.href = "/visitor";
+  const handleLogout = () => {
+    // Redirection hard tout de suite : évite RequireBackoffice → /login pendant le await signOut.
+    void supabase.auth.signOut({ scope: "local" });
+    window.location.replace("/visitor");
   };
 
   useEffect(() => {

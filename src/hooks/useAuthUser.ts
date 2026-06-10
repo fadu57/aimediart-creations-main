@@ -189,8 +189,6 @@ export function useAuthUser() {
   useEffect(() => {
     let cancelled = false;
 
-    // Ne pas appeler getSession() en parallele : il peut bloquer longtemps et entrer en course avec ce callback.
-    // onAuthStateChange est invoque tout de suite avec la session courante (evenement INITIAL_SESSION).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -198,8 +196,23 @@ export function useAuthUser() {
       void applySession(session);
     });
 
+    // Secours si INITIAL_SESSION tarde (extensions, stockage auth corrompu…).
+    void getSessionWithTimeout().then(({ session, timedOut }) => {
+      if (cancelled) return;
+      if (timedOut && import.meta.env.DEV) {
+        console.warn("[auth] getSession timeout — formulaire login débloqué");
+      }
+      void applySession(session);
+    });
+
+    const hardFallback = setTimeout(() => {
+      if (cancelled) return;
+      setState((s) => (s.loading ? { ...s, loading: false } : s));
+    }, AUTH_GET_SESSION_TIMEOUT_MS + 500);
+
     return () => {
       cancelled = true;
+      clearTimeout(hardFallback);
       subscription.unsubscribe();
     };
   }, [applySession]);

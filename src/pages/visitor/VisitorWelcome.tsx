@@ -26,6 +26,7 @@ import {
 } from "@/lib/visitorExpoFetch";
 import { markVisitorExpoGateDone } from "@/lib/visitorExpoGateSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import { reportVisitorError } from "@/lib/visitorErrorLogging";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import {
   persistAnonymousVisitorIdentity,
@@ -330,6 +331,7 @@ const VisitorWelcome = () => {
       toast.success(t("visitor_gate.quick_avatar.toast_selfie_saved"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_selfie_failed");
+      reportVisitorError({ message: msg, source: "visitor.app", stack: err instanceof Error ? err.stack : null });
       toast.error(msg);
     } finally {
       setUploadingPhoto(false);
@@ -358,6 +360,7 @@ const VisitorWelcome = () => {
       navigate(postGatePath, { replace: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.welcome_back.toast_failed");
+      reportVisitorError({ message: msg, source: "visitor.app", stack: err instanceof Error ? err.stack : null });
       toast.error(msg);
       if (import.meta.env.DEV) {
         console.warn("[VisitorWelcome] visite de retour :", err);
@@ -388,13 +391,17 @@ const VisitorWelcome = () => {
       const linked = await linkVisitorProfileByRecoveryCode(recoveryCodeInput);
       if (!linked.ok) {
         const key = RECOVERY_ERROR_KEYS[linked.error] ?? "visitor_gate.recover.errors.generic";
-        toast.error(t(key));
+        const msg = t(key);
+        reportVisitorError({ message: msg, source: "visitor.app", metadata: { code: linked.error } });
+        toast.error(msg);
         return;
       }
       setReturningProfile(linked.profile);
       setStep("welcome_back");
     } catch (err) {
-      toast.error(t("visitor_gate.recover.errors.generic"));
+      const msg = t("visitor_gate.recover.errors.generic");
+      reportVisitorError({ message: msg, source: "visitor.app", stack: err instanceof Error ? err.stack : null });
+      toast.error(msg);
       if (import.meta.env.DEV) console.warn("[VisitorWelcome] liaison code :", err);
     } finally {
       setRecoverBusy(false);
@@ -403,7 +410,9 @@ const VisitorWelcome = () => {
 
   const handleQuickVisitConfirm = async () => {
     if (!selectedAvatar) {
-      toast.error(t("visitor_gate.quick_avatar.toast_pick_avatar"));
+      const msg = t("visitor_gate.quick_avatar.toast_pick_avatar");
+      reportVisitorError({ message: msg, source: "visitor.app" });
+      toast.error(msg);
       return;
     }
 
@@ -424,6 +433,7 @@ const VisitorWelcome = () => {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_failed");
+      reportVisitorError({ message: msg, source: "visitor.app", stack: err instanceof Error ? err.stack : null });
       toast.error(msg);
       if (import.meta.env.DEV) {
         console.warn("[VisitorWelcome] visite rapide :", err);

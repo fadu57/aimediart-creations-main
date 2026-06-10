@@ -1,10 +1,14 @@
+import { FunctionsFetchError, FunctionsHttpError } from "@supabase/supabase-js";
 import { dispatchAiUsageRefresh } from "@/lib/aiUsageRefresh";
+import { supabase } from "@/lib/supabase";
 
 export type AnalyzeArtworkImageParams = {
   imageUrl?: string;
   inlineImage?: { mimeType: string; base64Data: string };
   artistName?: string;
   artworkName?: string;
+  /** Langue UI (fr, en, de, es, it) pour la fiche source générée. */
+  outputLang?: string;
 };
 
 /** Optionnel — l’analyse image renvoie désormais du texte brut dans `notes`. */
@@ -17,6 +21,8 @@ export type ImageAnalysisPersonaItem = {
 export type AnalyzeArtworkImageResponse = {
   /** Texte brut / Markdown de l’analyse (matériau source). */
   notes: string;
+  /** Langue effectivement demandée au modèle. */
+  output_lang?: string;
   personas?: ImageAnalysisPersonaItem[];
   /** true si Gemini a atteint maxOutputTokens (finishReason MAX_TOKENS). */
   truncated?: boolean;
@@ -52,6 +58,7 @@ export function normalizeAnalyzeArtworkImageResponse(raw: unknown): AnalyzeArtwo
   const maxOut = o.max_output_tokens;
   return {
     notes,
+    output_lang: typeof o.output_lang === "string" ? o.output_lang : undefined,
     truncated: o.truncated === true,
     finish_reason: typeof o.finish_reason === "string" ? o.finish_reason : null,
     model_used: typeof o.model_used === "string" ? o.model_used : undefined,
@@ -61,37 +68,42 @@ export function normalizeAnalyzeArtworkImageResponse(raw: unknown): AnalyzeArtwo
 }
 
 export async function analyzeArtworkImage(params: AnalyzeArtworkImageParams): Promise<AnalyzeArtworkImageResponse> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-  if (!supabaseUrl || !anonKey) {
-    throw new Error("Supabase env manquantes (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).");
-  }
-
   const payload = {
     image_url: params.imageUrl ?? null,
     image_base64: params.inlineImage?.base64Data ?? null,
     image_mime_type: params.inlineImage?.mimeType ?? null,
     artist_name: params.artistName ?? "",
     artwork_name: params.artworkName ?? "",
+    output_lang: params.outputLang ?? "fr",
   };
 
-  const url = `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/analyze-artwork-image`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
-    },
-    body: JSON.stringify(payload),
+  const { data, error } = await supabase.functions.invoke("analyze-artwork-image", {
+    body: payload,
   });
 
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(text || `Erreur analyze-artwork-image (${resp.status})`);
+  if (error) {
+    if (error instanceof FunctionsFetchError) {
+      throw new Error(
+        "Connexion impossible à analyze-artwork-image (réseau ou fonction indisponible). Vérifiez le déploiement Supabase.",
+      );
+    }
+    if (error instanceof FunctionsHttpError) {
+      const ctx = error.context as Response | undefined;
+      const text = ctx ? await ctx.text().catch(() => "") : "";
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as { error?: string; message?: string; details?: string };
+          const msg = [parsed.error, parsed.details, parsed.message].filter(Boolean).join(" — ");
+          if (msg) throw new Error(msg);
+        } catch (e) {
+          if (e instanceof Error && e.message && !e.message.startsWith("Unexpected")) throw e;
+          throw new Error(text.slice(0, 500));
+        }
+      }
+    }
+    throw new Error(error.message || "Erreur analyze-artwork-image.");
   }
 
-  const data: unknown = await resp.json();
   if (import.meta.env.DEV) {
     console.log("Données reçues par le Front-End (analyze-artwork-image) :", data);
   }

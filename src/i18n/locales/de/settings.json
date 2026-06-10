@@ -318,5 +318,38 @@
     "col_completion": "Ausgabe",
     "col_total": "Gesamt",
     "operation_tts_synthesize": "TTS-Synthese"
+  },
+  "visitor_errors": {
+    "back_settings": "Einstellungen",
+    "page_title": "Besucher-Fehlerlogs",
+    "page_sub": "JavaScript-Fehler, Fehler-Toasts und funktionale Fehler (QR-Scan, Kamera, Formulare…) im gesamten Besucherpfad.",
+    "client_id": "Besucher"
+  },
+  "organizer_errors": {
+    "back_settings": "Einstellungen",
+    "page_title": "Organisator-Fehlerlogs",
+    "page_sub": "JavaScript-Fehler, Fehler-Toasts und funktionale Fehler im Organisator-Backoffice.",
+    "client_id": "Benutzer"
+  },
+  "error_logs": {
+    "refresh": "Aktualisieren",
+    "filters_title": "Filter",
+    "filter_date_mode": "Zeitraum",
+    "filter_date_mode_day": "Tag",
+    "filter_date_mode_range": "Intervall",
+    "filter_date": "Datum",
+    "filter_date_from": "Von",
+    "filter_date_to": "Bis",
+    "filter_time_from": "Uhrzeit von",
+    "filter_time_to": "Uhrzeit bis",
+    "filter_error_type": "Fehlertyp",
+    "filter_all_types": "Alle Typen",
+    "apply_filters": "Anwenden",
+    "sessions_title": "{{count}} Fehler im Zeitraum",
+    "error_count_one": "{{count}} Fehler",
+    "error_count_other": "{{count}} Fehler",
+    "session_open": "Sitzung läuft",
+    "last_page": "Letzte Seite",
+    "empty": "Keine Fehler für diese Filter."
   }
 }

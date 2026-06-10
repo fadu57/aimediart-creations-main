@@ -660,6 +660,10 @@ const VisitorView = () => {
       (artistBioByLang[language] ?? "").trim() || (artistBioByLang.fr ?? "").trim();
     return fromTable;
   }, [artistBioByLang, language]);
+  const artistTtsText = useMemo(() => {
+    const bio = artistBioText.trim();
+    return bio || artistDisplayName;
+  }, [artistBioText, artistDisplayName]);
   const agencyThanksName = (
     Array.isArray(artwork?.agencies)
       ? artwork?.agencies?.[0]?.name_agency
@@ -985,6 +989,7 @@ const VisitorView = () => {
 
   const closeArtistPhotoModal = () => {
     if (!isArtistPhotoOpen || isArtistPhotoClosing) return;
+    tts.stop();
     setIsArtistPhotoClosing(true);
     artistPhotoCloseTimerRef.current = window.setTimeout(() => {
       setIsArtistPhotoOpen(false);
@@ -1629,12 +1634,27 @@ const VisitorView = () => {
                   onError={() => setArtistPhotoError(true)}
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-black/45 px-3 py-2">
-                  <p className="text-sm font-semibold text-white">{artistDisplayName}</p>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <p className="min-w-0 truncate text-sm font-semibold text-white">{artistDisplayName}</p>
+                    <TtsPlayButton
+                      isPlaying={tts.isSpeaking && tts.speakingText === artistTtsText}
+                      isLoading={tts.isLoading && tts.speakingText === artistTtsText}
+                      onPress={() => void tts.speak(artistTtsText, language)}
+                      supported
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex h-[180px] items-center justify-center rounded bg-gray-100 text-center text-sm text-gray-500">
-                {t("artist_photo_unavailable")}
+              <div className="flex h-[180px] flex-col items-center justify-center gap-2 rounded bg-gray-100 px-3 text-center text-sm text-gray-500">
+                <span>{t("artist_photo_unavailable")}</span>
+                <TtsPlayButton
+                  isPlaying={tts.isSpeaking && tts.speakingText === artistTtsText}
+                  isLoading={tts.isLoading && tts.speakingText === artistTtsText}
+                  onPress={() => void tts.speak(artistTtsText, language)}
+                  supported
+                  variant="onLight"
+                />
               </div>
             )}
             <div className="mt-3 max-h-[220px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-[15px]">

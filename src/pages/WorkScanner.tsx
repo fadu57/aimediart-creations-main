@@ -19,6 +19,13 @@ import {
   type NativeCameraQrSession,
 } from "@/lib/qrNativeCameraScanner";
 import { supabase } from "@/lib/supabase";
+import {
+  reportQrCameraError,
+  reportQrInvalid,
+  reportQrScannerUnavailable,
+  reportQrTorchError,
+  reportQrUnreadableImage,
+} from "@/lib/reportVisitorScanError";
 import { toast } from "sonner";
 
 const SCAN_ACCENT = "#d9a441";
@@ -75,6 +82,7 @@ const WorkScanner = () => {
         const now = Date.now();
         if (now - lastInvalidScanToastRef.current > 2800) {
           lastInvalidScanToastRef.current = now;
+          reportQrInvalid(decodedText);
           toast.message("QR non reconnu", {
             description: "Utilisez le QR d’une œuvre (cartel ou catalogue), bien centré et éclairé.",
           });
@@ -171,6 +179,12 @@ const WorkScanner = () => {
                   ? msg
                   : "Caméra indisponible pour le moment. Réessayez dans un instant.",
       );
+      reportQrCameraError(
+        isInsecureContext
+          ? "Caméra bloquée: contexte non sécurisé (HTTPS requis)."
+          : msg,
+        e,
+      );
       setCameraReady(false);
       setTorchSupported(false);
       setTorchOn(false);
@@ -189,6 +203,7 @@ const WorkScanner = () => {
       try {
         qr = getOrCreateFileQrReader();
       } catch {
+        reportQrScannerUnavailable();
         toast.error("Scanner fichier indisponible.");
         return;
       }
@@ -196,6 +211,7 @@ const WorkScanner = () => {
         const text = await scanQrFromImageFile(qr, file);
         handleQrDecoded(text);
       } catch {
+        reportQrUnreadableImage();
         toast.error("QR illisible sur cette image. Essayez une photo plus nette ou plus proche.");
       }
     },
@@ -233,7 +249,10 @@ const WorkScanner = () => {
     if (cameraSessionRef.current) {
       const ok = await cameraSessionRef.current.setTorch(nextTorchValue);
       if (ok) setTorchOn(nextTorchValue);
-      else setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+      else {
+        reportQrTorchError();
+        setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+      }
       return;
     }
     if (!qrRef.current) return;
@@ -243,6 +262,7 @@ const WorkScanner = () => {
       });
       setTorchOn(nextTorchValue);
     } catch {
+      reportQrTorchError();
       setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
     }
   };

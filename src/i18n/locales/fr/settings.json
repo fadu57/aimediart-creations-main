@@ -469,5 +469,38 @@
     "col_completion": "Sortie",
     "col_total": "Total",
     "operation_tts_synthesize": "TTS Synthèse"
+  },
+  "visitor_errors": {
+    "back_settings": "Paramètres",
+    "page_title": "Logs erreurs visiteurs",
+    "page_sub": "Erreurs JavaScript, toasts d'erreur et erreurs fonctionnelles (scan QR, caméra, formulaires…) sur tout le parcours visiteur.",
+    "client_id": "Visiteur"
+  },
+  "organizer_errors": {
+    "back_settings": "Paramètres",
+    "page_title": "Logs erreurs organisateurs",
+    "page_sub": "Erreurs JavaScript, toasts d'erreur et erreurs fonctionnelles sur tout le backoffice organisateur.",
+    "client_id": "Utilisateur"
+  },
+  "error_logs": {
+    "refresh": "Actualiser",
+    "filters_title": "Filtres",
+    "filter_date_mode": "Période",
+    "filter_date_mode_day": "Jour",
+    "filter_date_mode_range": "Intervalle",
+    "filter_date": "Date",
+    "filter_date_from": "Du",
+    "filter_date_to": "Au",
+    "filter_time_from": "Heure de",
+    "filter_time_to": "Heure à",
+    "filter_error_type": "Type d'erreur",
+    "filter_all_types": "Tous les types",
+    "apply_filters": "Appliquer",
+    "sessions_title": "{{count}} erreur(s) sur la période",
+    "error_count_one": "{{count}} erreur",
+    "error_count_other": "{{count}} erreurs",
+    "session_open": "session en cours",
+    "last_page": "Dernière page",
+    "empty": "Aucune erreur pour ces filtres."
   }
 }

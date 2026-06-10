@@ -62,6 +62,14 @@ import {
   serializeMediationDescriptionsByLang,
   serializeMediationDraftFingerprint,
 } from "@/lib/artworkDescriptionI18n";
+import {
+  createEmptySourceMaterialByLang,
+  hasAnySourceMaterial,
+  normalizeSourceMaterialToByLang,
+  serializeSourceMaterialByLang,
+  sourceMaterialDraftFingerprint,
+  sourceMaterialTextForLang,
+} from "@/lib/artworkSourceMaterialI18n";
 import { FR_MEDIATION_STYLE_LABELS } from "@/lib/mediationVisitorStyles";
 import { CANONICAL_MEDIATION_STYLE_SET } from "@/lib/mediationStyleCodes";
 import {
@@ -155,7 +163,7 @@ type DraftSnapshot = {
   artworkExpoId: string;
   artworkAgencyId: string;
   imageUrl: string;
-  sourceMaterial: string;
+  sourceMaterialFingerprint: string;
   mediationFingerprint: string;
 };
 
@@ -165,22 +173,33 @@ function buildDraftSnapshot(input: {
   artworkExpoId: string;
   artworkAgencyId: string;
   imageUrl: string;
-  sourceMaterial: string;
+  sourceMaterialByLang: Record<MediationUiLang, string>;
   descriptionsByLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>;
 }): DraftSnapshot {
   return {
-    title: input.title.trim(),
+    title: input.title,
     artistId: input.artistId.trim(),
     artworkExpoId: input.artworkExpoId.trim(),
     artworkAgencyId: input.artworkAgencyId.trim(),
     imageUrl: input.imageUrl.trim(),
-    sourceMaterial: input.sourceMaterial.trim(),
+    sourceMaterialFingerprint: sourceMaterialDraftFingerprint(input.sourceMaterialByLang),
     mediationFingerprint: serializeMediationDraftFingerprint(input.descriptionsByLang),
   };
 }
 
 function serializeDraftSnapshot(snapshot: DraftSnapshot): string {
   return JSON.stringify(snapshot);
+}
+
+/** Contraste net entre langue active, disponible et indisponible (matériau source + médiations). */
+function mediationLangButtonClassName(isSelected: boolean, langEnabled: boolean): string {
+  if (!langEnabled) {
+    return "border border-dashed border-muted-foreground/40 bg-muted/60 text-muted-foreground/50 shadow-none hover:bg-muted/60";
+  }
+  if (isSelected) {
+    return "border-amber-700 bg-amber-700 text-white shadow-md hover:bg-amber-800 hover:border-amber-800";
+  }
+  return "border-amber-500 bg-amber-50 text-amber-950 shadow-sm hover:bg-amber-100 hover:border-amber-600";
 }
 
 type MediationProgressState = {
@@ -239,6 +258,29 @@ function MediationGenerationProgressBar({
   );
 }
 
+/** Pastille numérotée du parcours médiation (étapes 1–4). */
+function WorkflowStepBadge({ step, inline = false }: { step: number; inline?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold leading-none text-white shadow-sm",
+        inline ? "relative shrink-0" : "pointer-events-none absolute -top-2 -right-2 z-10",
+      )}
+      aria-hidden
+    >
+      {step}
+    </span>
+  );
+}
+
+function mediationLangsWithContent(
+  byLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>,
+): MediationUiLang[] {
+  return MEDIATION_UI_LANGS.filter((L) =>
+    Object.values(byLang[L] ?? {}).some((s) => s.trim().length > 0),
+  );
+}
+
 const ANALYZE_PROGRESS_ESTIMATE_MS = 45_000;
 
 function analyzeProgressDetailFromElapsed(elapsedSec: number, t: (key: string) => string): string {
@@ -246,6 +288,223 @@ function analyzeProgressDetailFromElapsed(elapsedSec: number, t: (key: string) =
   if (elapsedSec < 18) return t("analyze_step_2");
   if (elapsedSec < 28) return t("analyze_step_3");
   return t("analyze_step_4");
+}
+
+type ArtworkModalIdentityRowProps = {
+  t: ReturnType<typeof useTranslation<"artwork_modal">>["t"];
+  photoInputRef: React.RefObject<HTMLInputElement | null>;
+  imageUrl: string;
+  isVisitorLocked: boolean;
+  isLoading: boolean;
+  uploadingImage: boolean;
+  onUploadImage: (file: File) => void;
+  title: string;
+  onTitleChange: (value: string) => void;
+  artistSearch: string;
+  onArtistSearchChange: (value: string) => void;
+  showArtistSuggestions: boolean;
+  onArtistSuggestionsOpen: (open: boolean) => void;
+  selectedArtistDisplay: string;
+  filteredArtists: ArtistOption[];
+  artistId: string;
+  onSelectArtist: (id: string, label: string) => void;
+  onOpenCreateArtist: () => void;
+  artworkQrImageUrl: string;
+  artworkExpoId: string;
+  isEditingExisting: boolean;
+  regeneratingQr: boolean;
+  onRegenerateQr: () => void;
+};
+
+function ArtworkModalIdentityRow({
+  t,
+  photoInputRef,
+  imageUrl,
+  isVisitorLocked,
+  isLoading,
+  uploadingImage,
+  onUploadImage,
+  title,
+  onTitleChange,
+  artistSearch,
+  onArtistSearchChange,
+  showArtistSuggestions,
+  onArtistSuggestionsOpen,
+  selectedArtistDisplay,
+  filteredArtists,
+  artistId,
+  onSelectArtist,
+  onOpenCreateArtist,
+  artworkQrImageUrl,
+  artworkExpoId,
+  isEditingExisting,
+  regeneratingQr,
+  onRegenerateQr,
+}: ArtworkModalIdentityRowProps) {
+  return (
+    <div className="flex min-w-0 flex-1 gap-4 items-start">
+      <div className="w-40 shrink-0">
+        <div className="group relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+          {imageUrl ? (
+            <img src={imageUrl} alt={t("img_alt")} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Upload className="h-6 w-6 text-muted-foreground/70" />
+            </div>
+          )}
+          <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <Button
+              type="button"
+              variant="secondary"
+              className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={isVisitorLocked || isLoading || uploadingImage}
+            >
+              {uploadingImage ? t("btn_uploading") : t("btn_change_photo")}
+            </Button>
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUploadImage(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-1 gap-4 items-start">
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="space-y-1.5">
+            <Label>{t("label_title")}</Label>
+            <Textarea
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              disabled={isVisitorLocked || isLoading}
+              rows={2}
+              className="min-h-[60px] resize-none p-[5px] text-base md:text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t("label_artist")}</Label>
+            <div className="relative">
+              <Input
+                value={artistSearch}
+                onChange={(e) => {
+                  onArtistSearchChange(e.target.value);
+                  onArtistSuggestionsOpen(true);
+                }}
+                onFocus={() => onArtistSuggestionsOpen(true)}
+                onBlur={() => {
+                  window.setTimeout(() => onArtistSuggestionsOpen(false), 120);
+                }}
+                placeholder={selectedArtistDisplay}
+                disabled={isVisitorLocked || isLoading}
+                className="p-[5px]"
+              />
+              {showArtistSuggestions ? (
+                <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                  {artistSearch.trim().length > 0 && filteredArtists.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-muted-foreground">{t("artist_not_found")}</p>
+                  ) : null}
+                  {filteredArtists.map((artist) => {
+                    const label =
+                      [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
+                      artist.artist_nickname ||
+                      artist.artist_id;
+                    return (
+                      <button
+                        key={artist.artist_id}
+                        type="button"
+                        className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
+                        onMouseDown={(ev) => ev.preventDefault()}
+                        onClick={() => onSelectArtist(artist.artist_id, label)}
+                      >
+                        <span className="truncate">{label}</span>
+                        <Check
+                          className={cn(
+                            "ml-2 h-4 w-4 shrink-0",
+                            artistId === artist.artist_id ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                      </button>
+                    );
+                  })}
+                  {!isVisitorLocked ? (
+                    <>
+                      {filteredArtists.length > 0 ? (
+                        <div className="mx-2 my-1 border-t border-border/60" />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
+                        onMouseDown={(ev) => ev.preventDefault()}
+                        onClick={onOpenCreateArtist}
+                      >
+                        <span className="text-base leading-none">+</span>
+                        {t("btn_create_artist")}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-1">
+          <div
+            className={cn(
+              "group relative flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
+              artworkQrImageUrl && "bg-white",
+              !artworkExpoId.trim() && "border-amber-400/70",
+            )}
+          >
+            {artworkQrImageUrl ? (
+              <img src={artworkQrImageUrl} alt={t("qr_alt")} className="h-full w-full object-contain p-1" />
+            ) : (
+              <p className="px-2 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">
+                {t("qr_empty")}
+              </p>
+            )}
+            {isEditingExisting && !isVisitorLocked ? (
+              <>
+                <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
+                    onClick={onRegenerateQr}
+                    disabled={regeneratingQr || isLoading}
+                  >
+                    {regeneratingQr ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        {t("btn_regenerating_qr")}
+                      </>
+                    ) : (
+                      t("btn_regenerate_qr")
+                    )}
+                  </Button>
+                </div>
+              </>
+            ) : null}
+          </div>
+          {!artworkExpoId.trim() ? (
+            <p className="max-w-[160px] text-center text-[10px] leading-tight text-amber-600">
+              {t("qr_warn_no_expo")}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: ArtworkModalProps) {
@@ -278,9 +537,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [artworkExpoOpen, setArtworkExpoOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [artworkQrImageUrl, setArtworkQrImageUrl] = useState("");
-  const [sourceMaterial, setSourceMaterial] = useState("");
-  /** Dernière valeur du matériau source (évite un état React stale juste après l’analyse). */
-  const sourceMaterialRef = useRef("");
+  const [sourceMaterialByLang, setSourceMaterialByLang] = useState(createEmptySourceMaterialByLang);
+  /** Langue affichée / éditée dans le matériau source (boutons verticaux). */
+  const [sourceMaterialEditLang, setSourceMaterialEditLang] = useState<MediationUiLang>("fr");
   const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
@@ -315,6 +574,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [artworkDraftLoading, setArtworkDraftLoading] = useState(false);
   /** Points structurés renvoyés par l’analyse d’image (affichage tolérant, optionnel). */
   const [imagePersonasFromAnalysis, setImagePersonasFromAnalysis] = useState<ImageAnalysisPersonaItem[]>([]);
+  /** Étape 1 : analyse d’image effectuée (matériau source disponible). */
+  const [imageAnalysisDone, setImageAnalysisDone] = useState(false);
 
   const selectedArtist = useMemo(
     () => artists.find((a) => a.artist_id === artistId) ?? null,
@@ -342,17 +603,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
   const isEditingExisting = Boolean(persistedArtworkId);
 
-  useEffect(() => {
-    sourceMaterialRef.current = sourceMaterial;
-  }, [sourceMaterial]);
+  const sourceMaterialForGeneration = useMemo(
+    () => sourceMaterialTextForLang(sourceMaterialByLang, i18n.language),
+    [sourceMaterialByLang, i18n.language],
+  );
+
+  const activeSourceMaterialLangSet = useMemo(
+    () => new Set(generationLangs),
+    [generationLangs],
+  );
 
   const persistArtworkSourceMaterial = useCallback(
-    async (material: string): Promise<void> => {
+    async (byLang: Record<MediationUiLang, string>): Promise<void> => {
       if (!persistedArtworkId) return;
-      const trimmed = material.trim();
+      const serialized = serializeSourceMaterialByLang(byLang);
+      const legacyPrimary =
+        sourceMaterialTextForLang(byLang, i18n.language) ||
+        sourceMaterialTextForLang(byLang, "fr") ||
+        null;
       const { data: updatedRows, error } = await supabase
         .from("artworks")
-        .update({ artwork_source_material: trimmed || null })
+        .update({
+          artwork_source_material: legacyPrimary,
+          artwork_source_material_i18n: serialized,
+        } as never)
         .eq("artwork_id", persistedArtworkId)
         .select("artwork_id");
       if (error) throw error;
@@ -361,29 +635,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           "Aucune ligne mise à jour pour artwork_source_material (droits RLS ou œuvre introuvable).",
         );
       }
-      setInitialDraftSignature(
-        serializeDraftSnapshot(
-          buildDraftSnapshot({
-            title,
-            artistId,
-            artworkExpoId,
-            artworkAgencyId,
-            imageUrl,
-            sourceMaterial: trimmed,
-            descriptionsByLang,
-          }),
-        ),
-      );
     },
-    [
-      persistedArtworkId,
-      title,
-      artistId,
-      artworkExpoId,
-      artworkAgencyId,
-      imageUrl,
-      descriptionsByLang,
-    ],
+    [persistedArtworkId, i18n.language],
   );
 
   useEffect(() => {
@@ -395,7 +648,14 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       return;
     }
     setMediationEditLang(mediationPrimaryLang);
+    setSourceMaterialEditLang(mediationPrimaryLang);
   }, [open, mediationPrimaryLang, setMediationOptionalLang]);
+
+  useEffect(() => {
+    if (!generationLangs.includes(sourceMaterialEditLang)) {
+      setSourceMaterialEditLang(mediationPrimaryLang);
+    }
+  }, [generationLangs, sourceMaterialEditLang, mediationPrimaryLang]);
 
   // Charger les agences (super-admins uniquement)
   useEffect(() => {
@@ -566,7 +826,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         const { data, error } = await supabase
           .from("artworks")
           .select(
-            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url",
+            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_source_material_i18n, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url",
           )
           .eq("artwork_id", id)
           .is("deleted_at", null)
@@ -590,7 +850,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           ((data as { artwork_qrcode_image?: string | null }).artwork_qrcode_image ?? "").trim() ||
           ((data as { artwork_qr_code_url?: string | null }).artwork_qr_code_url ?? "").trim();
         setArtworkQrImageUrl(qrImg);
-        setSourceMaterial((data.artwork_source_material as string | null) ?? "");
+        const nextSourceByLang = normalizeSourceMaterialToByLang(
+          (data as { artwork_source_material_i18n?: unknown }).artwork_source_material_i18n,
+          (data.artwork_source_material as string | null) ?? "",
+        );
+        setSourceMaterialByLang(nextSourceByLang);
+        setImageAnalysisDone(hasAnySourceMaterial(nextSourceByLang));
         setImagePersonasFromAnalysis([]);
         setDescriptionsByLang(nextByLang);
         setMediationEditLang(resolveMediationUiLang(i18n.language));
@@ -600,7 +865,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           artworkExpoId: (data.artwork_expo_id as string | null) ?? "",
           artworkAgencyId: (data.artwork_agency_id as string | null) ?? "",
           imageUrl: (data.artwork_image_url as string | null) ?? "",
-          sourceMaterial: (data.artwork_source_material as string | null) ?? "",
+          sourceMaterialByLang: nextSourceByLang,
           descriptionsByLang: nextByLang,
         });
         setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
@@ -625,7 +890,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setArtworkAgencyId(agency_id ?? "");
       setImageUrl("");
       setArtworkQrImageUrl("");
-      setSourceMaterial("");
+      setSourceMaterialByLang(createEmptySourceMaterialByLang());
+      setImageAnalysisDone(false);
       setImagePersonasFromAnalysis([]);
       const emptyMed = createEmptyDescriptionsByLang();
       setDescriptionsByLang(emptyMed);
@@ -637,7 +903,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         artworkExpoId: expo_id ?? "",
         artworkAgencyId: agency_id ?? "",
         imageUrl: "",
-        sourceMaterial: "",
+        sourceMaterialByLang: createEmptySourceMaterialByLang(),
         descriptionsByLang: emptyMed,
       });
       setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
@@ -707,13 +973,19 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     let newArtworkId: string | null = null;
     try {
       const serializedMediation = serializeMediationDescriptionsByLang(descriptionsByLang);
+      const serializedSource = serializeSourceMaterialByLang(sourceMaterialByLang);
+      const legacySource =
+        sourceMaterialTextForLang(sourceMaterialByLang, i18n.language) ||
+        sourceMaterialTextForLang(sourceMaterialByLang, "fr") ||
+        null;
       const payload = {
         artwork_title: title.trim(),
         artwork_artist_id: artistId,
         artwork_expo_id: artworkExpoId.trim() || null,
         artwork_agency_id: artworkAgencyId.trim() || null,
         artwork_image_url: imageUrl.trim() || null,
-        artwork_source_material: sourceMaterial.trim() || null,
+        artwork_source_material: legacySource,
+        artwork_source_material_i18n: serializedSource,
         artwork_description_i18n: serializedMediation,
         artwork_fingerprint: fingerprint || null,
       };
@@ -731,6 +1003,19 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           );
         }
         toast.success(t("toast_artwork_updated"));
+        setInitialDraftSignature(
+          serializeDraftSnapshot(
+            buildDraftSnapshot({
+              title,
+              artistId,
+              artworkExpoId,
+              artworkAgencyId,
+              imageUrl,
+              sourceMaterialByLang,
+              descriptionsByLang,
+            }),
+          ),
+        );
         void generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null).catch((e) => {
           console.warn("[ArtworkModal] QR régénération échouée :", e);
         });
@@ -840,12 +1125,34 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
   const canGenerateMediations =
     !isVisitorLocked &&
-    sourceMaterial.trim().length > 0 &&
+    imageAnalysisDone &&
+    sourceMaterialForGeneration.trim().length > 0 &&
     !generatingMediation &&
     regeneratingMediationStyleKey === null &&
     !analyzingImage;
 
   const canAnalyzeImage = !isVisitorLocked && Boolean(imageUrl) && !analyzingImage;
+
+  /** Langues sélectionnées (étape 2) avec contenu généré, ou configurées avant génération. */
+  const activeMediationLangs = useMemo(() => {
+    const configured = generationLangs;
+    const filled = mediationLangsWithContent(descriptionsByLang);
+    if (filled.length > 0) {
+      return configured.filter((L) => filled.includes(L));
+    }
+    return imageAnalysisDone ? configured : [];
+  }, [generationLangs, descriptionsByLang, imageAnalysisDone]);
+
+  const activeMediationLangSet = useMemo(
+    () => new Set(activeMediationLangs),
+    [activeMediationLangs],
+  );
+
+  useEffect(() => {
+    if (activeMediationLangs.length > 0 && !activeMediationLangSet.has(mediationEditLang)) {
+      setMediationEditLang(activeMediationLangs[0]);
+    }
+  }, [activeMediationLangs, activeMediationLangSet, mediationEditLang]);
 
   const mediationLangHelp = useMemo(() => {
     if (isAllLanguagesMode) {
@@ -869,11 +1176,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       artworkExpoId,
       artworkAgencyId,
       imageUrl,
-      sourceMaterial,
+      sourceMaterialByLang,
       descriptionsByLang,
     });
     return serializeDraftSnapshot(snapshot);
-  }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterial, descriptionsByLang]);
+  }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterialByLang, descriptionsByLang]);
   const hasUnsavedChanges =
     !artworkDraftLoading && currentDraftSignature !== initialDraftSignature;
 
@@ -885,13 +1192,15 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
     onOpenChange(false);
   };
-  const handleAnalyzeImage = async () => {
+  const handleAnalyzeImage = async (targetLang?: MediationUiLang) => {
     if (!imageUrl) return;
     if (isVisitorLocked) return;
     if (!artistId) {
       toast.error(t("toast_error_artist_analyze"));
       return;
     }
+    const outputLang = targetLang ?? mediationPrimaryLang;
+    setSourceMaterialEditLang(outputLang);
     setAnalyzeImageError(null);
     setAnalyzeTruncatedWarning(null);
     setAnalyzingImage(true);
@@ -924,11 +1233,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               inlineImage: { mimeType: prepared.mimeType, base64Data: prepared.base64Data },
               artistName: selectedArtistLabel || selectedArtistDisplay,
               artworkName: title.trim(),
+              outputLang,
             }
           : {
               imageUrl: prepared.imageUrl,
               artistName: selectedArtistLabel || selectedArtistDisplay,
               artworkName: title.trim(),
+              outputLang,
             },
       );
       if (apiProgressTimer) {
@@ -946,12 +1257,14 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         setAnalyzeTruncatedWarning(warnMsg);
       }
       const notes = analyzeResult.notes;
-      sourceMaterialRef.current = notes;
-      setSourceMaterial(notes);
+      const nextSourceByLang = { ...sourceMaterialByLang, [outputLang]: notes };
+      setSourceMaterialByLang(nextSourceByLang);
+      setSourceMaterialEditLang(outputLang);
+      setImageAnalysisDone(true);
       setImagePersonasFromAnalysis(Array.isArray(analyzeResult.personas) ? analyzeResult.personas : []);
       if (persistedArtworkId) {
         try {
-          await persistArtworkSourceMaterial(notes);
+          await persistArtworkSourceMaterial(nextSourceByLang);
         } catch (persistErr) {
           const persistMsg =
             persistErr instanceof Error ? persistErr.message : t("toast_error_source_persist");
@@ -970,6 +1283,29 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setAnalyzingImage(false);
       setAnalyzeProgress(null);
     }
+  };
+
+  const handleSourceMaterialLangSelect = (lng: MediationUiLang) => {
+    if (!activeSourceMaterialLangSet.has(lng)) return;
+    if (isVisitorLocked || isLoading || analyzingImage) return;
+    if (lng === sourceMaterialEditLang) return;
+
+    const hasExistingText = (sourceMaterialByLang[lng] ?? "").trim().length > 0;
+    if (hasExistingText) {
+      setSourceMaterialEditLang(lng);
+      return;
+    }
+
+    if (!imageUrl) {
+      setSourceMaterialEditLang(lng);
+      return;
+    }
+    if (!artistId) {
+      toast.error(t("toast_error_artist_analyze"));
+      setSourceMaterialEditLang(lng);
+      return;
+    }
+    void handleAnalyzeImage(lng);
   };
 
   const uploadArtworkImage = async (file: File) => {
@@ -1031,7 +1367,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       toast.error(t("toast_error_artist_generate"));
       return;
     }
-    if (!sourceMaterial.trim()) {
+    if (!sourceMaterialForGeneration.trim()) {
       toast.error(t("toast_error_source_required"));
       return;
     }
@@ -1039,10 +1375,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     setGeneratingMediation(true);
     setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
     try {
-      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      const materialForMediation =
+        (sourceMaterialByLang[mediationPrimaryLang] ?? "").trim() ||
+        sourceMaterialForGeneration.trim();
       if (persistedArtworkId) {
         setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
-        await persistArtworkSourceMaterial(materialForMediation);
+        await persistArtworkSourceMaterial(sourceMaterialByLang);
         setMediationProgress({
           percent: MEDIATION_GENERATION_PROGRESS.persist.end,
           detail: t("mediation_progress_persist"),
@@ -1149,7 +1487,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setMediationEditLang(lng);
       return;
     }
-    if (!sourceMaterial.trim()) {
+    if (!sourceMaterialForGeneration.trim()) {
       toast.error(t("toast_error_source_required"));
       setMediationEditLang(lng);
       return;
@@ -1167,7 +1505,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       toast.error(t("toast_error_artist_generate"));
       return;
     }
-    if (!sourceMaterial.trim()) {
+    if (!sourceMaterialForGeneration.trim()) {
       toast.error(t("toast_error_source_required"));
       return;
     }
@@ -1175,10 +1513,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     setLastMediationAnalyseFr(null);
     setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
     try {
-      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      const materialForMediation =
+        (sourceMaterialByLang[mediationPrimaryLang] ?? "").trim() ||
+        sourceMaterialForGeneration.trim();
       if (persistedArtworkId) {
         setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
-        await persistArtworkSourceMaterial(materialForMediation);
+        await persistArtworkSourceMaterial(sourceMaterialByLang);
         setMediationProgress({
           percent: MEDIATION_GENERATION_PROGRESS.persist.end,
           detail: t("mediation_progress_persist"),
@@ -1276,7 +1616,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       toast.error(t("toast_error_artist_generate"));
       return;
     }
-    if (!sourceMaterial.trim()) {
+    if (!sourceMaterialForGeneration.trim()) {
       toast.error(t("toast_error_source_required"));
       return;
     }
@@ -1288,10 +1628,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     setRegeneratingMediationStyleKey(styleKey);
     setMediationProgress({ percent: 0, detail: t("mediation_progress_start") });
     try {
-      const materialForMediation = sourceMaterialRef.current.trim() || sourceMaterial.trim();
+      const materialForMediation =
+        (sourceMaterialByLang[mediationPrimaryLang] ?? "").trim() ||
+        sourceMaterialForGeneration.trim();
       if (persistedArtworkId) {
         setMediationProgress({ percent: 2, detail: t("mediation_progress_persist") });
-        await persistArtworkSourceMaterial(materialForMediation);
+        await persistArtworkSourceMaterial(sourceMaterialByLang);
         setMediationProgress({
           percent: MEDIATION_GENERATION_PROGRESS.persist.end,
           detail: t("mediation_progress_persist"),
@@ -1498,170 +1840,45 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         <div className="space-y-3">
 
           {/* ── Rangée 1 ─────────────────────────────────────────── */}
-          <div className="flex gap-4 items-start">
-
-            {/* Colonne gauche fixe (w-40) : image + bouton Analyser */}
-            <div className="w-40 shrink-0 space-y-2">
-              <div className="group relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
-                {imageUrl ? (
-                  <img src={imageUrl} alt={t("img_alt")} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <Upload className="h-6 w-6 text-muted-foreground/70" />
-                  </div>
-                )}
-                <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={isVisitorLocked || isLoading || uploadingImage}
-                  >
-                    {uploadingImage ? t("btn_uploading") : t("btn_change_photo")}
-                  </Button>
-                </div>
-                <input
-                  ref={photoInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void uploadArtworkImage(file);
-                    e.target.value = "";
-                  }}
-                />
-              </div>
-              {imageUrl && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-auto w-full gap-1 whitespace-normal border border-amber-300/60 bg-amber-50 px-[5px] py-[5px] text-center text-xs leading-tight text-amber-900 shadow-sm hover:bg-amber-100"
-                  disabled={!canAnalyzeImage}
-                  onClick={() => void handleAnalyzeImage()}
-                >
-                  {analyzingImage ? <><Loader2 className="h-3 w-3 animate-spin" />{t("btn_analyzing")}</> : t("btn_analyze")}
-                </Button>
-              )}
-            </div>
-
-            {/* Colonne droite : [Titre + Artiste (flex-1)] + [QR (w-40)] */}
-            <div className="flex-1 flex gap-4 items-start">
-
-              {/* Titre + Artiste empilés */}
-              <div className="flex-1 min-w-0 space-y-3">
-                <div className="space-y-1.5">
-                  <Label>{t("label_title")}</Label>
-                  <Textarea
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    disabled={isVisitorLocked || isLoading}
-                    rows={2}
-                    className="min-h-[60px] resize-none p-[5px] text-base md:text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{t("label_artist")}</Label>
-                  <div className="relative">
-                    <Input
-                      value={artistSearch}
-                      onChange={(e) => { setArtistSearch(e.target.value); setShowArtistSuggestions(true); }}
-                      onFocus={() => setShowArtistSuggestions(true)}
-                      onBlur={() => { window.setTimeout(() => setShowArtistSuggestions(false), 120); }}
-                      placeholder={selectedArtistDisplay}
-                      disabled={isVisitorLocked || isLoading}
-                      className="p-[5px]"
-                    />
-                    {showArtistSuggestions && (
-                      <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                        {artistSearch.trim().length > 0 && filteredArtists.length === 0 && (
-                          <p className="px-3 py-2 text-sm text-muted-foreground">{t("artist_not_found")}</p>
-                        )}
-                        {filteredArtists.map((artist) => {
-                          const label =
-                            [artist.artist_firstname, artist.artist_lastname].filter(Boolean).join(" ").trim() ||
-                            artist.artist_nickname ||
-                            artist.artist_id;
-                          return (
-                            <button
-                              key={artist.artist_id}
-                              type="button"
-                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
-                              onMouseDown={(ev) => ev.preventDefault()}
-                              onClick={() => { setArtistId(artist.artist_id); setArtistSearch(label); setShowArtistSuggestions(false); }}
-                            >
-                              <span className="truncate">{label}</span>
-                              <Check className={cn("ml-2 h-4 w-4 shrink-0", artistId === artist.artist_id ? "opacity-100" : "opacity-0")} />
-                            </button>
-                          );
-                        })}
-                        {!isVisitorLocked && (
-                          <>
-                            {filteredArtists.length > 0 && <div className="mx-2 my-1 border-t border-border/60" />}
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent"
-                              onMouseDown={(ev) => ev.preventDefault()}
-                              onClick={() => { setShowArtistSuggestions(false); setArtistDialogOpen(true); }}
-                            >
-                              <span className="text-base leading-none">+</span>
-                              {t("btn_create_artist")}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* QR code */}
-              <div className="flex flex-col items-center gap-1">
-                <div
-                  className={cn(
-                    "group relative flex h-40 w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-muted/30",
-                    artworkQrImageUrl && "bg-white",
-                    !artworkExpoId.trim() && "border-amber-400/70",
-                  )}
-                >
-                  {artworkQrImageUrl ? (
-                    <img src={artworkQrImageUrl} alt={t("qr_alt")} className="h-full w-full object-contain p-1" />
-                  ) : (
-                    <p className="px-2 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">{t("qr_empty")}</p>
-                  )}
-                  {isEditingExisting && !isVisitorLocked && (
-                    <>
-                      <div className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity group-hover:opacity-100 bg-black/40" />
-                      <div className="pointer-events-none absolute inset-0 z-20 flex items-start justify-center px-2 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="pointer-events-auto justify-center bg-neutral-800/60 text-white hover:bg-neutral-800/72 border border-neutral-500/45 shadow-sm backdrop-blur-[1px]"
-                          onClick={() => void handleRegenerateQr()}
-                          disabled={regeneratingQr || isLoading}
-                        >
-                          {regeneratingQr ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden />{t("btn_regenerating_qr")}</> : t("btn_regenerate_qr")}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-                {!artworkExpoId.trim() && (
-                  <p className="max-w-[160px] text-center text-[10px] leading-tight text-amber-600">{t("qr_warn_no_expo")}</p>
-                )}
-              </div>
-
-            </div>
-          </div>
+          <ArtworkModalIdentityRow
+            t={t}
+            photoInputRef={photoInputRef}
+            imageUrl={imageUrl}
+            isVisitorLocked={isVisitorLocked}
+            isLoading={isLoading}
+            uploadingImage={uploadingImage}
+            onUploadImage={(file) => void uploadArtworkImage(file)}
+            title={title}
+            onTitleChange={setTitle}
+            artistSearch={artistSearch}
+            onArtistSearchChange={setArtistSearch}
+            showArtistSuggestions={showArtistSuggestions}
+            onArtistSuggestionsOpen={setShowArtistSuggestions}
+            selectedArtistDisplay={selectedArtistDisplay}
+            filteredArtists={filteredArtists}
+            artistId={artistId}
+            onSelectArtist={(id, label) => {
+              setArtistId(id);
+              setArtistSearch(label);
+              setShowArtistSuggestions(false);
+            }}
+            onOpenCreateArtist={() => {
+              setShowArtistSuggestions(false);
+              setArtistDialogOpen(true);
+            }}
+            artworkQrImageUrl={artworkQrImageUrl}
+            artworkExpoId={artworkExpoId}
+            isEditingExisting={isEditingExisting}
+            regeneratingQr={regeneratingQr}
+            onRegenerateQr={() => void handleRegenerateQr()}
+          />
 
           {/* ── Rangée 2 : [Agence 50%] (rôles &lt; 4) + [Expo] (rôles &lt; 4 ou 4–5) ── */}
           {canManageExpoLink && (
             <div className="flex gap-3 items-start">
               {canPickAgency && (
               <div className="flex-1 min-w-0 space-y-1.5">
-                <Label className="text-xs font-medium">Agence</Label>
+                <Label className="text-xs font-medium">{t("label_agency")}</Label>
                 <Popover open={artworkAgencyOpen} onOpenChange={setArtworkAgencyOpen}>
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline" role="combobox"
@@ -1669,16 +1886,18 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                       disabled={isVisitorLocked || isLoading}
                     >
                       <span className="truncate">
-                        {artworkAgencyId ? (agencyOptions.find((a) => a.id === artworkAgencyId)?.name ?? "Agence inconnue") : "Sélectionner une agence…"}
+                        {artworkAgencyId
+                          ? (agencyOptions.find((a) => a.id === artworkAgencyId)?.name ?? t("agency_unknown"))
+                          : t("agency_select_placeholder")}
                       </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Rechercher une agence…" />
+                      <CommandInput placeholder={t("agency_search_placeholder")} />
                       <CommandList>
-                        <CommandEmpty>Aucune agence trouvée.</CommandEmpty>
+                        <CommandEmpty>{t("agency_empty")}</CommandEmpty>
                         <CommandGroup>
                           {agencyOptions.map((a) => (
                             <CommandItem key={a.id} value={a.name} onSelect={() => { setArtworkAgencyId(a.id); setArtworkExpoId(""); setArtworkAgencyOpen(false); }}>
@@ -1694,7 +1913,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               </div>
               )}
               <div className={cn("min-w-0 space-y-1.5", canPickAgency ? "flex-1" : "w-full flex-1")}>
-                <Label className="text-xs font-medium">Exposition</Label>
+                <Label className="text-xs font-medium">{t("label_expo")}</Label>
                 <Popover open={artworkExpoOpen} onOpenChange={setArtworkExpoOpen}>
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline" role="combobox"
@@ -1703,19 +1922,19 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                     >
                       <span className="truncate">
                         {artworkExpoId
-                          ? (expoOptions.find((e) => e.id === artworkExpoId)?.name ?? "Expo inconnue")
+                          ? (expoOptions.find((e) => e.id === artworkExpoId)?.name ?? t("expo_unknown"))
                           : expoAgencyId
-                            ? "Sélectionner une expo…"
-                            : "— agence non résolue —"}
+                            ? t("expo_select_placeholder")
+                            : t("expo_agency_unresolved")}
                       </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[280px] p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="Rechercher une exposition…" />
+                      <CommandInput placeholder={t("expo_search_placeholder")} />
                       <CommandList>
-                        <CommandEmpty>Aucune exposition trouvée.</CommandEmpty>
+                        <CommandEmpty>{t("expo_empty")}</CommandEmpty>
                         <CommandGroup>
                           {expoOptions.map((e) => (
                             <CommandItem key={e.id} value={e.name} onSelect={() => { setArtworkExpoId(e.id); setArtworkExpoOpen(false); }}>
@@ -1757,7 +1976,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
         <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
           <div className="space-y-2">
-            <Label>{t("label_source_material")}</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="min-w-0 flex-1 leading-snug">{t("label_source_material")}</Label>
+              {imageUrl ? (
+                <div className="relative shrink-0">
+                  <WorkflowStepBadge step={1} />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-auto gap-1 whitespace-normal border border-amber-300/60 bg-amber-50 px-[5px] py-[5px] text-center text-xs leading-tight text-amber-900 shadow-sm hover:bg-amber-100"
+                    disabled={!canAnalyzeImage}
+                    onClick={() => void handleAnalyzeImage()}
+                  >
+                    {analyzingImage ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        {t("btn_analyzing")}
+                      </>
+                    ) : (
+                      t("btn_analyze")
+                    )}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
             {analyzingImage && analyzeProgress ? (
               <GenerationProgressBar
                 percent={analyzeProgress.percent}
@@ -1767,16 +2009,47 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 })}
               />
             ) : null}
-            <Textarea
-              value={sourceMaterial}
-              onChange={(e) => setSourceMaterial(e.target.value)}
-              disabled={isVisitorLocked || isLoading || analyzingImage}
-              className={cn(
-                "w-full min-h-[170px] text-xs leading-relaxed transition-colors placeholder:text-xs",
-                notesFlash ? "border-amber-400 ring-2 ring-amber-300" : "",
-              )}
-              placeholder={t("source_material_placeholder")}
-            />
+            <div className="flex items-stretch gap-2">
+              <div
+                className="flex shrink-0 flex-col gap-1"
+                role="group"
+                aria-label={t("source_material_lang_group_aria")}
+              >
+                {MEDIATION_UI_LANGS.map((lng) => {
+                  const langEnabled = activeSourceMaterialLangSet.has(lng);
+                  return (
+                    <Button
+                      key={lng}
+                      type="button"
+                      size="sm"
+                      variant={sourceMaterialEditLang === lng ? "default" : "outline"}
+                      className={cn(
+                        "h-8 w-9 min-w-[2.25rem] px-0 text-xs font-semibold",
+                        mediationLangButtonClassName(sourceMaterialEditLang === lng, langEnabled),
+                      )}
+                      disabled={isVisitorLocked || isLoading || analyzingImage || !langEnabled}
+                      aria-pressed={sourceMaterialEditLang === lng}
+                      onClick={() => handleSourceMaterialLangSelect(lng)}
+                    >
+                      {lng.toUpperCase()}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Textarea
+                value={sourceMaterialByLang[sourceMaterialEditLang]}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSourceMaterialByLang((prev) => ({ ...prev, [sourceMaterialEditLang]: v }));
+                }}
+                disabled={isVisitorLocked || isLoading || analyzingImage}
+                className={cn(
+                  "min-w-0 flex-1 min-h-[170px] text-xs leading-relaxed transition-colors placeholder:text-xs",
+                  notesFlash ? "border-amber-400 ring-2 ring-amber-300" : "",
+                )}
+                placeholder={t("source_material_placeholder")}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
               {t("source_material_help")}
             </p>
@@ -1817,46 +2090,62 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 <Label htmlFor="mediation-optional-lang" className="text-xs text-amber-950 shrink-0">
                   {t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
                 </Label>
-                <select
-                  id="mediation-optional-lang"
-                  className="h-8 min-w-[5.5rem] rounded-md border border-amber-300/60 bg-background px-2 text-xs font-semibold text-amber-950"
-                  value={mediationOptionalLang ?? ""}
-                  disabled={generatingMediation || regeneratingMediationStyleKey !== null || isLoading}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    setMediationOptionalLang(
-                      v && isMediationUiLang(v) ? v : null,
-                    );
-                  }}
-                >
-                  <option value="">{t("mediation_optional_lang_none")}</option>
-                  {MEDIATION_UI_LANGS.filter((lng) => lng !== mediationPrimaryLang).map((lng) => (
-                    <option key={lng} value={lng}>
-                      {lng.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative shrink-0">
+                  <WorkflowStepBadge step={2} />
+                  <select
+                    id="mediation-optional-lang"
+                    className="h-8 min-w-[5.5rem] rounded-md border border-amber-300/60 bg-background px-2 text-xs font-semibold text-amber-950 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={mediationOptionalLang ?? ""}
+                    disabled={
+                      !imageAnalysisDone ||
+                      generatingMediation ||
+                      regeneratingMediationStyleKey !== null ||
+                      isLoading
+                    }
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      setMediationOptionalLang(
+                        v && isMediationUiLang(v) ? v : null,
+                      );
+                    }}
+                  >
+                    <option value="">{t("mediation_optional_lang_none")}</option>
+                    {MEDIATION_UI_LANGS.filter((lng) => lng !== mediationPrimaryLang).map((lng) => (
+                      <option key={lng} value={lng}>
+                        {lng.toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[11px] font-medium text-destructive shrink-0">
+                  {t("mediation_optional_lang_limit_hint")}
+                </p>
                 <p className="w-full text-[11px] text-muted-foreground">{t("mediation_optional_lang_hint")}</p>
               </div>
             ) : null}
-            <Button
-              type="button"
-              variant="secondary"
-              className="gap-2 border border-amber-300/60 bg-amber-50 text-amber-900 hover:bg-amber-100"
-              disabled={!canGenerateMediations || isLoading}
-              onClick={() => void handleGenerateMediations()}
-            >
-              {generatingMediation ? (
-                <>
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                  {t("btn_generating")}
-                </>
-              ) : sourceMaterial.trim().length === 0 ? (
-                t("btn_waiting_notes")
-              ) : (
-                t("btn_generate")
-              )}
-            </Button>
+            <div className="relative w-fit max-w-full">
+              <WorkflowStepBadge step={3} />
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-2 border border-amber-300/60 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                disabled={!canGenerateMediations || isLoading}
+                onClick={() => void handleGenerateMediations()}
+              >
+                {generatingMediation ? (
+                  <>
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                    {t("btn_generating")}
+                  </>
+                ) : !imageAnalysisDone ? (
+                  t("btn_waiting_analyze")
+                ) : sourceMaterialForGeneration.trim().length === 0 ? (
+                  t("btn_waiting_notes")
+                ) : (
+                  t("btn_generate")
+                )}
+              </Button>
+            </div>
             {generatingMediation && mediationProgress ? (
               <div className="pt-1">
                 <MediationGenerationProgressBar
@@ -1959,7 +2248,9 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         <div className="space-y-2">
           <Label>{t("label_mediations")}</Label>
           <div className="flex flex-wrap items-center gap-2">
-            {MEDIATION_UI_LANGS.map((lng) => (
+            {MEDIATION_UI_LANGS.map((lng) => {
+              const langEnabled = activeMediationLangSet.has(lng);
+              return (
               <Button
                 key={lng}
                 type="button"
@@ -1967,14 +2258,15 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                 variant={mediationEditLang === lng ? "default" : "outline"}
                 className={cn(
                   "h-8 min-w-[2.75rem] px-2 text-xs font-semibold",
-                  mediationEditLang === lng ? "bg-amber-700 text-white hover:bg-amber-800" : "border-amber-300/60",
+                  mediationLangButtonClassName(mediationEditLang === lng, langEnabled),
                 )}
-                disabled={isAiBusy || isLoading}
+                disabled={isAiBusy || isLoading || !langEnabled}
                 onClick={() => handleMediationLangSelect(lng)}
               >
                 {lng.toUpperCase()}
               </Button>
-            ))}
+              );
+            })}
           </div>
           <p className="text-xs text-muted-foreground">{mediationLangHelp}</p>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
@@ -2003,32 +2295,40 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               return (
               <TabsContent key={tab.key} value={tab.key}>
                 <div className="mb-2 space-y-2">
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 border-amber-300/60 text-amber-900 hover:bg-amber-50"
-                      disabled={
-                        isVisitorLocked ||
-                        isLoading ||
-                        !artistId ||
-                        !sourceMaterial.trim() ||
-                        generatingMediation ||
-                        regeneratingMediationStyleKey !== null
-                      }
-                      aria-label={t("btn_regenerate_style_ai_aria", { label: tab.label })}
-                      onClick={() => void handleRegenerateMediationForStyle(tab.key)}
-                    >
-                      {regeneratingMediationStyleKey === tab.key ? (
-                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                      ) : (
-                        <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      )}
-                      {regeneratingMediationStyleKey === tab.key
-                        ? t("btn_regenerating_style_ai")
-                        : t("btn_regenerate_style_ai")}
-                    </Button>
+                  <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-1">
+                    <p className="text-[11px] font-medium leading-snug text-destructive">
+                      {t("mediation_regenerate_hint_line1")}
+                      <br />
+                      {t("mediation_regenerate_hint_line2")}
+                    </p>
+                    <div className="relative shrink-0">
+                      <WorkflowStepBadge step={4} />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 border-amber-300/60 text-amber-900 hover:bg-amber-50"
+                        disabled={
+                          isVisitorLocked ||
+                          isLoading ||
+                          !artistId ||
+                          !sourceMaterialForGeneration.trim() ||
+                          generatingMediation ||
+                          regeneratingMediationStyleKey !== null
+                        }
+                        aria-label={t("btn_regenerate_style_ai_aria", { label: tab.label })}
+                        onClick={() => void handleRegenerateMediationForStyle(tab.key)}
+                      >
+                        {regeneratingMediationStyleKey === tab.key ? (
+                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        )}
+                        {regeneratingMediationStyleKey === tab.key
+                          ? t("btn_regenerating_style_ai")
+                          : t("btn_regenerate_style_ai")}
+                      </Button>
+                    </div>
                   </div>
                   {regeneratingMediationStyleKey === tab.key && mediationProgress ? (
                     <MediationGenerationProgressBar

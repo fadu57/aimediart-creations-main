@@ -83,6 +83,7 @@
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "node-fetch": "^3.3.2",
+    "openai": "^6.42.0",
     "p5": "^2.2.3",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
