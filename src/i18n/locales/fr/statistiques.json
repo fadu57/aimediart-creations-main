@@ -3,7 +3,8 @@
     "title": "Statistiques",
     "subtitle": "Analyse détaillée des données de visite et feedback émotionnel",
     "print": "Imprimer les statistiques sélectionnées",
-    "preview": "Prévisualiser avant impression"
+    "preview": "Prévisualiser avant impression",
+    "previewDisabledNoVisitors": "Aucun visiteur enregistré pour ce périmètre"
   },
   "preview": {
     "title": "Aperçu avant impression",

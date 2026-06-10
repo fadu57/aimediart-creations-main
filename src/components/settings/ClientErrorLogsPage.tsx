@@ -113,13 +113,11 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
             {t(`${ns}.back_settings`)}
           </Link>
         </Button>
-        <div className="flex flex-1 flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <AlertTriangle className="h-6 w-6 text-[#E63946]" aria-hidden />
-            {t(`${ns}.page_title`)}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t(`${ns}.page_sub`)}</p>
-        </div>
+        <h1 className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-2xl font-semibold tracking-tight">
+          <AlertTriangle className="h-6 w-6 shrink-0 text-[#E63946]" aria-hidden />
+          <span className="shrink-0">{t(`${ns}.page_title`)}</span>
+          <span className="text-sm font-normal text-muted-foreground">{t(`${ns}.page_sub`)}</span>
+        </h1>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
           <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden />
           {t("error_logs.refresh")}

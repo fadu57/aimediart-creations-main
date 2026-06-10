@@ -215,7 +215,7 @@ function RootEntryRoute() {
     let target = "/dashboard";
     if (isVisitorRole(role_name, role_id)) target = "/scan-work1";
     else if (role_id === 4) target = "/expos";
-    else if (typeof role_id === "number" && role_id < 4) target = "/organisation";
+    else if (typeof role_id === "number" && role_id < 4) target = "/agencies";
     return <Navigate to={target} replace />;
   }
   const audience = getAudienceChoice();

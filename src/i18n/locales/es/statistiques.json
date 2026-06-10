@@ -3,7 +3,8 @@
     "title": "Estadísticas",
     "subtitle": "Análisis detallado de los datos de visita y retroalimentación emocional",
     "print": "Imprimir estadísticas seleccionadas",
-    "preview": "Vista previa antes de imprimir"
+    "preview": "Vista previa antes de imprimir",
+    "previewDisabledNoVisitors": "Ningún visitante registrado para este ámbito"
   },
   "preview": {
     "title": "Vista previa de impresión",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -34,13 +34,21 @@ const getRedirectAfterLoginPath = (): string | null => {
 
 const Login = () => {
   const { t } = useTranslation("auth");
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { session, loading: authLoading, role_name, role_id, agency_id } = useAuthUser();
   const expoIdFromUrl = searchParams.get("expo_id")?.trim() || "";
+  const [awaitPostLoginRedirect, setAwaitPostLoginRedirect] = useState(false);
 
   useEffect(() => {
     if (expoIdFromUrl) setCurrentExpoId(expoIdFromUrl);
   }, [expoIdFromUrl]);
+
+  useEffect(() => {
+    if (!awaitPostLoginRedirect || authLoading || !session) return;
+    setAwaitPostLoginRedirect(false);
+    navigate(resolveAuthenticatedHomePath(role_name, role_id), { replace: true });
+  }, [awaitPostLoginRedirect, authLoading, session, role_name, role_id, navigate]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,11 +67,13 @@ const Login = () => {
 
   if (session) {
     const redirectAfterLoginPath = getRedirectAfterLoginPath();
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("redirectAfterLogin");
+    if (redirectAfterLoginPath) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("redirectAfterLogin");
+      }
+      return <Navigate to={redirectAfterLoginPath} replace />;
     }
-    const target = redirectAfterLoginPath || resolveAuthenticatedHomePath(role_name, role_id);
-    return <Navigate to={target} replace />;
+    // Session résiduelle (ex. signOut incomplet) : formulaire visible, pas de rebond silencieux.
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,7 +98,7 @@ const Login = () => {
 
     toast.success(t("login.toast_success"));
     clearLoginTrackerSession();
-    /* Redirection : `session` + rôle via `useAuthUser` (bloc Navigate ci-dessus). */
+    setAwaitPostLoginRedirect(true);
   };
 
   const handleForgotPassword = async () => {

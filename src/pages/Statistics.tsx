@@ -32,6 +32,7 @@ import { StatisticsReportView, type StatisticsArtistCoverLetter, type Statistics
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
+import { cn } from "@/lib/utils";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import {
   ArrowDown,
@@ -1741,6 +1742,7 @@ const Statistics = () => {
     (open: boolean, skipDateCheck = false) => {
       if (!open && printExportBusy) return;
       if (open) {
+        if (uniqueVisitorsTotal === 0) return;
         const hasExpoDates = (() => {
           if (!selectedFilteredExpo) return false;
           const s = parseExpoYmdDate(selectedFilteredExpo.date_expo_du);
@@ -1764,7 +1766,7 @@ const Statistics = () => {
       shouldRestorePreviewFiltersRef.current = true;
       setPrintPreviewOpen(false);
     },
-    [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy, selectedFilteredExpo, manualPreviewDateFrom],
+    [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy, selectedFilteredExpo, manualPreviewDateFrom, uniqueVisitorsTotal],
   );
 
   const liveReportViewProps = buildReportExportSnapshot();
@@ -1888,7 +1890,13 @@ const Statistics = () => {
           <Button
             type="button"
             variant="outline"
-            className="mt-3"
+            className={cn(
+              "mt-3",
+              uniqueVisitorsTotal === 0 &&
+                "cursor-not-allowed border-neutral-600 bg-neutral-700/50 text-neutral-500 opacity-100 hover:bg-neutral-700/50 hover:text-neutral-500",
+            )}
+            disabled={uniqueVisitorsTotal === 0}
+            title={uniqueVisitorsTotal === 0 ? t("page.previewDisabledNoVisitors") : undefined}
             onClick={() => handlePrintPreviewOpenChange(true)}
           >
             {t("page.preview")}

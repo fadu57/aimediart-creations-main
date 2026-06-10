@@ -3,7 +3,8 @@
     "title": "Statistics",
     "subtitle": "Detailed analysis of visit data and emotional feedback",
     "print": "Print selected statistics",
-    "preview": "Preview before printing"
+    "preview": "Preview before printing",
+    "previewDisabledNoVisitors": "No visitors recorded for this scope"
   },
   "preview": {
     "title": "Print preview",

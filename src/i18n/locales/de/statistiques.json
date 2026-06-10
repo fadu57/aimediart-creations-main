@@ -3,7 +3,8 @@
     "title": "Statistiken",
     "subtitle": "Detaillierte Analyse der Besuchs- und Emotionsfeedback-Daten",
     "print": "Ausgewählte Statistiken drucken",
-    "preview": "Vor dem Drucken anzeigen"
+    "preview": "Vor dem Drucken anzeigen",
+    "previewDisabledNoVisitors": "Keine Besucher für diesen Bereich erfasst"
   },
   "preview": {
     "title": "Druckvorschau",

@@ -86,14 +86,14 @@ export function isVisitorRole(
   return normalizeRoleName(role_name) === normalizeRoleName(ROLE_VISITEUR);
 }
 
-/** Cible après connexion selon le rôle (admins globaux → vitrine /organisation). */
+/** Cible après connexion selon le rôle (admins globaux → /agencies). */
 export function resolveAuthenticatedHomePath(
   role_name: string | null | undefined,
   role_id: number | null | undefined,
 ): string {
   if (isVisitorRole(role_name, role_id)) return "/scan-work1";
   if (role_id === 4) return "/expos";
-  if (typeof role_id === "number" && role_id < 4) return "/organisation";
+  if (typeof role_id === "number" && role_id < 4) return "/agencies";
   return "/dashboard";
 }
 

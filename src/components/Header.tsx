@@ -168,10 +168,16 @@ export default function Header() {
     };
   }, [session?.user, agency_id, showGreetingAgency]);
 
-  const handleLogout = () => {
-    // Redirection hard tout de suite : évite RequireBackoffice → /login pendant le await signOut.
-    void supabase.auth.signOut({ scope: "local" });
-    window.location.replace("/visitor");
+  const handleLogout = async () => {
+    const postLogoutPath = role_id === 7 ? "/visitor" : "/organisation";
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } finally {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("redirectAfterLogin");
+        window.location.replace(postLogoutPath);
+      }
+    }
   };
 
   useEffect(() => {
