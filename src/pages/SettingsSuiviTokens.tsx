@@ -49,7 +49,7 @@ function dateLocale(lang: string): string {
 function limitsProviderFromTokenFilter(filter: string): string | undefined {
   if (filter === ALL_PROVIDERS) return undefined;
   if (filter === "google_gemini") return "gemini";
-  if (filter === "google_tts") return undefined;
+  if (filter === "google_tts" || filter === "openai") return undefined;
   return filter;
 }
 

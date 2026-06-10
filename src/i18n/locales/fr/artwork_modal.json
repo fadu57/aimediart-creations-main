@@ -123,5 +123,14 @@
   "toast_qr_regenerate_failed": "Régénération du QR impossible.",
   "dialog_edit_desc": "Modifier les informations et les textes de médiation de l'œuvre.",
   "dialog_new_desc": "Créer une nouvelle fiche œuvre avec textes de médiation et image.",
-  "tab_version_placeholder": "Version \"{{label}}\""
+  "tab_version_placeholder": "Version \"{{label}}\"",
+  "audio_player": {
+    "loading": "Chargement audio…",
+    "generating": "Audio en cours…",
+    "generate": "Générer l'audio",
+    "voice_f": "Voix F",
+    "voice_m": "Voix M",
+    "play_f": "Lire voix féminine",
+    "play_m": "Lire voix masculine"
+  }
 }

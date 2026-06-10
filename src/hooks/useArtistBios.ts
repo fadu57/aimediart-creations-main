@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { resolveBioPromptStyleId, triggerAudioGeneration } from "@/services/audioService";
 
 export const ARTIST_BIO_LANGUAGES = ["fr", "en", "es", "de", "it"] as const;
 
@@ -80,15 +81,19 @@ export async function upsertArtistBioRow(
     return;
   }
 
-  const { error: upsertError } = await supabase.from("artist_bios").upsert(
-    {
-      artist_id: artistId,
-      language,
-      bio_text: text,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "artist_id,language" },
-  );
+  const { error: upsertError, data } = await supabase
+    .from("artist_bios")
+    .upsert(
+      {
+        artist_id: artistId,
+        language,
+        bio_text: text,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "artist_id,language" },
+    )
+    .select("id")
+    .single();
 
   if (upsertError) {
     throw new Error(
@@ -96,5 +101,23 @@ export async function upsertArtistBioRow(
         ? upsertError.message
         : "Bio multilingue : enregistrement impossible.",
     );
+  }
+
+  const bioRowId = (data as { id?: string } | null)?.id;
+  if (bioRowId) {
+    void (async () => {
+      try {
+        const promptStyleId = await resolveBioPromptStyleId();
+        if (!promptStyleId) return;
+        await triggerAudioGeneration({
+          text_id: String(bioRowId),
+          text_type: "bio",
+          lang: language,
+          prompt_style_id: promptStyleId,
+        });
+      } catch (e) {
+        console.error("[useArtistBios] triggerAudioGeneration:", e);
+      }
+    })();
   }
 }

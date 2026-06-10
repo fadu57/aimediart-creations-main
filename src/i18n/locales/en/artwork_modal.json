@@ -122,5 +122,14 @@
   "toast_qr_regenerate_failed": "Could not regenerate QR code.",
   "dialog_edit_desc": "Edit the artwork information and mediation texts.",
   "dialog_new_desc": "Create a new artwork entry with mediation texts and image.",
-  "tab_version_placeholder": "Version \"{{label}}\""
+  "tab_version_placeholder": "Version \"{{label}}\"",
+  "audio_player": {
+    "loading": "Loading audio…",
+    "generating": "Audio in progress…",
+    "generate": "Generate audio",
+    "voice_f": "Voice F",
+    "voice_m": "Voice M",
+    "play_f": "Play female voice",
+    "play_m": "Play male voice"
+  }
 }

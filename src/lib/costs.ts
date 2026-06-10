@@ -96,6 +96,7 @@ export const KNOWN_COST_PROVIDER_KEYS = [
   "groq",
   "google_gemini",
   "google_tts",
+  "openai",
   "cursor",
   "huggingface",
   "supabase",
@@ -109,6 +110,7 @@ export const COST_PROVIDER_DISPLAY_NAMES: Record<KnownCostProviderKey, string> =
   groq: "Groq",
   google_gemini: "Google Gemini",
   google_tts: "Google Cloud TTS Neural2",
+  openai: "OpenAI TTS",
   cursor: "Cursor",
   huggingface: "HuggingFace",
   supabase: "Supabase",
@@ -123,9 +125,8 @@ export function costProviderDisplayName(providerKey: string): string {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helpers internes
-// ---------------------------------------------------------------------------
+/** Types d'outil toujours proposés dans les filtres coûts. */
+export const KNOWN_COST_TOOL_TYPES = ["llm", "tts", "image", "embedding", "other"] as const;
 
 type SupabaseQuery = ReturnType<typeof supabase.from>;
 
@@ -300,7 +301,7 @@ export async function getCostSelectOptions(): Promise<CostSelectOptions> {
     [...new Set(arr.filter((x): x is T => x != null && String(x).trim() !== ""))].sort() as T[];
 
   return {
-    toolTypes:  uniq(rows.map((r) => r.tool_type)),
+    toolTypes:  uniq([...KNOWN_COST_TOOL_TYPES, ...rows.map((r) => r.tool_type)]),
     providers:  uniq([...KNOWN_COST_PROVIDER_KEYS, ...rows.map((r) => r.provider)]),
     apiNames:   uniq(rows.map((r) => r.api_name)),
     modelNames: uniq(rows.map((r) => r.model_name)),

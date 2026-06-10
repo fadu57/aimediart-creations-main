@@ -95,6 +95,7 @@ const PROVIDER_FALLBACK: Record<
   groq: { provider_name: "Groq", category: "llm" },
   google_gemini: { provider_name: "Google Gemini", category: "llm" },
   google_tts: { provider_name: "Google Cloud TTS Neural2", category: "tts" },
+  openai: { provider_name: "OpenAI TTS", category: "tts" },
   cursor: { provider_name: "Cursor", category: "other", metadata: { cost_mode: "fixed_monthly" } },
   huggingface: { provider_name: "HuggingFace", category: "image" },
   supabase: { provider_name: "Supabase", category: "other", metadata: { cost_mode: "fixed_monthly" } },
@@ -226,6 +227,9 @@ function billingModeLabel(p: CostProvider, t: (k: string) => string): string {
       return t("providers.billing_api_per_character");
     }
     if (mode === "estimated_from_logs") return t("providers.billing_estimated");
+    return t("providers.billing_api_per_character");
+  }
+  if (p.provider_key === "openai") {
     return t("providers.billing_api_per_character");
   }
   if (p.provider_key === "cursor" && p.metadata?.cost_mode === "fixed_monthly") {
@@ -1252,6 +1256,80 @@ function GoogleTtsMonthlyEstimate({ refreshKey }: GoogleTtsMonthlyEstimateProps)
   );
 }
 
+type OpenAiTtsMonthlyEstimateProps = { refreshKey: number };
+
+function OpenAiTtsMonthlyEstimate({ refreshKey }: OpenAiTtsMonthlyEstimateProps) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(true);
+  const [costUsd, setCostUsd] = useState(0);
+  const [mp3Count, setMp3Count] = useState(0);
+  const [avgCostUsd, setAvgCostUsd] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void (async () => {
+      const monthStart = currentCalendarMonthStartLocal();
+      const monthEnd = new Date();
+      monthEnd.setHours(23, 59, 59, 999);
+
+      const [eventsRes, filesRes] = await Promise.all([
+        supabase
+          .from("ai_usage_events")
+          .select("cost_estimated")
+          .eq("provider", "openai")
+          .eq("tool_type", "tts")
+          .gte("created_at", monthStart),
+        supabase
+          .from("audio_files")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "ready")
+          .gte("created_at", monthStart),
+      ]);
+
+      if (cancelled) return;
+
+      const rows = (eventsRes.data ?? []) as Array<{ cost_estimated?: number | null }>;
+      const total = rows.reduce((sum, r) => sum + (Number(r.cost_estimated) || 0), 0);
+      const count = filesRes.count ?? 0;
+      setCostUsd(total);
+      setMp3Count(count);
+      setAvgCostUsd(count > 0 ? total / count : 0);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+        {t("providers.tts_openai_loading")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2 text-[11px] leading-snug">
+      <p className="font-medium text-foreground">{t("providers.tts_openai_title")}</p>
+      <p className="text-muted-foreground">{t("providers.tts_openai_note")}</p>
+      {mp3Count === 0 && costUsd === 0 ? (
+        <p className="text-muted-foreground">{t("providers.tts_openai_month_empty")}</p>
+      ) : (
+        <p className="text-muted-foreground">
+          {t("providers.tts_openai_month_stats", {
+            cost: formatCost(costUsd, "USD", 4),
+            count: mp3Count,
+            avg: formatCost(avgCostUsd, "USD", 4),
+          })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function OvhInvoiceSummary({ refreshKey }: OvhInvoiceSummaryProps) {
   const { t } = useTranslation("settings");
   const [count, setCount] = useState(0);
@@ -1806,6 +1884,9 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                     )}
                     {p.provider_key === "google_tts" && (
                       <GoogleTtsMonthlyEstimate refreshKey={ttsRefreshKey} />
+                    )}
+                    {p.provider_key === "openai" && (
+                      <OpenAiTtsMonthlyEstimate refreshKey={ttsRefreshKey} />
                     )}
                     {p.provider_key === "google_gemini" && !p.cost_import_supported && (
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">

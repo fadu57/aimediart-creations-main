@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import { AddArtistDialog } from "@/components/AddArtistDialog";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
+import {
+  buildMediationStylePromptStyleMap,
+  triggerMediationAudioBatch,
+} from "@/services/audioService";
+import { AudioPlayer } from "@/components/AudioPlayer";
 import { generatePersonasBatchWithRetry } from "@/lib/mediationBatchGenerate";
 import { analyzeArtworkImage, type ImageAnalysisPersonaItem } from "@/services/imageAnalysisService";
 import { supabase } from "@/lib/supabase";
@@ -139,6 +144,8 @@ type StyleTabEntry = {
   icon?: string | null;
   styleRules?: string | null;
   systemInstruction?: string | null;
+  /** UUID `prompt_style.id` pour génération audio. */
+  promptStyleId?: string | null;
 };
 
 const DEFAULT_STYLE_TABS: StyleTabEntry[] = MEDIATION_DESCRIPTION_KEYS.map((key) => ({
@@ -815,6 +822,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           icon: iconTrim,
           styleRules,
           systemInstruction,
+          promptStyleId: row.id != null ? String(row.id) : null,
         });
       }
 
@@ -1003,6 +1011,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           );
         }
         toast.success(t("toast_artwork_updated"));
+        triggerMediationAudioBatch({
+          artworkId: persistedArtworkId,
+          descriptionsByLang: serializedMediation,
+          stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
+        });
         setInitialDraftSignature(
           serializeDraftSnapshot(
             buildDraftSnapshot({
@@ -1027,6 +1040,13 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           .single();
         if (error) throw error;
         newArtworkId = (inserted as { artwork_id: string } | null)?.artwork_id ?? null;
+        if (newArtworkId) {
+          triggerMediationAudioBatch({
+            artworkId: newArtworkId,
+            descriptionsByLang: serializedMediation,
+            stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
+          });
+        }
         toast.success(t("toast_artwork_created"));
       }
       onOpenChange(false);
@@ -1355,6 +1375,15 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       }
     }
     toast.success(t(successToastKey, toastParams));
+
+    if (persistedArtworkId) {
+      triggerMediationAudioBatch({
+        artworkId: persistedArtworkId,
+        descriptionsByLang: serializedMediation,
+        stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
+      });
+    }
+
     return true;
   };
 
@@ -2357,6 +2386,16 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   className="min-h-[140px] w-full text-sm"
                   placeholder={t("tab_version_placeholder", { label: placeholderLabel })}
                 />
+                {persistedArtworkId && tab.promptStyleId ? (
+                  <AudioPlayer
+                    text_id={persistedArtworkId}
+                    text_type="mediation"
+                    lang={mediationEditLang}
+                    prompt_style_id={tab.promptStyleId}
+                    variant="onLight"
+                    className="mt-2"
+                  />
+                ) : null}
               </TabsContent>
               );
             })}

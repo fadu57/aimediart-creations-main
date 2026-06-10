@@ -419,7 +419,7 @@ export function formatUsageTableCell(
   column: UsageTableColumn,
   value: number,
 ): string {
-  if ((provider ?? "").trim() === "google_tts") {
+  if ((provider ?? "").trim() === "google_tts" || (provider ?? "").trim() === "openai") {
     if (column === "prompt") return "—";
     return `${formatTokenCount(Math.max(0, value))} car.`;
   }

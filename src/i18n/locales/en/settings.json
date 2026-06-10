@@ -232,7 +232,12 @@
     "tts_cloud_free_quota": "Free quota: {{quota}} char. / month",
     "tts_cloud_month_empty": "No synthesis recorded this month.",
     "tts_cloud_month_stats": "Current month: {{cost}} · {{chars}} char. used · {{remaining}} char. free quota left · {{count}} synthesis(es)",
-    "tts_cloud_loading": "Loading month estimate…"
+    "tts_cloud_loading": "Loading month estimate…",
+    "tts_openai_title": "OpenAI TTS",
+    "tts_openai_note": "MP3 audio guides (bios and mediations) via generate-audio Edge Function.",
+    "tts_openai_loading": "Loading OpenAI TTS month estimate…",
+    "tts_openai_month_empty": "No OpenAI TTS MP3 this month.",
+    "tts_openai_month_stats": "Current month: {{cost}} · {{count}} MP3(s) · avg {{avg}} / MP3"
   },
   "wakatime": {
     "back_settings": "Settings",

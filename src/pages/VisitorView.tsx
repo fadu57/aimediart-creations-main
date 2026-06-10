@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
+import { AudioPlayer } from "@/components/AudioPlayer";
 import { TtsPlayButton } from "@/components/TtsPlayButton";
 import { useGoogleTts } from "@/hooks/useGoogleTts";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
+import { resolveBioPromptStyleId } from "@/services/audioService";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
 import { rowCanonicalMediationStyle } from "@/lib/mediationVisitorStyles";
 import {
@@ -196,6 +198,8 @@ const VisitorView = () => {
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const [artist, setArtist] = useState<ArtistRow | null>(null);
   const [artistBioByLang, setArtistBioByLang] = useState<Record<string, string>>({});
+  const [artistBioIdByLang, setArtistBioIdByLang] = useState<Record<string, string>>({});
+  const [bioPromptStyleId, setBioPromptStyleId] = useState<string | null>(null);
   const [emotionsDb, setEmotionsDb] = useState<EmotionRow[]>([]);
   const [emotionsError, setEmotionsError] = useState<string | null>(null);
   const [loadingArtwork, setLoadingArtwork] = useState(true);
@@ -421,19 +425,23 @@ const VisitorView = () => {
 
         const { data: artistBioRows } = await supabase
           .from("artist_bios")
-          .select("language, bio_text")
+          .select("id, language, bio_text")
           .eq("artist_id", artistId);
         if (!cancelled) {
           const bioByLang: Record<string, string> = {};
+          const bioIdByLang: Record<string, string> = {};
           for (const row of (artistBioRows ?? []) as Array<{
+            id?: string | null;
             language?: string | null;
             bio_text?: string | null;
           }>) {
             const lang = (row.language ?? "").trim().toLowerCase().slice(0, 2);
             if (!lang) continue;
             bioByLang[lang] = (row.bio_text ?? "").trim();
+            if (row.id) bioIdByLang[lang] = String(row.id);
           }
           setArtistBioByLang(bioByLang);
+          setArtistBioIdByLang(bioIdByLang);
         }
       } catch (e) {
         console.error("VisitorView loadArtworkAndArtist:", e);
@@ -450,6 +458,10 @@ const VisitorView = () => {
       cancelled = true;
     };
   }, [artworkId]);
+
+  useEffect(() => {
+    void resolveBioPromptStyleId().then(setBioPromptStyleId);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -660,6 +672,14 @@ const VisitorView = () => {
       (artistBioByLang[language] ?? "").trim() || (artistBioByLang.fr ?? "").trim();
     return fromTable;
   }, [artistBioByLang, language]);
+  const artistBioRowId = useMemo(() => {
+    return (
+      artistBioIdByLang[language] ??
+      artistBioIdByLang.fr ??
+      Object.values(artistBioIdByLang)[0] ??
+      null
+    );
+  }, [artistBioIdByLang, language]);
   const artistTtsText = useMemo(() => {
     const bio = artistBioText.trim();
     return bio || artistDisplayName;
@@ -1416,6 +1436,15 @@ const VisitorView = () => {
                               verseMode={slide.canonicalCode === "poetique"}
                               className="text-left"
                             />
+                            {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
+                              <AudioPlayer
+                                text_id={artwork.artwork_id}
+                                text_type="mediation"
+                                lang={language}
+                                prompt_style_id={slide.sid}
+                                className="mt-2"
+                              />
+                            ) : null}
                           </article>
                         </SwiperSlide>
                       );
@@ -1661,6 +1690,16 @@ const VisitorView = () => {
               <p className="text-xs leading-relaxed text-gray-700 break-words [word-wrap:break-word]">
                 {artistBioText || t("artist_bio_unavailable")}
               </p>
+              {artistBioRowId && bioPromptStyleId ? (
+                <AudioPlayer
+                  text_id={artistBioRowId}
+                  text_type="bio"
+                  lang={language}
+                  prompt_style_id={bioPromptStyleId}
+                  variant="onLight"
+                  className="mt-2"
+                />
+              ) : null}
             </div>
             <button
               type="button"
