@@ -215,7 +215,69 @@ serve(async (req: Request) => {
       if (rowTs >= existingTs) byClient.set(clientId, row);
     }
 
-    return jsonResponse({ rows: Array.from(byClient.values()) });
+    const rows = Array.from(byClient.values());
+    const clientIds = [
+      ...new Set(rows.map((row) => String(row.visitor_client_id ?? "").trim()).filter(Boolean)),
+    ];
+    const artworkIds = [
+      ...new Set(
+        rows
+          .map((row) => String(row.artwork_id ?? "").trim())
+          .filter((id) => id && UUID_RE.test(id)),
+      ),
+    ];
+
+    const pseudoByClient = new Map<string, string>();
+    if (clientIds.length > 0) {
+      const { data: visitors } = await admin
+        .from("visitors")
+        .select("visitor_client_id, visitor_pseudo, visitor_name")
+        .in("visitor_client_id", clientIds);
+      for (const visitor of visitors ?? []) {
+        const v = visitor as {
+          visitor_client_id?: string | null;
+          visitor_pseudo?: string | null;
+          visitor_name?: string | null;
+        };
+        const cid = String(v.visitor_client_id ?? "").trim();
+        if (!cid) continue;
+        const pseudo = String(v.visitor_pseudo ?? "").trim();
+        const name = String(v.visitor_name ?? "").trim();
+        if (pseudo) pseudoByClient.set(cid, pseudo);
+        else if (name && name.toLowerCase() !== "anonymous") pseudoByClient.set(cid, name);
+      }
+    }
+
+    const titleByArtwork = new Map<string, string>();
+    const artworkIdsMissingTitle = artworkIds.filter((id) => {
+      const row = rows.find((r) => String(r.artwork_id ?? "").trim() === id);
+      return !String(row?.artwork_title ?? "").trim();
+    });
+    if (artworkIdsMissingTitle.length > 0) {
+      const { data: artworks } = await admin
+        .from("artworks")
+        .select("artwork_id, artwork_title")
+        .in("artwork_id", artworkIdsMissingTitle);
+      for (const artwork of artworks ?? []) {
+        const a = artwork as { artwork_id?: string | null; artwork_title?: string | null };
+        const id = String(a.artwork_id ?? "").trim();
+        const title = String(a.artwork_title ?? "").trim();
+        if (id && title) titleByArtwork.set(id, title);
+      }
+    }
+
+    const enriched = rows.map((row) => {
+      const clientId = String(row.visitor_client_id ?? "").trim();
+      const artworkId = String(row.artwork_id ?? "").trim();
+      const storedTitle = String(row.artwork_title ?? "").trim();
+      return {
+        ...row,
+        visitor_pseudo: pseudoByClient.get(clientId) || null,
+        artwork_title: storedTitle || titleByArtwork.get(artworkId) || null,
+      };
+    });
+
+    return jsonResponse({ rows: enriched });
   }
 
   const sessionId = body.session_id?.trim() ?? "";

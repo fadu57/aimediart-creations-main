@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { supabase } from "@/lib/supabase";
 import {
   banVisitorAudioSession,
   listVisitorAudioPresence,
@@ -26,6 +27,80 @@ function formatLastSeen(value: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+async function enrichPresenceRows(
+  rows: VisitorAudioPresenceRow[],
+  unknownVisitor: string,
+  unknownArtwork: string,
+): Promise<VisitorAudioPresenceRow[]> {
+  if (rows.length === 0) return rows;
+
+  const clientIds = [
+    ...new Set(
+      rows
+        .filter((row) => !row.visitor_pseudo?.trim())
+        .map((row) => row.visitor_client_id.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const artworkIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.artwork_id && !row.artwork_title?.trim())
+        .map((row) => row.artwork_id!.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  const pseudoByClient = new Map<string, string>();
+  const titleByArtwork = new Map<string, string>();
+
+  if (clientIds.length > 0) {
+    const { data } = await supabase
+      .from("visitors")
+      .select("visitor_client_id, visitor_pseudo, visitor_name")
+      .in("visitor_client_id", clientIds);
+    for (const visitor of (data ?? []) as Array<{
+      visitor_client_id?: string | null;
+      visitor_pseudo?: string | null;
+      visitor_name?: string | null;
+    }>) {
+      const cid = visitor.visitor_client_id?.trim() ?? "";
+      if (!cid) continue;
+      const pseudo = visitor.visitor_pseudo?.trim() ?? "";
+      const name = visitor.visitor_name?.trim() ?? "";
+      if (pseudo) pseudoByClient.set(cid, pseudo);
+      else if (name && name.toLowerCase() !== "anonymous") pseudoByClient.set(cid, name);
+    }
+  }
+
+  if (artworkIds.length > 0) {
+    const { data } = await supabase
+      .from("artworks")
+      .select("artwork_id, artwork_title")
+      .in("artwork_id", artworkIds);
+    for (const artwork of (data ?? []) as Array<{
+      artwork_id?: string | null;
+      artwork_title?: string | null;
+    }>) {
+      const id = artwork.artwork_id?.trim() ?? "";
+      const title = artwork.artwork_title?.trim() ?? "";
+      if (id && title) titleByArtwork.set(id, title);
+    }
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    visitor_pseudo:
+      row.visitor_pseudo?.trim() ||
+      pseudoByClient.get(row.visitor_client_id.trim()) ||
+      unknownVisitor,
+    artwork_title:
+      row.artwork_title?.trim() ||
+      (row.artwork_id ? titleByArtwork.get(row.artwork_id.trim()) : undefined) ||
+      unknownArtwork,
+  }));
 }
 
 export default function ExposVisitorAudioMonitor() {
@@ -48,7 +123,6 @@ export default function ExposVisitorAudioMonitor() {
   );
 
   const loadExpos = useCallback(async () => {
-    const { supabase } = await import("@/lib/supabase");
     const { data } = await supabase.from("expos").select("id, expo_name").is("deleted_at", null);
     setExpos((data as ExpoOption[] | null) ?? []);
   }, []);
@@ -64,14 +138,19 @@ export default function ExposVisitorAudioMonitor() {
     setError(null);
     try {
       const data = await listVisitorAudioPresence(filterExpoId);
-      setRows(data);
+      const enriched = await enrichPresenceRows(
+        data,
+        t("audio_monitor.visitor_unknown"),
+        t("audio_monitor.artwork_unknown"),
+      );
+      setRows(enriched);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filterExpoId, canAccess]);
+  }, [filterExpoId, canAccess, t]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -183,30 +262,29 @@ export default function ExposVisitorAudioMonitor() {
       ) : (
         <div className="overflow-x-auto rounded-lg border">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-white/15 bg-[#2A2A2A] text-left text-xs font-semibold uppercase tracking-wide text-[#F0F0F0]">
               <tr>
-                <th className="px-3 py-2">{t("audio_monitor.col_visitor")}</th>
-                <th className="px-3 py-2">{t("audio_monitor.col_artwork")}</th>
-                <th className="px-3 py-2">{t("audio_monitor.col_consent")}</th>
-                <th className="px-3 py-2">{t("audio_monitor.col_seen")}</th>
-                <th className="px-3 py-2">{t("audio_monitor.col_status")}</th>
-                <th className="px-3 py-2 text-right">{t("audio_monitor.col_action")}</th>
+                <th className="px-3 py-2.5">{t("audio_monitor.col_visitor")}</th>
+                <th className="px-3 py-2.5">{t("audio_monitor.col_artwork")}</th>
+                <th className="px-3 py-2.5">{t("audio_monitor.col_consent")}</th>
+                <th className="px-3 py-2.5">{t("audio_monitor.col_seen")}</th>
+                <th className="px-3 py-2.5">{t("audio_monitor.col_status")}</th>
+                <th className="px-3 py-2.5 text-right">{t("audio_monitor.col_action")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const isBanned = Boolean(row.banned_at);
                 const busy = actionId === row.id;
+                const visitorLabel = row.visitor_pseudo?.trim() || t("audio_monitor.visitor_unknown");
+                const artworkLabel = row.artwork_title?.trim() || t("audio_monitor.artwork_unknown");
                 return (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2 font-mono text-xs" title={row.visitor_client_id}>
-                      {row.visitor_client_id.slice(0, 8)}…{row.visitor_client_id.slice(-4)}
+                  <tr key={row.id} className="border-t border-white/10">
+                    <td className="px-3 py-2.5 font-medium" title={row.visitor_client_id}>
+                      {visitorLabel}
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{row.artwork_title?.trim() || "—"}</div>
-                      {row.artwork_id ? (
-                        <div className="text-xs text-muted-foreground">{row.artwork_id.slice(0, 8)}…</div>
-                      ) : null}
+                    <td className="px-3 py-2.5 font-medium" title={row.artwork_id ?? undefined}>
+                      {artworkLabel}
                     </td>
                     <td className="px-3 py-2">
                       {row.audio_consent_acknowledged === true ? (

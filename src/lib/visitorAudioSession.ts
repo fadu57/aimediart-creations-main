@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 export type VisitorAudioPresenceRow = {
   id: string;
   visitor_client_id: string;
+  visitor_pseudo?: string | null;
   expo_id: string | null;
   artwork_id: string | null;
   artwork_title: string | null;

@@ -83,6 +83,8 @@
     "empty": "No active visitors in the last 5 minutes.",
     "col_visitor": "Visitor",
     "col_artwork": "Scanned artwork",
+    "visitor_unknown": "Unknown visitor",
+    "artwork_unknown": "Unknown artwork",
     "col_consent": "Audio rules",
     "consent_yes": "Accepted",
     "consent_pending": "Pending",

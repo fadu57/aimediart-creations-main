@@ -84,6 +84,8 @@
     "empty": "Aucun visiteur actif sur les 5 dernières minutes.",
     "col_visitor": "Visiteur",
     "col_artwork": "Œuvre scannée",
+    "visitor_unknown": "Visiteur inconnu",
+    "artwork_unknown": "Œuvre inconnue",
     "col_consent": "Règles audio",
     "consent_yes": "Accepté",
     "consent_pending": "En attente",
