@@ -79,7 +79,6 @@
     "type_anonymous": "Quick visit (anonymous)",
     "selfie_alt": "Selfie of {{name}}",
     "btn_register": "Create my account",
-    "btn_link_code": "My link code",
     "btn_logout": "Sign out"
   },
   "error_missing_data": "Technical error: missing data for recording (visitor_id/artwork_id/emotion/note).",

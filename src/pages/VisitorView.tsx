@@ -5,7 +5,6 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { TtsPlayButton } from "@/components/TtsPlayButton";
 import { useVisitorTtsWithGuard } from "@/hooks/useVisitorTtsWithGuard";
 import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
-import { VisitorLinkCodeDialog } from "@/components/visitor/VisitorLinkCodeDialog";
 import {
   VisitorProfilePopup,
   type VisitorProfilePopupData,
@@ -244,7 +243,6 @@ const VisitorViewCore = () => {
   );
   const [authLastName, setAuthLastName] = useState<string | null>(null);
   const [isProfilePopupOpen, setIsProfilePopupOpen] = useState(false);
-  const [isLinkCodeDialogOpen, setIsLinkCodeDialogOpen] = useState(false);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
@@ -894,11 +892,6 @@ const VisitorViewCore = () => {
   const handleProfileSignup = () => {
     closeProfilePopup();
     handleSignupClick();
-  };
-
-  const handleShowLinkCode = () => {
-    closeProfilePopup();
-    setIsLinkCodeDialogOpen(true);
   };
 
   const openCommentModal = () => {
@@ -1980,12 +1973,6 @@ const VisitorViewCore = () => {
         onClose={closeProfilePopup}
         onLogout={profilePopupData?.isAuthenticated ? handleProfileLogout : undefined}
         onSignup={profilePopupData && !profilePopupData.isAuthenticated ? handleProfileSignup : undefined}
-        onShowLinkCode={profilePopupData && !profilePopupData.isAuthenticated ? handleShowLinkCode : undefined}
-      />
-      <VisitorLinkCodeDialog
-        open={isLinkCodeDialogOpen}
-        onOpenChange={setIsLinkCodeDialogOpen}
-        allowRegenerate
       />
 
     </div>

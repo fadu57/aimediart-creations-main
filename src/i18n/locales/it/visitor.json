@@ -79,7 +79,6 @@
     "type_anonymous": "Visita rapida (anonima)",
     "selfie_alt": "Selfie di {{name}}",
     "btn_register": "Crea il mio account",
-    "btn_link_code": "Il mio codice di collegamento",
     "btn_logout": "Disconnetti"
   },
   "error_missing_data": "Errore tecnico: dati mancanti per la registrazione (visitor_id/artwork_id/emotion/note).",

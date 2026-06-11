@@ -79,7 +79,6 @@
     "type_anonymous": "Schnellbesuch (anonym)",
     "selfie_alt": "Selfie von {{name}}",
     "btn_register": "Konto erstellen",
-    "btn_link_code": "Mein Verknüpfungscode",
     "btn_logout": "Abmelden"
   },
   "error_missing_data": "Technischer Fehler: fehlende Daten für die Aufzeichnung (visitor_id/artwork_id/emotion/note).",

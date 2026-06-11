@@ -79,7 +79,6 @@
     "type_anonymous": "Visita rápida (anónima)",
     "selfie_alt": "Selfie de {{name}}",
     "btn_register": "Crear mi cuenta",
-    "btn_link_code": "Mi código de enlace",
     "btn_logout": "Cerrar sesión"
   },
   "error_missing_data": "Error técnico: faltan datos para el registro (visitor_id/artwork_id/emotion/note).",

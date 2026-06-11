@@ -17,7 +17,6 @@ type Props = {
   onClose: () => void;
   onLogout?: () => void;
   onSignup?: () => void;
-  onShowLinkCode?: () => void;
 };
 
 export function VisitorProfilePopup({
@@ -26,7 +25,6 @@ export function VisitorProfilePopup({
   onClose,
   onLogout,
   onSignup,
-  onShowLinkCode,
 }: Props) {
   const { t } = useTranslation("visitor");
 
@@ -111,16 +109,6 @@ export function VisitorProfilePopup({
               onClick={onSignup}
             >
               {t("profile_popup.btn_register")}
-            </Button>
-          ) : null}
-          {!profile.isAuthenticated && onShowLinkCode ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-white/35 bg-transparent text-[#F0F0F0] hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
-              onClick={onShowLinkCode}
-            >
-              {t("profile_popup.btn_link_code")}
             </Button>
           ) : null}
           {profile.isAuthenticated && onLogout ? (
