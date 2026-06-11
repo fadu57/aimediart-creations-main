@@ -34,8 +34,8 @@ export const HEADER_NAV_ITEMS: HeaderNavEntry[] = [
   { key: "menu_agence", to: "/agencies", label: "Organisation" },
   { key: "menu_user", to: "/user", label: "User" },
   { key: "menu_expos", to: "/expos", label: "Expos" },
-  { key: "menu_catalogue", to: "/catalogue", label: "Catalogue" },
   { key: "menu_artiste", to: "/artistes", label: "Artistes" },
+  { key: "menu_catalogue", to: "/catalogue", label: "Catalogue" },
   { key: "menu_stats", to: "/statistiques", label: "Statistiques" },
 ];
 

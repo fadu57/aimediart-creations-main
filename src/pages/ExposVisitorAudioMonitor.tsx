@@ -200,12 +200,12 @@ export default function ExposVisitorAudioMonitor() {
   }
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
+    <div className="space-y-4 p-4 sm:p-6 text-[#F0F0F0]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">{t("audio_monitor.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("audio_monitor.subtitle")}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t("audio_monitor.duplicate_hint")}</p>
+          <h1 className="text-xl font-semibold text-[#F0F0F0]">{t("audio_monitor.title")}</h1>
+          <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.subtitle")}</p>
+          <p className="mt-1 text-xs text-[#F0F0F0]/60">{t("audio_monitor.duplicate_hint")}</p>
         </div>
         <Button type="button" variant="outline" size="sm" asChild>
           <Link to="/expos">{t("audio_monitor.back_expos")}</Link>
@@ -252,16 +252,16 @@ export default function ExposVisitorAudioMonitor() {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {!filterExpoId ? (
-        <p className="text-sm text-muted-foreground">{t("audio_monitor.pick_expo_hint")}</p>
+        <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.pick_expo_hint")}</p>
       ) : loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-[#F0F0F0]/60" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("audio_monitor.empty")}</p>
+        <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.empty")}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[640px] text-sm">
+        <div className="overflow-x-auto rounded-lg border border-white/15 bg-[#1E1E1E]">
+          <table className="w-full min-w-[640px] text-sm text-[#F0F0F0]">
             <thead className="border-b border-white/15 bg-[#2A2A2A] text-left text-xs font-semibold uppercase tracking-wide text-[#F0F0F0]">
               <tr>
                 <th className="px-3 py-2.5">{t("audio_monitor.col_visitor")}</th>
@@ -272,39 +272,41 @@ export default function ExposVisitorAudioMonitor() {
                 <th className="px-3 py-2.5 text-right">{t("audio_monitor.col_action")}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-white/10">
               {rows.map((row) => {
                 const isBanned = Boolean(row.banned_at);
                 const busy = actionId === row.id;
                 const visitorLabel = row.visitor_pseudo?.trim() || t("audio_monitor.visitor_unknown");
                 const artworkLabel = row.artwork_title?.trim() || t("audio_monitor.artwork_unknown");
                 return (
-                  <tr key={row.id} className="border-t border-white/10">
-                    <td className="px-3 py-2.5 font-medium" title={row.visitor_client_id}>
+                  <tr key={row.id} className="bg-[#1E1E1E]">
+                    <td className="px-3 py-2.5 font-medium text-[#F0F0F0]" title={row.visitor_client_id}>
                       {visitorLabel}
                     </td>
-                    <td className="px-3 py-2.5 font-medium" title={row.artwork_id ?? undefined}>
+                    <td className="px-3 py-2.5 font-medium text-[#F0F0F0]" title={row.artwork_id ?? undefined}>
                       {artworkLabel}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5">
                       {row.audio_consent_acknowledged === true ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600">
+                        <span className="inline-flex items-center gap-1 text-emerald-400">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           {t("audio_monitor.consent_yes")}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">{t("audio_monitor.consent_pending")}</span>
+                        <span className="text-[#F0F0F0]/65">{t("audio_monitor.consent_pending")}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{formatLastSeen(row.last_seen_at)}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-[#F0F0F0]/90">
+                      {formatLastSeen(row.last_seen_at)}
+                    </td>
+                    <td className="px-3 py-2.5">
                       {isBanned ? (
-                        <span className="font-medium text-destructive">{t("audio_monitor.status_banned")}</span>
+                        <span className="font-medium text-red-400">{t("audio_monitor.status_banned")}</span>
                       ) : (
-                        <span className="text-muted-foreground">{t("audio_monitor.status_active")}</span>
+                        <span className="text-[#F0F0F0]/75">{t("audio_monitor.status_active")}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-3 py-2.5 text-right">
                       {isBanned ? (
                         <Button
                           type="button"
@@ -338,7 +340,7 @@ export default function ExposVisitorAudioMonitor() {
       )}
 
       {filterExpoId ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-[#F0F0F0]/60">
           {t("audio_monitor.expo_label")} {expoById.get(filterExpoId) ?? filterExpoId}
         </p>
       ) : null}

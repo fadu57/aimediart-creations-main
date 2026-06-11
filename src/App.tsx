@@ -173,7 +173,7 @@ function VisitorShell() {
 
 function AdminShell() {
   return (
-    <div className="mx-auto h-[200px] w-full max-w-[1200px]">
+    <div className="mx-auto w-full max-w-[1200px]">
       <BackofficeNavGuard />
     </div>
   );
