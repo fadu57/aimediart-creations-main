@@ -47,6 +47,10 @@ type AudioPlayerProps = {
 
   playOnly?: boolean;
 
+  /** Boutons Voix F/M plus petits, alignés sur une seule ligne. */
+
+  compact?: boolean;
+
 };
 
 
@@ -204,6 +208,8 @@ export function AudioPlayer({
   variant = "onDark",
 
   playOnly = false,
+
+  compact = false,
 
 }: AudioPlayerProps) {
 
@@ -532,9 +538,17 @@ export function AudioPlayer({
 
 
 
+  const iconSize = compact ? "h-3 w-3" : "h-3.5 w-3.5";
+
   return (
 
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div
+      className={cn(
+        "flex items-center shrink-0",
+        compact ? "flex-nowrap gap-1" : "flex-wrap gap-2",
+        className,
+      )}
+    >
 
       {(["F", "M"] as const).map((gender) => {
 
@@ -576,7 +590,9 @@ export function AudioPlayer({
 
             className={cn(
 
-              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+              "inline-flex items-center rounded-full border font-semibold transition-colors",
+
+              compact ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-1.5 px-2.5 py-1 text-[11px]",
 
               btnClass,
 
@@ -594,15 +610,15 @@ export function AudioPlayer({
 
             {!playOnly && busy && !ready ? (
 
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              <Loader2 className={cn(iconSize, "animate-spin shrink-0")} aria-hidden />
 
             ) : isPlaying ? (
 
-              <Pause className="h-3.5 w-3.5" aria-hidden />
+              <Pause className={cn(iconSize, "shrink-0")} aria-hidden />
 
             ) : (
 
-              <Play className="h-3.5 w-3.5" aria-hidden />
+              <Play className={cn(iconSize, "shrink-0")} aria-hidden />
 
             )}
 

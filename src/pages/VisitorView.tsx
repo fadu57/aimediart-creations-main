@@ -2,8 +2,6 @@
 import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { AudioPlayer } from "@/components/AudioPlayer";
-import { TtsPlayButton } from "@/components/TtsPlayButton";
-import { useVisitorTtsWithGuard } from "@/hooks/useVisitorTtsWithGuard";
 import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
 import {
   VisitorProfilePopup,
@@ -204,7 +202,6 @@ const VisitorViewCore = () => {
   const { session, loading: authLoading, role_id, role_name, first_name } = useAuthUser();
   const { language, setLanguage } = useUiLanguage();
   const { can, loading: navMatrixLoading } = useNavigationMatrix();
-  const tts = useVisitorTtsWithGuard();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const effectiveExpoId = expoIdFromQuery || artwork?.artwork_expo_id?.trim() || "";
@@ -1170,7 +1167,6 @@ const VisitorViewCore = () => {
 
   const closeArtistPhotoModal = () => {
     if (!isArtistPhotoOpen || isArtistPhotoClosing) return;
-    tts.stop();
     setIsArtistPhotoClosing(true);
     artistPhotoCloseTimerRef.current = window.setTimeout(() => {
       setIsArtistPhotoOpen(false);
@@ -1603,28 +1599,22 @@ const VisitorViewCore = () => {
                                   {slide.label}
                                 </span>
                               </div>
-                              <TtsPlayButton
-                                isPlaying={tts.isSpeaking && tts.speakingText === slide.text}
-                                isLoading={tts.isLoading && tts.speakingText === slide.text}
-                                onPress={() => void tts.speak(slide.text, language as string)}
-                                supported
-                              />
+                              {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
+                                <AudioPlayer
+                                  text_id={artwork.artwork_id}
+                                  text_type="mediation"
+                                  lang={language}
+                                  prompt_style_id={slide.sid}
+                                  playOnly
+                                  compact
+                                />
+                              ) : null}
                             </div>
                             <VisitorMediationMarkdown
                               text={slide.text}
                               verseMode={slide.canonicalCode === "poetique"}
                               className="text-left"
                             />
-                            {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
-                              <AudioPlayer
-                                text_id={artwork.artwork_id}
-                                text_type="mediation"
-                                lang={language}
-                                prompt_style_id={slide.sid}
-                                className="mt-2"
-                                playOnly
-                              />
-                            ) : null}
                           </article>
                         </SwiperSlide>
                       );
