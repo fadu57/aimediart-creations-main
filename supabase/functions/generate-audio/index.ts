@@ -138,15 +138,19 @@ serve(async (req) => {
 
     // 8. Log ai_usage_events
     await supabase.from("ai_usage_events").insert({
-      provider:            "openai",
-      tool:                "tts",
-      model_name:          model,
-      tokens_input:        Math.round(styledText.length / 4),
-      tokens_output:       0,
-      cost_usd:            costUsd,
-      latency_ms:          latencyMs,
-      context_object_type: text_type,
-      context_object_id:   text_id,
+      provider:        "openai",
+      tool_type:       "tts",
+      api_name:        "tts",
+      model_name:      model,
+      input_units:     styledText.length,
+      output_units:    0,
+      unit_type:       "characters",
+      cost_estimated:  costUsd,
+      currency:        "USD",
+      status:          "success",
+      operation_name:  text_type,
+      source:          "generate-audio",
+      metadata:        { text_id, lang, prompt_style_id, gender, voice_id: voiceId, latency_ms: latencyMs },
     });
 
     return new Response(
