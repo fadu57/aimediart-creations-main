@@ -21,6 +21,7 @@ import { resolveBioPromptStyleId } from "@/services/audioService";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
 import { rowCanonicalMediationStyle } from "@/lib/mediationVisitorStyles";
 import {
+  getMediationFilledUiLangs,
   getMediationLangBucketFromRaw,
   MEDIATION_UI_LANGS,
   normalizeMediationStyleKeyForLookup,
@@ -559,7 +560,26 @@ const VisitorViewCore = () => {
     [artwork?.artwork_description_i18n],
   );
 
-  const languageOptionsForArtwork = UI_LANGUAGE_OPTIONS;
+  const mediationFilledLangs = useMemo(
+    () => (artwork ? getMediationFilledUiLangs(artworkDescriptionResolved) : null),
+    [artwork, artworkDescriptionResolved],
+  );
+
+  const languageOptionsForArtwork = useMemo(() => {
+    if (!mediationFilledLangs) {
+      return UI_LANGUAGE_OPTIONS.filter((option) => option.value === language);
+    }
+    if (mediationFilledLangs.length === 0) return [];
+    const filled = new Set(mediationFilledLangs);
+    return UI_LANGUAGE_OPTIONS.filter((option) => filled.has(option.value as MediationUiLang));
+  }, [mediationFilledLangs, language]);
+
+  useEffect(() => {
+    if (!mediationFilledLangs?.length) return;
+    if (!mediationFilledLangs.includes(language as MediationUiLang)) {
+      setLanguage(mediationFilledLangs[0] as UiLanguage);
+    }
+  }, [mediationFilledLangs, language, setLanguage]);
 
   const aiSlides = useMemo((): MediationAiSlide[] => {
     const ordered = [...promptStylesDb].sort((a, b) => {
@@ -1203,28 +1223,30 @@ const VisitorViewCore = () => {
                   <span className="fab-item-label">{tHeader("settings")}</span>
                 </NavLink>
               )}
-              <div className="fab-item fab-language-item px-2" aria-label={t("aria_language")}>
-                <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
-                  <span className={activeLanguage.flagClass} aria-hidden />
-                  <select
-                    id="languageSelector"
-                    value={language}
-                    onChange={(e) => {
-                      setLanguage(e.target.value as UiLanguage);
-                      setIsFabOpen(false);
-                    }}
-                    className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
-                    aria-label={t("aria_language")}
-                    title={t("aria_language")}
-                  >
-                    {languageOptionsForArtwork.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+              {languageOptionsForArtwork.length > 0 && (
+                <div className="fab-item fab-language-item px-2" aria-label={t("aria_language")}>
+                  <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
+                    <span className={activeLanguage.flagClass} aria-hidden />
+                    <select
+                      id="languageSelector"
+                      value={language}
+                      onChange={(e) => {
+                        setLanguage(e.target.value as UiLanguage);
+                        setIsFabOpen(false);
+                      }}
+                      className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
+                      aria-label={t("aria_language")}
+                      title={t("aria_language")}
+                    >
+                      {languageOptionsForArtwork.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
+              )}
               <button
                 type="button"
                 className="fab-item fab-auth-item"
