@@ -1,5 +1,5 @@
 /**
- * Garde-fou audio pour expositions intérieures : consentement, écouteurs, bannissement admin.
+ * Garde-fou audio pour expositions intérieures : consentement déclaratif + bannissement admin.
  */
 
 import {
@@ -13,12 +13,6 @@ import {
   type ReactNode,
 } from "react";
 
-import {
-  checkHeadphones,
-  requestDeviceLabelsPermission,
-  subscribeAudioDeviceChanges,
-  type HeadphoneCheckResult,
-} from "@/lib/headphoneDetection";
 import { hasIndoorAudioConsent, saveIndoorAudioConsent } from "@/lib/indoorAudioConsent";
 import { fetchExpoRowForVisitor } from "@/lib/visitorExpoFetch";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
@@ -26,6 +20,7 @@ import {
   fetchVisitorAudioBanStatus,
   sendVisitorAudioHeartbeat,
 } from "@/lib/visitorAudioSession";
+
 const BAN_POLL_MS = 10_000;
 const HEARTBEAT_MS = 15_000;
 
@@ -35,8 +30,6 @@ export type IndoorAudioGuardContextValue = {
   isBanned: boolean;
   hasConsented: boolean;
   showOnboarding: boolean;
-  headphonesConnected: boolean | null;
-  headphonesUncertain: boolean;
   acceptConsent: () => void;
   /** Retourne false si la lecture doit être bloquée. */
   assertCanPlay: () => boolean;
@@ -54,8 +47,6 @@ export function useIndoorAudioGuard(): IndoorAudioGuardContextValue {
       isBanned: false,
       hasConsented: true,
       showOnboarding: false,
-      headphonesConnected: null,
-      headphonesUncertain: false,
       acceptConsent: () => undefined,
       assertCanPlay: () => true,
       registerPauseCallback: () => () => undefined,
@@ -83,9 +74,9 @@ export function IndoorAudioGuardProvider({
   const [isBanned, setIsBanned] = useState(false);
   const [hasConsented, setHasConsented] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [headphones, setHeadphones] = useState<HeadphoneCheckResult | null>(null);
   const pauseCallbacksRef = useRef<Set<() => void>>(new Set());
   const sessionIdRef = useRef<string | null>(null);
+  const [resolvedExpoId, setResolvedExpoId] = useState(expoId);
 
   const pauseAllAudio = useCallback(() => {
     pauseCallbacksRef.current.forEach((cb) => {
@@ -97,17 +88,22 @@ export function IndoorAudioGuardProvider({
     });
   }, []);
 
-  const applyHeadphoneResult = useCallback(
-    (result: HeadphoneCheckResult) => {
-      setHeadphones(result);
-      if (!result.hasExternalOutput && !result.uncertain) {
-        pauseAllAudio();
-      }
-    },
-    [pauseAllAudio],
-  );
-
-  const [resolvedExpoId, setResolvedExpoId] = useState(expoId);
+  const sendHeartbeat = useCallback(async () => {
+    if (!resolvedExpoId) return;
+    try {
+      const sessionId = await sendVisitorAudioHeartbeat({
+        visitor_client_id: visitorClientId,
+        expo_id: resolvedExpoId,
+        artwork_id: artworkId ?? null,
+        artwork_title: artworkTitle ?? null,
+        page_url: typeof window !== "undefined" ? window.location.href : null,
+        headphones_detected: null,
+      });
+      if (sessionId) sessionIdRef.current = sessionId;
+    } catch (err) {
+      if (import.meta.env.DEV) console.warn("[IndoorAudioGuard] heartbeat:", err);
+    }
+  }, [resolvedExpoId, visitorClientId, artworkId, artworkTitle]);
 
   // Résout expo_id depuis l'œuvre si absent de l'URL
   useEffect(() => {
@@ -136,7 +132,7 @@ export function IndoorAudioGuardProvider({
     };
   }, [expoId, artworkId]);
 
-  // Charge expo_indoor
+  // Charge expo_indoor et état de consentement
   useEffect(() => {
     if (!resolvedExpoId) {
       setIsIndoorExpo(false);
@@ -157,48 +153,18 @@ export function IndoorAudioGuardProvider({
       setHasConsented(consented);
       setShowOnboarding(indoor && !consented);
       setIsLoading(false);
-
-      if (indoor) {
-        await requestDeviceLabelsPermission();
-        if (!cancelled) {
-          applyHeadphoneResult(await checkHeadphones());
-        }
-      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [resolvedExpoId, visitorClientId, applyHeadphoneResult]);
+  }, [resolvedExpoId, visitorClientId]);
 
-  // Écoute branchement / débranchement écouteurs
+  // Heartbeat présence + polling bannissement (après consentement en expo intérieure)
   useEffect(() => {
-    if (!isIndoorExpo || isBanned) return;
-    return subscribeAudioDeviceChanges(applyHeadphoneResult);
-  }, [isIndoorExpo, isBanned, applyHeadphoneResult]);
-
-  // Heartbeat présence + polling bannissement
-  useEffect(() => {
-    if (!isIndoorExpo || !resolvedExpoId) return;
+    if (!isIndoorExpo || !resolvedExpoId || !hasConsented) return;
 
     let cancelled = false;
-
-    const heartbeat = async () => {
-      if (cancelled) return;
-      try {
-        const sessionId = await sendVisitorAudioHeartbeat({
-          visitor_client_id: visitorClientId,
-          expo_id: resolvedExpoId,
-          artwork_id: artworkId ?? null,
-          artwork_title: artworkTitle ?? null,
-          page_url: typeof window !== "undefined" ? window.location.href : null,
-          headphones_detected: headphones?.hasExternalOutput ?? null,
-        });
-        if (sessionId) sessionIdRef.current = sessionId;
-      } catch (err) {
-        if (import.meta.env.DEV) console.warn("[IndoorAudioGuard] heartbeat:", err);
-      }
-    };
 
     const pollBan = async () => {
       if (cancelled) return;
@@ -215,15 +181,15 @@ export function IndoorAudioGuardProvider({
       }
     };
 
-    void heartbeat();
+    void sendHeartbeat();
     void pollBan();
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") void heartbeat();
+      if (document.visibilityState === "visible") void sendHeartbeat();
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    const heartbeatTimer = window.setInterval(() => void heartbeat(), HEARTBEAT_MS);
+    const heartbeatTimer = window.setInterval(() => void sendHeartbeat(), HEARTBEAT_MS);
     const banTimer = window.setInterval(() => void pollBan(), BAN_POLL_MS);
 
     return () => {
@@ -232,22 +198,15 @@ export function IndoorAudioGuardProvider({
       window.clearInterval(heartbeatTimer);
       window.clearInterval(banTimer);
     };
-  }, [
-    isIndoorExpo,
-    resolvedExpoId,
-    artworkId,
-    artworkTitle,
-    visitorClientId,
-    headphones?.hasExternalOutput,
-    pauseAllAudio,
-  ]);
+  }, [isIndoorExpo, resolvedExpoId, hasConsented, visitorClientId, sendHeartbeat, pauseAllAudio]);
 
   const acceptConsent = useCallback(() => {
     if (!resolvedExpoId) return;
     saveIndoorAudioConsent(resolvedExpoId, visitorClientId);
     setHasConsented(true);
     setShowOnboarding(false);
-  }, [resolvedExpoId, visitorClientId]);
+    void sendHeartbeat();
+  }, [resolvedExpoId, visitorClientId, sendHeartbeat]);
 
   const assertCanPlay = useCallback((): boolean => {
     if (!isIndoorExpo) return true;
@@ -273,8 +232,6 @@ export function IndoorAudioGuardProvider({
       isBanned,
       hasConsented,
       showOnboarding,
-      headphonesConnected: headphones?.hasExternalOutput ?? null,
-      headphonesUncertain: headphones?.uncertain ?? true,
       acceptConsent,
       assertCanPlay,
       registerPauseCallback,
@@ -285,7 +242,6 @@ export function IndoorAudioGuardProvider({
       isBanned,
       hasConsented,
       showOnboarding,
-      headphones,
       acceptConsent,
       assertCanPlay,
       registerPauseCallback,

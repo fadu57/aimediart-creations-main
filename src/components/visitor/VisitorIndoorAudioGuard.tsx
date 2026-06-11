@@ -19,8 +19,6 @@ function VisitorIndoorAudioGuardUI({ children }: { children: ReactNode }) {
       {children}
       <IndoorAudioOnboardingModal
         open={guard.showOnboarding && !guard.isBanned}
-        headphonesConnected={guard.headphonesConnected}
-        headphonesUncertain={guard.headphonesUncertain}
         onAccept={guard.acceptConsent}
       />
       <AudioBanOverlay open={guard.isBanned} />

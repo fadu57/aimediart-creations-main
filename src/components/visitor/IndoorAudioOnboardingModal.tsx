@@ -1,4 +1,4 @@
-import { Headphones, VolumeX } from "lucide-react";
+import { Headphones } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -6,22 +6,14 @@ import { cn } from "@/lib/utils";
 
 type IndoorAudioOnboardingModalProps = {
   open: boolean;
-  headphonesConnected: boolean | null;
-  headphonesUncertain: boolean;
   onAccept: () => void;
 };
 
-export function IndoorAudioOnboardingModal({
-  open,
-  headphonesConnected,
-  headphonesUncertain,
-  onAccept,
-}: IndoorAudioOnboardingModalProps) {
+/** Modal de courtoisie audio — approche déclarative, sans détection matérielle. */
+export function IndoorAudioOnboardingModal({ open, onAccept }: IndoorAudioOnboardingModalProps) {
   const { t } = useTranslation("visitor");
 
   if (!open) return null;
-
-  const noHeadphones = headphonesConnected === false && !headphonesUncertain;
 
   return (
     <div
@@ -38,23 +30,13 @@ export function IndoorAudioOnboardingModal({
         aria-labelledby="indoor-audio-onboarding-title"
       >
         <div className="mb-3 flex items-center gap-2">
-          {noHeadphones ? (
-            <VolumeX className="h-6 w-6 shrink-0 text-amber-400" aria-hidden />
-          ) : (
-            <Headphones className="h-6 w-6 shrink-0 text-emerald-400" aria-hidden />
-          )}
+          <Headphones className="h-6 w-6 shrink-0 text-emerald-400" aria-hidden />
           <h2 id="indoor-audio-onboarding-title" className="text-base font-bold leading-tight">
             {t("indoor_audio.title")}
           </h2>
         </div>
 
-        {noHeadphones ? (
-          <p className="text-sm leading-relaxed text-[#F0F0F0]/90">{t("indoor_audio.no_headphones")}</p>
-        ) : headphonesUncertain ? (
-          <p className="text-sm leading-relaxed text-[#F0F0F0]/90">{t("indoor_audio.uncertain_devices")}</p>
-        ) : (
-          <p className="text-sm leading-relaxed text-[#F0F0F0]/90">{t("indoor_audio.headphones_ok")}</p>
-        )}
+        <p className="text-sm leading-relaxed text-[#F0F0F0]/90">{t("indoor_audio.courtesy_message")}</p>
 
         <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
           {t("indoor_audio.ban_warning")}
