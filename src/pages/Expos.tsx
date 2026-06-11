@@ -681,34 +681,30 @@ const Expos = () => {
         </div>
         <BackofficeStickyAgencyLogoSlot />
         {canCreateExpo && (
-          <div className="flex w-full min-w-0 max-w-full flex-col gap-2 md:ml-auto md:w-auto md:max-w-[520px]">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                className="gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground"
-                onClick={openCreate}
-              >
-                <Plus className="h-4 w-4" />
-                {t("page.create")}
-              </Button>
-              <Button type="button" variant="outline" className="gap-2" asChild>
-                <Link to="/expos/expos2">{t("page.tableau")}</Link>
-              </Button>
-              <Button type="button" variant="outline" className="gap-2" asChild>
-                <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="outline" className="gap-2" asChild>
-                <Link to="/expos/visitor-audio">{t("audio_monitor.title")}</Link>
-              </Button>
-              <Button type="button" variant="outline" className="gap-2" asChild>
-                <Link to="/expos/sponsors">
-                  <Building2 className="h-4 w-4" aria-hidden />
-                  {t("page.sponsorsList", "Liste des sponsors")}
-                </Link>
-              </Button>
-            </div>
+          <div className="grid w-full min-w-0 max-w-full grid-cols-3 gap-2 md:ml-auto md:w-[540px]">
+            <Button
+              type="button"
+              className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={openCreate}
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              {t("page.create")}
+            </Button>
+            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+              <Link to="/expos/expos2">{t("page.tableau")}</Link>
+            </Button>
+            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+              <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
+            </Button>
+            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+              <Link to="/expos/visitor-audio">{t("audio_monitor.title")}</Link>
+            </Button>
+            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+              <Link to="/expos/sponsors">
+                <Building2 className="h-4 w-4 shrink-0" aria-hidden />
+                {t("page.sponsorsList", "Liste des sponsors")}
+              </Link>
+            </Button>
           </div>
         )}
       </div>
