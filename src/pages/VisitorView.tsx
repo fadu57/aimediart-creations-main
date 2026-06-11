@@ -5,6 +5,11 @@ import { AudioPlayer } from "@/components/AudioPlayer";
 import { TtsPlayButton } from "@/components/TtsPlayButton";
 import { useVisitorTtsWithGuard } from "@/hooks/useVisitorTtsWithGuard";
 import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
+import { VisitorLinkCodeDialog } from "@/components/visitor/VisitorLinkCodeDialog";
+import {
+  VisitorProfilePopup,
+  type VisitorProfilePopupData,
+} from "@/components/visitor/VisitorProfilePopup";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, BookOpen, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
@@ -237,6 +242,9 @@ const VisitorViewCore = () => {
   const [anonymousProfile, setAnonymousProfile] = useState<VisitorAnonymousProfile | null>(() =>
     typeof window !== "undefined" ? getVisitorAnonymousProfile() : null,
   );
+  const [authLastName, setAuthLastName] = useState<string | null>(null);
+  const [isProfilePopupOpen, setIsProfilePopupOpen] = useState(false);
+  const [isLinkCodeDialogOpen, setIsLinkCodeDialogOpen] = useState(false);
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
@@ -743,6 +751,38 @@ const VisitorViewCore = () => {
     ? t("header_anon")
     : t("header_greeting", { name: headerFirstName || t("header_visitor") });
   const anonymousPseudo = anonymousProfile?.pseudo?.trim() || "";
+  const profileDisplayName = useMemo(() => {
+    if (isAnonymousVisitor) {
+      return anonymousPseudo || t("header_visitor");
+    }
+    const parts = [headerFirstName, authLastName?.trim()].filter(Boolean);
+    return parts.join(" ") || session?.user?.email?.split("@")[0] || t("header_visitor");
+  }, [anonymousPseudo, authLastName, headerFirstName, isAnonymousVisitor, session?.user?.email, t]);
+  const profilePopupData = useMemo((): VisitorProfilePopupData | null => {
+    if (isAnonymousVisitor) {
+      if (!headerAvatarUrl && !anonymousProfile?.avatarUrl?.trim()) return null;
+      return {
+        displayName: profileDisplayName,
+        avatarUrl: headerAvatarUrl || anonymousProfile?.avatarUrl || null,
+        selfieUrl: anonymousProfile?.selfieUrl || null,
+        isAuthenticated: false,
+      };
+    }
+    if (!headerAvatarUrl) return null;
+    return {
+      displayName: profileDisplayName,
+      email: session?.user?.email ?? null,
+      avatarUrl: headerAvatarUrl,
+      isAuthenticated: true,
+    };
+  }, [
+    anonymousProfile?.avatarUrl,
+    anonymousProfile?.selfieUrl,
+    headerAvatarUrl,
+    isAnonymousVisitor,
+    profileDisplayName,
+    session?.user?.email,
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -780,6 +820,7 @@ const VisitorViewCore = () => {
     }
 
     setAnonymousProfile(null);
+    setAuthLastName(null);
     const userId = session?.user?.id?.trim();
     if (!userId) {
       setHeaderAvatarUrl(null);
@@ -787,9 +828,14 @@ const VisitorViewCore = () => {
     }
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase.from("profiles").select("avatar_url").eq("id", userId).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("avatar_url, last_name")
+        .eq("id", userId)
+        .maybeSingle();
       if (cancelled) return;
-      const row = data as { avatar_url?: string | null } | null;
+      const row = data as { avatar_url?: string | null; last_name?: string | null } | null;
+      setAuthLastName(row?.last_name?.trim() || null);
       const profileUrl = row?.avatar_url?.trim() || "";
       if (profileUrl) {
         setHeaderAvatarUrl(profileUrl);
@@ -836,6 +882,23 @@ const VisitorViewCore = () => {
       sessionStorage.setItem("redirectAfterAuth", window.location.href);
     }
     navigate("/register");
+  };
+
+  const closeProfilePopup = () => setIsProfilePopupOpen(false);
+
+  const handleProfileLogout = () => {
+    closeProfilePopup();
+    void handleAuthAffordanceClick();
+  };
+
+  const handleProfileSignup = () => {
+    closeProfilePopup();
+    handleSignupClick();
+  };
+
+  const handleShowLinkCode = () => {
+    closeProfilePopup();
+    setIsLinkCodeDialogOpen(true);
   };
 
   const openCommentModal = () => {
@@ -1148,13 +1211,18 @@ const VisitorViewCore = () => {
                 )}
               </p>
               {headerAvatarUrl ? (
-                <img
-                  src={headerAvatarUrl}
-                  alt={t("header_avatar_alt", {
-                    name: headerFirstName || anonymousPseudo || t("header_visitor"),
-                  })}
-                  className="h-10 w-10 shrink-0 rounded-full border-2 border-[#E63946]/75 object-cover shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
-                />
+                <button
+                  type="button"
+                  onClick={() => setIsProfilePopupOpen(true)}
+                  className="shrink-0 rounded-full transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E63946]"
+                  aria-label={t("header_avatar_open_profile")}
+                >
+                  <img
+                    src={headerAvatarUrl}
+                    alt=""
+                    className="h-10 w-10 rounded-full border-2 border-[#E63946]/75 object-cover shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+                  />
+                </button>
               ) : null}
             </div>
           </div>
@@ -1905,6 +1973,20 @@ const VisitorViewCore = () => {
           </div>
         </div>
       )}
+
+      <VisitorProfilePopup
+        open={isProfilePopupOpen}
+        profile={profilePopupData}
+        onClose={closeProfilePopup}
+        onLogout={profilePopupData?.isAuthenticated ? handleProfileLogout : undefined}
+        onSignup={profilePopupData && !profilePopupData.isAuthenticated ? handleProfileSignup : undefined}
+        onShowLinkCode={profilePopupData && !profilePopupData.isAuthenticated ? handleShowLinkCode : undefined}
+      />
+      <VisitorLinkCodeDialog
+        open={isLinkCodeDialogOpen}
+        onOpenChange={setIsLinkCodeDialogOpen}
+        allowRegenerate
+      />
 
     </div>
   );
