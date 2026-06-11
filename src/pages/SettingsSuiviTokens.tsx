@@ -17,6 +17,7 @@ import {
   breakdownByProvider,
   fetchTokenUsageDateBounds,
   fetchTokenUsageLogs,
+  fetchTtsUsageEvents,
   filterTokenRowsByProvider,
   filterTokenRowsToAnchorDay,
   formatTokenCount,
@@ -28,10 +29,14 @@ import {
   getTokenFetchRange,
   getTokenPeriodRange,
   jobTypeLabel,
+  mergeUsageRows,
   summarizeTokenUsage,
+  summarizeTtsUsageRecap,
   tokenTimeSeries,
+  usageProviderLabel,
   type TokenPeriod,
 } from "@/lib/aiTokenUsage";
+import { formatCost } from "@/lib/costs";
 import { cn } from "@/lib/utils";
 
 const PERIODS: TokenPeriod[] = ["day", "week", "month"];
@@ -93,14 +98,22 @@ export default function SettingsSuiviTokens() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await fetchTokenUsageLogs(fetchRange);
+    const [logsRes, eventsRes] = await Promise.all([
+      fetchTokenUsageLogs(fetchRange),
+      fetchTtsUsageEvents(fetchRange),
+    ]);
     setLoading(false);
-    if (err) {
-      setError(err);
+    if (logsRes.error) {
+      setError(logsRes.error);
       setRows([]);
       return;
     }
-    setRows(data);
+    if (eventsRes.error) {
+      setError(eventsRes.error);
+      setRows([]);
+      return;
+    }
+    setRows(mergeUsageRows(logsRes.data, eventsRes.data));
   }, [fetchRange]);
 
   useEffect(() => {
@@ -139,6 +152,7 @@ export default function SettingsSuiviTokens() {
   const summary = useMemo(() => summarizeTokenUsage(periodRows), [periodRows]);
   const byProvider = useMemo(() => breakdownByProvider(periodRows), [periodRows]);
   const byModel = useMemo(() => breakdownByModel(periodRows), [periodRows]);
+  const ttsRecap = useMemo(() => summarizeTtsUsageRecap(periodRows), [periodRows]);
   const series = useMemo(
     () => tokenTimeSeries(filteredRows, chartRange).map((p) => ({
       date: formatTokenChartDayLabel(p.date),
@@ -262,7 +276,7 @@ export default function SettingsSuiviTokens() {
             <SelectContent>
               <SelectItem value={ALL_PROVIDERS}>{t("tokens.filter_all_providers")}</SelectItem>
               {availableProviders.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+                <SelectItem key={p} value={p}>{usageProviderLabel(p)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -377,6 +391,40 @@ export default function SettingsSuiviTokens() {
             </CardContent>
           </Card>
 
+          {ttsRecap.length > 0 && (
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">{t("tokens.recap_tts_title")}</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-xs">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="py-2 pr-3 font-medium">{t("tokens.col_provider")}</th>
+                      <th className="py-2 pr-3 font-medium">{t("tokens.col_tool")}</th>
+                      <th className="py-2 pr-3 font-medium text-right">{t("tokens.col_units")}</th>
+                      <th className="py-2 font-medium text-right">{t("tokens.col_cost")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ttsRecap.map((row) => (
+                      <tr key={`${row.provider}-${row.tool}`} className="border-b border-border/40">
+                        <td className="py-2 pr-3">{usageProviderLabel(row.provider)}</td>
+                        <td className="py-2 pr-3 uppercase">{row.tool}</td>
+                        <td className="py-2 pr-3 text-right tabular-nums">
+                          {formatTokenCount(row.inputUnits)} {t("tokens.unit_characters")}
+                        </td>
+                        <td className="py-2 text-right tabular-nums font-medium">
+                          {formatCost(row.costUsd, "USD", 4)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="glass-card">
               <CardHeader className="pb-2">
@@ -459,17 +507,17 @@ export default function SettingsSuiviTokens() {
                           <td className="py-2 pr-3 whitespace-nowrap tabular-nums">
                             {new Date(r.created_at).toLocaleString("fr-FR")}
                           </td>
-                          <td className="py-2 pr-3">{r.provider}</td>
+                          <td className="py-2 pr-3">{usageProviderLabel(r.provider)}</td>
                           <td className="py-2 pr-3 max-w-[180px] truncate" title={r.model_id}>{r.model_id}</td>
                           <td className="py-2 pr-3">{jobTypeLabel(r.metadata)}</td>
                           <td className="py-2 pr-3 text-right tabular-nums">
-                            {formatUsageTableCell(r.provider, "prompt", prompt)}
+                            {formatUsageTableCell(r.provider, "prompt", prompt, r)}
                           </td>
                           <td className="py-2 pr-3 text-right tabular-nums">
-                            {formatUsageTableCell(r.provider, "completion", completion)}
+                            {formatUsageTableCell(r.provider, "completion", completion, r)}
                           </td>
                           <td className="py-2 text-right tabular-nums font-medium">
-                            {formatUsageTableCell(r.provider, "total", total)}
+                            {formatUsageTableCell(r.provider, "total", total, r)}
                           </td>
                         </tr>
                       );

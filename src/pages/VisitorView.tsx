@@ -672,18 +672,19 @@ const VisitorView = () => {
       (artistBioByLang[language] ?? "").trim() || (artistBioByLang.fr ?? "").trim();
     return fromTable;
   }, [artistBioByLang, language]);
-  const artistBioRowId = useMemo(() => {
-    return (
-      artistBioIdByLang[language] ??
-      artistBioIdByLang.fr ??
-      Object.values(artistBioIdByLang)[0] ??
-      null
-    );
+  /** Paire text_id + lang cohérente pour audio_files (évite id FR + lang EN). */
+  const artistBioAudioTarget = useMemo(() => {
+    const langCode = language.trim().toLowerCase().slice(0, 2);
+    if (artistBioIdByLang[langCode]) {
+      return { text_id: artistBioIdByLang[langCode], lang: langCode };
+    }
+    if (artistBioIdByLang.fr) {
+      return { text_id: artistBioIdByLang.fr, lang: "fr" };
+    }
+    const first = Object.entries(artistBioIdByLang)[0];
+    if (first) return { text_id: first[1], lang: first[0] };
+    return null;
   }, [artistBioIdByLang, language]);
-  const artistTtsText = useMemo(() => {
-    const bio = artistBioText.trim();
-    return bio || artistDisplayName;
-  }, [artistBioText, artistDisplayName]);
   const agencyThanksName = (
     Array.isArray(artwork?.agencies)
       ? artwork?.agencies?.[0]?.name_agency
@@ -1443,6 +1444,7 @@ const VisitorView = () => {
                                 lang={language}
                                 prompt_style_id={slide.sid}
                                 className="mt-2"
+                                playOnly
                               />
                             ) : null}
                           </article>
@@ -1665,41 +1667,38 @@ const VisitorView = () => {
                 <div className="absolute inset-x-0 bottom-0 bg-black/45 px-3 py-2">
                   <div className="flex items-center justify-between gap-1.5">
                     <p className="min-w-0 truncate text-sm font-semibold text-white">{artistDisplayName}</p>
-                    <TtsPlayButton
-                      isPlaying={tts.isSpeaking && tts.speakingText === artistTtsText}
-                      isLoading={tts.isLoading && tts.speakingText === artistTtsText}
-                      onPress={() => void tts.speak(artistTtsText, language)}
-                      supported
-                    />
+                    {artistBioAudioTarget && bioPromptStyleId ? (
+                      <AudioPlayer
+                        text_id={artistBioAudioTarget.text_id}
+                        text_type="bio"
+                        lang={artistBioAudioTarget.lang}
+                        prompt_style_id={bioPromptStyleId}
+                        variant="onDark"
+                        playOnly
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex h-[180px] flex-col items-center justify-center gap-2 rounded bg-gray-100 px-3 text-center text-sm text-gray-500">
                 <span>{t("artist_photo_unavailable")}</span>
-                <TtsPlayButton
-                  isPlaying={tts.isSpeaking && tts.speakingText === artistTtsText}
-                  isLoading={tts.isLoading && tts.speakingText === artistTtsText}
-                  onPress={() => void tts.speak(artistTtsText, language)}
-                  supported
-                  variant="onLight"
-                />
+                {artistBioAudioTarget && bioPromptStyleId ? (
+                  <AudioPlayer
+                    text_id={artistBioAudioTarget.text_id}
+                    text_type="bio"
+                    lang={artistBioAudioTarget.lang}
+                    prompt_style_id={bioPromptStyleId}
+                    variant="onLight"
+                    playOnly
+                  />
+                ) : null}
               </div>
             )}
             <div className="mt-3 max-h-[220px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-[15px]">
               <p className="text-xs leading-relaxed text-gray-700 break-words [word-wrap:break-word]">
                 {artistBioText || t("artist_bio_unavailable")}
               </p>
-              {artistBioRowId && bioPromptStyleId ? (
-                <AudioPlayer
-                  text_id={artistBioRowId}
-                  text_type="bio"
-                  lang={language}
-                  prompt_style_id={bioPromptStyleId}
-                  variant="onLight"
-                  className="mt-2"
-                />
-              ) : null}
             </div>
             <button
               type="button"

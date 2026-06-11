@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Loader2, Pause, Play, Volume2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -20,16 +20,38 @@ type AudioPlayerProps = {
   prompt_style_id: string;
   className?: string;
   variant?: "onDark" | "onLight";
+  /** Vue visiteur : lecture MP3 uniquement, pas de génération. */
+  playOnly?: boolean;
 };
 
 const POLL_MS = 5000;
 
+function normLang(l: string): string {
+  return l.trim().toLowerCase().slice(0, 2);
+}
+
+/** Cherche le MP3 : langue demandée → fr → autre ; style exact → n'importe quel style. */
 function pickFileForGender(files: AudioFile[], gender: AudioGender, lang: string, prompt_style_id: string) {
-  return files.find(
-    (f) =>
-      f.gender === gender &&
-      f.lang === lang &&
-      f.prompt_style_id === prompt_style_id,
+  const langCandidates = [
+    ...new Set([normLang(lang), "fr", ...files.map((f) => normLang(f.lang))]),
+  ].filter(Boolean);
+
+  for (const l of langCandidates) {
+    const exact = files.find(
+      (f) =>
+        f.gender === gender &&
+        normLang(f.lang) === l &&
+        f.prompt_style_id === prompt_style_id,
+    );
+    if (exact) return exact;
+  }
+  for (const l of langCandidates) {
+    const loose = files.find((f) => f.gender === gender && normLang(f.lang) === l);
+    if (loose) return loose;
+  }
+  return (
+    files.find((f) => f.gender === gender && f.prompt_style_id === prompt_style_id) ??
+    files.find((f) => f.gender === gender)
   );
 }
 
@@ -40,6 +62,7 @@ export function AudioPlayer({
   prompt_style_id,
   className,
   variant = "onDark",
+  playOnly = false,
 }: AudioPlayerProps) {
   const { t } = useTranslation("artwork_modal");
   const [files, setFiles] = useState<AudioFile[]>([]);
@@ -95,7 +118,10 @@ export function AudioPlayer({
     setPlayingGender(null);
   };
 
-  const handlePlay = async (gender: AudioGender) => {
+  const handlePlay = async (gender: AudioGender, e?: MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
     const file = gender === "F" ? fileF : fileM;
     if (!file || file.status !== "ready" || !file.storage_path) return;
 
@@ -143,6 +169,7 @@ export function AudioPlayer({
       : "border-white/30 bg-[#2A2A2A] text-[#F0F0F0] hover:bg-[#353535]";
 
   if (loading) {
+    if (playOnly) return null;
     return (
       <div className={cn("flex items-center gap-2 text-xs opacity-70", className)}>
         <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -155,7 +182,9 @@ export function AudioPlayer({
   const readyM = fileM?.status === "ready" && !!fileM.storage_path;
   const hasAnyFile = !!fileF || !!fileM;
 
-  if (!hasAnyFile || (!readyF && !readyM && !isGenerating)) {
+  if (playOnly) {
+    if (!readyF && !readyM) return null;
+  } else if (!hasAnyFile || (!readyF && !readyM && !isGenerating)) {
     return (
       <div className={cn("flex flex-wrap items-center gap-2", className)}>
         <Button
@@ -177,7 +206,7 @@ export function AudioPlayer({
     );
   }
 
-  if (isGenerating && !readyF && !readyM) {
+  if (!playOnly && isGenerating && !readyF && !readyM) {
     return (
       <div className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-xs", shellClass, className)}>
         <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden />
@@ -194,23 +223,28 @@ export function AudioPlayer({
         const busy = file?.status === "generating" || file?.status === "pending";
         const isPlaying = playingGender === gender;
 
-        if (!file && !busy) return null;
+        if (playOnly) {
+          if (!ready) return null;
+        } else if (!file && !busy) {
+          return null;
+        }
 
         return (
           <button
             key={gender}
             type="button"
-            disabled={!ready && !busy}
-            onClick={() => void handlePlay(gender)}
+            disabled={!ready}
+            onClick={(e) => void handlePlay(gender, e)}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
               btnClass,
-              !ready && busy && "cursor-wait opacity-70",
+              !playOnly && !ready && busy && "cursor-wait opacity-70",
+              !ready && "cursor-not-allowed opacity-50",
               isPlaying && "border-[#E63946] text-[#E63946]",
             )}
             aria-label={t(gender === "F" ? "audio_player.play_f" : "audio_player.play_m")}
           >
-            {busy && !ready ? (
+            {!playOnly && busy && !ready ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
             ) : isPlaying ? (
               <Pause className="h-3.5 w-3.5" aria-hidden />

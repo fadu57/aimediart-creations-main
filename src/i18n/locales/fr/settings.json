@@ -245,6 +245,7 @@
     "kpi_top_provider": "Fournisseur principal",
     "chart_timeline_title": "Évolution des coûts (par jour)",
     "chart_provider_title": "Répartition par fournisseur",
+    "openai_tts_card_title": "OpenAI TTS — synthèse du mois",
     "table_title": "Détail des événements",
     "col_date": "Date",
     "col_tool_type": "Type d'outil",
@@ -341,6 +342,12 @@
     "tts_openai_loading": "Calcul OpenAI TTS du mois…",
     "tts_openai_month_empty": "Aucun MP3 OpenAI TTS ce mois-ci.",
     "tts_openai_month_stats": "Mois en cours : {{cost}} · {{count}} MP3 généré(s) · coût moyen {{avg}} / MP3",
+    "tts_openai_month_cost": "Coût total du mois : {{cost}}",
+    "tts_openai_month_mp3": "{{count}} MP3 généré(s) · coût moyen {{avg}} / MP3",
+    "tts_openai_gender_f": "Voix F : {{count}}",
+    "tts_openai_gender_m": "Voix M : {{count}}",
+    "tts_openai_type_bio": "Bios : {{count}}",
+    "tts_openai_type_mediation": "Médiations : {{count}}",
     "gcp_config_required": "Configuration GCP requise",
     "gcp_doc_link": "Guide facturation GCP",
     "backfill_title_gemini": "Backfill historique Google Gemini",
@@ -443,7 +450,7 @@
   "tokens": {
     "back_settings": "Paramètres",
     "page_title": "Suivi des tokens IA",
-    "page_sub": "Consommation de tokens enregistrée par Groq, Gemini, Google TTS et les Edge Functions.",
+    "page_sub": "Consommation enregistrée par Groq, Gemini, Google TTS, OpenAI TTS et les Edge Functions.",
     "refresh": "Actualiser",
     "empty": "Aucune consommation enregistrée pour cette période.",
     "rls_hint": "Si les totaux restent à zéro, vérifiez la politique RLS SELECT sur ai_usage_logs pour les utilisateurs authentifiés.",
@@ -473,7 +480,12 @@
     "col_prompt": "Entrée",
     "col_completion": "Sortie",
     "col_total": "Total",
-    "operation_tts_synthesize": "TTS Synthèse"
+    "operation_tts_synthesize": "TTS Synthèse",
+    "recap_tts_title": "Récapitulatif TTS",
+    "col_tool": "Outil",
+    "col_units": "Unités consommées",
+    "col_cost": "Coût",
+    "unit_characters": "caractères"
   },
   "visitor_errors": {
     "back_settings": "Paramètres",

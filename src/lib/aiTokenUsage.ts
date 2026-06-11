@@ -18,7 +18,19 @@ export type AiUsageLogRow = {
   artwork_id: string | null;
   created_at: string;
   metadata: Record<string, unknown> | null;
+  /** Présent pour les lignes issues de ai_usage_events (ex. OpenAI TTS). */
+  tool_type?: string | null;
+  cost_estimated?: number | null;
 };
+
+/** Fournisseurs toujours proposés dans le filtre suivi tokens. */
+export const KNOWN_USAGE_PROVIDERS = [
+  "groq",
+  "gemini",
+  "google_gemini",
+  "google_tts",
+  "openai",
+] as const;
 
 export type TokenUsageFilters = {
   dateFrom: string;
@@ -140,12 +152,120 @@ export function filterTokenRowsByProvider(
 
 /** Liste triée des fournisseurs distincts présents dans les lignes. */
 export function listDistinctProviders(rows: AiUsageLogRow[]): string[] {
-  const set = new Set<string>();
+  const set = new Set<string>(KNOWN_USAGE_PROVIDERS);
   for (const r of rows) {
     const p = (r.provider ?? "").trim();
     if (p) set.add(p);
   }
   return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+export type TtsUsageRecapItem = {
+  provider: string;
+  tool: string;
+  inputUnits: number;
+  costUsd: number;
+  callCount: number;
+};
+
+function isTtsCharactersRow(r: AiUsageLogRow): boolean {
+  const provider = (r.provider ?? "").trim();
+  const tool = (r.tool_type ?? r.metadata?.tool_type ?? "").toString().trim();
+  if (provider === "openai" && tool === "tts") return true;
+  if (provider === "google_tts") return true;
+  return false;
+}
+
+/** Lignes TTS depuis ai_usage_events (OpenAI, etc.). */
+export async function fetchTtsUsageEvents(
+  filters: TokenUsageFilters,
+): Promise<{ data: AiUsageLogRow[]; error: string | null }> {
+  const all: AiUsageLogRow[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+    let q = supabase
+      .from("ai_usage_events")
+      .select(
+        "id, provider, tool_type, model_name, input_units, output_units, cost_estimated, created_at, metadata, operation_name",
+      )
+      .eq("tool_type", "tts")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    q = applyDateFilters(q, filters) as typeof q;
+    if (filters.provider) q = q.eq("provider", filters.provider) as typeof q;
+
+    const { data, error } = await q;
+    if (error) return { data: [], error: error.message };
+
+    const batch = (data ?? []) as Array<{
+      id: string;
+      provider: string;
+      tool_type: string;
+      model_name: string | null;
+      input_units: number | null;
+      output_units: number | null;
+      cost_estimated: number | null;
+      created_at: string;
+      metadata: Record<string, unknown> | null;
+      operation_name: string | null;
+    }>;
+
+    for (const e of batch) {
+      const inputUnits = Math.max(0, Number(e.input_units ?? 0));
+      all.push({
+        id: e.id,
+        model_id: (e.model_name ?? "tts").trim() || "tts",
+        provider: e.provider,
+        prompt_tokens: 0,
+        completion_tokens: Math.max(0, Number(e.output_units ?? 0)),
+        total_tokens: inputUnits,
+        artwork_id: null,
+        created_at: e.created_at,
+        metadata: {
+          ...(e.metadata ?? {}),
+          tool_type: e.tool_type,
+          operation: e.operation_name,
+          cost_estimated: e.cost_estimated,
+        },
+        tool_type: e.tool_type,
+        cost_estimated: e.cost_estimated,
+      });
+    }
+
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  return { data: all, error: null };
+}
+
+export function mergeUsageRows(
+  logs: AiUsageLogRow[],
+  events: AiUsageLogRow[],
+): AiUsageLogRow[] {
+  return [...logs, ...events].sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Récapitulatif TTS par fournisseur / outil (période filtrée). */
+export function summarizeTtsUsageRecap(rows: AiUsageLogRow[]): TtsUsageRecapItem[] {
+  const map = new Map<string, TtsUsageRecapItem>();
+
+  for (const r of rows) {
+    if (!isTtsCharactersRow(r)) continue;
+    const provider = (r.provider ?? "—").trim() || "—";
+    const tool = (r.tool_type ?? r.metadata?.tool_type ?? "tts").toString().trim() || "tts";
+    const key = `${provider}::${tool}`;
+    const inputUnits = Math.max(0, Number(r.total_tokens ?? r.prompt_tokens ?? 0));
+    const cost = Math.max(0, Number(r.cost_estimated ?? r.metadata?.cost_estimated ?? 0));
+    const cur = map.get(key) ?? { provider, tool, inputUnits: 0, costUsd: 0, callCount: 0 };
+    cur.inputUnits += inputUnits;
+    cur.costUsd += cost;
+    cur.callCount += 1;
+    map.set(key, cur);
+  }
+
+  return [...map.values()].sort((a, b) => b.inputUnits - a.inputUnits);
 }
 
 export type TokenPeriodRange = {
@@ -413,17 +533,35 @@ export function formatTokenCount(n: number): string {
 
 export type UsageTableColumn = "prompt" | "completion" | "total";
 
-/** Affichage colonnes Entrée / Sortie / Total du tableau Derniers appels (aware google_tts). */
+/** Affichage colonnes Entrée / Sortie / Total du tableau Derniers appels (TTS caractères). */
 export function formatUsageTableCell(
   provider: string,
   column: UsageTableColumn,
   value: number,
+  row?: Pick<AiUsageLogRow, "tool_type" | "metadata">,
 ): string {
-  if ((provider ?? "").trim() === "google_tts" || (provider ?? "").trim() === "openai") {
+  const p = (provider ?? "").trim();
+  const tool = (row?.tool_type ?? row?.metadata?.tool_type ?? "").toString().trim();
+  const isCharBased =
+    p === "google_tts" || (p === "openai" && tool === "tts") || (p === "openai" && !tool);
+
+  if (isCharBased) {
     if (column === "prompt") return "—";
-    return `${formatTokenCount(Math.max(0, value))} car.`;
+    return `${formatTokenCount(Math.max(0, value))} ${i18n.t("tokens.unit_characters", { ns: "settings", defaultValue: "car." })}`;
   }
   return formatTokenCount(Math.max(0, value));
+}
+
+export function usageProviderLabel(provider: string): string {
+  const key = (provider ?? "").trim();
+  const labels: Record<string, string> = {
+    groq: "Groq",
+    gemini: "Google Gemini",
+    google_gemini: "Google Gemini",
+    google_tts: "Google Cloud TTS",
+    openai: "OpenAI",
+  };
+  return labels[key] ?? key;
 }
 
 export function jobTypeLabel(metadata: Record<string, unknown> | null): string {

@@ -223,6 +223,9 @@
   "common": {
     "null_placeholder": "undefined"
   },
+  "couts": {
+    "openai_tts_card_title": "OpenAI TTS — monthly summary"
+  },
   "providers": {
     "billing_api_per_character": "API · per character",
     "billing_estimated": "Estimated (logs)",
@@ -237,7 +240,13 @@
     "tts_openai_note": "MP3 audio guides (bios and mediations) via generate-audio Edge Function.",
     "tts_openai_loading": "Loading OpenAI TTS month estimate…",
     "tts_openai_month_empty": "No OpenAI TTS MP3 this month.",
-    "tts_openai_month_stats": "Current month: {{cost}} · {{count}} MP3(s) · avg {{avg}} / MP3"
+    "tts_openai_month_stats": "Current month: {{cost}} · {{count}} MP3(s) · avg {{avg}} / MP3",
+    "tts_openai_month_cost": "Total cost this month: {{cost}}",
+    "tts_openai_month_mp3": "{{count}} MP3(s) generated · avg {{avg}} / MP3",
+    "tts_openai_gender_f": "Voice F: {{count}}",
+    "tts_openai_gender_m": "Voice M: {{count}}",
+    "tts_openai_type_bio": "Bios: {{count}}",
+    "tts_openai_type_mediation": "Mediations: {{count}}"
   },
   "wakatime": {
     "back_settings": "Settings",
@@ -299,7 +308,7 @@
   "tokens": {
     "back_settings": "Settings",
     "page_title": "AI token tracking",
-    "page_sub": "Token usage logged by Groq, Gemini, Google TTS and Edge Functions.",
+    "page_sub": "Usage logged by Groq, Gemini, Google TTS, OpenAI TTS and Edge Functions.",
     "refresh": "Refresh",
     "empty": "No usage recorded for this period.",
     "rls_hint": "If totals stay at zero, check the RLS SELECT policy on ai_usage_logs for authenticated users.",
@@ -329,7 +338,12 @@
     "col_prompt": "Input",
     "col_completion": "Output",
     "col_total": "Total",
-    "operation_tts_synthesize": "TTS synthesis"
+    "operation_tts_synthesize": "TTS synthesis",
+    "recap_tts_title": "TTS summary",
+    "col_tool": "Tool",
+    "col_units": "Units consumed",
+    "col_cost": "Cost",
+    "unit_characters": "characters"
   },
   "visitor_errors": {
     "back_settings": "Settings",

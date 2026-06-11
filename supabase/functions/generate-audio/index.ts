@@ -67,7 +67,6 @@ serve(async (req) => {
 
     const voiceId     = gender === "F" ? style.voice_f : style.voice_m;
     const personaVibe = style.persona_vibe ?? "";
-    const styledText  = personaVibe ? `[STYLE: ${personaVibe}]\n\n${textContent}` : textContent;
 
     // 3. Upsert audio_files -> generating
     const storagePath = `${text_type}/${text_id}/${lang}/${prompt_style_id}_${gender}.mp3`;
@@ -83,7 +82,7 @@ serve(async (req) => {
       provider:     "openai",
       model,
       status:       "generating",
-      input_chars:  styledText.length,
+      input_chars:  textContent.length,
     }, { onConflict: "text_id,text_type,lang,prompt_style_id,gender" });
 
     // 4. Appel OpenAI TTS
@@ -96,9 +95,10 @@ serve(async (req) => {
         "Content-Type":  "application/json",
       },
       body: JSON.stringify({
-        model,
+        model:           "gpt-4o-mini-tts",
         voice:           voiceId,
-        input:           styledText,
+        input:           textContent,
+        instructions:    personaVibe,
         response_format: "mp3",
       }),
     });
@@ -120,13 +120,13 @@ serve(async (req) => {
     if (uploadError) throw new Error(`Storage upload : ${uploadError.message}`);
 
     // 6. Calcul coût
-    const costUsd = styledText.length * (TTS_COST_PER_CHAR[model] ?? TTS_COST_PER_CHAR["tts-1"]);
+    const costUsd = textContent.length * (TTS_COST_PER_CHAR[model] ?? TTS_COST_PER_CHAR["tts-1"]);
 
     // 7. Update audio_files -> ready
     await supabase.from("audio_files").update({
       status:          "ready",
       file_size_bytes: fileSizeBytes,
-      input_tokens:    Math.round(styledText.length / 4),
+      input_tokens:    Math.round(textContent.length / 4),
       cost_usd:        costUsd,
       updated_at:      new Date().toISOString(),
     })
@@ -142,7 +142,7 @@ serve(async (req) => {
       tool_type:       "tts",
       api_name:        "tts",
       model_name:      model,
-      input_units:     styledText.length,
+      input_units:     textContent.length,
       output_units:    0,
       unit_type:       "characters",
       cost_estimated:  costUsd,

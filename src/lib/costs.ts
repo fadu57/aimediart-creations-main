@@ -125,6 +125,26 @@ export function costProviderDisplayName(providerKey: string): string {
   );
 }
 
+/** Couleurs distinctes par fournisseur dans les graphiques coûts. */
+export const COST_PROVIDER_CHART_COLORS: Record<string, string> = {
+  groq: "#8b5cf6",
+  google_gemini: "#3b82f6",
+  google_tts: "#f59e0b",
+  openai: "#10b981",
+  cursor: "#6366f1",
+  huggingface: "#ec4899",
+  supabase: "#14b8a6",
+  vercel: "#64748b",
+  ovh: "#E63946",
+};
+
+export function costProviderChartColor(providerKey: string, index = 0): string {
+  const known = COST_PROVIDER_CHART_COLORS[providerKey];
+  if (known) return known;
+  const palette = ["#94a3b8", "#a78bfa", "#fb923c", "#2dd4bf", "#f472b6"];
+  return palette[index % palette.length];
+}
+
 /** Types d'outil toujours proposés dans les filtres coûts. */
 export const KNOWN_COST_TOOL_TYPES = ["llm", "tts", "image", "embedding", "other"] as const;
 

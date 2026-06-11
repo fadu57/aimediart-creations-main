@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
   ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
   getCostTimeSeries, getCostSelectOptions, exportCostsCsv, formatCost, formatUsdToEurHint,
-  DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName,
+  DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
   type CostEvent, type CostFilters, type CostSummary,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
   type CostSort, type CostSortColumn,
@@ -60,6 +60,7 @@ import {
 import { GoogleBillingCard } from "@/components/admin/GoogleBillingCard";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { fetchOpenAiTtsMonthStats, type OpenAiTtsMonthStats } from "@/lib/openAiTtsStats";
 
 // ---------------------------------------------------------------------------
 // Types — Fournisseurs
@@ -1168,6 +1169,103 @@ function currentCalendarMonthStartLocal(): string {
   return `${y}-${m}-01T00:00:00.000`;
 }
 
+type OpenAiTtsStatsBlockProps = {
+  stats: OpenAiTtsMonthStats | null;
+  loading: boolean;
+  compact?: boolean;
+};
+
+function OpenAiTtsStatsBlock({ stats, loading, compact }: OpenAiTtsStatsBlockProps) {
+  const { t } = useTranslation("settings");
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+        {t("providers.tts_openai_loading")}
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const empty = stats.mp3Count === 0 && stats.costUsd === 0;
+
+  return (
+    <div className={cn(
+      "space-y-2 leading-snug",
+      compact ? "text-[11px]" : "text-xs",
+    )}
+    >
+      <p className={cn("font-medium text-foreground", !compact && "text-sm")}>
+        {t("providers.tts_openai_title")}
+      </p>
+      {!compact && (
+        <p className="text-muted-foreground">{t("providers.tts_openai_note")}</p>
+      )}
+      {empty ? (
+        <p className="text-muted-foreground">{t("providers.tts_openai_month_empty")}</p>
+      ) : (
+        <div className="flex flex-col gap-1.5 text-muted-foreground">
+          <p>
+            {t("providers.tts_openai_month_cost", { cost: formatCost(stats.costUsd, "USD", 4) })}
+          </p>
+          <p>
+            {t("providers.tts_openai_month_mp3", {
+              count: stats.mp3Count,
+              avg: formatCost(stats.avgCostUsd, "USD", 4),
+            })}
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <span>{t("providers.tts_openai_gender_f", { count: stats.byGender.F })}</span>
+            <span>{t("providers.tts_openai_gender_m", { count: stats.byGender.M })}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <span>{t("providers.tts_openai_type_bio", { count: stats.byTextType.bio })}</span>
+            <span>{t("providers.tts_openai_type_mediation", { count: stats.byTextType.mediation })}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type OpenAiTtsSummaryCardProps = { refreshKey: number };
+
+function OpenAiTtsSummaryCard({ refreshKey }: OpenAiTtsSummaryCardProps) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<OpenAiTtsMonthStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void fetchOpenAiTtsMonthStats().then((s) => {
+      if (!cancelled) {
+        setStats(s);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  return (
+    <Card className="glass-card border-emerald-500/20">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Activity className="h-4 w-4 text-emerald-600" aria-hidden />
+          {t("couts.openai_tts_card_title")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <OpenAiTtsStatsBlock stats={stats} loading={loading} />
+      </CardContent>
+    </Card>
+  );
+}
+
 type GoogleTtsMonthlyEstimateProps = { refreshKey: number };
 
 function GoogleTtsMonthlyEstimate({ refreshKey }: GoogleTtsMonthlyEstimateProps) {
@@ -1259,73 +1357,26 @@ function GoogleTtsMonthlyEstimate({ refreshKey }: GoogleTtsMonthlyEstimateProps)
 type OpenAiTtsMonthlyEstimateProps = { refreshKey: number };
 
 function OpenAiTtsMonthlyEstimate({ refreshKey }: OpenAiTtsMonthlyEstimateProps) {
-  const { t } = useTranslation("settings");
   const [loading, setLoading] = useState(true);
-  const [costUsd, setCostUsd] = useState(0);
-  const [mp3Count, setMp3Count] = useState(0);
-  const [avgCostUsd, setAvgCostUsd] = useState(0);
+  const [stats, setStats] = useState<OpenAiTtsMonthStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void (async () => {
-      const monthStart = currentCalendarMonthStartLocal();
-      const monthEnd = new Date();
-      monthEnd.setHours(23, 59, 59, 999);
-
-      const [eventsRes, filesRes] = await Promise.all([
-        supabase
-          .from("ai_usage_events")
-          .select("cost_estimated")
-          .eq("provider", "openai")
-          .eq("tool_type", "tts")
-          .gte("created_at", monthStart),
-        supabase
-          .from("audio_files")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "ready")
-          .gte("created_at", monthStart),
-      ]);
-
-      if (cancelled) return;
-
-      const rows = (eventsRes.data ?? []) as Array<{ cost_estimated?: number | null }>;
-      const total = rows.reduce((sum, r) => sum + (Number(r.cost_estimated) || 0), 0);
-      const count = filesRes.count ?? 0;
-      setCostUsd(total);
-      setMp3Count(count);
-      setAvgCostUsd(count > 0 ? total / count : 0);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    void fetchOpenAiTtsMonthStats().then((s) => {
+      if (!cancelled) {
+        setStats(s);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [refreshKey]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-        {t("providers.tts_openai_loading")}
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2 text-[11px] leading-snug">
-      <p className="font-medium text-foreground">{t("providers.tts_openai_title")}</p>
-      <p className="text-muted-foreground">{t("providers.tts_openai_note")}</p>
-      {mp3Count === 0 && costUsd === 0 ? (
-        <p className="text-muted-foreground">{t("providers.tts_openai_month_empty")}</p>
-      ) : (
-        <p className="text-muted-foreground">
-          {t("providers.tts_openai_month_stats", {
-            cost: formatCost(costUsd, "USD", 4),
-            count: mp3Count,
-            avg: formatCost(avgCostUsd, "USD", 4),
-          })}
-        </p>
-      )}
+    <div className="rounded-lg border border-border/40 bg-muted/10 p-3">
+      <OpenAiTtsStatsBlock stats={stats} loading={loading} compact />
     </div>
   );
 }
@@ -2318,6 +2369,8 @@ export default function SettingsCouts() {
         </div>
       )}
 
+      <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} />
+
       {/* Graphiques */}
       <div className="grid lg:grid-cols-2 gap-6">
 
@@ -2376,7 +2429,14 @@ export default function SettingsCouts() {
                     formatter={(value: number) => [`${value} ${currency}`, "Coût"]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Bar dataKey="coût" fill="#E63946" radius={[0, 3, 3, 0]} maxBarSize={20} />
+                  <Bar dataKey="coût" radius={[0, 3, 3, 0]} maxBarSize={20}>
+                    {providerChartData.map((entry, index) => (
+                      <Cell
+                        key={entry.name}
+                        fill={costProviderChartColor(entry.name, index)}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
