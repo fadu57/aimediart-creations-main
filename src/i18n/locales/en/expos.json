@@ -74,6 +74,7 @@
   "audio_monitor": {
     "title": "Visitor audio monitor",
     "subtitle": "Active visitors in indoor exhibitions — QR location and live audio ban.",
+    "duplicate_hint": "The same person may appear twice with multiple visitor tabs or devices (each has its own ID). Close unused visitor tabs.",
     "back_expos": "Back to exhibitions",
     "select_expo": "Exhibition",
     "expo_placeholder": "Choose an exhibition…",
@@ -82,7 +83,9 @@
     "empty": "No active visitors in the last 5 minutes.",
     "col_visitor": "Visitor",
     "col_artwork": "Scanned artwork",
-    "col_headphones": "Headphones",
+    "col_consent": "Audio rules",
+    "consent_yes": "Accepted",
+    "consent_pending": "Pending",
     "col_seen": "Last seen",
     "col_status": "Status",
     "col_action": "Action",

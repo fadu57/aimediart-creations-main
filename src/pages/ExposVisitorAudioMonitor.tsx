@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Ban, Headphones, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { Ban, CheckCircle2, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -126,6 +126,7 @@ export default function ExposVisitorAudioMonitor() {
         <div>
           <h1 className="text-xl font-semibold">{t("audio_monitor.title")}</h1>
           <p className="text-sm text-muted-foreground">{t("audio_monitor.subtitle")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("audio_monitor.duplicate_hint")}</p>
         </div>
         <Button type="button" variant="outline" size="sm" asChild>
           <Link to="/expos">{t("audio_monitor.back_expos")}</Link>
@@ -186,7 +187,7 @@ export default function ExposVisitorAudioMonitor() {
               <tr>
                 <th className="px-3 py-2">{t("audio_monitor.col_visitor")}</th>
                 <th className="px-3 py-2">{t("audio_monitor.col_artwork")}</th>
-                <th className="px-3 py-2">{t("audio_monitor.col_headphones")}</th>
+                <th className="px-3 py-2">{t("audio_monitor.col_consent")}</th>
                 <th className="px-3 py-2">{t("audio_monitor.col_seen")}</th>
                 <th className="px-3 py-2">{t("audio_monitor.col_status")}</th>
                 <th className="px-3 py-2 text-right">{t("audio_monitor.col_action")}</th>
@@ -198,7 +199,9 @@ export default function ExposVisitorAudioMonitor() {
                 const busy = actionId === row.id;
                 return (
                   <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2 font-mono text-xs">{row.visitor_client_id.slice(0, 12)}…</td>
+                    <td className="px-3 py-2 font-mono text-xs" title={row.visitor_client_id}>
+                      {row.visitor_client_id.slice(0, 8)}…{row.visitor_client_id.slice(-4)}
+                    </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{row.artwork_title?.trim() || "—"}</div>
                       {row.artwork_id ? (
@@ -206,14 +209,13 @@ export default function ExposVisitorAudioMonitor() {
                       ) : null}
                     </td>
                     <td className="px-3 py-2">
-                      {row.headphones_detected === true ? (
+                      {row.audio_consent_acknowledged === true ? (
                         <span className="inline-flex items-center gap-1 text-emerald-600">
-                          <Headphones className="h-3.5 w-3.5" /> OK
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {t("audio_monitor.consent_yes")}
                         </span>
-                      ) : row.headphones_detected === false ? (
-                        <span className="text-amber-600">Non</span>
                       ) : (
-                        "?"
+                        <span className="text-muted-foreground">{t("audio_monitor.consent_pending")}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{formatLastSeen(row.last_seen_at)}</td>

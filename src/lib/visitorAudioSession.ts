@@ -12,6 +12,7 @@ export type VisitorAudioPresenceRow = {
   artwork_title: string | null;
   page_url: string | null;
   headphones_detected: boolean | null;
+  audio_consent_acknowledged: boolean | null;
   banned_at: string | null;
   last_seen_at: string;
   created_at: string;
@@ -25,6 +26,7 @@ type HeartbeatPayload = {
   artwork_title?: string | null;
   page_url?: string | null;
   headphones_detected?: boolean | null;
+  audio_consent_acknowledged?: boolean | null;
 };
 
 type BanStatusPayload = {

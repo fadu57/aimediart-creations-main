@@ -75,6 +75,7 @@
   "audio_monitor": {
     "title": "Surveillance audio visiteurs",
     "subtitle": "Visiteurs actifs en expo intérieure — position QR et bannissement audio en direct.",
+    "duplicate_hint": "Un même visiteur peut apparaître en double si plusieurs onglets ou appareils sont ouverts (chacun a son identifiant). Fermez les onglets visiteur inutilisés.",
     "back_expos": "Retour aux expositions",
     "select_expo": "Exposition",
     "expo_placeholder": "Choisir une exposition…",
@@ -83,7 +84,9 @@
     "empty": "Aucun visiteur actif sur les 5 dernières minutes.",
     "col_visitor": "Visiteur",
     "col_artwork": "Œuvre scannée",
-    "col_headphones": "Écouteurs",
+    "col_consent": "Règles audio",
+    "consent_yes": "Accepté",
+    "consent_pending": "En attente",
     "col_seen": "Vu à",
     "col_status": "Statut",
     "col_action": "Action",

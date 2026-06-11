@@ -26,6 +26,7 @@ type RequestBody = {
   artwork_title?: string | null;
   page_url?: string | null;
   headphones_detected?: boolean | null;
+  audio_consent_acknowledged?: boolean | null;
   session_id?: string | null;
   reason?: string | null;
 };
@@ -127,8 +128,9 @@ serve(async (req: Request) => {
       artwork_id: artworkId,
       artwork_title: artworkTitle,
       page_url: clampText(body.page_url, 2000),
-      headphones_detected:
-        typeof body.headphones_detected === "boolean" ? body.headphones_detected : null,
+      headphones_detected: null,
+      audio_consent_acknowledged:
+        body.audio_consent_acknowledged === true ? true : null,
       last_seen_at: now,
     };
 
@@ -198,7 +200,22 @@ serve(async (req: Request) => {
       return jsonResponse({ error: error.message }, 500);
     }
 
-    return jsonResponse({ rows: data ?? [] });
+    const rawRows = (data ?? []) as Array<Record<string, unknown>>;
+    const byClient = new Map<string, Record<string, unknown>>();
+    for (const row of rawRows) {
+      const clientId = String(row.visitor_client_id ?? "").trim();
+      if (!clientId) continue;
+      const existing = byClient.get(clientId);
+      if (!existing) {
+        byClient.set(clientId, row);
+        continue;
+      }
+      const rowTs = new Date(String(row.last_seen_at ?? 0)).getTime();
+      const existingTs = new Date(String(existing.last_seen_at ?? 0)).getTime();
+      if (rowTs >= existingTs) byClient.set(clientId, row);
+    }
+
+    return jsonResponse({ rows: Array.from(byClient.values()) });
   }
 
   const sessionId = body.session_id?.trim() ?? "";

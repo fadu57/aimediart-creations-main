@@ -33,8 +33,12 @@ import {
 } from "@/lib/mediationSwiperLoop";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
+import {
+  localizeVisitorAnonymousProfile,
+  resolveReturningAnonymousVisitor,
+} from "@/lib/registerAnonymousVisitorSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
-import { getVisitorAnonymousProfile, getVisitorAnonymousPseudo } from "@/lib/visitorAnonymousProfile";
+import { getVisitorAnonymousProfile, type VisitorAnonymousProfile } from "@/lib/visitorAnonymousProfile";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 
@@ -229,6 +233,9 @@ const VisitorViewCore = () => {
   const [sameArtistArtworkIds, setSameArtistArtworkIds] = useState<string[]>([]);
   const [quickFeedbackHint, setQuickFeedbackHint] = useState<QuickFeedbackHint | null>(null);
   const [headerAvatarUrl, setHeaderAvatarUrl] = useState<string | null>(null);
+  const [anonymousProfile, setAnonymousProfile] = useState<VisitorAnonymousProfile | null>(() =>
+    typeof window !== "undefined" ? getVisitorAnonymousProfile() : null,
+  );
   const actionBarRef = useRef<HTMLDivElement | null>(null);
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
@@ -715,15 +722,44 @@ const VisitorViewCore = () => {
   const headerIdentityLabel = isAnonymousVisitor
     ? t("header_anon")
     : t("header_greeting", { name: headerFirstName || t("header_visitor") });
-  const anonymousPseudo = getVisitorAnonymousPseudo()?.trim() || "";
+  const anonymousPseudo = anonymousProfile?.pseudo?.trim() || "";
 
   useEffect(() => {
     if (!isAuthenticated) {
-      const anon = getVisitorAnonymousProfile();
-      const url = anon?.selfieUrl?.trim() || anon?.avatarUrl?.trim() || null;
-      setHeaderAvatarUrl(url);
-      return;
+      let cancelled = false;
+
+      const applyAnonymousProfile = async (profile: VisitorAnonymousProfile) => {
+        const localized = await localizeVisitorAnonymousProfile(profile, language);
+        if (cancelled) return;
+        setAnonymousProfile(localized);
+        setHeaderAvatarUrl(localized.selfieUrl?.trim() || localized.avatarUrl?.trim() || null);
+      };
+
+      void (async () => {
+        const local = getVisitorAnonymousProfile();
+        if (local?.avatarUrl?.trim()) {
+          await applyAnonymousProfile(local);
+          return;
+        }
+
+        const remote = await resolveReturningAnonymousVisitor();
+        if (remote) {
+          await applyAnonymousProfile(remote);
+          return;
+        }
+
+        if (!cancelled) {
+          setAnonymousProfile(null);
+          setHeaderAvatarUrl(null);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
     }
+
+    setAnonymousProfile(null);
     const userId = session?.user?.id?.trim();
     if (!userId) {
       setHeaderAvatarUrl(null);
@@ -749,7 +785,7 @@ const VisitorViewCore = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, session?.user?.id, session?.user?.user_metadata]);
+  }, [isAuthenticated, language, session?.user?.id, session?.user?.user_metadata]);
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
   useEffect(() => {

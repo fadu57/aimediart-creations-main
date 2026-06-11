@@ -68,7 +68,7 @@ export function IndoorAudioGuardProvider({
   artworkTitle,
   children,
 }: IndoorAudioGuardProviderProps) {
-  const visitorClientId = useMemo(() => getOrCreateVisitorUuid(), []);
+  const [visitorClientId, setVisitorClientId] = useState(() => getOrCreateVisitorUuid());
   const [isIndoorExpo, setIsIndoorExpo] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(expoId));
   const [isBanned, setIsBanned] = useState(false);
@@ -88,22 +88,38 @@ export function IndoorAudioGuardProvider({
     });
   }, []);
 
+  // Resynchronise l'ID si un autre onglet a régénéré visitor_uuid (évite 2 lignes fantômes).
+  useEffect(() => {
+    const syncVisitorId = () => {
+      const current = getOrCreateVisitorUuid();
+      setVisitorClientId((prev) => (prev === current ? prev : current));
+    };
+    syncVisitorId();
+    window.addEventListener("storage", syncVisitorId);
+    window.addEventListener("focus", syncVisitorId);
+    return () => {
+      window.removeEventListener("storage", syncVisitorId);
+      window.removeEventListener("focus", syncVisitorId);
+    };
+  }, []);
+
   const sendHeartbeat = useCallback(async () => {
     if (!resolvedExpoId) return;
+    const clientId = getOrCreateVisitorUuid();
     try {
       const sessionId = await sendVisitorAudioHeartbeat({
-        visitor_client_id: visitorClientId,
+        visitor_client_id: clientId,
         expo_id: resolvedExpoId,
         artwork_id: artworkId ?? null,
         artwork_title: artworkTitle ?? null,
         page_url: typeof window !== "undefined" ? window.location.href : null,
-        headphones_detected: null,
+        audio_consent_acknowledged: true,
       });
       if (sessionId) sessionIdRef.current = sessionId;
     } catch (err) {
       if (import.meta.env.DEV) console.warn("[IndoorAudioGuard] heartbeat:", err);
     }
-  }, [resolvedExpoId, visitorClientId, artworkId, artworkTitle]);
+  }, [resolvedExpoId, artworkId, artworkTitle]);
 
   // Résout expo_id depuis l'œuvre si absent de l'URL
   useEffect(() => {
@@ -169,7 +185,7 @@ export function IndoorAudioGuardProvider({
     const pollBan = async () => {
       if (cancelled) return;
       try {
-        const status = await fetchVisitorAudioBanStatus(visitorClientId);
+        const status = await fetchVisitorAudioBanStatus(getOrCreateVisitorUuid());
         if (status.session_id) sessionIdRef.current = status.session_id;
         if (status.banned) {
           setIsBanned(true);
