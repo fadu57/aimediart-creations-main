@@ -20,7 +20,6 @@ import {
   unbanVisitorAudioSession,
   type VisitorAudioPresenceRow,
 } from "@/lib/visitorAudioSession";
-import { buildSimulatedAudioPresenceRows } from "@/lib/visitorAudioMonitorSimulate";
 
 type ExpoOption = { id: string; expo_name: string | null };
 
@@ -111,12 +110,6 @@ export default function ExposVisitorAudioMonitor() {
   const { t } = useTranslation("expos");
   const [searchParams, setSearchParams] = useSearchParams();
   const filterExpoId = searchParams.get("expo_id")?.trim() || "";
-  const simulateCount = useMemo(() => {
-    const raw = searchParams.get("simulate")?.trim() ?? "";
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 0;
-  }, [searchParams]);
-  const isSimulate = simulateCount > 0;
   const { loading: authLoading, role_id: currentRoleId } = useAuthUser();
   const canAccess = typeof currentRoleId === "number" && currentRoleId >= 1 && currentRoleId <= 4;
 
@@ -137,21 +130,7 @@ export default function ExposVisitorAudioMonitor() {
     setExpos((data as ExpoOption[] | null) ?? []);
   }, []);
 
-  const simulatedRows = useMemo(
-    () =>
-      isSimulate
-        ? buildSimulatedAudioPresenceRows(simulateCount, filterExpoId || "00000000-0000-4000-8000-000000000001")
-        : [],
-    [filterExpoId, isSimulate, simulateCount],
-  );
-  const displayRows = isSimulate ? simulatedRows : rows;
-
   const loadPresence = useCallback(async (silent = false) => {
-    if (isSimulate) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
     if (!filterExpoId || !canAccess) {
       setRows([]);
       setLoading(false);
@@ -174,7 +153,7 @@ export default function ExposVisitorAudioMonitor() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filterExpoId, canAccess, t, isSimulate]);
+  }, [filterExpoId, canAccess, t]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -182,18 +161,12 @@ export default function ExposVisitorAudioMonitor() {
   }, [canAccess, loadExpos]);
 
   useEffect(() => {
-    if (isSimulate) {
-      setLoading(false);
-      setError(null);
-      return;
-    }
     void loadPresence();
     const timer = window.setInterval(() => void loadPresence(true), 10_000);
     return () => window.clearInterval(timer);
-  }, [loadPresence, isSimulate]);
+  }, [loadPresence]);
 
   const handleBan = async (row: VisitorAudioPresenceRow) => {
-    if (isSimulate) return;
     setActionId(row.id);
     try {
       await banVisitorAudioSession(row.id);
@@ -206,7 +179,6 @@ export default function ExposVisitorAudioMonitor() {
   };
 
   const handleUnban = async (row: VisitorAudioPresenceRow) => {
-    if (isSimulate) return;
     setActionId(row.id);
     try {
       await unbanVisitorAudioSession(row.id);
@@ -271,21 +243,7 @@ export default function ExposVisitorAudioMonitor() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={refreshing}
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              if (isSimulate) next.delete("simulate");
-              else next.set("simulate", "200");
-              setSearchParams(next, { replace: true });
-            }}
-          >
-            {isSimulate ? t("audio_monitor.simulate_off") : t("audio_monitor.simulate_on")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!filterExpoId || refreshing || isSimulate}
+            disabled={!filterExpoId || refreshing}
             onClick={() => void loadPresence(true)}
           >
             <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -294,26 +252,20 @@ export default function ExposVisitorAudioMonitor() {
         </CardContent>
       </Card>
 
-      {isSimulate ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-          {t("audio_monitor.simulate_banner", { count: simulateCount })}
-        </p>
-      ) : null}
-
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {!filterExpoId && !isSimulate ? (
+      {!filterExpoId ? (
         <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.pick_expo_hint")}</p>
-      ) : loading && !isSimulate ? (
+      ) : loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-[#F0F0F0]/60" />
         </div>
-      ) : displayRows.length === 0 ? (
+      ) : rows.length === 0 ? (
         <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.empty")}</p>
       ) : (
         <>
           <p className="text-xs font-medium text-[#F0F0F0]/70">
-            {t("audio_monitor.row_count", { count: displayRows.length })}
+            {t("audio_monitor.row_count", { count: rows.length })}
           </p>
           <div className="max-h-[min(70vh,640px)] overflow-auto rounded-lg border border-white/15 bg-[#1E1E1E]">
             <table className="w-full min-w-[640px] text-xs text-[#F0F0F0]">
@@ -328,7 +280,7 @@ export default function ExposVisitorAudioMonitor() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10 [&_td]:text-[#F0F0F0]">
-                {displayRows.map((row) => {
+                {rows.map((row) => {
                   const isBanned = Boolean(row.banned_at);
                   const busy = actionId === row.id;
                   const visitorLabel = row.visitor_pseudo?.trim() || t("audio_monitor.visitor_unknown");
@@ -368,7 +320,7 @@ export default function ExposVisitorAudioMonitor() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            disabled={busy || isSimulate}
+                            disabled={busy}
                             className="h-7 px-2 text-xs"
                             onClick={() => void handleUnban(row)}
                           >
@@ -380,7 +332,7 @@ export default function ExposVisitorAudioMonitor() {
                             type="button"
                             size="sm"
                             variant="destructive"
-                            disabled={busy || isSimulate}
+                            disabled={busy}
                             className="h-7 px-2 text-xs"
                             onClick={() => void handleBan(row)}
                           >
