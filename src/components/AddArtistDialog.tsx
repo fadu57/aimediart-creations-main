@@ -28,10 +28,13 @@ import {
   ARTIST_BIO_LANGUAGES,
   EMPTY_BIOS,
   hasAnyBioText,
+  loadArtistBioFormData,
   loadArtistBiosForForm,
   upsertArtistBioRow,
   type Language,
 } from "@/hooks/useArtistBios";
+import { AudioVoiceLangStatus } from "@/components/AudioVoiceLangStatus";
+import { resolveBioPromptStyleId } from "@/services/audioService";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   normalizePostalCode,
@@ -363,6 +366,9 @@ export function AddArtistDialog({
   const [activeLanguage, setActiveLanguage] = useState<Language>("fr");
   /** Contenu des textarea — chargé depuis `artist_bios`, modifié localement ensuite. */
   const [artistBios, setArtistBios] = useState<Record<Language, string>>(() => ({ ...EMPTY_BIOS }));
+  const [artistBioRowIds, setArtistBioRowIds] = useState<Partial<Record<Language, string>>>({});
+  const [bioPromptStyleId, setBioPromptStyleId] = useState<string | null>(null);
+  const [audioStatusRefreshKey, setAudioStatusRefreshKey] = useState(0);
   const [biosLoading, setBiosLoading] = useState(false);
 
   const form = useForm<ArtistFormInput>({
@@ -432,6 +438,7 @@ export function AddArtistDialog({
   useEffect(() => {
     if (!bioArtistId) {
       setArtistBios({ ...EMPTY_BIOS });
+      setArtistBioRowIds({});
       artistBiosFromDbRef.current = { ...EMPTY_BIOS };
       biosLoadedRef.current = true;
       setBiosLoading(false);
@@ -444,10 +451,11 @@ export function AddArtistDialog({
 
     void (async () => {
       try {
-        const loaded = await loadArtistBiosForForm(bioArtistId);
+        const loaded = await loadArtistBioFormData(bioArtistId);
         if (cancelled) return;
-        setArtistBios(loaded);
-        artistBiosFromDbRef.current = loaded;
+        setArtistBios(loaded.texts);
+        setArtistBioRowIds(loaded.rowIds);
+        artistBiosFromDbRef.current = loaded.texts;
         biosLoadedRef.current = true;
         if (import.meta.env.DEV) {
           console.debug("[AddArtistDialog] artist_bios", bioArtistId, loaded);
@@ -469,6 +477,23 @@ export function AddArtistDialog({
       cancelled = true;
     };
   }, [bioArtistId]);
+
+  useEffect(() => {
+    void resolveBioPromptStyleId().then(setBioPromptStyleId);
+  }, []);
+
+  const bioAudioTargetsByLang = useMemo(() => {
+    const map: Record<string, { lang: string; text_id: string; prompt_style_id: string } | null> = {};
+    if (!bioPromptStyleId) return map;
+    for (const lang of ARTIST_BIO_LANGUAGES) {
+      const rowId = artistBioRowIds[lang];
+      const hasText = (artistBios[lang] ?? "").trim().length > 0;
+      map[lang] = rowId && hasText
+        ? { lang, text_id: rowId, prompt_style_id: bioPromptStyleId }
+        : null;
+    }
+    return map;
+  }, [artistBioRowIds, artistBios, bioPromptStyleId]);
 
   useEffect(() => {
     if (open) {
@@ -1161,6 +1186,9 @@ export function AddArtistDialog({
         for (const lang of ARTIST_BIO_LANGUAGES) {
           await upsertArtistBioRow(savedArtistId, lang, artistBios[lang]);
         }
+        const bioData = await loadArtistBioFormData(savedArtistId);
+        setArtistBioRowIds(bioData.rowIds);
+        setAudioStatusRefreshKey((k) => k + 1);
       }
 
       if (isLiving) {
@@ -1702,6 +1730,13 @@ export function AddArtistDialog({
                           </TabsTrigger>
                         ))}
                       </TabsList>
+                      <AudioVoiceLangStatus
+                        languages={ARTIST_BIO_LANGUAGES}
+                        text_type="bio"
+                        targetsByLang={bioAudioTargetsByLang}
+                        refreshKey={audioStatusRefreshKey}
+                        className="min-w-0 flex-1 justify-end"
+                      />
                     </div>
 
                     <div className="mt-2 h-[115px] w-[540px] shrink-0">

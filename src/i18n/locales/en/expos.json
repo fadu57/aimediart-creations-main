@@ -45,7 +45,12 @@
     "cancel": "Cancel"
   },
   "form": {
-    "navTypeLabel": "For the visitor, navigation type"
+    "navTypeLabel": "For the visitor, navigation type",
+    "navTypeSameArtist": "One scanned artwork shows all artworks by the same artist",
+    "navTypeScanSequence": "Scanned artworks one after another",
+    "venueTypeLabel": "Exhibition venue",
+    "venueIndoor": "Indoor",
+    "venueOutdoor": "Outdoor"
   },
   "tableau": {
     "title": "Exhibitions — Full table",
@@ -65,5 +70,26 @@
     "cancel": "Cancel",
     "confirm": "Delete",
     "archiving": "Archiving..."
+  },
+  "audio_monitor": {
+    "title": "Visitor audio monitor",
+    "subtitle": "Active visitors in indoor exhibitions — QR location and live audio ban.",
+    "back_expos": "Back to exhibitions",
+    "select_expo": "Exhibition",
+    "expo_placeholder": "Choose an exhibition…",
+    "refresh": "Refresh",
+    "pick_expo_hint": "Select an exhibition to see connected visitors.",
+    "empty": "No active visitors in the last 5 minutes.",
+    "col_visitor": "Visitor",
+    "col_artwork": "Scanned artwork",
+    "col_headphones": "Headphones",
+    "col_seen": "Last seen",
+    "col_status": "Status",
+    "col_action": "Action",
+    "status_banned": "Banned",
+    "status_active": "Active",
+    "ban": "Ban audio",
+    "unban": "Restore",
+    "expo_label": "Exhibition:"
   }
 }

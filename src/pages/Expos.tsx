@@ -697,6 +697,9 @@ const Expos = () => {
               <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
             </Button>
             <Button type="button" variant="outline" className="gap-2" asChild>
+              <Link to="/expos/visitor-audio">{t("audio_monitor.title")}</Link>
+            </Button>
+            <Button type="button" variant="outline" className="gap-2" asChild>
               <Link to="/expos/sponsors">
                 <Building2 className="h-4 w-4" aria-hidden />
                 {t("page.sponsorsList", "Liste des sponsors")}

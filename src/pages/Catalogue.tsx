@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Plus, Search, Loader2, X, RefreshCw } from "lucide-react";
+import { Plus, Search, Loader2, X, RefreshCw, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import QRCode from "qrcode";
@@ -36,6 +36,10 @@ import {
   countMaxMediationStylesAcrossLangs,
   getMediationFilledUiLangs,
 } from "@/lib/artworkDescriptionI18n";
+import {
+  buildArtworkVoiceCatalogMap,
+  type ArtworkVoiceCatalogSummary,
+} from "@/lib/artworkVoiceCatalog";
 import { useTranslation } from "react-i18next";
 type ArtworkRow = {
   artwork_id: string;
@@ -70,6 +74,26 @@ type ExpoOption = {
   name: string;
   agency_id?: string | null;
 };
+
+type ExpoMovePending = {
+  artworkId: string;
+  artworkTitle: string;
+  fromExpoId: string | null;
+  toExpoId: string | null;
+};
+
+function resolveExpoLabel(
+  expoId: string | null | undefined,
+  options: ExpoOption[],
+  noneLabel: string,
+): string {
+  const raw = (expoId ?? "").trim();
+  if (!raw) return noneLabel;
+  const match =
+    options.find((o) => o.id === raw) ??
+    options.find((o) => (o.expo_id ?? "").trim() === raw);
+  return match?.name ?? raw;
+}
 
 function artworkArtistFromRow(aw: Pick<ArtworkRow, "artists">): ArtistRow | undefined {
   const a = aw.artists;
@@ -110,6 +134,9 @@ const Catalogue = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q")?.trim() ?? "");
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
+  const [voiceSummaryByArtwork, setVoiceSummaryByArtwork] = useState<
+    Record<string, ArtworkVoiceCatalogSummary>
+  >({});
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
   const [selectedExpoFilter, setSelectedExpoFilter] = useState(
     () => searchParams.get("expo")?.trim() || "all",
@@ -126,6 +153,8 @@ const Catalogue = () => {
   const [bulkQrProgress, setBulkQrProgress] = useState<{ done: number; total: number } | null>(null);
   const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
   const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
+  const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
+  const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
   const navigate = useNavigate();
@@ -378,6 +407,23 @@ const Catalogue = () => {
       agency_id: row.artwork_agency_id ?? null,
       expo_id: row.artwork_expo_id ?? null,
     }));
+
+    const artworkIds = normalizedRows.map((r) => r.artwork_id).filter(Boolean);
+    let voiceMap: Record<string, ArtworkVoiceCatalogSummary> = {};
+    if (artworkIds.length > 0) {
+      const { data: audioRows, error: audioError } = await supabase
+        .from("audio_files")
+        .select("text_id, lang, status, storage_path")
+        .eq("text_type", "mediation")
+        .in("text_id", artworkIds);
+      if (audioError) {
+        console.error("[Catalogue] audio_files:", audioError);
+      } else {
+        voiceMap = buildArtworkVoiceCatalogMap(normalizedRows, audioRows ?? []);
+      }
+    }
+
+    setVoiceSummaryByArtwork(voiceMap);
     setArtworks(normalizedRows);
 
     setLoading(false);
@@ -489,8 +535,8 @@ const Catalogue = () => {
   };
 
   const assignArtworkToExpo = useCallback(
-    async (artworkId: string, targetExpoId: string | null) => {
-      if (!artworkId) return;
+    async (artworkId: string, targetExpoId: string | null): Promise<boolean> => {
+      if (!artworkId) return false;
       const normalizedExpoId = targetExpoId?.trim() ? targetExpoId : null;
       setIsAssigningExpo(true);
       setError(null);
@@ -501,26 +547,74 @@ const Catalogue = () => {
 
       if (updateError) {
         setError(`Affectation expo impossible : ${updateError.message}`);
-      } else {
-        setArtworks((prev) =>
-          prev.map((row) =>
-            row.artwork_id === artworkId
-              ? {
-                  ...row,
-                  artwork_expo_id: normalizedExpoId,
-                  expo_id: normalizedExpoId,
-                }
-              : row,
-          ),
-        );
-        if (selectedExpoFilter !== "all") {
-          // Re-synchronise la liste selon le filtre en cours.
-          void loadCatalogue();
-        }
+        setIsAssigningExpo(false);
+        return false;
+      }
+
+      setArtworks((prev) =>
+        prev.map((row) =>
+          row.artwork_id === artworkId
+            ? {
+                ...row,
+                artwork_expo_id: normalizedExpoId,
+                expo_id: normalizedExpoId,
+              }
+            : row,
+        ),
+      );
+      if (selectedExpoFilter !== "all") {
+        void loadCatalogue();
       }
       setIsAssigningExpo(false);
+      return true;
     },
     [loadCatalogue, selectedExpoFilter],
+  );
+
+  const requestExpoMove = useCallback(
+    (
+      artworkId: string,
+      artworkTitle: string | null,
+      fromExpoId: string | null,
+      toExpoId: string | null,
+    ) => {
+      const normalizedFrom = fromExpoId?.trim() || null;
+      const normalizedTo = toExpoId?.trim() || null;
+      if (normalizedFrom === normalizedTo) return;
+      setExpoMovePending({
+        artworkId,
+        artworkTitle: (artworkTitle ?? "").trim() || t("artwork_untitled"),
+        fromExpoId: normalizedFrom,
+        toExpoId: normalizedTo,
+      });
+    },
+    [t],
+  );
+
+  const confirmExpoMove = useCallback(async () => {
+    if (!expoMovePending) return;
+    const { artworkId, fromExpoId, toExpoId } = expoMovePending;
+    setExpoMovePending(null);
+    const success = await assignArtworkToExpo(artworkId, toExpoId);
+    if (success) {
+      setExpoUndoByArtwork((prev) => ({ ...prev, [artworkId]: fromExpoId }));
+    }
+  }, [assignArtworkToExpo, expoMovePending]);
+
+  const undoExpoMove = useCallback(
+    async (artworkId: string) => {
+      const previousExpoId = expoUndoByArtwork[artworkId];
+      if (previousExpoId === undefined) return;
+      const success = await assignArtworkToExpo(artworkId, previousExpoId);
+      if (success) {
+        setExpoUndoByArtwork((prev) => {
+          const next = { ...prev };
+          delete next[artworkId];
+          return next;
+        });
+      }
+    },
+    [assignArtworkToExpo, expoUndoByArtwork],
   );
 
   const updateArtworkStatus = useCallback(async (artworkId: string, nextActive: boolean) => {
@@ -827,6 +921,18 @@ const Catalogue = () => {
           const mediationLangsLabel = getMediationFilledUiLangs(aw.artwork_description_i18n)
             .map((lang) => lang.toUpperCase())
             .join(" - ");
+          const voiceSummary = voiceSummaryByArtwork[aw.artwork_id] ?? {
+            readyCount: 0,
+            expectedCount: 0,
+            langsLabel: "",
+            isComplete: false,
+          };
+          const hasExpectedVoices = voiceSummary.expectedCount > 0;
+          const voiceBadgeComplete = voiceSummary.isComplete;
+          const voiceBadgePartial =
+            hasExpectedVoices &&
+            voiceSummary.readyCount > 0 &&
+            voiceSummary.readyCount < voiceSummary.expectedCount;
 
           return (
             <Card key={aw.artwork_id} className="glass-card hover:shadow-lg transition-all duration-300 overflow-hidden">
@@ -862,7 +968,12 @@ const Catalogue = () => {
                     <Select
                       value={selectedExpoValue}
                       onValueChange={(value) => {
-                        void assignArtworkToExpo(aw.artwork_id, value === "__none__" ? null : value);
+                        requestExpoMove(
+                          aw.artwork_id,
+                          aw.artwork_title,
+                          selectedExpoOption?.id ?? null,
+                          value === "__none__" ? null : value,
+                        );
                       }}
                       disabled={isAssigningExpo}
                     >
@@ -888,6 +999,20 @@ const Catalogue = () => {
                         )}
                       </SelectContent>
                     </Select>
+                    {expoUndoByArtwork[aw.artwork_id] !== undefined ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 w-full gap-1 px-1.5 text-[10px]"
+                        disabled={isAssigningExpo}
+                        aria-label={t("expo_move_undo_aria")}
+                        onClick={() => void undoExpoMove(aw.artwork_id)}
+                      >
+                        <Undo2 className="h-3 w-3 shrink-0" aria-hidden />
+                        {t("expo_move_undo")}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -975,6 +1100,31 @@ const Catalogue = () => {
                         langs: mediationLangsLabel,
                       })}
                     </span>
+                    <span
+                      className={cn(
+                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        !hasExpectedVoices
+                          ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
+                          : voiceBadgeComplete
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            : voiceBadgePartial
+                              ? "border-amber-300 bg-amber-50 text-amber-800"
+                              : "border-[#E63946] bg-[#E63946] text-white",
+                      )}
+                    >
+                      {!hasExpectedVoices
+                        ? t("badge_ia_voice_none")
+                        : voiceBadgePartial
+                          ? t("badge_ia_voice_partial", {
+                              ready: voiceSummary.readyCount,
+                              expected: voiceSummary.expectedCount,
+                              langs: voiceSummary.langsLabel || mediationLangsLabel,
+                            })
+                          : t("badge_ia_voice", {
+                              count: voiceSummary.readyCount,
+                              langs: voiceSummary.langsLabel || mediationLangsLabel,
+                            })}
+                    </span>
                     </div>
                   </div>
                 </div>
@@ -983,6 +1133,45 @@ const Catalogue = () => {
           );
         })}
       </div>
+
+      <AlertDialog
+        open={expoMovePending !== null}
+        onOpenChange={(open) => {
+          if (!open) setExpoMovePending(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("expo_move_confirm_title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {expoMovePending
+                ? t("expo_move_confirm_desc", {
+                    title: expoMovePending.artworkTitle,
+                    from: resolveExpoLabel(
+                      expoMovePending.fromExpoId,
+                      expoOptions,
+                      t("expo_label_none"),
+                    ),
+                    to: resolveExpoLabel(
+                      expoMovePending.toExpoId,
+                      expoOptions,
+                      t("expo_label_none"),
+                    ),
+                  })
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("expo_move_confirm_no")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-700 text-white hover:bg-amber-800"
+              onClick={() => void confirmExpoMove()}
+            >
+              {t("expo_move_confirm_yes")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={bulkQrConfirmOpen} onOpenChange={(open) => !open && setBulkQrConfirmOpen(false)}>
         <AlertDialogContent>

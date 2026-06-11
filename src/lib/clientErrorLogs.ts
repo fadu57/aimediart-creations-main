@@ -44,6 +44,21 @@ export type ClientErrorLogFilters = {
 
 export const ALL_ERROR_SOURCES = "all";
 
+/** Clés i18n (`settings.error_logs.source_*`) pour les codes `error_source` connus. */
+export const CLIENT_ERROR_SOURCE_I18N_KEYS: Record<string, string> = {
+  "toast.error": "error_logs.source_toast",
+  unhandledrejection: "error_logs.source_unhandledrejection",
+  "window.error": "error_logs.source_window_error",
+};
+
+export function clientErrorSourceLabel(
+  source: string,
+  t: (key: string) => string,
+): string {
+  const key = CLIENT_ERROR_SOURCE_I18N_KEYS[source.trim()];
+  return key ? t(key) : source;
+}
+
 function tablesForAudience(audience: ErrorLogAudience): {
   sessions: string;
   logs: string;
@@ -147,6 +162,31 @@ export async function fetchClientErrorLogs(
   });
 
   return { data: mapped, error: null };
+}
+
+export async function deleteClientErrorSessions(
+  audience: ErrorLogAudience,
+  sessionIds: string[],
+): Promise<{ error: string | null }> {
+  if (!sessionIds.length) return { error: null };
+  const { sessions } = tablesForAudience(audience);
+  const { error } = await supabase.from(sessions).delete().in("id", sessionIds);
+  return { error: error?.message ?? null };
+}
+
+/** Supprime les sessions contenant au moins un log correspondant aux filtres courants. */
+export async function deleteClientErrorSessionsForFilters(
+  audience: ErrorLogAudience,
+  filters: ClientErrorLogFilters,
+): Promise<{ deletedCount: number; error: string | null }> {
+  const { data, error: fetchErr } = await fetchClientErrorLogs(audience, filters, 5000);
+  if (fetchErr) return { deletedCount: 0, error: fetchErr };
+
+  const sessionIds = [...new Set(data.map((row) => row.session_id).filter(Boolean))];
+  if (!sessionIds.length) return { deletedCount: 0, error: null };
+
+  const { error } = await deleteClientErrorSessions(audience, sessionIds);
+  return { deletedCount: error ? 0 : sessionIds.length, error };
 }
 
 export function formatClientErrorDate(iso: string | null | undefined, locale: string): string {

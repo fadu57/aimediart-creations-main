@@ -18,6 +18,8 @@ const HIDDEN_EXPO_KEYS = new Set([
   "expo_horaires",
   // Navigation : gérée par les boutons radio dans la section logo
   "type_navigation",
+  // Lieu : géré par les boutons radio dans la section logo
+  "expo_indoor",
 ]);
 
 /** Colonnes affichées / éditables (hors clés étrangères `*_id`). */

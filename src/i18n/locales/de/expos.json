@@ -45,7 +45,12 @@
     "cancel": "Abbrechen"
   },
   "form": {
-    "navTypeLabel": "Für den Besucher, Navigationstyp"
+    "navTypeLabel": "Für den Besucher, Navigationstyp",
+    "navTypeSameArtist": "Ein gescanntes Werk zeigt alle Werke desselben Künstlers",
+    "navTypeScanSequence": "Gescannte Werke nacheinander",
+    "venueTypeLabel": "Ausstellungsort",
+    "venueIndoor": "Innen",
+    "venueOutdoor": "Außen"
   },
   "tableau": {
     "title": "Ausstellungen — Vollständige Tabelle",

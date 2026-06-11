@@ -41,6 +41,7 @@ import {
   linkVisitorProfileByRecoveryCode,
   normalizeVisitorRecoveryCodeInput,
 } from "@/lib/visitorRecoveryLink";
+import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
 
 function buildQuery(expoId: string): string {
   if (!expoId) return "";
@@ -103,7 +104,7 @@ const RECOVERY_ERROR_KEYS: Record<string, string> = {
   missing_client_id: "visitor_gate.recover.errors.generic",
 };
 
-const VisitorWelcome = () => {
+const VisitorWelcomeCore = () => {
   const { t } = useTranslation("landing");
   const { language: uiLanguage } = useUiLanguage();
   const navigate = useNavigate();
@@ -893,6 +894,25 @@ const VisitorWelcome = () => {
       </div>
     );
   }
+};
+
+/** Landing visiteur après scan QR — garde audio intérieur + premier heartbeat admin. */
+const VisitorWelcome = () => {
+  const { t } = useTranslation("visitor");
+  const [searchParams] = useSearchParams();
+  const expoId = searchParams.get("expo_id")?.trim() ?? "";
+  const artworkId =
+    searchParams.get("artwork_id")?.trim() ?? searchParams.get("artworkId")?.trim() ?? "";
+
+  return (
+    <VisitorIndoorAudioGuard
+      expoId={expoId}
+      artworkId={artworkId || undefined}
+      artworkTitle={t("indoor_audio.welcome_presence_label")}
+    >
+      <VisitorWelcomeCore />
+    </VisitorIndoorAudioGuard>
+  );
 };
 
 export default VisitorWelcome;

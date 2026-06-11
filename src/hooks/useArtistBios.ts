@@ -32,24 +32,40 @@ export function hasAnyBioText(b: Record<Language, string>): boolean {
  * Ne lit jamais `artists.artist_bio`.
  */
 export async function loadArtistBiosForForm(artistId: string): Promise<Record<Language, string>> {
+  const { texts } = await loadArtistBioFormData(artistId);
+  return texts;
+}
+
+export type ArtistBioFormData = {
+  texts: Record<Language, string>;
+  rowIds: Partial<Record<Language, string>>;
+};
+
+export async function loadArtistBioFormData(artistId: string): Promise<ArtistBioFormData> {
   const { data, error } = await supabase
     .from("artist_bios")
-    .select("language,bio_text")
+    .select("id, language, bio_text")
     .eq("artist_id", artistId);
 
   if (error) {
     throw error;
   }
 
-  const merged: Record<Language, string> = { ...EMPTY_BIOS };
+  const texts: Record<Language, string> = { ...EMPTY_BIOS };
+  const rowIds: Partial<Record<Language, string>> = {};
 
-  for (const row of (data ?? []) as Array<{ language?: string | null; bio_text?: string | null }>) {
+  for (const row of (data ?? []) as Array<{
+    id?: string | null;
+    language?: string | null;
+    bio_text?: string | null;
+  }>) {
     const lang = normalizeLang(row.language);
     if (!lang) continue;
-    merged[lang] = (row.bio_text ?? "").trim();
+    texts[lang] = (row.bio_text ?? "").trim();
+    if (row.id) rowIds[lang] = String(row.id);
   }
 
-  return merged;
+  return { texts, rowIds };
 }
 
 /**

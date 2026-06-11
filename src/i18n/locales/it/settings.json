@@ -344,12 +344,27 @@
     "filter_time_to": "Ora a",
     "filter_error_type": "Tipo di errore",
     "filter_all_types": "Tutti i tipi",
+    "source_toast": "Errori di notifica (Toast)",
+    "source_unhandledrejection": "Errori in background (Promise non gestite)",
+    "source_window_error": "Errori dell'applicazione (Browser)",
     "apply_filters": "Applica",
     "sessions_title": "{{count}} errore/i nel periodo",
     "error_count_one": "{{count}} errore",
     "error_count_other": "{{count}} errori",
     "session_open": "sessione aperta",
     "last_page": "Ultima pagina",
-    "empty": "Nessun errore per questi filtri."
+    "empty": "Nessun errore per questi filtri.",
+    "mark_resolved": "Segna come risolto",
+    "select_all": "Seleziona tutto",
+    "delete_selected": "Elimina selezione ({{count}})",
+    "clear_filtered": "Svuota periodo filtrato",
+    "delete_selected_title": "Eliminare le sessioni selezionate?",
+    "delete_selected_desc": "{{count}} sessione/i e i relativi errori saranno eliminati definitivamente.",
+    "clear_filtered_title": "Svuotare tutti i log del periodo?",
+    "clear_filtered_desc": "Tutte le sessioni visibili con i filtri attuali saranno eliminate. Azione irreversibile.",
+    "cancel": "Annulla",
+    "confirm_delete": "Elimina",
+    "delete_success": "{{count}} sessione/i eliminate.",
+    "delete_error": "Impossibile eliminare i log."
   }
 }

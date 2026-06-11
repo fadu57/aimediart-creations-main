@@ -9,9 +9,12 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
 import {
   buildMediationStylePromptStyleMap,
-  triggerMediationAudioBatch,
+  triggerMediationAudioBatchForChanges,
+  mediationLangNeedsAudioGeneration,
+  triggerMediationAudioForLang,
 } from "@/services/audioService";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { AudioVoiceLangStatus } from "@/components/AudioVoiceLangStatus";
 import { generatePersonasBatchWithRetry } from "@/lib/mediationBatchGenerate";
 import { analyzeArtworkImage, type ImageAnalysisPersonaItem } from "@/services/imageAnalysisService";
 import { supabase } from "@/lib/supabase";
@@ -288,6 +291,12 @@ function mediationLangsWithContent(
   );
 }
 
+function sourceMaterialLangsWithContent(
+  byLang: Record<MediationUiLang, string>,
+): MediationUiLang[] {
+  return MEDIATION_UI_LANGS.filter((L) => (byLang[L] ?? "").trim().length > 0);
+}
+
 const ANALYZE_PROGRESS_ESTIMATE_MS = 45_000;
 
 function analyzeProgressDetailFromElapsed(elapsedSec: number, t: (key: string) => string): string {
@@ -549,6 +558,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [sourceMaterialEditLang, setSourceMaterialEditLang] = useState<MediationUiLang>("fr");
   const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
+  const [audioStatusRefreshKey, setAudioStatusRefreshKey] = useState(0);
+  const [audioOptimisticLangs, setAudioOptimisticLangs] = useState<string[]>([]);
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
   const [activeTab, setActiveTab] = useState<DescriptionKey>("enfant");
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
@@ -569,6 +580,10 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     lang: MediationUiLang;
     emptyPersonaCount: number;
   } | null>(null);
+  const [langAudioGeneratePrompt, setLangAudioGeneratePrompt] = useState<{
+    lang: MediationUiLang;
+  } | null>(null);
+  const savedMediationBaselineRef = useRef<Record<string, Record<string, string>>>({});
   const [artistSearch, setArtistSearch] = useState("");
   const [showArtistSuggestions, setShowArtistSuggestions] = useState(false);
   const [duplicateArtwork, setDuplicateArtwork] = useState<{ artwork_id: string; artwork_title: string | null } | null>(null);
@@ -615,10 +630,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     [sourceMaterialByLang, i18n.language],
   );
 
-  const activeSourceMaterialLangSet = useMemo(
-    () => new Set(generationLangs),
-    [generationLangs],
-  );
+  const activeSourceMaterialLangSet = useMemo(() => {
+    const filled = sourceMaterialLangsWithContent(sourceMaterialByLang);
+    const langs = filled.length > 0 ? filled : generationLangs;
+    return new Set(langs);
+  }, [sourceMaterialByLang, generationLangs]);
 
   const persistArtworkSourceMaterial = useCallback(
     async (byLang: Record<MediationUiLang, string>): Promise<void> => {
@@ -866,6 +882,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         setImageAnalysisDone(hasAnySourceMaterial(nextSourceByLang));
         setImagePersonasFromAnalysis([]);
         setDescriptionsByLang(nextByLang);
+        savedMediationBaselineRef.current = serializeMediationDescriptionsByLang(nextByLang);
         setMediationEditLang(resolveMediationUiLang(i18n.language));
         const initialSnapshot = buildDraftSnapshot({
           title: (data.artwork_title as string | null) ?? "",
@@ -903,6 +920,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setImagePersonasFromAnalysis([]);
       const emptyMed = createEmptyDescriptionsByLang();
       setDescriptionsByLang(emptyMed);
+      savedMediationBaselineRef.current = {};
       setMediationEditLang(resolveMediationUiLang(i18n.language));
       setDuplicateArtwork(null);
       const initialSnapshot = buildDraftSnapshot({
@@ -1011,11 +1029,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           );
         }
         toast.success(t("toast_artwork_updated"));
-        triggerMediationAudioBatch({
-          artworkId: persistedArtworkId,
-          descriptionsByLang: serializedMediation,
-          stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
-        });
+        triggerMediationAudioOnChanges(persistedArtworkId, descriptionsByLang);
+        updateMediationBaseline(descriptionsByLang);
         setInitialDraftSignature(
           serializeDraftSnapshot(
             buildDraftSnapshot({
@@ -1041,11 +1056,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
         if (error) throw error;
         newArtworkId = (inserted as { artwork_id: string } | null)?.artwork_id ?? null;
         if (newArtworkId) {
-          triggerMediationAudioBatch({
-            artworkId: newArtworkId,
-            descriptionsByLang: serializedMediation,
-            stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
-          });
+          triggerMediationAudioOnChanges(newArtworkId, descriptionsByLang);
+          updateMediationBaseline(descriptionsByLang);
         }
         toast.success(t("toast_artwork_created"));
       }
@@ -1153,14 +1165,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
   const canAnalyzeImage = !isVisitorLocked && Boolean(imageUrl) && !analyzingImage;
 
-  /** Langues sélectionnées (étape 2) avec contenu généré, ou configurées avant génération. */
+  /** Langues accessibles : toutes celles avec texte sauvegardé, sinon la config étape 2. */
   const activeMediationLangs = useMemo(() => {
-    const configured = generationLangs;
     const filled = mediationLangsWithContent(descriptionsByLang);
-    if (filled.length > 0) {
-      return configured.filter((L) => filled.includes(L));
-    }
-    return imageAnalysisDone ? configured : [];
+    if (filled.length > 0) return filled;
+    return imageAnalysisDone ? generationLangs : [];
   }, [generationLangs, descriptionsByLang, imageAnalysisDone]);
 
   const activeMediationLangSet = useMemo(
@@ -1173,6 +1182,29 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setMediationEditLang(activeMediationLangs[0]);
     }
   }, [activeMediationLangs, activeMediationLangSet, mediationEditLang]);
+
+  /** À l’édition : resynchroniser la langue optionnelle si plusieurs langues ont du contenu. */
+  useEffect(() => {
+    if (!open || artworkDraftLoading || !isEditingExisting) return;
+    if (!allowsOptionalLang || isAllLanguagesMode) return;
+
+    const filled = mediationLangsWithContent(descriptionsByLang);
+    const secondary = filled.find((L) => L !== mediationPrimaryLang);
+    if (!secondary) return;
+    if (mediationOptionalLang !== secondary) {
+      setMediationOptionalLang(secondary);
+    }
+  }, [
+    open,
+    artworkDraftLoading,
+    isEditingExisting,
+    allowsOptionalLang,
+    isAllLanguagesMode,
+    descriptionsByLang,
+    mediationPrimaryLang,
+    mediationOptionalLang,
+    setMediationOptionalLang,
+  ]);
 
   const mediationLangHelp = useMemo(() => {
     if (isAllLanguagesMode) {
@@ -1187,8 +1219,79 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
   }, [isAllLanguagesMode, mediationOptionalLang, mediationPrimaryLang, t]);
 
+  const mediationAudioTargetsByLang = useMemo(() => {
+    const map: Record<
+      string,
+      Array<{ lang: string; text_id: string; prompt_style_id: string }> | null
+    > = {};
+    if (!persistedArtworkId) return map;
+    for (const lng of MEDIATION_UI_LANGS) {
+      const byStyle = descriptionsByLang[lng] ?? {};
+      const targets: Array<{ lang: string; text_id: string; prompt_style_id: string }> = [];
+      for (const tab of styleTabs ?? []) {
+        const prompt_style_id = tab.promptStyleId?.trim();
+        const text = (byStyle[tab.key] ?? "").trim();
+        if (!prompt_style_id || !text) continue;
+        targets.push({ lang: lng, text_id: persistedArtworkId, prompt_style_id });
+      }
+      map[lng] = targets.length > 0 ? targets : null;
+    }
+    return map;
+  }, [persistedArtworkId, descriptionsByLang, styleTabs]);
+
+  const mediationStyleMap = useMemo(
+    () => buildMediationStylePromptStyleMap(styleTabs ?? []),
+    [styleTabs],
+  );
+
+  const mediationPromptStyleLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const tab of styleTabs ?? []) {
+      const id = tab.promptStyleId?.trim();
+      if (id) map[id] = tab.label;
+    }
+    return map;
+  }, [styleTabs]);
+
+  const updateMediationBaseline = useCallback(
+    (byLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>) => {
+      savedMediationBaselineRef.current = serializeMediationDescriptionsByLang(byLang);
+    },
+    [],
+  );
+
+  const triggerMediationAudioOnChanges = useCallback(
+    (artworkId: string, byLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>) => {
+      triggerMediationAudioBatchForChanges({
+        artworkId,
+        descriptionsByLang: serializeMediationDescriptionsByLang(byLang),
+        baselineByLang: savedMediationBaselineRef.current,
+        stylePromptStyleIds: mediationStyleMap,
+      });
+      setAudioStatusRefreshKey((k) => k + 1);
+    },
+    [mediationStyleMap],
+  );
+
   const isAiBusy =
     generatingMediation || regeneratingMediationStyleKey !== null || analyzingImage;
+
+  const checkMediationAudioForLang = useCallback(
+    async (lng: MediationUiLang) => {
+      if (!persistedArtworkId || isVisitorLocked || isAiBusy) return;
+      const hasText = Object.values(descriptionsByLang[lng] ?? {}).some((raw) => (raw ?? "").trim());
+      if (!hasText) return;
+      const needsAudio = await mediationLangNeedsAudioGeneration(
+        persistedArtworkId,
+        lng,
+        serializeMediationDescriptionsByLang(descriptionsByLang),
+        mediationStyleMap,
+      );
+      if (needsAudio) setLangAudioGeneratePrompt({ lang: lng });
+    },
+    [persistedArtworkId, isVisitorLocked, isAiBusy, descriptionsByLang, mediationStyleMap],
+  );
+
   const currentDraftSignature = useMemo(() => {
     const snapshot = buildDraftSnapshot({
       title,
@@ -1377,11 +1480,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     toast.success(t(successToastKey, toastParams));
 
     if (persistedArtworkId) {
-      triggerMediationAudioBatch({
-        artworkId: persistedArtworkId,
-        descriptionsByLang: serializedMediation,
-        stylePromptStyleIds: buildMediationStylePromptStyleMap(styleTabs ?? []),
-      });
+      triggerMediationAudioOnChanges(persistedArtworkId, base);
+      updateMediationBaseline(base);
     }
 
     return true;
@@ -1514,6 +1614,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     const currentPersonaEmpty = !(descriptionsByLang[lng]?.[activeTab] ?? "").trim();
     if (!currentPersonaEmpty) {
       setMediationEditLang(lng);
+      void checkMediationAudioForLang(lng);
       return;
     }
     if (!sourceMaterialForGeneration.trim()) {
@@ -2251,6 +2352,58 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog
+          open={langAudioGeneratePrompt !== null}
+          onOpenChange={(open) => {
+            if (!open) setLangAudioGeneratePrompt(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {langAudioGeneratePrompt
+                  ? t("dialog_lang_audio_title", {
+                      lang: langCodeForProgress(langAudioGeneratePrompt.lang),
+                    })
+                  : ""}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {langAudioGeneratePrompt
+                  ? t("dialog_lang_audio_desc", {
+                      lang: langCodeForProgress(langAudioGeneratePrompt.lang),
+                    })
+                  : ""}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setLangAudioGeneratePrompt(null)}>
+                {t("dialog_lang_audio_no")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-amber-700 text-white hover:bg-amber-800"
+                onClick={() => {
+                  const lng = langAudioGeneratePrompt?.lang;
+                  setLangAudioGeneratePrompt(null);
+                  if (!lng || !persistedArtworkId) return;
+                  const langKey = lng.trim().toLowerCase().slice(0, 2);
+                  triggerMediationAudioForLang({
+                    artworkId: persistedArtworkId,
+                    lang: lng,
+                    descriptionsByLang: serializeMediationDescriptionsByLang(descriptionsByLang),
+                    stylePromptStyleIds: mediationStyleMap,
+                  });
+                  setAudioOptimisticLangs((prev) =>
+                    prev.includes(langKey) ? prev : [...prev, langKey],
+                  );
+                  setAudioStatusRefreshKey((k) => k + 1);
+                }}
+              >
+                {t("dialog_lang_audio_yes")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -2296,6 +2449,30 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               </Button>
               );
             })}
+            <AudioVoiceLangStatus
+              languages={MEDIATION_UI_LANGS}
+              text_type="mediation"
+              targetsByLang={mediationAudioTargetsByLang}
+              refreshKey={audioStatusRefreshKey}
+              optimisticLangs={audioOptimisticLangs}
+              onOptimisticLangDone={(lang) =>
+                setAudioOptimisticLangs((prev) => prev.filter((l) => l !== lang))
+              }
+              promptStyleLabels={mediationPromptStyleLabels}
+              onRetryLang={(lang) => {
+                if (!persistedArtworkId) return;
+                const lng = lang.trim().toLowerCase().slice(0, 2) as MediationUiLang;
+                triggerMediationAudioForLang({
+                  artworkId: persistedArtworkId,
+                  lang: lng,
+                  descriptionsByLang: serializeMediationDescriptionsByLang(descriptionsByLang),
+                  stylePromptStyleIds: mediationStyleMap,
+                });
+                setAudioOptimisticLangs((prev) => (prev.includes(lng) ? prev : [...prev, lng]));
+                setAudioStatusRefreshKey((k) => k + 1);
+              }}
+              className="min-w-0 flex-1"
+            />
           </div>
           <p className="text-xs text-muted-foreground">{mediationLangHelp}</p>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
@@ -2325,10 +2502,12 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               <TabsContent key={tab.key} value={tab.key}>
                 <div className="mb-2 space-y-2">
                   <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-1">
-                    <p className="text-[11px] font-medium leading-snug text-destructive">
+                    <p className="w-[450px] py-1 text-[11px] font-medium leading-snug text-destructive">
                       {t("mediation_regenerate_hint_line1")}
                       <br />
                       {t("mediation_regenerate_hint_line2")}
+                      <br />
+                      {t("mediation_regenerate_hint_line3")}
                     </p>
                     <div className="relative shrink-0">
                       <WorkflowStepBadge step={4} />

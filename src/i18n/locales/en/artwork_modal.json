@@ -74,6 +74,7 @@
   "mediation_optional_lang_limit_hint": "Only 1 additional optional language is allowed",
   "mediation_regenerate_hint_line1": "If you are not satisfied with a generated mediation text,",
   "mediation_regenerate_hint_line2": "you can regenerate one persona at most",
+  "mediation_regenerate_hint_line3": "You can also edit or type mediation text yourself at any time. Only one edit per persona is allowed",
   "mediation_ai_analysis_toggle": "View AI analysis (model reasoning, French)",
   "mediation_ai_analysis_hint": "From the model’s “analysis and reflection” field. Not shown to visitors; tabs below hold persona texts.",
   "analyze_personas_toggle": "View structured points (image analysis)",
@@ -95,6 +96,10 @@
   "dialog_lang_generate_desc": "The “{{persona}}” persona is empty in {{lang}}. Generate all {{count}} mediations (every persona) in this language? Text already filled for other personas in {{lang}} will be kept.",
   "dialog_lang_generate_yes": "Yes, generate",
   "dialog_lang_generate_no": "No, view only",
+  "dialog_lang_audio_title": "Generate voices in {{lang}}?",
+  "dialog_lang_audio_desc": "Mediation texts exist in {{lang}} but audio guides (voices F and M) are not ready yet. Start generation now?",
+  "dialog_lang_audio_yes": "Yes, generate voices",
+  "dialog_lang_audio_no": "Later",
   "toast_mediation_lang_generated": "Mediations generated in {{lang}} ({{count}} persona(s)).",
   "btn_regenerate_style_ai": "Regenerate this persona (AI)",
   "btn_regenerating_style_ai": "Regenerating…",
@@ -127,9 +132,22 @@
     "loading": "Loading audio…",
     "generating": "Audio in progress…",
     "generate": "Generate audio",
+    "retry": "Retry",
+    "error": "Audio generation failed or timed out.",
     "voice_f": "Voice F",
     "voice_m": "Voice M",
     "play_f": "Play female voice",
     "play_m": "Play male voice"
+  },
+  "audio_voice_status": {
+    "label": "Generated voices",
+    "aria": "Audio guide status by language",
+    "voice_f": "Female voice",
+    "voice_m": "Male voice",
+    "progress": "{{ready}}/{{total}}",
+    "progress_generating": "{{ready}}/{{total}} · {{active}} in progress",
+    "progress_errors": "{{ready}}/{{total}} · {{error}} error(s)",
+    "progress_errors_pending": "{{ready}}/{{total}} · {{error}} error(s) · {{pending}} pending",
+    "retry_lang": "Retry audio generation for this language"
   }
 }

@@ -75,6 +75,7 @@
   "mediation_optional_lang_limit_hint": "Seule 1 langue optionnelle supplémentaire est possible",
   "mediation_regenerate_hint_line1": "Si vous n'êtes pas satisfait d'un texte de médiation généré,",
   "mediation_regenerate_hint_line2": "vous pouvez sélectionner 1 persona max pour le régénérer",
+  "mediation_regenerate_hint_line3": "Vous pouvez aussi modifier / saisir vous-même à tout moment un texte de médiation. Mais seule 1 modification par persona est possible",
   "mediation_ai_analysis_toggle": "Voir l'analyse IA (raisonnement du modèle, langue FR)",
   "mediation_ai_analysis_hint": "Ce texte provient du champ « analyse et réflexion » du modèle. Il n'est pas affiché aux visiteurs ; les onglets ci-dessous contiennent les textes par persona.",
   "analyze_personas_toggle": "Voir les points structurés (analyse d'image)",
@@ -96,6 +97,10 @@
   "dialog_lang_generate_desc": "Le persona « {{persona}} » est vide en {{lang}}. Souhaitez-vous générer les {{count}} médiations (tous les personas) dans cette langue ? Les textes déjà remplis pour d'autres personas en {{lang}} seront conservés.",
   "dialog_lang_generate_yes": "Oui, générer",
   "dialog_lang_generate_no": "Non, afficher seulement",
+  "dialog_lang_audio_title": "Générer les voix en {{lang}} ?",
+  "dialog_lang_audio_desc": "Des textes de médiation existent en {{lang}} mais les guides audio (voix F et M) ne sont pas encore prêts. Souhaitez-vous lancer la génération maintenant ?",
+  "dialog_lang_audio_yes": "Oui, générer les voix",
+  "dialog_lang_audio_no": "Plus tard",
   "toast_mediation_lang_generated": "Médiations générées en {{lang}} ({{count}} persona(s)).",
   "btn_regenerate_style_ai": "Régénérer ce persona (IA)",
   "btn_regenerating_style_ai": "Régénération…",
@@ -128,9 +133,22 @@
     "loading": "Chargement audio…",
     "generating": "Audio en cours…",
     "generate": "Générer l'audio",
+    "retry": "Réessayer",
+    "error": "La génération audio a échoué ou a expiré.",
     "voice_f": "Voix F",
     "voice_m": "Voix M",
     "play_f": "Lire voix féminine",
     "play_m": "Lire voix masculine"
+  },
+  "audio_voice_status": {
+    "label": "Voix générées",
+    "aria": "État des guides audio par langue",
+    "voice_f": "Voix féminine",
+    "voice_m": "Voix masculine",
+    "progress": "{{ready}}/{{total}}",
+    "progress_generating": "{{ready}}/{{total}} · {{active}} en cours",
+    "progress_errors": "{{ready}}/{{total}} · {{error}} erreur(s)",
+    "progress_errors_pending": "{{ready}}/{{total}} · {{error}} erreur(s) · {{pending}} en attente",
+    "retry_lang": "Relancer la génération audio pour cette langue"
   }
 }

@@ -46,7 +46,12 @@
     "cancel": "Annuler"
   },
   "form": {
-    "navTypeLabel": "Pour le visiteur, type de navigation"
+    "navTypeLabel": "Pour le visiteur, type de navigation",
+    "navTypeSameArtist": "Une œuvre scannée donne toutes les œuvres du même artiste",
+    "navTypeScanSequence": "Œuvres scannées l'une après l'autre",
+    "venueTypeLabel": "Lieu de l'exposition",
+    "venueIndoor": "En intérieur",
+    "venueOutdoor": "En extérieur"
   },
   "tableau": {
     "title": "Expositions — Tableau complet",
@@ -66,5 +71,26 @@
     "cancel": "Annuler",
     "confirm": "Supprimer",
     "archiving": "Archivage..."
+  },
+  "audio_monitor": {
+    "title": "Surveillance audio visiteurs",
+    "subtitle": "Visiteurs actifs en expo intérieure — position QR et bannissement audio en direct.",
+    "back_expos": "Retour aux expositions",
+    "select_expo": "Exposition",
+    "expo_placeholder": "Choisir une exposition…",
+    "refresh": "Actualiser",
+    "pick_expo_hint": "Sélectionnez une exposition pour voir les visiteurs connectés.",
+    "empty": "Aucun visiteur actif sur les 5 dernières minutes.",
+    "col_visitor": "Visiteur",
+    "col_artwork": "Œuvre scannée",
+    "col_headphones": "Écouteurs",
+    "col_seen": "Vu à",
+    "col_status": "Statut",
+    "col_action": "Action",
+    "status_banned": "Banni",
+    "status_active": "Actif",
+    "ban": "Bannir audio",
+    "unban": "Réactiver",
+    "expo_label": "Exposition :"
   }
 }

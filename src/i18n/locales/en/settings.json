@@ -370,12 +370,27 @@
     "filter_time_to": "Time to",
     "filter_error_type": "Error type",
     "filter_all_types": "All types",
+    "source_toast": "Notification errors (Toast)",
+    "source_unhandledrejection": "Background errors (Unhandled promises)",
+    "source_window_error": "Application errors (Browser)",
     "apply_filters": "Apply",
     "sessions_title": "{{count}} error(s) in period",
     "error_count_one": "{{count}} error",
     "error_count_other": "{{count}} errors",
     "session_open": "session open",
     "last_page": "Last page",
-    "empty": "No errors for these filters."
+    "empty": "No errors for these filters.",
+    "mark_resolved": "Mark as resolved",
+    "select_all": "Select all",
+    "delete_selected": "Delete selection ({{count}})",
+    "clear_filtered": "Clear filtered period",
+    "delete_selected_title": "Delete selected sessions?",
+    "delete_selected_desc": "{{count}} session(s) and their errors will be permanently removed.",
+    "clear_filtered_title": "Clear all logs in this period?",
+    "clear_filtered_desc": "All sessions matching the current filters will be removed. This cannot be undone.",
+    "cancel": "Cancel",
+    "confirm_delete": "Delete",
+    "delete_success": "{{count}} session(s) deleted.",
+    "delete_error": "Could not delete logs."
   }
 }

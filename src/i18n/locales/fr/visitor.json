@@ -92,5 +92,16 @@
   "tts_voice_label": "Voix :",
   "tts_voice_aria": "Choisir la voix de lecture",
   "tts_voice_auto": "Automatique",
-  "tts_voice_none": "Aucune voix installée"
+  "tts_voice_none": "Aucune voix installée",
+  "indoor_audio": {
+    "title": "Audio en salle d'exposition",
+    "no_headphones": "Nous n'avons pas détecté d'écouteurs. Pour le confort de tous, branchez des écouteurs (filaires ou Bluetooth) ou baissez le volume de votre appareil au strict minimum avant d'écouter.",
+    "uncertain_devices": "Nous ne pouvons pas vérifier vos écouteurs sur cet appareil. Par courtoisie envers les autres visiteurs, utilisez des écouteurs ou un volume très bas.",
+    "headphones_ok": "Merci d'utiliser vos écouteurs et de garder un volume discret dans les salles.",
+    "ban_warning": "Si vous dérangez les autres visiteurs en diffusant du son dans la salle, l'équipe de l'exposition peut suspendre votre accès audio pour le reste de la visite.",
+    "accept": "J'ai compris et j'accepte",
+    "welcome_presence_label": "Portail d'accueil exposition",
+    "ban_title": "Audio suspendu",
+    "ban_message": "Audio suspendu par le musée. Par respect pour le calme de l'exposition, l'usage des haut-parleurs est interdit. Veuillez brancher vos écouteurs et vous adresser à l'accueil pour réactiver votre accès."
+  }
 }

@@ -9,6 +9,8 @@ export type VisitorExpoInfo = {
   date_expo_du: string | null;
   date_expo_au: string | null;
   expo_descript_i18n: string | Record<string, string> | null;
+  /** true = en intérieur (défaut), false = extérieur */
+  expo_indoor: boolean;
 };
 
 function coerceDisplayCell(value: unknown): string {
@@ -81,5 +83,6 @@ export function mapExpoRowToInfo(row: VisitorExpoRow): VisitorExpoInfo {
     date_expo_du: coerceDisplayCell(row.date_expo_du) || null,
     date_expo_au: coerceDisplayCell(row.date_expo_au) || null,
     expo_descript_i18n,
+    expo_indoor: row.expo_indoor !== false,
   };
 }

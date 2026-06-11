@@ -165,6 +165,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const [initialHoraires, setInitialHoraires] = useState<ExpoHoraires>({ ...HORAIRES_VIDE });
   const [typeNavigation, setTypeNavigation] = useState<boolean>(false);
   const [initialTypeNavigation, setInitialTypeNavigation] = useState<boolean>(false);
+  const [expoIndoor, setExpoIndoor] = useState<boolean>(true);
+  const [initialExpoIndoor, setInitialExpoIndoor] = useState<boolean>(true);
   const [sponsorLogos, setSponsorLogos] = useState<SponsorLogoEntry[]>([]);
   const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -313,6 +315,9 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       const loadedTypeNav = row.type_navigation === true;
       setTypeNavigation(loadedTypeNav);
       setInitialTypeNavigation(loadedTypeNav);
+      const loadedExpoIndoor = row.expo_indoor !== false;
+      setExpoIndoor(loadedExpoIndoor);
+      setInitialExpoIndoor(loadedExpoIndoor);
     } catch (e) {
       toast.error(getErrorMessage(e, "Impossible de charger l’exposition."));
       onOpenChange(false);
@@ -352,6 +357,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       setInitialHoraires(emptyHoraires);
       setTypeNavigation(false);
       setInitialTypeNavigation(false);
+      setExpoIndoor(true);
+      setInitialExpoIndoor(true);
       return;
     }
     void loadRow();
@@ -401,6 +408,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         payload.curator = null;
         payload.expo_horaires = horaires;
         payload.type_navigation = typeNavigation;
+        payload.expo_indoor = expoIndoor;
 
         for (const k of sortedKeys) {
           if (k === "id") continue;
@@ -422,6 +430,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         payload.curator = null;
         payload.expo_horaires = horaires;
         payload.type_navigation = typeNavigation;
+        payload.expo_indoor = expoIndoor;
         for (const k of Object.keys(mergedValues)) {
           if (k === "id" || k.endsWith("_id") || k === "created_at" || k === "updated_at") continue;
           const raw = mergedValues[k] ?? "";
@@ -439,6 +448,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       setInitialSelectedCuratorId(selectedCuratorId);
       setInitialHoraires(horaires);
       setInitialTypeNavigation(typeNavigation);
+      setInitialExpoIndoor(expoIndoor);
       setLogoFileByKey({});
       onOpenChange(false);
     } catch (e) {
@@ -560,7 +570,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
     (canPickAgency && selectedAgencyId !== initialSelectedAgencyId) ||
     selectedCuratorId !== initialSelectedCuratorId ||
     JSON.stringify(horaires) !== JSON.stringify(initialHoraires) ||
-    typeNavigation !== initialTypeNavigation;
+    typeNavigation !== initialTypeNavigation ||
+    expoIndoor !== initialExpoIndoor;
   const requestClose = () => {
     if (mode === "edit" && hasFormChanges) {
       setShowCloseConfirm(true);
@@ -581,7 +592,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       }}
     >
       <DialogContent
-        className="max-h-[92vh] max-w-lg overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:max-w-2xl"
+        className="max-h-[92vh] w-[96vw] max-w-5xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{mode === "create" ? "Nouvelle exposition" : "Fiche de l'exposition"}</DialogTitle>
@@ -1036,36 +1047,69 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                           }}
                         />
                       </div>
-                      {/* Navigation des œuvres — à droite du logo */}
-                      <div className="shrink-0 space-y-2 w-[430px]">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          {t("form.navTypeLabel")}
-                        </p>
-                        <div className="space-y-1.5">
-                          <label className="flex cursor-pointer items-start gap-2 text-sm">
-                            <input
-                              type="radio"
-                              name="type_navigation"
-                              value="false"
-                              checked={!typeNavigation}
-                              onChange={() => setTypeNavigation(false)}
-                              disabled={saving}
-                              className="mt-0.5 accent-primary"
-                            />
-                            <span className="flex-1">Une œuvre scannée donne toutes les œuvres du même artiste</span>
-                          </label>
-                          <label className="flex cursor-pointer items-start gap-2 text-sm">
-                            <input
-                              type="radio"
-                              name="type_navigation"
-                              value="true"
-                              checked={typeNavigation}
-                              onChange={() => setTypeNavigation(true)}
-                              disabled={saving}
-                              className="mt-0.5 accent-primary"
-                            />
-                            <span>Œuvres scannées l'une après l'autre</span>
-                          </label>
+                      {/* Navigation + lieu — à droite du logo, côte à côte */}
+                      <div className="flex min-w-0 flex-1 items-start gap-6">
+                        <div className="shrink-0 space-y-2 w-[270px]">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            {t("form.navTypeLabel")}
+                          </p>
+                          <div className="space-y-1.5">
+                            <label className="flex cursor-pointer items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="type_navigation"
+                                value="false"
+                                checked={!typeNavigation}
+                                onChange={() => setTypeNavigation(false)}
+                                disabled={saving}
+                                className="mt-0.5 accent-primary"
+                              />
+                              <span className="flex-1">{t("form.navTypeSameArtist")}</span>
+                            </label>
+                            <label className="flex cursor-pointer items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="type_navigation"
+                                value="true"
+                                checked={typeNavigation}
+                                onChange={() => setTypeNavigation(true)}
+                                disabled={saving}
+                                className="mt-0.5 accent-primary"
+                              />
+                              <span>{t("form.navTypeScanSequence")}</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="shrink-0 space-y-2 w-[350px]">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            {t("form.venueTypeLabel")}
+                          </p>
+                          <div className="space-y-1.5">
+                            <label className="flex cursor-pointer items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="expo_indoor"
+                                value="true"
+                                checked={expoIndoor}
+                                onChange={() => setExpoIndoor(true)}
+                                disabled={saving}
+                                className="mt-0.5 accent-primary"
+                              />
+                              <span className="flex-1">{t("form.venueIndoor")}</span>
+                            </label>
+                            <label className="flex cursor-pointer items-start gap-2 text-sm">
+                              <input
+                                type="radio"
+                                name="expo_indoor"
+                                value="false"
+                                checked={!expoIndoor}
+                                onChange={() => setExpoIndoor(false)}
+                                disabled={saving}
+                                className="mt-0.5 accent-primary"
+                              />
+                              <span>{t("form.venueOutdoor")}</span>
+                            </label>
+                          </div>
                         </div>
                       </div>
 

@@ -92,5 +92,16 @@
   "tts_voice_label": "Voice:",
   "tts_voice_aria": "Choose reading voice",
   "tts_voice_auto": "Automatic",
-  "tts_voice_none": "No voice installed"
+  "tts_voice_none": "No voice installed",
+  "indoor_audio": {
+    "title": "Audio in the exhibition rooms",
+    "no_headphones": "We did not detect headphones. For everyone's comfort, please plug in headphones (wired or Bluetooth) or turn your device volume down to the minimum before listening.",
+    "uncertain_devices": "We cannot verify your headphones on this device. Please use headphones or a very low volume out of courtesy to other visitors.",
+    "headphones_ok": "Thank you for using headphones and keeping the volume discreet in the galleries.",
+    "ban_warning": "If you disturb other visitors by playing sound aloud, the exhibition staff may suspend your audio access for the rest of your visit.",
+    "accept": "I understand and agree",
+    "welcome_presence_label": "Exhibition welcome portal",
+    "ban_title": "Audio suspended",
+    "ban_message": "Audio suspended by the museum. Out of respect for the quiet of the exhibition, speaker playback is not allowed. Please plug in your headphones and contact the front desk to restore your access."
+  }
 }

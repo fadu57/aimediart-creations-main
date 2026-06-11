@@ -74,6 +74,7 @@ import ExpoCastPage from "./pages/ExpoCastPage";
 import OeuvresArtiste from "./pages/OeuvresArtiste";
 import WelcomeLanding from "./pages/WelcomeLanding";
 import VisitorWelcome from "./pages/visitor/VisitorWelcome";
+import ExposVisitorAudioMonitor from "./pages/ExposVisitorAudioMonitor";
 import LegalStaticPage from "./pages/LegalStaticPage";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getAudienceChoice } from "./lib/audienceChoice";
@@ -305,6 +306,7 @@ const AppRoutes = () => (
           <Route path="expos/expos2" element={<Expos2 />} />
           <Route path="expos/visitors" element={<ExposVisitors />} />
           <Route path="expos/visitors/:id" element={<ExposVisitorDetail />} />
+          <Route path="expos/visitor-audio" element={<ExposVisitorAudioMonitor />} />
           <Route path="expos/sponsors" element={<ExposSponsors />} />
           <Route path="visiteurs-corbeille" element={<VisiteursCorbeille />} />
           <Route path="expos-corbeille" element={<ExposCorbeille />} />

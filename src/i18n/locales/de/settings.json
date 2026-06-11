@@ -344,12 +344,27 @@
     "filter_time_to": "Uhrzeit bis",
     "filter_error_type": "Fehlertyp",
     "filter_all_types": "Alle Typen",
+    "source_toast": "Benachrichtigungsfehler (Toast)",
+    "source_unhandledrejection": "Hintergrundfehler (Unbehandelte Promises)",
+    "source_window_error": "Anwendungsfehler (Browser)",
     "apply_filters": "Anwenden",
     "sessions_title": "{{count}} Fehler im Zeitraum",
     "error_count_one": "{{count}} Fehler",
     "error_count_other": "{{count}} Fehler",
     "session_open": "Sitzung läuft",
     "last_page": "Letzte Seite",
-    "empty": "Keine Fehler für diese Filter."
+    "empty": "Keine Fehler für diese Filter.",
+    "mark_resolved": "Als behoben markieren",
+    "select_all": "Alle auswählen",
+    "delete_selected": "Auswahl löschen ({{count}})",
+    "clear_filtered": "Gefilterten Zeitraum leeren",
+    "delete_selected_title": "Ausgewählte Sitzungen löschen?",
+    "delete_selected_desc": "{{count}} Sitzung(en) und ihre Fehler werden endgültig gelöscht.",
+    "clear_filtered_title": "Alle Logs im Zeitraum löschen?",
+    "clear_filtered_desc": "Alle Sitzungen der aktuellen Filter werden gelöscht. Nicht rückgängig zu machen.",
+    "cancel": "Abbrechen",
+    "confirm_delete": "Löschen",
+    "delete_success": "{{count}} Sitzung(en) gelöscht.",
+    "delete_error": "Logs konnten nicht gelöscht werden."
   }
 }

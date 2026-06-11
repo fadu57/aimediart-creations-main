@@ -3,7 +3,8 @@ import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-d
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { TtsPlayButton } from "@/components/TtsPlayButton";
-import { useGoogleTts } from "@/hooks/useGoogleTts";
+import { useVisitorTtsWithGuard } from "@/hooks/useVisitorTtsWithGuard";
+import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, BookOpen, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
@@ -172,7 +173,7 @@ function mediationStyleTextForLang(raw: unknown, styleKey: string, lang: Mediati
   return typeof v === "string" ? v.trim() : "";
 }
 
-const VisitorView = () => {
+const VisitorViewCore = () => {
   const { t } = useTranslation("visitor");
   const { t: tHeader } = useTranslation("header");
   const navigate = useNavigate();
@@ -193,7 +194,7 @@ const VisitorView = () => {
   const { session, loading: authLoading, role_id, role_name, first_name } = useAuthUser();
   const { language, setLanguage } = useUiLanguage();
   const { can, loading: navMatrixLoading } = useNavigationMatrix();
-  const tts = useGoogleTts();
+  const tts = useVisitorTtsWithGuard();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const [artist, setArtist] = useState<ArtistRow | null>(null);
@@ -1428,7 +1429,7 @@ const VisitorView = () => {
                               <TtsPlayButton
                                 isPlaying={tts.isSpeaking && tts.speakingText === slide.text}
                                 isLoading={tts.isLoading && tts.speakingText === slide.text}
-                                onPress={() => void tts.speak(slide.text, language)}
+                                onPress={() => void tts.speak(slide.text, language as string)}
                                 supported
                               />
                             </div>
@@ -1848,6 +1849,25 @@ const VisitorView = () => {
       )}
 
     </div>
+  );
+};
+
+/** Page œuvre visiteur — enveloppée par la garde audio intérieur. */
+const VisitorView = () => {
+  const [searchParams] = useSearchParams();
+  const { artworkId: artworkIdParam } = useParams<{ artworkId?: string }>();
+  const expoId = searchParams.get("expo_id")?.trim() || "";
+  const artworkId = useMemo(() => {
+    const raw = artworkIdParam?.trim();
+    if (!raw) return undefined;
+    const parsed = parseArtworkIdFromInput(raw);
+    return parsed || raw;
+  }, [artworkIdParam]);
+
+  return (
+    <VisitorIndoorAudioGuard expoId={expoId} artworkId={artworkId}>
+      <VisitorViewCore />
+    </VisitorIndoorAudioGuard>
   );
 };
 

@@ -45,7 +45,12 @@
     "cancel": "Cancelar"
   },
   "form": {
-    "navTypeLabel": "Para el visitante, tipo de navegación"
+    "navTypeLabel": "Para el visitante, tipo de navegación",
+    "navTypeSameArtist": "Una obra escaneada muestra todas las obras del mismo artista",
+    "navTypeScanSequence": "Obras escaneadas una tras otra",
+    "venueTypeLabel": "Lugar de la exposición",
+    "venueIndoor": "En interior",
+    "venueOutdoor": "En exterior"
   },
   "tableau": {
     "title": "Exposiciones — Tabla completa",
