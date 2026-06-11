@@ -272,7 +272,7 @@ export default function ExposVisitorAudioMonitor() {
                 <th className="px-3 py-2.5 text-right">{t("audio_monitor.col_action")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10">
+            <tbody className="divide-y divide-white/10 [&_td]:text-[#F0F0F0]">
               {rows.map((row) => {
                 const isBanned = Boolean(row.banned_at);
                 const busy = actionId === row.id;
@@ -296,7 +296,7 @@ export default function ExposVisitorAudioMonitor() {
                         <span className="text-[#F0F0F0]/65">{t("audio_monitor.consent_pending")}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-[#F0F0F0]/90">
+                    <td className="px-3 py-2.5 whitespace-nowrap font-medium tabular-nums">
                       {formatLastSeen(row.last_seen_at)}
                     </td>
                     <td className="px-3 py-2.5">
