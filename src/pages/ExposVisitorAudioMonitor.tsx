@@ -20,8 +20,12 @@ import {
   unbanVisitorAudioSession,
   type VisitorAudioPresenceRow,
 } from "@/lib/visitorAudioSession";
+import { buildSimulatedAudioPresenceRows } from "@/lib/visitorAudioMonitorSimulate";
 
 type ExpoOption = { id: string; expo_name: string | null };
+
+const TH = "px-2 py-1.5 text-[10px]";
+const TD = "px-2 py-1 text-xs leading-tight";
 
 function formatLastSeen(value: string): string {
   const d = new Date(value);
@@ -107,6 +111,12 @@ export default function ExposVisitorAudioMonitor() {
   const { t } = useTranslation("expos");
   const [searchParams, setSearchParams] = useSearchParams();
   const filterExpoId = searchParams.get("expo_id")?.trim() || "";
+  const simulateCount = useMemo(() => {
+    const raw = searchParams.get("simulate")?.trim() ?? "";
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 0;
+  }, [searchParams]);
+  const isSimulate = simulateCount > 0;
   const { loading: authLoading, role_id: currentRoleId } = useAuthUser();
   const canAccess = typeof currentRoleId === "number" && currentRoleId >= 1 && currentRoleId <= 4;
 
@@ -127,7 +137,21 @@ export default function ExposVisitorAudioMonitor() {
     setExpos((data as ExpoOption[] | null) ?? []);
   }, []);
 
+  const simulatedRows = useMemo(
+    () =>
+      isSimulate
+        ? buildSimulatedAudioPresenceRows(simulateCount, filterExpoId || "00000000-0000-4000-8000-000000000001")
+        : [],
+    [filterExpoId, isSimulate, simulateCount],
+  );
+  const displayRows = isSimulate ? simulatedRows : rows;
+
   const loadPresence = useCallback(async (silent = false) => {
+    if (isSimulate) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     if (!filterExpoId || !canAccess) {
       setRows([]);
       setLoading(false);
@@ -150,7 +174,7 @@ export default function ExposVisitorAudioMonitor() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filterExpoId, canAccess, t]);
+  }, [filterExpoId, canAccess, t, isSimulate]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -158,12 +182,18 @@ export default function ExposVisitorAudioMonitor() {
   }, [canAccess, loadExpos]);
 
   useEffect(() => {
+    if (isSimulate) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
     void loadPresence();
     const timer = window.setInterval(() => void loadPresence(true), 10_000);
     return () => window.clearInterval(timer);
-  }, [loadPresence]);
+  }, [loadPresence, isSimulate]);
 
   const handleBan = async (row: VisitorAudioPresenceRow) => {
+    if (isSimulate) return;
     setActionId(row.id);
     try {
       await banVisitorAudioSession(row.id);
@@ -176,6 +206,7 @@ export default function ExposVisitorAudioMonitor() {
   };
 
   const handleUnban = async (row: VisitorAudioPresenceRow) => {
+    if (isSimulate) return;
     setActionId(row.id);
     try {
       await unbanVisitorAudioSession(row.id);
@@ -240,7 +271,21 @@ export default function ExposVisitorAudioMonitor() {
             type="button"
             variant="outline"
             size="sm"
-            disabled={!filterExpoId || refreshing}
+            disabled={refreshing}
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              if (isSimulate) next.delete("simulate");
+              else next.set("simulate", "200");
+              setSearchParams(next, { replace: true });
+            }}
+          >
+            {isSimulate ? t("audio_monitor.simulate_off") : t("audio_monitor.simulate_on")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!filterExpoId || refreshing || isSimulate}
             onClick={() => void loadPresence(true)}
           >
             <RefreshCw className={`mr-1.5 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -249,94 +294,108 @@ export default function ExposVisitorAudioMonitor() {
         </CardContent>
       </Card>
 
+      {isSimulate ? (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          {t("audio_monitor.simulate_banner", { count: simulateCount })}
+        </p>
+      ) : null}
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {!filterExpoId ? (
+      {!filterExpoId && !isSimulate ? (
         <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.pick_expo_hint")}</p>
-      ) : loading ? (
+      ) : loading && !isSimulate ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-[#F0F0F0]/60" />
         </div>
-      ) : rows.length === 0 ? (
+      ) : displayRows.length === 0 ? (
         <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.empty")}</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-white/15 bg-[#1E1E1E]">
-          <table className="w-full min-w-[640px] text-sm text-[#F0F0F0]">
-            <thead className="border-b border-white/15 bg-[#2A2A2A] text-left text-xs font-semibold uppercase tracking-wide text-[#F0F0F0]">
-              <tr>
-                <th className="px-3 py-2.5">{t("audio_monitor.col_visitor")}</th>
-                <th className="px-3 py-2.5">{t("audio_monitor.col_artwork")}</th>
-                <th className="px-3 py-2.5">{t("audio_monitor.col_consent")}</th>
-                <th className="px-3 py-2.5">{t("audio_monitor.col_seen")}</th>
-                <th className="px-3 py-2.5">{t("audio_monitor.col_status")}</th>
-                <th className="px-3 py-2.5 text-right">{t("audio_monitor.col_action")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10 [&_td]:text-[#F0F0F0]">
-              {rows.map((row) => {
-                const isBanned = Boolean(row.banned_at);
-                const busy = actionId === row.id;
-                const visitorLabel = row.visitor_pseudo?.trim() || t("audio_monitor.visitor_unknown");
-                const artworkLabel = row.artwork_title?.trim() || t("audio_monitor.artwork_unknown");
-                return (
-                  <tr key={row.id} className="bg-[#1E1E1E]">
-                    <td className="px-3 py-2.5 font-medium text-[#F0F0F0]" title={row.visitor_client_id}>
-                      {visitorLabel}
-                    </td>
-                    <td className="px-3 py-2.5 font-medium text-[#F0F0F0]" title={row.artwork_id ?? undefined}>
-                      {artworkLabel}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {row.audio_consent_acknowledged === true ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {t("audio_monitor.consent_yes")}
-                        </span>
-                      ) : (
-                        <span className="text-[#F0F0F0]/65">{t("audio_monitor.consent_pending")}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap font-medium tabular-nums">
-                      {formatLastSeen(row.last_seen_at)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {isBanned ? (
-                        <span className="font-medium text-red-400">{t("audio_monitor.status_banned")}</span>
-                      ) : (
-                        <span className="text-[#F0F0F0]/75">{t("audio_monitor.status_active")}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {isBanned ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          onClick={() => void handleUnban(row)}
-                        >
-                          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-1 h-4 w-4" />}
-                          {t("audio_monitor.unban")}
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          disabled={busy}
-                          onClick={() => void handleBan(row)}
-                        >
-                          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="mr-1 h-4 w-4" />}
-                          {t("audio_monitor.ban")}
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <p className="text-xs font-medium text-[#F0F0F0]/70">
+            {t("audio_monitor.row_count", { count: displayRows.length })}
+          </p>
+          <div className="max-h-[min(70vh,640px)] overflow-auto rounded-lg border border-white/15 bg-[#1E1E1E]">
+            <table className="w-full min-w-[640px] text-xs text-[#F0F0F0]">
+              <thead className="sticky top-0 z-10 border-b border-white/15 bg-[#2A2A2A] text-left text-[10px] font-semibold uppercase tracking-wide text-[#F0F0F0]">
+                <tr>
+                  <th className={TH}>{t("audio_monitor.col_visitor")}</th>
+                  <th className={TH}>{t("audio_monitor.col_artwork")}</th>
+                  <th className={TH}>{t("audio_monitor.col_consent")}</th>
+                  <th className={TH}>{t("audio_monitor.col_seen")}</th>
+                  <th className={TH}>{t("audio_monitor.col_status")}</th>
+                  <th className={`${TH} text-right`}>{t("audio_monitor.col_action")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10 [&_td]:text-[#F0F0F0]">
+                {displayRows.map((row) => {
+                  const isBanned = Boolean(row.banned_at);
+                  const busy = actionId === row.id;
+                  const visitorLabel = row.visitor_pseudo?.trim() || t("audio_monitor.visitor_unknown");
+                  const artworkLabel = row.artwork_title?.trim() || t("audio_monitor.artwork_unknown");
+                  return (
+                    <tr key={row.id} className="bg-[#1E1E1E] hover:bg-[#252525]">
+                      <td className={`${TD} max-w-[140px] truncate font-medium`} title={row.visitor_client_id}>
+                        {visitorLabel}
+                      </td>
+                      <td className={`${TD} max-w-[180px] truncate font-medium`} title={row.artwork_id ?? undefined}>
+                        {artworkLabel}
+                      </td>
+                      <td className={TD}>
+                        {row.audio_consent_acknowledged === true ? (
+                          <span className="inline-flex items-center gap-0.5 text-emerald-400">
+                            <CheckCircle2 className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">{t("audio_monitor.consent_yes")}</span>
+                            <span className="sm:hidden">OK</span>
+                          </span>
+                        ) : (
+                          <span className="text-[#F0F0F0]/65">{t("audio_monitor.consent_pending")}</span>
+                        )}
+                      </td>
+                      <td className={`${TD} whitespace-nowrap font-medium tabular-nums`}>
+                        {formatLastSeen(row.last_seen_at)}
+                      </td>
+                      <td className={TD}>
+                        {isBanned ? (
+                          <span className="font-medium text-red-400">{t("audio_monitor.status_banned")}</span>
+                        ) : (
+                          <span className="text-[#F0F0F0]/75">{t("audio_monitor.status_active")}</span>
+                        )}
+                      </td>
+                      <td className={`${TD} text-right`}>
+                        {isBanned ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || isSimulate}
+                            className="h-7 px-2 text-xs"
+                            onClick={() => void handleUnban(row)}
+                          >
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="mr-1 h-3 w-3" />}
+                            {t("audio_monitor.unban")}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            disabled={busy || isSimulate}
+                            className="h-7 px-2 text-xs"
+                            onClick={() => void handleBan(row)}
+                          >
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="mr-1 h-3 w-3" />}
+                            {t("audio_monitor.ban")}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {filterExpoId ? (
