@@ -69,6 +69,11 @@ export async function fetchExpoRowForVisitor(expoIdRaw: string): Promise<Visitor
   return null;
 }
 
+/** true = œuvres scannées l'une après l'autre ; false = toutes les œuvres du même artiste. */
+export function readExpoScanSequenceNavigation(row: VisitorExpoRow | null): boolean {
+  return row?.type_navigation === true;
+}
+
 export function mapExpoRowToInfo(row: VisitorExpoRow): VisitorExpoInfo {
   const rawLogo = expoLogoRawFromRow(row);
   const descriptRaw = row.expo_descript_i18n;

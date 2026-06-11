@@ -37,6 +37,7 @@ import {
   type MediationCarouselSlide,
 } from "@/lib/mediationSwiperLoop";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
+import { fetchExpoRowForVisitor, readExpoScanSequenceNavigation } from "@/lib/visitorExpoFetch";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import {
   localizeVisitorAnonymousProfile,
@@ -190,8 +191,8 @@ const VisitorViewCore = () => {
   const isEmbedded = searchParams.get("embed") === "1";
   const navModeFromQuery = searchParams.get("nav_mode")?.trim() || "";
   const [œuvresNavigationMode, setOeuvresNavigationMode] = useState("");
-  const isSameArtistNavigation =
-    navModeFromQuery === "same_artist_all_works" || œuvresNavigationMode === "same_artist_all_works";
+  const [expoScanSequenceNav, setExpoScanSequenceNav] = useState<boolean | null>(null);
+  const expoIdFromQuery = searchParams.get("expo_id")?.trim() || "";
   const { artworkId: artworkIdParam } = useParams<{ artworkId?: string }>();
   /** Corrige les URLs cassées du type /œuvre/http%3A%2F%2F... (QR mal lu ou double encodage). */
   const artworkId = useMemo(() => {
@@ -206,6 +207,16 @@ const VisitorViewCore = () => {
   const tts = useVisitorTtsWithGuard();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
+  const effectiveExpoId = expoIdFromQuery || artwork?.artwork_expo_id?.trim() || "";
+  const isSameArtistNavigation = useMemo(() => {
+    if (navModeFromQuery === "same_artist_all_works") return true;
+    if (navModeFromQuery === "single_scan_sequence") return false;
+    if (effectiveExpoId && expoScanSequenceNav !== null) {
+      return !expoScanSequenceNav;
+    }
+    return œuvresNavigationMode === "same_artist_all_works";
+  }, [navModeFromQuery, effectiveExpoId, expoScanSequenceNav, œuvresNavigationMode]);
+  const showScanAnotherNav = !isEmbedded && !isSameArtistNavigation;
   const [artist, setArtist] = useState<ArtistRow | null>(null);
   const [artistBioByLang, setArtistBioByLang] = useState<Record<string, string>>({});
   const [artistBioIdByLang, setArtistBioIdByLang] = useState<Record<string, string>>({});
@@ -332,6 +343,22 @@ const VisitorViewCore = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!effectiveExpoId) {
+      setExpoScanSequenceNav(null);
+      return;
+    }
+    void (async () => {
+      const row = await fetchExpoRowForVisitor(effectiveExpoId);
+      if (cancelled) return;
+      setExpoScanSequenceNav(readExpoScanSequenceNavigation(row));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveExpoId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1036,7 +1063,8 @@ const VisitorViewCore = () => {
     setIsValidationPopupOpen(false);
     const artworkIdForQuery = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
     const queryParts: string[] = [];
-    if (expoId) queryParts.push(`expo_id=${encodeURIComponent(expoId)}`);
+    const scanExpoId = effectiveExpoId || expoId;
+    if (scanExpoId) queryParts.push(`expo_id=${encodeURIComponent(scanExpoId)}`);
     if (artworkIdForQuery) queryParts.push(`artwork_id=${encodeURIComponent(artworkIdForQuery)}`);
     const target = queryParts.length > 0 ? `/scan-work2?${queryParts.join("&")}` : "/scan-work2";
     navigate(target);
@@ -1071,6 +1099,9 @@ const VisitorViewCore = () => {
       total: sameArtistArtworkIds.length,
     };
   }, [isSameArtistNavigation, sameArtistArtworkIds, artwork?.artwork_id, artworkId]);
+
+  const hasTopVisitorBar =
+    !isEmbedded && ((isSameArtistNavigation && Boolean(sameArtistNavMeta)) || showScanAnotherNav);
 
   const quickFeedbackHintMessageKey = useMemo((): string | null => {
     if (!quickFeedbackHint) return null;
@@ -1350,7 +1381,7 @@ const VisitorViewCore = () => {
       </div>
       <div
         className={`œuvre-page-container ${
-          isEmbedded ? "pt-[58px]" : isSameArtistNavigation ? "pt-[68px]" : "pt-[92px]"
+          isEmbedded ? "pt-[58px]" : hasTopVisitorBar ? "pt-[68px]" : "pt-[92px]"
         } space-y-0 pb-6`}
       >
         {isSameArtistNavigation && sameArtistNavMeta && (
@@ -1405,6 +1436,17 @@ const VisitorViewCore = () => {
                 />
               </button>
             </div>
+          </div>
+        )}
+        {showScanAnotherNav && (
+          <div className="œuvre-full-width-box mb-3 mt-0 px-4">
+            <Button
+              type="button"
+              className="h-11 w-full rounded-2xl border border-white/10 bg-[#181818] text-sm font-semibold text-[#F0F0F0] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-[#E63946]/40 hover:bg-[#222222]"
+              onClick={handleScanAnotherArtwork}
+            >
+              {t("btn_scan_another")}
+            </Button>
           </div>
         )}
         {/* Artwork title + artiste (bio au clic) */}
