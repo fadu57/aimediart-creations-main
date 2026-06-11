@@ -1059,7 +1059,7 @@ const VisitorViewCore = () => {
     setCommentError(null);
   };
 
-  const handleScanAnotherArtwork = () => {
+  const navigateToScanAnotherArtwork = () => {
     setIsValidationPopupOpen(false);
     const artworkIdForQuery = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
     const queryParts: string[] = [];
@@ -1068,6 +1068,17 @@ const VisitorViewCore = () => {
     if (artworkIdForQuery) queryParts.push(`artwork_id=${encodeURIComponent(artworkIdForQuery)}`);
     const target = queryParts.length > 0 ? `/scan-work2?${queryParts.join("&")}` : "/scan-work2";
     navigate(target);
+  };
+
+  const handleScanAnotherArtworkClick = () => {
+    if (!assertFeedbackBeforeLeavingArtwork()) return;
+    handleResetFeedbackSelection();
+    navigateToScanAnotherArtwork();
+  };
+
+  /** Après validation du ressenti (popup merci) — pas de re-contrôle. */
+  const handleScanAnotherArtwork = () => {
+    navigateToScanAnotherArtwork();
   };
 
   const handleExitExpo = () => {
@@ -1121,7 +1132,7 @@ const VisitorViewCore = () => {
     }, 4500);
   };
 
-  const handleSameArtistNavigationClick = (direction: -1 | 1) => {
+  const assertFeedbackBeforeLeavingArtwork = (): boolean => {
     const hasNoEmotion = !selectedEmotion;
     const hasNoHeart = heartRating === 0;
     if (hasNoEmotion || hasNoHeart) {
@@ -1129,8 +1140,13 @@ const VisitorViewCore = () => {
       window.setTimeout(() => {
         emotionSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 120);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleSameArtistNavigationClick = (direction: -1 | 1) => {
+    if (!assertFeedbackBeforeLeavingArtwork()) return;
     handleResetFeedbackSelection();
     navigateSameArtistArtwork(direction);
   };
@@ -1443,7 +1459,7 @@ const VisitorViewCore = () => {
             <Button
               type="button"
               className="h-11 w-full rounded-2xl border border-white/10 bg-[#181818] text-sm font-semibold text-[#F0F0F0] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors hover:border-[#E63946]/40 hover:bg-[#222222]"
-              onClick={handleScanAnotherArtwork}
+              onClick={handleScanAnotherArtworkClick}
             >
               {t("btn_scan_another")}
             </Button>
