@@ -315,7 +315,7 @@ export default function ExposVisitors() {
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
       <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" onClick={() => navigate("/expos")}>
+        <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn" onClick={() => navigate("/expos")}>
           ← Retour aux expositions
         </Button>
       </div>
@@ -328,7 +328,7 @@ export default function ExposVisitors() {
               : "Visiteurs inscrits"}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs" asChild>
+            <Button type="button" variant="outline" size="sm" className="backoffice-toolbar-outline-btn h-7 gap-1 text-xs" asChild>
               <Link to="/visiteurs-corbeille">
                 <ArchiveRestore className="h-3.5 w-3.5" />
                 Corbeille

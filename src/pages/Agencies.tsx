@@ -328,7 +328,7 @@ const Agencies = () => {
               <Plus className="h-4 w-4" />
               {t("page.create")}
             </Button>
-            <Button type="button" variant="outline" className="gap-2" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn gap-2" asChild>
               <Link to="/agencies/agencies2">{t("page.tableau")}</Link>
             </Button>
           </div>

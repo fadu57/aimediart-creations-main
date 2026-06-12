@@ -187,7 +187,7 @@ const Artists = () => {
                 <Plus className="h-4 w-4" /> {t("btn_new_artist")}
               </Button>
             )}
-            <Button type="button" variant="outline" className="gap-2" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn gap-2" asChild>
               <Link to="/artistes/artistes2">{t("btn_table_view")}</Link>
             </Button>
           </div>

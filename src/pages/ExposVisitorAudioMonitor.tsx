@@ -210,7 +210,7 @@ export default function ExposVisitorAudioMonitor() {
           <p className="text-sm text-[#F0F0F0]/75">{t("audio_monitor.subtitle")}</p>
           <p className="mt-1 text-xs text-[#F0F0F0]/60">{t("audio_monitor.duplicate_hint")}</p>
         </div>
-        <Button type="button" variant="outline" size="sm" asChild>
+        <Button type="button" variant="outline" size="sm" className="backoffice-toolbar-outline-btn" asChild>
           <Link to="/expos">{t("audio_monitor.back_expos")}</Link>
         </Button>
       </div>

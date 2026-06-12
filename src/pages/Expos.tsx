@@ -690,16 +690,16 @@ const Expos = () => {
               <Plus className="h-4 w-4 shrink-0" />
               {t("page.create")}
             </Button>
-            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
               <Link to="/expos/expos2">{t("page.tableau")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
               <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
               <Link to="/expos/visitor-audio">{t("audio_monitor.title")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
               <Link to="/expos/sponsors">
                 <Building2 className="h-4 w-4 shrink-0" aria-hidden />
                 {t("page.sponsorsList", "Liste des sponsors")}

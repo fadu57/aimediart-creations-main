@@ -1891,7 +1891,7 @@ const Statistics = () => {
             type="button"
             variant="outline"
             className={cn(
-              "mt-3",
+              "backoffice-toolbar-outline-btn mt-3",
               uniqueVisitorsTotal === 0 &&
                 "cursor-not-allowed border-neutral-600 bg-neutral-700/50 text-neutral-500 opacity-100 hover:bg-neutral-700/50 hover:text-neutral-500",
             )}

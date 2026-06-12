@@ -342,6 +342,14 @@
     border-color: hsl(var(--accent) / 0.65);
   }
 
+  /**
+   * Barres d’outils back-office (fond #121212 + texte clair hérité) :
+   * les boutons outline doivent rester lisibles (fond clair, texte sombre).
+   */
+  .backoffice-toolbar-outline-btn {
+    @apply border-border bg-white text-neutral-900 hover:bg-neutral-100 hover:text-neutral-950;
+  }
+
   .text-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
     -webkit-background-clip: text;

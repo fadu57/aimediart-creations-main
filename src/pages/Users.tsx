@@ -2065,7 +2065,7 @@ const Users = ({
           >
             + Nouvel utilisateur
           </Button>
-          <Button asChild type="button" variant="outline" className="border-border bg-background/80">
+          <Button asChild type="button" variant="outline" className="backoffice-toolbar-outline-btn">
             <Link to="/user/utilisateurs" className="text-center leading-tight">Tableau</Link>
           </Button>
         </div>

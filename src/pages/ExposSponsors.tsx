@@ -255,7 +255,7 @@ export default function ExposSponsors() {
           <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("page.subtitle")}</p>
         </div>
-        <Button variant="outline" className="gap-2 shrink-0" asChild>
+        <Button variant="outline" className="backoffice-toolbar-outline-btn gap-2 shrink-0" asChild>
           <Link to="/expos">
             <ArrowLeft className="h-4 w-4" />
             {t("page.back")}
