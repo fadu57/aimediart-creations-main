@@ -32,6 +32,7 @@ import { toPublicStorageUrl, resolveAvatarDisplayUrl, readAvatarFromMeta } from 
 import { fetchUserEditDetails } from "@/lib/userEditDetails";
 import { resolveUserAvatarUrl, readAvatarFromRpcRow } from "@/lib/userAvatar";
 import { isRoleAssignableBy, parseNumericRoleId } from "@/lib/roleHierarchy";
+import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 
 // ---------------------------------------------------------------------------
 // Nouveau modèle :
@@ -53,6 +54,7 @@ type UserRow = {
   email?: string | null;
   phone?: string | null;
   expo_id?: string | null;
+  last_sign_in_at?: string | null;
 };
 
 type ExpoOption = {
@@ -207,6 +209,7 @@ type RpcUserWithRolesRow = {
   email?: string | null;
   birth_year?: number | string | null;
   birth_month?: string | number | null;
+  last_sign_in_at?: string | null;
 };
 
 function rpcRowUserId(row: RpcUserWithRolesRow): string {
@@ -490,6 +493,7 @@ function mapRpcRowToUserRow(row: RpcUserWithRolesRow): UserRow | null {
     role_id: parseNumericRoleId(row.role_id),
     agency_id: row.agency_id ?? null,
     expo_id: row.expo_id ?? null,
+    last_sign_in_at: typeof row.last_sign_in_at === "string" ? row.last_sign_in_at : null,
   };
 }
 
@@ -2121,6 +2125,9 @@ const Users = ({
                   </p>
                 ) : null}
                 <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Dernière connexion&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
+                </p>
                 {u.phone?.trim() ? <p className="text-sm">{u.phone.trim()}</p> : null}
               </div>
               <div className="ml-auto flex w-24 shrink-0 flex-col gap-1">

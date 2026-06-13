@@ -40,16 +40,53 @@ export type ClientErrorLogFilters = {
   timeFrom: string;
   timeTo: string;
   errorSource: string;
+  /** Organisateur : filtre par utilisateur (profiles.id). */
+  organizerUserId: string;
+  /** Visiteur : filtre par visitor_client_id. */
+  visitorClientId: string;
 };
 
 export const ALL_ERROR_SOURCES = "all";
+export const ALL_ORGANIZER_USERS = "all";
+export const ALL_VISITORS = "all";
+
+/** Codes `error_source` pour connexion / déconnexion / session. */
+export const AUTH_EVENT_SOURCES = [
+  "auth.sign_in",
+  "auth.sign_out",
+  "auth.session_start",
+  "auth.session_end",
+] as const;
+
+export type AuthEventSource = (typeof AUTH_EVENT_SOURCES)[number];
 
 /** Clés i18n (`settings.error_logs.source_*`) pour les codes `error_source` connus. */
 export const CLIENT_ERROR_SOURCE_I18N_KEYS: Record<string, string> = {
   "toast.error": "error_logs.source_toast",
   unhandledrejection: "error_logs.source_unhandledrejection",
   "window.error": "error_logs.source_window_error",
+  "auth.sign_in": "error_logs.source_auth_sign_in",
+  "auth.sign_out": "error_logs.source_auth_sign_out",
+  "auth.session_start": "error_logs.source_auth_session_start",
+  "auth.session_end": "error_logs.source_auth_session_end",
 };
+
+export function isAuthEventSource(source: string): boolean {
+  return (AUTH_EVENT_SOURCES as readonly string[]).includes(source.trim());
+}
+
+export function splitLogsByAuthKind(logs: ClientErrorLogRow[]): {
+  errors: ClientErrorLogRow[];
+  authLogs: ClientErrorLogRow[];
+} {
+  const errors: ClientErrorLogRow[] = [];
+  const authLogs: ClientErrorLogRow[] = [];
+  for (const log of logs) {
+    if (isAuthEventSource(log.error_source)) authLogs.push(log);
+    else errors.push(log);
+  }
+  return { errors, authLogs };
+}
 
 export function clientErrorSourceLabel(
   source: string,
@@ -113,6 +150,8 @@ export function defaultClientErrorFilters(today = new Date()): ClientErrorLogFil
     timeFrom: "00:00",
     timeTo: "23:59",
     errorSource: ALL_ERROR_SOURCES,
+    organizerUserId: ALL_ORGANIZER_USERS,
+    visitorClientId: ALL_VISITORS,
   };
 }
 
@@ -123,12 +162,147 @@ export async function fetchDistinctErrorSources(
   const { data, error } = await supabase.from(logs).select("error_source").limit(5000);
   if (error) return { data: [], error: error.message };
 
-  const set = new Set<string>();
+  const set = new Set<string>(AUTH_EVENT_SOURCES);
   for (const row of data ?? []) {
     const src = (row as { error_source?: string }).error_source?.trim();
     if (src) set.add(src);
   }
   return { data: [...set].sort(), error: null };
+}
+
+function syntheticAuthLogsForSession(
+  session: ClientErrorSessionRow,
+  existingBySource: Set<string>,
+): ClientErrorLogRow[] {
+  const rows: ClientErrorLogRow[] = [];
+  if (!existingBySource.has("auth.session_start")) {
+    rows.push({
+      id: `syn-start-${session.id}`,
+      session_id: session.id,
+      error_message: "Début de session (connexion au parcours)",
+      error_stack: null,
+      error_source: "auth.session_start",
+      page_url: session.last_page_url,
+      metadata: null,
+      created_at: session.started_at,
+    });
+  }
+  if (session.ended_at && !existingBySource.has("auth.session_end")) {
+    rows.push({
+      id: `syn-end-${session.id}`,
+      session_id: session.id,
+      error_message: "Fin de session (déconnexion ou fermeture onglet)",
+      error_stack: null,
+      error_source: "auth.session_end",
+      page_url: session.last_page_url,
+      metadata: null,
+      created_at: session.ended_at,
+    });
+  }
+  return rows;
+}
+
+function shouldIncludeAuthSynthetic(filters: ClientErrorLogFilters): boolean {
+  if (filters.errorSource === ALL_ERROR_SOURCES) return true;
+  return filters.errorSource === "auth.session_start" || filters.errorSource === "auth.session_end";
+}
+
+async function fetchSessionsForAuthSynthetic(
+  audience: ErrorLogAudience,
+  fromIso: string,
+  toIso: string,
+): Promise<ClientErrorSessionRow[]> {
+  const { sessions } = tablesForAudience(audience);
+  const [{ data: started }, { data: ended }] = await Promise.all([
+    supabase
+      .from(sessions)
+      .select("*")
+      .gte("started_at", fromIso)
+      .lte("started_at", toIso)
+      .limit(2000),
+    supabase
+      .from(sessions)
+      .select("*")
+      .not("ended_at", "is", null)
+      .gte("ended_at", fromIso)
+      .lte("ended_at", toIso)
+      .limit(2000),
+  ]);
+
+  const byId = new Map<string, ClientErrorSessionRow>();
+  for (const row of [...(started ?? []), ...(ended ?? [])] as ClientErrorSessionRow[]) {
+    if (row?.id) byId.set(row.id, row);
+  }
+  return [...byId.values()];
+}
+
+export type OrganizerUserFilterOption = {
+  id: string;
+  label: string;
+};
+
+/** Liste des utilisateurs organisateurs pour le filtre déroulant. */
+export async function fetchOrganizerUsersForFilter(): Promise<{
+  data: OrganizerUserFilterOption[];
+  error: string | null;
+}> {
+  const { data, error } = await supabase.rpc("get_all_users_with_roles");
+  if (error) return { data: [], error: error.message };
+
+  const options: OrganizerUserFilterOption[] = [];
+  for (const row of data ?? []) {
+    const r = row as {
+      id?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+      username?: string | null;
+      role_id?: number | null;
+    };
+    const id = r.id?.trim();
+    if (!id) continue;
+    if (r.role_id === 7) continue;
+    const label =
+      formatProfileFullName(r.first_name, r.last_name) ??
+      r.username?.trim() ??
+      id.slice(0, 8);
+    options.push({ id, label });
+  }
+
+  options.sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  return { data: options, error: null };
+}
+
+function sessionMatchesOrganizerUserFilter(
+  session: ClientErrorSessionRow | null,
+  matchingUserIds: Set<string> | null,
+): boolean {
+  if (!matchingUserIds) return true;
+  const userId = session?.auth_user_id?.trim();
+  return Boolean(userId && matchingUserIds.has(userId));
+}
+
+function sessionMatchesVisitorClientFilter(
+  session: ClientErrorSessionRow | null,
+  matchingClientIds: Set<string> | null,
+): boolean {
+  if (!matchingClientIds) return true;
+  const clientId = session?.visitor_client_id?.trim();
+  return Boolean(clientId && matchingClientIds.has(clientId));
+}
+
+function sessionMatchesAudienceFilter(
+  audience: ErrorLogAudience,
+  session: ClientErrorSessionRow | null,
+  matchingOrganizerUserIds: Set<string> | null,
+  matchingVisitorClientIds: Set<string> | null,
+): boolean {
+  if (audience === "organizer") {
+    return sessionMatchesOrganizerUserFilter(session, matchingOrganizerUserIds);
+  }
+  if (audience === "visitor") {
+    return sessionMatchesVisitorClientFilter(session, matchingVisitorClientIds);
+  }
+  return true;
 }
 
 export async function fetchClientErrorLogs(
@@ -138,6 +312,18 @@ export async function fetchClientErrorLogs(
 ): Promise<{ data: ClientErrorLogWithSession[]; error: string | null }> {
   const { logs, sessionFk } = tablesForAudience(audience);
   const { fromIso, toIso } = buildClientErrorFilterRange(filters);
+
+  const userIdFilter = filters.organizerUserId?.trim() ?? "";
+  const matchingOrganizerUserIds =
+    audience === "organizer" && userIdFilter && userIdFilter !== ALL_ORGANIZER_USERS
+      ? new Set([userIdFilter])
+      : null;
+
+  const visitorIdFilter = filters.visitorClientId?.trim() ?? "";
+  const matchingVisitorClientIds =
+    audience === "visitor" && visitorIdFilter && visitorIdFilter !== ALL_VISITORS
+      ? new Set([visitorIdFilter])
+      : null;
 
   let query = supabase
     .from(logs)
@@ -159,9 +345,53 @@ export async function fetchClientErrorLogs(
     const session = r[sessionFk] ?? null;
     const { [sessionFk]: _drop, ...log } = r;
     return { ...log, session } as ClientErrorLogWithSession;
-  });
+  }).filter((row) =>
+    sessionMatchesAudienceFilter(
+      audience,
+      row.session,
+      matchingOrganizerUserIds,
+      matchingVisitorClientIds,
+    ),
+  );
 
-  return { data: mapped, error: null };
+  if (shouldIncludeAuthSynthetic(filters)) {
+    const sessions = (await fetchSessionsForAuthSynthetic(audience, fromIso, toIso)).filter(
+      (session) =>
+        sessionMatchesAudienceFilter(
+          audience,
+          session,
+          matchingOrganizerUserIds,
+          matchingVisitorClientIds,
+        ),
+    );
+    const logsBySession = new Map<string, ClientErrorLogRow[]>();
+    for (const row of mapped) {
+      const list = logsBySession.get(row.session_id) ?? [];
+      list.push(row);
+      logsBySession.set(row.session_id, list);
+    }
+
+    for (const session of sessions) {
+      const existingSources = new Set(
+        (logsBySession.get(session.id) ?? []).map((l) => l.error_source),
+      );
+      const synthetic = syntheticAuthLogsForSession(session, existingSources).filter((log) => {
+        if (filters.errorSource === ALL_ERROR_SOURCES) return true;
+        return log.error_source === filters.errorSource;
+      });
+      if (!synthetic.length) continue;
+
+      for (const log of synthetic) {
+        mapped.push({ ...log, session });
+      }
+    }
+  }
+
+  mapped.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+
+  return { data: mapped.slice(0, limit), error: null };
 }
 
 export async function deleteClientErrorSessions(
@@ -226,13 +456,209 @@ export function groupLogsBySession(
 export function sessionClientLabel(
   audience: ErrorLogAudience,
   session: ClientErrorSessionRow,
+  profileNames?: ReadonlyMap<string, string>,
+  visitorLabels?: ReadonlyMap<string, string>,
 ): string {
   if (audience === "visitor") {
     const id = session.visitor_client_id?.trim();
-    return id ? id.slice(0, 12) + (id.length > 12 ? "…" : "") : "—";
+    if (!id) return "—";
+    const label = visitorLabels?.get(id);
+    if (label) return label;
+    return id.slice(0, 12) + "…";
   }
-  const id = session.auth_user_id?.trim();
-  return id ? id.slice(0, 8) + "…" : "—";
+  const userId = session.auth_user_id?.trim();
+  if (!userId) return "—";
+  const name = profileNames?.get(userId);
+  if (name) return name;
+  return userId.slice(0, 8) + "…";
+}
+
+export function formatProfileFullName(
+  firstName?: string | null,
+  lastName?: string | null,
+): string | null {
+  const parts = [firstName?.trim(), lastName?.trim()].filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
+}
+
+function readNameFromLogMetadata(
+  meta: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!meta || typeof meta !== "object") return null;
+  return (
+    formatProfileFullName(
+      typeof meta.first_name === "string"
+        ? meta.first_name
+        : typeof meta.prenom === "string"
+          ? meta.prenom
+          : null,
+      typeof meta.last_name === "string"
+        ? meta.last_name
+        : typeof meta.nom === "string"
+          ? meta.nom
+          : null,
+    ) ?? null
+  );
+}
+
+/** Prénom + nom pour les logs auth organisateur (session ou metadata du log). */
+export function authLogOrganizerDisplayName(
+  session: ClientErrorSessionRow,
+  log: ClientErrorLogRow,
+  profileNames: ReadonlyMap<string, string>,
+): string | null {
+  const fromMeta = readNameFromLogMetadata(log.metadata);
+  if (fromMeta) return fromMeta;
+  const userId = session.auth_user_id?.trim();
+  if (!userId) return null;
+  return profileNames.get(userId) ?? null;
+}
+
+export type VisitorFilterOption = {
+  id: string;
+  label: string;
+};
+
+const ANONYMOUS_VISITOR_NAMES = new Set(["anonymous", "anonyme"]);
+
+/** Libellé visiteur : prénom + nom (ou nom complet), sinon pseudo. */
+export function formatVisitorDisplayLabel(
+  visitorName?: string | null,
+  visitorPseudo?: string | null,
+  profileFirstName?: string | null,
+  profileLastName?: string | null,
+): string | null {
+  const fromProfile = formatProfileFullName(profileFirstName, profileLastName);
+  if (fromProfile) return fromProfile;
+
+  const name = visitorName?.trim();
+  if (name && !ANONYMOUS_VISITOR_NAMES.has(name.toLowerCase())) return name;
+
+  const pseudo = visitorPseudo?.trim();
+  if (pseudo) return pseudo;
+
+  return null;
+}
+
+function applyVisitorRowLabel(
+  result: Map<string, string>,
+  clientId: string,
+  visitorName?: string | null,
+  visitorPseudo?: string | null,
+): void {
+  const label = formatVisitorDisplayLabel(visitorName, visitorPseudo);
+  if (label) result.set(clientId, label);
+}
+
+/** Labels visiteur pour affichage (sessions / logs). */
+export async function fetchVisitorLabelsByClientIds(
+  clientIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(clientIds.map((id) => id.trim()).filter(Boolean))];
+  const result = new Map<string, string>();
+  if (!unique.length) return result;
+
+  const { data: byClientId, error } = await supabase
+    .from("visitors")
+    .select("id, visitor_client_id, visitor_name, visitor_pseudo")
+    .in("visitor_client_id", unique);
+
+  if (error) return result;
+
+  const unresolved = new Set(unique);
+  for (const row of byClientId ?? []) {
+    const r = row as {
+      id?: string | null;
+      visitor_client_id?: string | null;
+      visitor_name?: string | null;
+      visitor_pseudo?: string | null;
+    };
+    const clientId = r.visitor_client_id?.trim();
+    if (!clientId || !unresolved.has(clientId)) continue;
+    unresolved.delete(clientId);
+    applyVisitorRowLabel(result, clientId, r.visitor_name, r.visitor_pseudo);
+  }
+
+  if (unresolved.size > 0) {
+    const { data: byId } = await supabase
+      .from("visitors")
+      .select("id, visitor_client_id, visitor_name, visitor_pseudo")
+      .in("id", [...unresolved]);
+    for (const row of byId ?? []) {
+      const r = row as {
+        id?: string | null;
+        visitor_name?: string | null;
+        visitor_pseudo?: string | null;
+      };
+      const id = r.id?.trim();
+      if (!id || !unresolved.has(id)) continue;
+      applyVisitorRowLabel(result, id, r.visitor_name, r.visitor_pseudo);
+    }
+  }
+
+  return result;
+}
+
+/** Liste des visiteurs pour le filtre déroulant (autocomplétion). */
+export async function fetchVisitorsForFilter(): Promise<{
+  data: VisitorFilterOption[];
+  error: string | null;
+}> {
+  const { data, error } = await supabase
+    .from("visitors")
+    .select("id, visitor_client_id, visitor_name, visitor_pseudo")
+    .is("deleted_at", null)
+    .limit(3000);
+
+  if (error) return { data: [], error: error.message };
+
+  const options: VisitorFilterOption[] = [];
+  const seen = new Set<string>();
+
+  for (const row of data ?? []) {
+    const r = row as {
+      id?: string | null;
+      visitor_client_id?: string | null;
+      visitor_name?: string | null;
+      visitor_pseudo?: string | null;
+    };
+    const clientId = (r.visitor_client_id ?? r.id)?.trim();
+    if (!clientId || seen.has(clientId)) continue;
+    seen.add(clientId);
+    const label =
+      formatVisitorDisplayLabel(r.visitor_name, r.visitor_pseudo) ??
+      `${clientId.slice(0, 12)}…`;
+    options.push({ id: clientId, label });
+  }
+
+  options.sort((a, b) => a.label.localeCompare(b.label, "fr"));
+  return { data: options, error: null };
+}
+
+export async function fetchProfileNamesByUserIds(
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  const result = new Map<string, string>();
+  if (!unique.length) return result;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .in("id", unique);
+
+  if (error) return result;
+
+  for (const row of data ?? []) {
+    const id = (row as { id?: string }).id?.trim();
+    if (!id) continue;
+    const name = formatProfileFullName(
+      (row as { first_name?: string | null }).first_name,
+      (row as { last_name?: string | null }).last_name,
+    );
+    if (name) result.set(id, name);
+  }
+  return result;
 }
 
 /** @deprecated */

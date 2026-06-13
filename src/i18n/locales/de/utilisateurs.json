@@ -12,6 +12,8 @@
     "colOrganisation": "Organisation",
     "colExpo": "Ausstellung",
     "colRole": "Rolle",
+    "colLastSignIn": "Letzte Anmeldung",
+    "neverSignedIn": "Nie angemeldet",
     "empty": "Kein Benutzer sichtbar.",
     "deleteAriaLabel": "Benutzer löschen",
     "deleteTitle": "Löschen"

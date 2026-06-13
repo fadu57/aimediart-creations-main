@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
@@ -25,6 +25,10 @@ import {
   type VisitorExpoInfo,
 } from "@/lib/visitorExpoFetch";
 import { markVisitorExpoGateDone } from "@/lib/visitorExpoGateSession";
+import {
+  startVisitorExpoVisit,
+  type VisitorExpoVisitEntrySource,
+} from "@/lib/visitorExpoVisit";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
 import { reportVisitorError } from "@/lib/visitorErrorLogging";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
@@ -155,11 +159,27 @@ const VisitorWelcomeCore = () => {
   const expoDescriptionTruncated = Boolean(fullExpoDescription && fullExpoDescription.length > 450);
   const showExpoWelcome = Boolean(hasExpoLandingContext || effectiveExpoId || expoInfo);
 
+  const visitStartRef = useRef<string | null>(null);
+
+  const navigateAfterGate = useCallback(
+    async (entrySource: VisitorExpoVisitEntrySource, navOptions?: { replace?: boolean }) => {
+      const expo = effectiveExpoId.trim();
+      if (expo && visitStartRef.current !== expo) {
+        const visitId = await startVisitorExpoVisit({ expoId: expo, entrySource });
+        if (visitId) {
+          visitStartRef.current = expo;
+        }
+      }
+      navigate(postGatePath, { replace: navOptions?.replace ?? false });
+    },
+    [effectiveExpoId, navigate, postGatePath],
+  );
+
   const handleLinkCodeDialogOpenChange = (open: boolean) => {
     setLinkCodeDialogOpen(open);
     if (!open && pendingScanNavigate) {
       setPendingScanNavigate(false);
-      navigate(postGatePath, { replace: false });
+      void navigateAfterGate("visitor_welcome");
     }
   };
 
@@ -193,7 +213,18 @@ const VisitorWelcomeCore = () => {
             if (hasExpoLandingContext) {
               // Visiteur reconnu avec contexte expo → bypass gate
               markVisitorExpoGateDone();
-              navigate(buildPostGatePath(artworkId, expoId), { replace: true });
+              getOrCreateVisitorUuid();
+              const path = buildPostGatePath(artworkId, expoId);
+              if (expoId.trim()) {
+                const visitId = await startVisitorExpoVisit({
+                  expoId: expoId.trim(),
+                  entrySource: "direct_link",
+                });
+                if (visitId) {
+                  visitStartRef.current = expoId.trim();
+                }
+              }
+              navigate(path, { replace: true });
             } else {
               setStep("welcome_back");
             }
@@ -209,7 +240,18 @@ const VisitorWelcomeCore = () => {
           if (hasExpoLandingContext) {
             // Visiteur reconnu avec contexte expo → bypass gate
             markVisitorExpoGateDone();
-            navigate(buildPostGatePath(artworkId, expoId), { replace: true });
+            getOrCreateVisitorUuid();
+            const path = buildPostGatePath(artworkId, expoId);
+            if (expoId.trim()) {
+              const visitId = await startVisitorExpoVisit({
+                expoId: expoId.trim(),
+                entrySource: "resume",
+              });
+              if (visitId) {
+                visitStartRef.current = expoId.trim();
+              }
+            }
+            navigate(path, { replace: true });
           } else {
             setStep("welcome_back");
           }
@@ -358,7 +400,7 @@ const VisitorWelcomeCore = () => {
       });
       setVisitorAnonymousProfile(profileToSave);
       markVisitorExpoGateDone();
-      navigate(postGatePath, { replace: false });
+      await navigateAfterGate("visitor_welcome");
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.welcome_back.toast_failed");
       reportVisitorError({ message: msg, source: "visitor.app", stack: err instanceof Error ? err.stack : null });
@@ -430,7 +472,7 @@ const VisitorWelcomeCore = () => {
       markVisitorExpoGateDone();
       const deferred = await showRecoveryCodeAfterProfile();
       if (!deferred) {
-        navigate(postGatePath, { replace: false });
+        await navigateAfterGate("visitor_welcome");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("visitor_gate.quick_avatar.toast_failed");
@@ -609,7 +651,8 @@ const VisitorWelcomeCore = () => {
                 onClick={() => {
                   if (returningIsAuth) {
                     markVisitorExpoGateDone();
-                    navigate(postGatePath, { replace: false });
+                    getOrCreateVisitorUuid();
+                    void navigateAfterGate("resume");
                     return;
                   }
                   void handleWelcomeBackContinue();

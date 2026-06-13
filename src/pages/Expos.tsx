@@ -226,6 +226,7 @@ const Expos = () => {
   const [panelFormatExpo, setPanelFormatExpo] = useState<ExpoRow | null>(null);
   const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
+  const [visitorCountByExpoId, setVisitorCountByExpoId] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [orgSearchTerm, setOrgSearchTerm] = useState("");
   const [descriptionPopup, setDescriptionPopup] = useState<{
@@ -384,6 +385,42 @@ const Expos = () => {
   useEffect(() => {
     void loadSponsorLogos();
   }, [loadSponsorLogos]);
+
+  const loadVisitorCounts = useCallback(async () => {
+    const expoIds = rows.map((r) => r.id).filter(Boolean);
+    if (!expoIds.length) {
+      setVisitorCountByExpoId({});
+      return;
+    }
+    const { data, error: countErr } = await supabase
+      .from("visitor_expo_visits")
+      .select("expo_id, visitor_id")
+      .in("expo_id", expoIds);
+    if (countErr) {
+      if (import.meta.env.DEV) {
+        console.warn("[Expos] visitor_expo_visits:", countErr.message);
+      }
+      setVisitorCountByExpoId({});
+      return;
+    }
+    const uniqueByExpo: Record<string, Set<string>> = {};
+    for (const row of (data as Array<{ expo_id?: string | null; visitor_id?: string | null }> | null) ?? []) {
+      const expoId = row.expo_id?.trim();
+      const visitorId = row.visitor_id?.trim();
+      if (!expoId || !visitorId) continue;
+      if (!uniqueByExpo[expoId]) uniqueByExpo[expoId] = new Set();
+      uniqueByExpo[expoId].add(visitorId);
+    }
+    const counts: Record<string, number> = {};
+    for (const expoId of expoIds) {
+      counts[expoId] = uniqueByExpo[expoId]?.size ?? 0;
+    }
+    setVisitorCountByExpoId(counts);
+  }, [rows]);
+
+  useEffect(() => {
+    void loadVisitorCounts();
+  }, [loadVisitorCounts]);
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
@@ -813,6 +850,9 @@ const Expos = () => {
                       </Link>
                     </p>
                   )}
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t("card.visitorTotal", { count: visitorCountByExpoId[ex.id] ?? 0 })}
+                  </p>
                   {(() => {
                     const raw = ex.expo_descript_i18n;
                     if (!raw) return null;
@@ -861,7 +901,7 @@ const Expos = () => {
                       to={`/expos/visitors?expo_id=${encodeURIComponent(ex.id)}`}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {t("card.cardVisitors")}
+                      {t("card.cardVisitors", { count: visitorCountByExpoId[ex.id] ?? 0 })}
                     </Link>
                   </Button>
                   <Button

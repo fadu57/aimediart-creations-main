@@ -6,6 +6,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
+import { endOrganizerErrorSession, logClientError } from "@/lib/clientErrorLogging";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
@@ -171,6 +172,15 @@ export default function Header() {
   const handleLogout = async () => {
     const postLogoutPath = role_id === 7 ? "/visitor" : "/organisation";
     try {
+      if (session?.user?.id && role_id !== 7) {
+        void logClientError("organizer", {
+          message: "Déconnexion volontaire (menu)",
+          source: "auth.sign_out",
+          authUserId: session.user.id,
+          agencyId: agency_id ?? null,
+        });
+        void endOrganizerErrorSession(true);
+      }
       await supabase.auth.signOut({ scope: "local" });
     } finally {
       if (typeof window !== "undefined") {

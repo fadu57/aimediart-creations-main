@@ -88,8 +88,14 @@ export async function resolveReturningAnonymousVisitor(): Promise<VisitorAnonymo
   return null;
 }
 
+export type AnonymousVisitorSession = {
+  visitorClientId: string;
+  /** PK `public.visitors.id` retournée par la RPC (null si non disponible). */
+  visitorDbId: string | null;
+};
+
 /** Enregistre ou met à jour la ligne `visitors` pour l’UUID navigateur courant. */
-export async function registerAnonymousVisitorSession(): Promise<string> {
+export async function registerAnonymousVisitorSession(): Promise<AnonymousVisitorSession> {
   const visitorUuid = getOrCreateVisitorUuid();
   if (!visitorUuid) {
     throw new Error("Identifiant visiteur indisponible.");
@@ -111,7 +117,7 @@ export async function registerAnonymousVisitorSession(): Promise<string> {
 
   const deviceFp = buildDeviceFingerprint() || null;
 
-  const { error: regError } = await supabase.rpc("register_anonymous_visitor", {
+  const { data: visitorDbId, error: regError } = await supabase.rpc("register_anonymous_visitor", {
     p_visitor_client_id:  visitorUuid,
     p_fingerprint:        fpIdRaw,
     p_fingerprint_source: fpIdRaw ? "fingerprintjs_visitor_id" : null,
@@ -131,7 +137,8 @@ export async function registerAnonymousVisitorSession(): Promise<string> {
     throw new Error(regError.message);
   }
 
-  return visitorUuid;
+  const dbId = typeof visitorDbId === "string" ? visitorDbId.trim() : null;
+  return { visitorClientId: visitorUuid, visitorDbId: dbId || null };
 }
 
 /** Persiste le pseudo choisi côté serveur (SECURITY DEFINER). */
@@ -178,7 +185,7 @@ export async function persistAnonymousVisitorIdentity(input: {
     throw new Error("Pseudo visiteur manquant.");
   }
 
-  const visitorUuid = await registerAnonymousVisitorSession();
+  const { visitorClientId: visitorUuid } = await registerAnonymousVisitorSession();
 
   let selfieUrl = input.keepSelfieUrl?.trim() || null;
   let selfieObjectPath = input.keepSelfieObjectPath?.trim() || null;

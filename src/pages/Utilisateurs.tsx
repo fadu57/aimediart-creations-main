@@ -32,6 +32,7 @@ import Users from "@/pages/Users";
 // Soft-delete : profiles.deleted_at — colonne unifiée pour toutes les corbeilles.
 // ---------------------------------------------------------------------------
 import { softDeleteUserProfile } from "@/lib/userSoftDelete";
+import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 type AdminUserRow = {
   id: string;
   role_id: number | null;
@@ -42,6 +43,7 @@ type AdminUserRow = {
   birth_year: string | null;
   phone: string | null;
   email: string | null; // non pré-chargé — saisie admin via edge function seulement
+  last_sign_in_at: string | null;
 };
 
 type RoleOption = {
@@ -60,7 +62,7 @@ type ExpoOption = {
   expo_name: string | null;
 };
 
-type SortKey = "last_name" | "first_name" | "agency" | "expo" | "role";
+type SortKey = "last_name" | "first_name" | "agency" | "expo" | "role" | "last_sign_in";
 type SortDir = "asc" | "desc";
 
 function normalizeRoleLabel(roleId: number, label: string | null | undefined): string {
@@ -175,6 +177,7 @@ export default function Utilisateurs() {
       if (sortKey === "first_name") return row.first_name?.trim() || "";
       if (sortKey === "agency") return (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
       if (sortKey === "expo") return (row.expo_id && expoLabelById.get(row.expo_id)) || "";
+      if (sortKey === "last_sign_in") return row.last_sign_in_at || "";
       return row.role_id != null ? String(row.role_id).padStart(3, "0") : "999";
     };
     const cmp = (a: AdminUserRow, b: AdminUserRow) => {
@@ -315,6 +318,7 @@ export default function Utilisateurs() {
         first_name?: string | null;
         last_name?: string | null;
         phone?: string | null;
+        last_sign_in_at?: string | null;
       }> | null) ?? []
     )
       .filter((r) => typeof r.id === "string" && r.id.trim())
@@ -328,6 +332,7 @@ export default function Utilisateurs() {
         birth_year: null,
         phone: r.phone ?? null,
         email: null, // auth.users.email non accessible côté client
+        last_sign_in_at: typeof r.last_sign_in_at === "string" ? r.last_sign_in_at : null,
       }));
 
     // Filtrage par rôle visible (même logique que l'ancienne requête SQL)
@@ -524,6 +529,10 @@ export default function Utilisateurs() {
                     {t("page.colRole")}
                     <SortButtons column="role" />
                   </th>
+                  <th className="w-52 px-2 py-1 whitespace-nowrap">
+                    {t("page.colLastSignIn")}
+                    <SortButtons column="last_sign_in" />
+                  </th>
                   <th className="w-10 px-2 py-1" aria-label="Actions" />
                 </tr>
               </thead>
@@ -578,6 +587,9 @@ export default function Utilisateurs() {
                           {row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "—"}
                         </span>
                       </td>
+                      <td className="w-52 px-2 py-1 whitespace-nowrap">
+                        {formatUserLastSignIn(row.last_sign_in_at, t("page.neverSignedIn"))}
+                      </td>
                       <td className="w-10 px-2 py-1">
                         {canShowDelete ? (
                           <Button
@@ -603,7 +615,7 @@ export default function Utilisateurs() {
                 })}
                 {sortedRows.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-2 py-1.5 text-muted-foreground">
+                    <td colSpan={7} className="px-2 py-1.5 text-muted-foreground">
                       {t("page.empty")}
                     </td>
                   </tr>

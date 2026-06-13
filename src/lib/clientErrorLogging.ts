@@ -16,7 +16,11 @@ export type ClientErrorSource =
   | "qr.scanner_unavailable"
   | "qr.torch"
   | "visitor.app"
-  | "organizer.app";
+  | "organizer.app"
+  | "auth.sign_in"
+  | "auth.sign_out"
+  | "auth.session_start"
+  | "auth.session_end";
 
 type LogPayload = {
   audience: ErrorLogAudience;
@@ -425,9 +429,27 @@ export function installClientErrorLogCapture(
 
   const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT") {
+      void logClientError(audience, {
+        message:
+          audience === "visitor"
+            ? "Déconnexion visiteur (signOut)"
+            : "Déconnexion organisateur (signOut)",
+        source: "auth.sign_out",
+        authUserId: options.authUserId,
+        agencyId: options.agencyId,
+      });
       void endClientErrorSession(audience, true);
     }
     if (event === "SIGNED_IN") {
+      void logClientError(audience, {
+        message:
+          audience === "visitor"
+            ? "Connexion visiteur (authentification)"
+            : "Connexion organisateur (authentification)",
+        source: "auth.sign_in",
+        authUserId: session?.user?.id ?? null,
+        agencyId: options.agencyId,
+      });
       void ensureClientErrorSession(audience, {
         authUserId: session?.user?.id ?? null,
         agencyId: options.agencyId ?? null,

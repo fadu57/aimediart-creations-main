@@ -14,6 +14,10 @@ import {
 
   ChevronUp,
 
+  ChevronsUpDown,
+
+  Check,
+
   Loader2,
 
   RefreshCw,
@@ -60,6 +64,32 @@ import { Label } from "@/components/ui/label";
 
 import {
 
+  Popover,
+
+  PopoverContent,
+
+  PopoverTrigger,
+
+} from "@/components/ui/popover";
+
+import {
+
+  Command,
+
+  CommandEmpty,
+
+  CommandGroup,
+
+  CommandInput,
+
+  CommandItem,
+
+  CommandList,
+
+} from "@/components/ui/command";
+
+import {
+
   Select,
 
   SelectContent,
@@ -80,6 +110,10 @@ import {
 
   ALL_ERROR_SOURCES,
 
+  ALL_ORGANIZER_USERS,
+
+  ALL_VISITORS,
+
   clientErrorSourceLabel,
 
   defaultClientErrorFilters,
@@ -92,15 +126,33 @@ import {
 
   fetchDistinctErrorSources,
 
+  fetchOrganizerUsersForFilter,
+
+  fetchVisitorLabelsByClientIds,
+
+  fetchVisitorsForFilter,
+
   formatClientErrorDate,
 
+  authLogOrganizerDisplayName,
+
+  fetchProfileNamesByUserIds,
+
   groupLogsBySession,
+
+  isAuthEventSource,
+
+  splitLogsByAuthKind,
 
   sessionClientLabel,
 
   type ClientErrorLogFilters,
 
   type ClientErrorLogRow,
+
+  type OrganizerUserFilterOption,
+
+  type VisitorFilterOption,
 
 } from "@/lib/clientErrorLogs";
 
@@ -132,6 +184,27 @@ function dateLocale(lang: string): string {
 
 
 
+const FILTER_LABEL_CLASS = "text-xs font-medium leading-none";
+
+const FILTER_TIME_CLASS = "h-9 w-[96px] shrink-0 text-sm";
+
+const FILTER_SELECT_TRIGGER_CLASS = "h-9 w-full text-sm";
+
+const DATE_PICKER_INPUT_CLASS =
+  "relative h-9 w-[112px] shrink-0 cursor-pointer px-1.5 text-sm [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0";
+
+function openDatePickerOnClick(e: React.MouseEvent<HTMLInputElement>) {
+  const input = e.currentTarget;
+  if (typeof input.showPicker !== "function") return;
+  try {
+    input.showPicker();
+  } catch {
+    // ignore (déjà ouvert ou navigateur non compatible)
+  }
+}
+
+
+
 export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
   const ns = audience === "visitor" ? "visitor_errors" : "organizer_errors";
@@ -141,6 +214,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
   const { loading: authLoading, role_id } = useAuthUser();
 
   const canAccess = typeof role_id === "number" && role_id < 4;
+
+  const canDeleteLogs = role_id === 1;
 
 
 
@@ -167,6 +242,18 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
     Array<{ session: { id: string; started_at: string; ended_at: string | null; last_page_url: string | null; visitor_client_id?: string | null; auth_user_id: string | null }; logs: ClientErrorLogRow[] }>
 
   >([]);
+
+  const [profileNames, setProfileNames] = useState<Map<string, string>>(() => new Map());
+
+  const [visitorLabels, setVisitorLabels] = useState<Map<string, string>>(() => new Map());
+
+  const [organizerUsers, setOrganizerUsers] = useState<OrganizerUserFilterOption[]>([]);
+
+  const [visitorFilterOptions, setVisitorFilterOptions] = useState<VisitorFilterOption[]>([]);
+
+  const [visitorFilterOpen, setVisitorFilterOpen] = useState(false);
+
+  const [organizerFilterOpen, setOrganizerFilterOpen] = useState(false);
 
 
 
@@ -226,6 +313,50 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
   useEffect(() => {
 
+    if (!canAccess || audience !== "organizer") {
+
+      setOrganizerUsers([]);
+
+      return;
+
+    }
+
+    void fetchOrganizerUsersForFilter().then(({ data, error: userErr }) => {
+
+      if (userErr) console.warn("[ClientErrorLogsPage] users filter:", userErr);
+
+      setOrganizerUsers(data);
+
+    });
+
+  }, [canAccess, audience]);
+
+
+
+  useEffect(() => {
+
+    if (!canAccess || audience !== "visitor") {
+
+      setVisitorFilterOptions([]);
+
+      return;
+
+    }
+
+    void fetchVisitorsForFilter().then(({ data, error: visitorErr }) => {
+
+      if (visitorErr) console.warn("[ClientErrorLogsPage] visitors filter:", visitorErr);
+
+      setVisitorFilterOptions(data);
+
+    });
+
+  }, [canAccess, audience]);
+
+
+
+  useEffect(() => {
+
     if (!canAccess) return;
 
     void load();
@@ -234,13 +365,88 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
 
 
-  const totalErrors = useMemo(
+  useEffect(() => {
 
-    () => grouped.reduce((acc, g) => acc + g.logs.length, 0),
+    if (audience !== "organizer" || !grouped.length) {
 
-    [grouped],
+      setProfileNames(new Map());
 
-  );
+      return;
+
+    }
+
+    const userIds = grouped
+
+      .map((g) => g.session.auth_user_id)
+
+      .filter((id): id is string => Boolean(id?.trim()));
+
+    void fetchProfileNamesByUserIds(userIds).then(setProfileNames);
+
+  }, [audience, grouped]);
+
+
+
+  useEffect(() => {
+
+    if (audience !== "visitor" || !grouped.length) {
+
+      setVisitorLabels(new Map());
+
+      return;
+
+    }
+
+    const clientIds = grouped
+
+      .map((g) => g.session.visitor_client_id)
+
+      .filter((id): id is string => Boolean(id?.trim()));
+
+    void fetchVisitorLabelsByClientIds(clientIds).then(setVisitorLabels);
+
+  }, [audience, grouped]);
+
+
+
+  const { totalErrors, totalAuthLogs } = useMemo(() => {
+    let errors = 0;
+    let auth = 0;
+    for (const g of grouped) {
+      const split = splitLogsByAuthKind(g.logs);
+      errors += split.errors.length;
+      auth += split.authLogs.length;
+    }
+    return { totalErrors: errors, totalAuthLogs: auth };
+  }, [grouped]);
+
+
+
+  const selectedOrganizerLabel = useMemo(() => {
+
+    if (filters.organizerUserId === ALL_ORGANIZER_USERS) {
+
+      return t("error_logs.filter_all_users");
+
+    }
+
+    return organizerUsers.find((u) => u.id === filters.organizerUserId)?.label ?? "—";
+
+  }, [filters.organizerUserId, organizerUsers, t]);
+
+
+
+  const selectedVisitorLabel = useMemo(() => {
+
+    if (filters.visitorClientId === ALL_VISITORS) {
+
+      return t("error_logs.filter_all_visitors");
+
+    }
+
+    return visitorFilterOptions.find((v) => v.id === filters.visitorClientId)?.label ?? "—";
+
+  }, [filters.visitorClientId, t, visitorFilterOptions]);
 
 
 
@@ -286,6 +492,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
   const handleDeleteSelected = useCallback(async () => {
 
+    if (!canDeleteLogs) return;
+
     const ids = [...selectedSessionIds];
 
     if (!ids.length) return;
@@ -312,11 +520,13 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
     void loadSources();
 
-  }, [audience, load, loadSources, selectedSessionIds, t]);
+  }, [audience, canDeleteLogs, load, loadSources, selectedSessionIds, t]);
 
 
 
   const handleClearFiltered = useCallback(async () => {
+
+    if (!canDeleteLogs) return;
 
     setDeleting(true);
 
@@ -346,7 +556,7 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
     void loadSources();
 
-  }, [audience, filters, load, loadSources, t]);
+  }, [audience, canDeleteLogs, filters, load, loadSources, t]);
 
 
 
@@ -402,6 +612,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
         </h1>
 
+        {canDeleteLogs && (
+
         <Button
 
           variant="outline"
@@ -422,6 +634,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
         </Button>
 
+        )}
+
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || deleting}>
 
           <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} aria-hidden />
@@ -434,7 +648,7 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
 
 
-      <Card>
+      <Card className="overflow-visible">
 
         <CardHeader className="pb-2">
 
@@ -442,13 +656,13 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
         </CardHeader>
 
-        <CardContent className="flex flex-col gap-4">
+        <CardContent className="overflow-visible flex flex-col gap-4">
 
-          <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-nowrap items-end gap-2 overflow-visible pb-0.5">
 
-            <div className="flex min-w-[140px] flex-col gap-1.5">
+            <div className="flex w-[108px] shrink-0 flex-col gap-1">
 
-              <Label htmlFor="date-mode">{t("error_logs.filter_date_mode")}</Label>
+              <Label htmlFor="date-mode" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_date_mode")}</Label>
 
               <Select
 
@@ -458,7 +672,7 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
               >
 
-                <SelectTrigger id="date-mode">
+                <SelectTrigger id="date-mode" className={FILTER_SELECT_TRIGGER_CLASS}>
 
                   <SelectValue />
 
@@ -480,9 +694,9 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
             {filters.dateMode === "day" ? (
 
-              <div className="flex min-w-[160px] flex-col gap-1.5">
+              <div className="flex shrink-0 flex-col gap-1">
 
-                <Label htmlFor="date-single">{t("error_logs.filter_date")}</Label>
+                <Label htmlFor="date-single" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_date")}</Label>
 
                 <Input
 
@@ -492,6 +706,10 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                   value={filters.dateSingle}
 
+                  className={DATE_PICKER_INPUT_CLASS}
+
+                  onClick={openDatePickerOnClick}
+
                   onChange={(e) => setFilters((f) => ({ ...f, dateSingle: e.target.value }))}
 
                 />
@@ -500,11 +718,11 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
             ) : (
 
-              <>
+              <div className="flex shrink-0 items-end gap-1">
 
-                <div className="flex min-w-[160px] flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
 
-                  <Label htmlFor="date-from">{t("error_logs.filter_date_from")}</Label>
+                  <Label htmlFor="date-from" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_date_from")}</Label>
 
                   <Input
 
@@ -514,15 +732,19 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                     value={filters.dateFrom}
 
+                    className={DATE_PICKER_INPUT_CLASS}
+
+                    onClick={openDatePickerOnClick}
+
                     onChange={(e) => setFilters((f) => ({ ...f, dateFrom: e.target.value }))}
 
                   />
 
                 </div>
 
-                <div className="flex min-w-[160px] flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
 
-                  <Label htmlFor="date-to">{t("error_logs.filter_date_to")}</Label>
+                  <Label htmlFor="date-to" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_date_to")}</Label>
 
                   <Input
 
@@ -532,21 +754,25 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                     value={filters.dateTo}
 
+                    className={DATE_PICKER_INPUT_CLASS}
+
+                    onClick={openDatePickerOnClick}
+
                     onChange={(e) => setFilters((f) => ({ ...f, dateTo: e.target.value }))}
 
                   />
 
                 </div>
 
-              </>
+              </div>
 
             )}
 
 
 
-            <div className="flex min-w-[120px] flex-col gap-1.5">
+            <div className="flex shrink-0 flex-col gap-1">
 
-              <Label htmlFor="time-from">{t("error_logs.filter_time_from")}</Label>
+              <Label htmlFor="time-from" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_time_from")}</Label>
 
               <Input
 
@@ -556,15 +782,17 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                 value={filters.timeFrom}
 
+                className={FILTER_TIME_CLASS}
+
                 onChange={(e) => setFilters((f) => ({ ...f, timeFrom: e.target.value }))}
 
               />
 
             </div>
 
-            <div className="flex min-w-[120px] flex-col gap-1.5">
+            <div className="flex shrink-0 flex-col gap-1">
 
-              <Label htmlFor="time-to">{t("error_logs.filter_time_to")}</Label>
+              <Label htmlFor="time-to" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_time_to")}</Label>
 
               <Input
 
@@ -574,6 +802,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                 value={filters.timeTo}
 
+                className={FILTER_TIME_CLASS}
+
                 onChange={(e) => setFilters((f) => ({ ...f, timeTo: e.target.value }))}
 
               />
@@ -582,9 +812,9 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
 
 
-            <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+            <div className="flex w-[168px] shrink-0 flex-col gap-1">
 
-              <Label htmlFor="error-source">{t("error_logs.filter_error_type")}</Label>
+              <Label htmlFor="error-source" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_error_type")}</Label>
 
               <Select
 
@@ -594,7 +824,7 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
               >
 
-                <SelectTrigger id="error-source">
+                <SelectTrigger id="error-source" className={FILTER_SELECT_TRIGGER_CLASS}>
 
                   <SelectValue />
 
@@ -622,7 +852,271 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
 
 
-            <Button type="button" onClick={() => void load()} disabled={loading || deleting}>
+            {audience === "organizer" && (
+
+              <div className="flex w-[176px] shrink-0 flex-col gap-1">
+
+                <Label htmlFor="organizer-user" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_user_name")}</Label>
+
+                <Popover open={organizerFilterOpen} onOpenChange={setOrganizerFilterOpen}>
+
+                  <PopoverTrigger asChild>
+
+                    <Button
+
+                      id="organizer-user"
+
+                      type="button"
+
+                      variant="outline"
+
+                      role="combobox"
+
+                      aria-expanded={organizerFilterOpen}
+
+                      className={cn(FILTER_SELECT_TRIGGER_CLASS, "justify-between px-3 font-normal")}
+
+                    >
+
+                      <span className="truncate">{selectedOrganizerLabel}</span>
+
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
+
+                    </Button>
+
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+
+                    <Command>
+
+                      <CommandInput placeholder={t("error_logs.filter_user_search")} className="h-9" />
+
+                      <CommandList>
+
+                        <CommandEmpty>{t("error_logs.filter_user_empty")}</CommandEmpty>
+
+                        <CommandGroup>
+
+                          <CommandItem
+
+                            value="__all_users__"
+
+                            onSelect={() => {
+
+                              setFilters((f) => ({ ...f, organizerUserId: ALL_ORGANIZER_USERS }));
+
+                              setOrganizerFilterOpen(false);
+
+                            }}
+
+                          >
+
+                            <Check
+
+                              className={cn(
+
+                                "mr-2 h-4 w-4",
+
+                                filters.organizerUserId === ALL_ORGANIZER_USERS ? "opacity-100" : "opacity-0",
+
+                              )}
+
+                              aria-hidden
+
+                            />
+
+                            {t("error_logs.filter_all_users")}
+
+                          </CommandItem>
+
+                          {organizerUsers.map((user) => (
+
+                            <CommandItem
+
+                              key={user.id}
+
+                              value={`${user.label} ${user.id}`}
+
+                              onSelect={() => {
+
+                                setFilters((f) => ({ ...f, organizerUserId: user.id }));
+
+                                setOrganizerFilterOpen(false);
+
+                              }}
+
+                            >
+
+                              <Check
+
+                                className={cn(
+
+                                  "mr-2 h-4 w-4",
+
+                                  filters.organizerUserId === user.id ? "opacity-100" : "opacity-0",
+
+                                )}
+
+                                aria-hidden
+
+                              />
+
+                              {user.label}
+
+                            </CommandItem>
+
+                          ))}
+
+                        </CommandGroup>
+
+                      </CommandList>
+
+                    </Command>
+
+                  </PopoverContent>
+
+                </Popover>
+
+              </div>
+
+            )}
+
+
+
+            {audience === "visitor" && (
+
+              <div className="flex w-[176px] shrink-0 flex-col gap-1">
+
+                <Label htmlFor="visitor-filter" className={FILTER_LABEL_CLASS}>{t("error_logs.filter_visitor")}</Label>
+
+                <Popover open={visitorFilterOpen} onOpenChange={setVisitorFilterOpen}>
+
+                  <PopoverTrigger asChild>
+
+                    <Button
+
+                      id="visitor-filter"
+
+                      type="button"
+
+                      variant="outline"
+
+                      role="combobox"
+
+                      aria-expanded={visitorFilterOpen}
+
+                      className={cn(FILTER_SELECT_TRIGGER_CLASS, "justify-between px-3 font-normal")}
+
+                    >
+
+                      <span className="truncate">{selectedVisitorLabel}</span>
+
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
+
+                    </Button>
+
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+
+                    <Command>
+
+                      <CommandInput placeholder={t("error_logs.filter_visitor_search")} className="h-9" />
+
+                      <CommandList>
+
+                        <CommandEmpty>{t("error_logs.filter_visitor_empty")}</CommandEmpty>
+
+                        <CommandGroup>
+
+                          <CommandItem
+
+                            value="__all_visitors__"
+
+                            onSelect={() => {
+
+                              setFilters((f) => ({ ...f, visitorClientId: ALL_VISITORS }));
+
+                              setVisitorFilterOpen(false);
+
+                            }}
+
+                          >
+
+                            <Check
+
+                              className={cn(
+
+                                "mr-2 h-4 w-4",
+
+                                filters.visitorClientId === ALL_VISITORS ? "opacity-100" : "opacity-0",
+
+                              )}
+
+                              aria-hidden
+
+                            />
+
+                            {t("error_logs.filter_all_visitors")}
+
+                          </CommandItem>
+
+                          {visitorFilterOptions.map((visitor) => (
+
+                            <CommandItem
+
+                              key={visitor.id}
+
+                              value={`${visitor.label} ${visitor.id}`}
+
+                              onSelect={() => {
+
+                                setFilters((f) => ({ ...f, visitorClientId: visitor.id }));
+
+                                setVisitorFilterOpen(false);
+
+                              }}
+
+                            >
+
+                              <Check
+
+                                className={cn(
+
+                                  "mr-2 h-4 w-4",
+
+                                  filters.visitorClientId === visitor.id ? "opacity-100" : "opacity-0",
+
+                                )}
+
+                                aria-hidden
+
+                              />
+
+                              {visitor.label}
+
+                            </CommandItem>
+
+                          ))}
+
+                        </CommandGroup>
+
+                      </CommandList>
+
+                    </Command>
+
+                  </PopoverContent>
+
+                </Popover>
+
+              </div>
+
+            )}
+
+
+
+            <Button type="button" className="h-9 shrink-0" onClick={() => void load()} disabled={loading || deleting}>
 
               {t("error_logs.apply_filters")}
 
@@ -653,12 +1147,13 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
 
           <CardTitle className="text-base">
-
-            {t("error_logs.sessions_title", { count: totalErrors })}
-
+            {t("error_logs.period_summary", {
+              errorCount: totalErrors,
+              authCount: totalAuthLogs,
+            })}
           </CardTitle>
 
-          {grouped.length > 0 && (
+          {canDeleteLogs && grouped.length > 0 && (
 
             <div className="flex flex-wrap items-center gap-3">
 
@@ -729,8 +1224,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
             <ul className="divide-y divide-border">
 
               {grouped.map(({ session, logs }) => {
-
                 const expanded = expandedId === session.id;
+                const { errors: errorLogs, authLogs } = splitLogsByAuthKind(logs);
 
                 const sessionDates = session.ended_at
 
@@ -738,7 +1233,7 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                   : `${formatClientErrorDate(session.started_at, locale)} · ${t("error_logs.session_open")}`;
 
-                const metaLine = `${t(`${ns}.client_id`)}: ${sessionClientLabel(audience, session)} · ${t("error_logs.last_page")}: ${session.last_page_url || "—"}`;
+                const metaLine = `${t(`${ns}.client_id`)}: ${sessionClientLabel(audience, session, profileNames, visitorLabels)} · ${t("error_logs.last_page")}: ${session.last_page_url || "—"}`;
 
 
 
@@ -747,6 +1242,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
                   <li key={session.id} className="py-0.5">
 
                     <div className="flex items-center gap-1.5 rounded-md px-1 hover:bg-muted/40">
+
+                      {canDeleteLogs && (
 
                       <Checkbox
 
@@ -759,6 +1256,8 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
                         className="shrink-0"
 
                       />
+
+                      )}
 
                       <button
 
@@ -784,10 +1283,17 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                         </span>
 
-                        <span className="shrink-0 font-medium text-[#E63946]">
-
-                          {t("error_logs.error_count", { count: logs.length })}
-
+                        <span className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                          {errorLogs.length > 0 ? (
+                            <span className="font-medium text-[#E63946]">
+                              {t("error_logs.error_count", { count: errorLogs.length })}
+                            </span>
+                          ) : null}
+                          {authLogs.length > 0 ? (
+                            <span className="font-medium text-sky-400">
+                              {t("error_logs.auth_log_count", { count: authLogs.length })}
+                            </span>
+                          ) : null}
                         </span>
 
                         <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
@@ -810,59 +1316,59 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                     {expanded && (
 
-                      <div className="ml-7 space-y-1 border-l border-border py-1 pl-3">
+                      <div className={cn("space-y-1 border-l border-border py-1 pl-3", canDeleteLogs ? "ml-7" : "ml-1")}>
 
-                        {logs.map((log) => (
-
-                          <div
-
-                            key={log.id}
-
-                            className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-xs"
-
-                          >
-
-                            <div className="flex flex-wrap gap-x-1.5 gap-y-0 text-muted-foreground">
-
-                              <span>{formatClientErrorDate(log.created_at, locale)}</span>
-
-                              <span>·</span>
-
-                              <span>{clientErrorSourceLabel(log.error_source, t)}</span>
-
-                              {log.page_url && (
-
-                                <>
-
-                                  <span>·</span>
-
-                                  <span className="truncate">{log.page_url}</span>
-
-                                </>
-
+                        {logs.map((log) => {
+                          const authEvent = isAuthEventSource(log.error_source);
+                          const organizerName =
+                            authEvent && audience === "organizer"
+                              ? authLogOrganizerDisplayName(session, log, profileNames)
+                              : null;
+                          return (
+                            <div
+                              key={log.id}
+                              className={cn(
+                                "rounded border px-2 py-1.5 text-xs",
+                                authEvent
+                                  ? "border-sky-400/30 bg-sky-400/5"
+                                  : "border-border/60 bg-muted/20",
                               )}
-
+                            >
+                              <div className="flex flex-wrap gap-x-1.5 gap-y-0 text-muted-foreground">
+                                <span>{formatClientErrorDate(log.created_at, locale)}</span>
+                                <span>·</span>
+                                <span className={authEvent ? "text-sky-400" : undefined}>
+                                  {clientErrorSourceLabel(log.error_source, t)}
+                                </span>
+                                {organizerName && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="font-medium text-sky-400">{organizerName}</span>
+                                  </>
+                                )}
+                                {log.page_url && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="truncate">{log.page_url}</span>
+                                  </>
+                                )}
+                              </div>
+                              <p
+                                className={cn(
+                                  "mt-0.5 font-medium leading-snug",
+                                  authEvent ? "text-sky-400" : "text-destructive",
+                                )}
+                              >
+                                {log.error_message}
+                              </p>
+                              {log.error_stack && (
+                                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-tight text-muted-foreground">
+                                  {log.error_stack}
+                                </pre>
+                              )}
                             </div>
-
-                            <p className="mt-0.5 font-medium leading-snug text-destructive">
-
-                              {log.error_message}
-
-                            </p>
-
-                            {log.error_stack && (
-
-                              <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-tight text-muted-foreground">
-
-                                {log.error_stack}
-
-                              </pre>
-
-                            )}
-
-                          </div>
-
-                        ))}
+                          );
+                        })}
 
                       </div>
 

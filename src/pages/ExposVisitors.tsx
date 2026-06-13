@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
 
+import { formatFrenchDateTime } from "@/lib/userLastSignIn";
+
 type VisitorRow = {
   id: string;
   source: "visitors" | "profiles";
@@ -37,11 +39,7 @@ type SortKey = "name" | "pseudo" | "email" | "agency" | "expo" | "created_at";
 type SortDir = "asc" | "desc";
 
 function formatDate(value: string | null | undefined): string {
-  const raw = value?.trim() || "";
-  if (!raw) return "—";
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString("fr-FR");
+  return formatFrenchDateTime(value, "—");
 }
 
 const DATE_FILTER_INPUT_CLASS =
@@ -353,7 +351,7 @@ export default function ExposVisitors() {
                   <th className="w-36 px-2 py-1">Pseudo <SortButtons column="pseudo" /></th>
                   <th className="w-52 px-2 py-1">Email <SortButtons column="email" /></th>
                   <th className="w-36 px-2 py-1">Exposition <SortButtons column="expo" /></th>
-                  <th className="w-52 px-2 py-1 text-center">
+                  <th className="w-64 px-2 py-1 text-center">
                     Inscription du … au <SortButtons column="created_at" />
                   </th>
                   <th className="w-8 px-1 py-1" />
@@ -436,7 +434,7 @@ export default function ExposVisitors() {
                       <td className="px-2 py-1 truncate" title={pseudo}>{pseudo}</td>
                       <td className="px-2 py-1 truncate" title={row.email || ""}>{row.email || "—"}</td>
                       <td className="px-2 py-1 truncate" title={expo}>{expo}</td>
-                      <td className="px-2 py-1 whitespace-nowrap">{formatDate(row.created_at)}</td>
+                      <td className="w-64 px-2 py-1 whitespace-nowrap">{formatDate(row.created_at)}</td>
                       {/* Supprimer — droite */}
                       <td className="px-1 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                         <button

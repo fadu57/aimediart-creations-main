@@ -110,6 +110,7 @@ export default function ExposVisitorDetail() {
           .maybeSingle();
 
         // Si la colonne n'existe pas encore (migration non appliquée), retry sans
+        let visitorRow: Record<string, unknown> | null = null;
         if (err?.code === "42703") {
           const { data: rowFallback, error: errFallback } = await supabase
             .from("visitors")
@@ -117,11 +118,37 @@ export default function ExposVisitorDetail() {
             .eq("id", id)
             .maybeSingle();
           if (errFallback) { setError(errFallback.message); setLoading(false); return; }
-          setData(rowFallback as Record<string, unknown> | null);
+          visitorRow = rowFallback as Record<string, unknown> | null;
         } else {
           if (err) { setError(err.message); setLoading(false); return; }
-          setData(row as Record<string, unknown> | null);
+          visitorRow = row as Record<string, unknown> | null;
         }
+
+        const { data: lastExpoVisit } = await supabase
+          .from("visitor_expo_visits")
+          .select("entered_at, last_activity_at, ended_at, status, entry_source")
+          .eq("visitor_id", id)
+          .order("entered_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        type ExpoVisitSnap = {
+          entered_at?: string | null;
+          last_activity_at?: string | null;
+          ended_at?: string | null;
+          status?: string | null;
+          entry_source?: string | null;
+        };
+        const lv = lastExpoVisit as ExpoVisitSnap | null;
+        const lastActivity = lv?.last_activity_at ?? lv?.entered_at ?? null;
+
+        setData(visitorRow ? {
+          ...visitorRow,
+          last_seen_at: lastActivity ?? visitorRow.last_seen_at ?? null,
+          has_visit_data: Boolean(lastActivity || visitorRow.last_seen_at),
+          last_expo_visit_status: lv?.status ?? null,
+          last_expo_visit_entry: lv?.entry_source ?? null,
+        } : null);
       } else {
         const { data: row, error: err } = await supabase
           .from("profiles")
@@ -151,40 +178,35 @@ export default function ExposVisitorDetail() {
           }
         }
 
-        // Dernière visite connue : on cherche dans expos_visits puis guest_visits
-        type LastVisit = { ip_address?: string | null; language?: string | null; timezone?: string | null; created_at?: string | null } | null;
-
-        const { data: ev } = await supabase
-          .from("expos_visits")
-          .select("ip_address, language, timezone, created_at")
-          .eq("user_id", id)
-          .order("created_at", { ascending: false })
+        const { data: lastExpoVisit } = await supabase
+          .from("visitor_expo_visits")
+          .select("entered_at, last_activity_at, ended_at, status, entry_source")
+          .eq("auth_user_id", id)
+          .order("entered_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        let lv = ev as LastVisit;
-
-        // Fallback guest_visits si rien dans expos_visits
-        if (!lv?.ip_address && !lv?.language) {
-          const { data: gv } = await supabase
-            .from("guest_visits")
-            .select("ip_address, language, timezone, created_at")
-            .eq("user_id", id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (gv) lv = gv as LastVisit;
-        }
+        type ExpoVisitSnap = {
+          entered_at?: string | null;
+          last_activity_at?: string | null;
+          ended_at?: string | null;
+          status?: string | null;
+          entry_source?: string | null;
+        };
+        const lv = lastExpoVisit as ExpoVisitSnap | null;
+        const lastActivity = lv?.last_activity_at ?? lv?.entered_at ?? null;
 
         setData(row ? {
           ...row as Record<string, unknown>,
           agency_name: agencyName,
           role_id: roleId,
-          ip_address:      lv?.ip_address  ?? null,
-          client_locale:   lv?.language    ?? null,
-          client_timezone: lv?.timezone    ?? null,
-          last_seen_at:    lv?.created_at  ?? null,
-          has_visit_data:  !!(lv?.ip_address || lv?.language || lv?.timezone),
+          ip_address: null,
+          client_locale: null,
+          client_timezone: null,
+          last_seen_at: lastActivity,
+          has_visit_data: Boolean(lastActivity),
+          last_expo_visit_status: lv?.status ?? null,
+          last_expo_visit_entry: lv?.entry_source ?? null,
         } : null);
       }
 

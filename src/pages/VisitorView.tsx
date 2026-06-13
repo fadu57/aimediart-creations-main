@@ -42,6 +42,13 @@ import {
   resolveReturningAnonymousVisitor,
 } from "@/lib/registerAnonymousVisitorSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import {
+  getStoredVisitorExpoVisitId,
+  endVisitorExpoVisit,
+  resolveCurrentVisitIdForExpo,
+  startVisitorExpoVisit,
+  touchVisitorExpoVisit,
+} from "@/lib/visitorExpoVisit";
 import { getVisitorAnonymousProfile, type VisitorAnonymousProfile } from "@/lib/visitorAnonymousProfile";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
@@ -257,6 +264,7 @@ const VisitorViewCore = () => {
   const mediationMainSwiperRef = useRef<SwiperInstance | null>(null);
   const artistPhotoCloseTimerRef = useRef<number | null>(null);
   const quickFeedbackTimerRef = useRef<number | null>(null);
+  const visitEntryTouchedRef = useRef(false);
 
   useEffect(() => {
     const syncAuthUser = async () => {
@@ -876,6 +884,31 @@ const VisitorViewCore = () => {
   }, [isAuthenticated, language, session?.user?.id, session?.user?.user_metadata]);
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
+  // Historisation visite expo : repli si le welcome n'a pas encore démarré la session (QR œuvre seul, etc.)
+  useEffect(() => {
+    const expo = effectiveExpoId.trim();
+    if (!expo || loadingArtwork) return;
+    if (getStoredVisitorExpoVisitId(expo)) return;
+    void startVisitorExpoVisit({
+      expoId: expo,
+      entrySource: artworkId ? "artwork_page" : "first_scan",
+    });
+  }, [effectiveExpoId, loadingArtwork, artworkId]);
+
+  // Touch discret à l'entrée sur la page œuvre (une fois par montage / expo)
+  useEffect(() => {
+    visitEntryTouchedRef.current = false;
+  }, [effectiveExpoId]);
+
+  useEffect(() => {
+    const expo = effectiveExpoId.trim();
+    if (!expo || loadingArtwork || visitEntryTouchedRef.current) return;
+    const visitId = getStoredVisitorExpoVisitId(expo);
+    if (!visitId) return;
+    visitEntryTouchedRef.current = true;
+    void touchVisitorExpoVisit({ visitId, expoId: expo });
+  }, [effectiveExpoId, loadingArtwork]);
+
   useEffect(() => {
     if (!canSubmitFeedback) return;
     actionBarRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1001,6 +1034,10 @@ const VisitorViewCore = () => {
     if (trimmedComment) {
       payload.comment_text = trimmedComment;
     }
+    const activeVisitId = validExpoId ? resolveCurrentVisitIdForExpo(validExpoId) : null;
+    if (activeVisitId) {
+      payload.visit_id = activeVisitId;
+    }
     console.log("Tentative d'insertion avec :", payload);
 
     setSubmittingFeedback(true);
@@ -1037,6 +1074,9 @@ const VisitorViewCore = () => {
     }
 
     setPendingCommentText("");
+    if (validExpoId && activeVisitId) {
+      void touchVisitorExpoVisit({ visitId: activeVisitId, expoId: validExpoId });
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
     triggerHeartConfetti();
     if (isSameArtistNavigation) {
@@ -1080,6 +1120,10 @@ const VisitorViewCore = () => {
 
   const handleExitExpo = () => {
     setIsValidationPopupOpen(false);
+    const expo = (effectiveExpoId || expoId).trim();
+    if (expo) {
+      void endVisitorExpoVisit({ expoId: expo });
+    }
     setIsExitPopupOpen(true);
   };
 

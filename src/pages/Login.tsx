@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { logClientError } from "@/lib/clientErrorLogging";
 import { buildSignupTrackingPayload } from "@/lib/signupTrackingFromLogin";
 import { clearLoginTrackerSession } from "@/lib/visitorTracking";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
@@ -85,7 +86,7 @@ const Login = () => {
     }
 
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: trimmed,
       password,
     });
@@ -94,6 +95,14 @@ const Login = () => {
     if (error) {
       toast.error(error.message || t("login.toast_sign_in_failed"));
       return;
+    }
+
+    if (data.user?.id) {
+      void logClientError("organizer", {
+        message: "Connexion réussie (email / mot de passe)",
+        source: "auth.sign_in",
+        authUserId: data.user.id,
+      });
     }
 
     toast.success(t("login.toast_success"));

@@ -122,6 +122,18 @@ serve(async (req: Request) => {
       console.error("[log-client-error] session_start:", error.message);
       return jsonResponse({ error: "Échec enregistrement session.", details: error.message }, 500);
     }
+
+    const { error: logErr } = await admin.from(logsTable).insert({
+      session_id: sessionId,
+      error_message: "Début de session (connexion au parcours)",
+      error_source: "auth.session_start",
+      page_url: pageUrl,
+      metadata: {},
+    });
+    if (logErr) {
+      console.error("[log-client-error] session_start log:", logErr.message);
+    }
+
     return jsonResponse({ ok: true, action, audience });
   }
 
@@ -137,6 +149,18 @@ serve(async (req: Request) => {
       console.error("[log-client-error] session_end:", error.message);
       return jsonResponse({ error: "Échec clôture session.", details: error.message }, 500);
     }
+
+    const { error: logErr } = await admin.from(logsTable).insert({
+      session_id: sessionId,
+      error_message: "Fin de session (déconnexion ou fermeture onglet)",
+      error_source: "auth.session_end",
+      page_url: pageUrl,
+      metadata: {},
+    });
+    if (logErr) {
+      console.error("[log-client-error] session_end log:", logErr.message);
+    }
+
     return jsonResponse({ ok: true, action, audience });
   }
 
