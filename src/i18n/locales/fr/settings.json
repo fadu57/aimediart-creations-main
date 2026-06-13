@@ -535,6 +535,7 @@
     "error_count_one": "{{count}} erreur",
     "error_count_other": "{{count}} erreurs",
     "session_open": "session en cours",
+    "session_duration": "Durée {{duration}}",
     "last_page": "Dernière page",
     "empty": "Aucune erreur pour ces filtres.",
     "mark_resolved": "Erreur traitée",

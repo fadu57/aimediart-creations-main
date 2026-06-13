@@ -88,6 +88,43 @@ export function splitLogsByAuthKind(logs: ClientErrorLogRow[]): {
   return { errors, authLogs };
 }
 
+const DISCONNECT_EVENT_SOURCES = new Set(["auth.sign_out", "auth.session_end"]);
+
+export function sessionHasDisconnectEvent(logs: ClientErrorLogRow[]): boolean {
+  return logs.some((log) => DISCONNECT_EVENT_SOURCES.has(log.error_source.trim()));
+}
+
+export function isDisconnectEventSource(source: string): boolean {
+  return DISCONNECT_EVENT_SOURCES.has(source.trim());
+}
+
+/** Durée lisible entre début et fin de session (ex. « 5 min », « 1 h 12 min »). */
+export function formatConnectionDuration(
+  startedAt: string | null | undefined,
+  endedAt: string | null | undefined,
+): string | null {
+  if (!startedAt || !endedAt) return null;
+  const start = new Date(startedAt).getTime();
+  const end = new Date(endedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+
+  const totalSeconds = Math.floor((end - start) / 1000);
+  if (totalSeconds < 60) return `${totalSeconds} s`;
+
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 24) {
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${days} j ${remHours} h` : `${days} j`;
+}
+
 export function clientErrorSourceLabel(
   source: string,
   t: (key: string) => string,

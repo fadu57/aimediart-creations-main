@@ -367,6 +367,7 @@
     "error_count_one": "{{count}} error",
     "error_count_other": "{{count}} errores",
     "session_open": "sesión abierta",
+    "session_duration": "Duración {{duration}}",
     "last_page": "Última página",
     "empty": "Ningún error para estos filtros.",
     "mark_resolved": "Marcar como resuelto",

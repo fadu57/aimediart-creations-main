@@ -393,6 +393,7 @@
     "error_count_one": "{{count}} error",
     "error_count_other": "{{count}} errors",
     "session_open": "session open",
+    "session_duration": "Duration {{duration}}",
     "last_page": "Last page",
     "empty": "No errors for these filters.",
     "mark_resolved": "Mark as resolved",

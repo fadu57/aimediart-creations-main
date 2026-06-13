@@ -367,6 +367,7 @@
     "error_count_one": "{{count}} Fehler",
     "error_count_other": "{{count}} Fehler",
     "session_open": "Sitzung läuft",
+    "session_duration": "Dauer {{duration}}",
     "last_page": "Letzte Seite",
     "empty": "Keine Fehler für diese Filter.",
     "mark_resolved": "Als behoben markieren",

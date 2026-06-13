@@ -134,13 +134,17 @@ import {
 
   formatClientErrorDate,
 
-  authLogOrganizerDisplayName,
+  formatConnectionDuration,
 
   fetchProfileNamesByUserIds,
 
   groupLogsBySession,
 
   isAuthEventSource,
+
+  isDisconnectEventSource,
+
+  sessionHasDisconnectEvent,
 
   splitLogsByAuthKind,
 
@@ -1227,13 +1231,18 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
                 const expanded = expandedId === session.id;
                 const { errors: errorLogs, authLogs } = splitLogsByAuthKind(logs);
 
+                const connectionDuration =
+                  sessionHasDisconnectEvent(authLogs) && session.ended_at
+                    ? formatConnectionDuration(session.started_at, session.ended_at)
+                    : null;
+
                 const sessionDates = session.ended_at
 
-                  ? `${formatClientErrorDate(session.started_at, locale)} → ${formatClientErrorDate(session.ended_at, locale)}`
+                  ? `${formatClientErrorDate(session.started_at, locale)} → ${formatClientErrorDate(session.ended_at, locale)}${connectionDuration ? ` · ${t("error_logs.session_duration", { duration: connectionDuration })}` : ""}`
 
                   : `${formatClientErrorDate(session.started_at, locale)} · ${t("error_logs.session_open")}`;
 
-                const metaLine = `${t(`${ns}.client_id`)}: ${sessionClientLabel(audience, session, profileNames, visitorLabels)} · ${t("error_logs.last_page")}: ${session.last_page_url || "—"}`;
+                const metaLine = sessionClientLabel(audience, session, profileNames, visitorLabels);
 
 
 
@@ -1320,9 +1329,10 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
                         {logs.map((log) => {
                           const authEvent = isAuthEventSource(log.error_source);
-                          const organizerName =
-                            authEvent && audience === "organizer"
-                              ? authLogOrganizerDisplayName(session, log, profileNames)
+                          const disconnectEvent = isDisconnectEventSource(log.error_source);
+                          const logConnectionDuration =
+                            disconnectEvent && session.ended_at
+                              ? formatConnectionDuration(session.started_at, session.ended_at)
                               : null;
                           return (
                             <div
@@ -1340,10 +1350,12 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
                                 <span className={authEvent ? "text-sky-400" : undefined}>
                                   {clientErrorSourceLabel(log.error_source, t)}
                                 </span>
-                                {organizerName && (
+                                {logConnectionDuration && (
                                   <>
                                     <span>·</span>
-                                    <span className="font-medium text-sky-400">{organizerName}</span>
+                                    <span className="text-sky-400">
+                                      {t("error_logs.session_duration", { duration: logConnectionDuration })}
+                                    </span>
                                   </>
                                 )}
                                 {log.page_url && (
