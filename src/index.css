@@ -508,19 +508,22 @@
     border-radius: 12px;
   }
 
-  .fab-container.fab-top-right .fab-item.fab-item-stack,
-  .fab-container.œuvre-navi .fab-item.fab-item-stack {
+  .fab-container.fab-top-right .fab-settings-group,
+  .fab-container.œuvre-navi .fab-settings-group {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-height: auto;
+    gap: 2px;
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 1);
     white-space: normal;
-    height: auto;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    overflow: hidden;
   }
 
   /* Menu burger header : lignes plus compactes que le FAB œuvre */
-  .fab-container.fab-top-right .fab-item:not(.fab-item-stack) {
+  .fab-container.fab-top-right .fab-item:not(.fab-settings-group) {
     min-height: 36px;
     padding: 0 10px;
     gap: 6px;
@@ -657,8 +660,8 @@
       height: 44px;
     }
 
-    .fab-container.fab-top-right .fab-item:not(.fab-item-stack),
-    .fab-container.œuvre-navi .fab-item:not(.fab-item-stack) {
+    .fab-container.fab-top-right .fab-item:not(.fab-settings-group),
+    .fab-container.œuvre-navi .fab-item:not(.fab-settings-group) {
       min-height: 34px;
       padding: 0 8px;
       font-size: 12px;

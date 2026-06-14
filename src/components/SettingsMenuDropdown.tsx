@@ -104,7 +104,7 @@ export function SettingsMenuDropdown({
 
   if (variant === "fab") {
     return (
-      <div className="fab-item fab-item-stack flex-col items-stretch gap-0.5 px-1 py-1.5">
+      <div className="fab-settings-group">
         <NavLink
           to="/settings"
           className={cn(
