@@ -122,5 +122,13 @@
   "toast_qr_regenerate_failed": "No se pudo regenerar el código QR.",
   "dialog_edit_desc": "Editar la información y los textos de mediación de la obra.",
   "dialog_new_desc": "Crear una nueva ficha de obra con textos de mediación e imagen.",
-  "tab_version_placeholder": "Versión \"{{label}}\""
+  "tab_version_placeholder": "Versión \"{{label}}\"",
+  "audio_generate_dialog": {
+    "title": "Generación de audio — mediación",
+    "desc": "Seguimiento de todas las voces por persona e idioma.",
+    "close": "Cerrar",
+    "fill_missing": "Completar voces faltantes",
+    "all_voices_ready": "Todas las voces han sido generadas",
+    "background_hint": "Puede cerrar: la generación continuará en segundo plano."
+  }
 }

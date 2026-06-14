@@ -122,5 +122,13 @@
   "toast_qr_regenerate_failed": "QR-Code konnte nicht neu erzeugt werden.",
   "dialog_edit_desc": "Kunstwerk-Informationen und Mediationstexte bearbeiten.",
   "dialog_new_desc": "Eine neue Kunstwerkdatei mit Mediationstexten und Bild erstellen.",
-  "tab_version_placeholder": "Version \"{{label}}\""
+  "tab_version_placeholder": "Version \"{{label}}\"",
+  "audio_generate_dialog": {
+    "title": "Audiogenerierung — Mediation",
+    "desc": "Alle Stimmen nach Persona und Sprache verfolgen.",
+    "close": "Schließen",
+    "fill_missing": "Fehlende Stimmen ergänzen",
+    "all_voices_ready": "Alle Stimmen wurden generiert",
+    "background_hint": "Sie können schließen — die Generierung läuft im Hintergrund weiter."
+  }
 }

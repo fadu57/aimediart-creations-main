@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { Loader2, Volume2 } from "lucide-react";
+import { CheckCircle2, Loader2, Volume2 } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -15,7 +15,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { MediationUiLang } from "@/lib/artworkDescriptionI18n";
-import { hasPendingAudioForArtwork, subscribeAudioQueue } from "@/services/audioService";
+import {
+  fetchMediationVoiceFillState,
+  hasPendingAudioForArtwork,
+  subscribeAudioQueue,
+  type MediationVoiceFillState,
+} from "@/services/audioService";
+
+const FILL_STATE_POLL_MS = 2000;
 
 type MediationPersonaEntry = {
   key: string;
@@ -35,8 +42,7 @@ type MediationPersonaAudioDialogProps = {
   onOptimisticCellDone: (cellKey: string) => void;
   onRetryCell: (lang: string, styleKey: string, promptStyleId: string) => void;
   onCancelCell: (lang: string, promptStyleId: string) => void | Promise<void>;
-  onGenerateAll: () => void;
-  generateAllDisabled?: boolean;
+  onFillMissing: () => void | Promise<void>;
 };
 
 /** Modal de suivi génération audio (tous personas × langues), au-dessus de la fiche œuvre. */
@@ -52,23 +58,57 @@ export function MediationPersonaAudioDialog({
   onOptimisticCellDone,
   onRetryCell,
   onCancelCell,
-  onGenerateAll,
-  generateAllDisabled = false,
+  onFillMissing,
 }: MediationPersonaAudioDialogProps) {
   const { t } = useTranslation("artwork_modal");
   const [queueActive, setQueueActive] = useState(false);
+  const [fillState, setFillState] = useState<MediationVoiceFillState | null>(null);
 
   const syncQueueActive = useCallback(() => {
     setQueueActive(hasPendingAudioForArtwork(artworkId));
   }, [artworkId]);
 
+  const refreshFillState = useCallback(() => {
+    if (!open || !artworkId) return;
+    void fetchMediationVoiceFillState({
+      artworkId,
+      personas,
+      languages,
+      descriptionsByLang,
+    }).then(setFillState);
+  }, [open, artworkId, personas, languages, descriptionsByLang]);
+
   useEffect(() => {
     if (!open) return;
     syncQueueActive();
-    return subscribeAudioQueue(syncQueueActive);
-  }, [open, syncQueueActive]);
+    refreshFillState();
+    return subscribeAudioQueue(() => {
+      syncQueueActive();
+      refreshFillState();
+    });
+  }, [open, syncQueueActive, refreshFillState]);
+
+  useEffect(() => {
+    if (!open) return;
+    refreshFillState();
+  }, [open, refreshFillState, refreshKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(refreshFillState, FILL_STATE_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [open, refreshFillState]);
 
   const generationsInProgress = queueActive || optimisticCells.length > 0;
+  const allReady = fillState?.allReady ?? false;
+  const hasExpectedVoices = (fillState?.totalExpected ?? 0) > 0;
+  const canFillMissing = hasExpectedVoices && !allReady && (fillState?.missingCount ?? 0) > 0;
+
+  const buttonLabel = allReady
+    ? t("audio_generate_dialog.all_voices_ready")
+    : t("audio_generate_dialog.fill_missing");
+
+  const buttonDisabled = !hasExpectedVoices || allReady || !canFillMissing || generationsInProgress;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,15 +128,17 @@ export function MediationPersonaAudioDialog({
               size="sm"
               variant="outline"
               className="mt-0.5 shrink-0 gap-1.5"
-              disabled={generateAllDisabled || generationsInProgress}
-              onClick={onGenerateAll}
+              disabled={buttonDisabled}
+              onClick={() => void onFillMissing()}
             >
               {generationsInProgress ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : allReady ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
               ) : (
                 <Volume2 className="h-3.5 w-3.5" aria-hidden />
               )}
-              {t("audio_generate_dialog.generate_all")}
+              {buttonLabel}
             </Button>
           </div>
         </DialogHeader>

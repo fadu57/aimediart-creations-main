@@ -9,6 +9,7 @@ import type { MediationUiLang } from "@/lib/artworkDescriptionI18n";
 import { cn } from "@/lib/utils";
 import {
   audioVoiceCellKey,
+  buildMediationVoiceTargets,
   fetchAudioVoiceStatusMapByCell,
   getPendingAudioJobsByCell,
   subscribeAudioQueue,
@@ -66,26 +67,13 @@ function cellHasText(
   return !!(descriptionsByLang[lang]?.[styleKey] ?? "").trim();
 }
 
-function buildMediationVoiceTargets(
+function buildMediationVoiceTargetsForStatus(
   artworkId: string,
   personas: readonly MediationPersonaEntry[],
   descriptionsByLang: Record<string, Record<string, string>>,
   languages: readonly string[],
 ): AudioVoiceLangTarget[] {
-  const targets: AudioVoiceLangTarget[] = [];
-  for (const persona of personas) {
-    const promptStyleId = persona.promptStyleId?.trim();
-    if (!promptStyleId) continue;
-    for (const lng of languages) {
-      if (!cellHasText(descriptionsByLang, persona.key, lng)) continue;
-      targets.push({
-        lang: lng,
-        text_id: artworkId,
-        prompt_style_id: promptStyleId,
-      });
-    }
-  }
-  return targets;
+  return buildMediationVoiceTargets(artworkId, personas, descriptionsByLang, languages);
 }
 
 function hasInProgress(
@@ -283,7 +271,7 @@ export function MediationAllVoicesStatus({
   }));
 
   const targets = useMemo(
-    () => buildMediationVoiceTargets(artworkId, personas, descriptionsByLang, languages),
+    () => buildMediationVoiceTargetsForStatus(artworkId, personas, descriptionsByLang, languages),
     [artworkId, personas, descriptionsByLang, languages],
   );
 

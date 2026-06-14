@@ -572,6 +572,184 @@ export async function mediationLangNeedsAudioGeneration(
   return false;
 }
 
+export type MediationPersonaRef = {
+  key: string;
+  promptStyleId?: string | null;
+};
+
+export type MediationVoiceTarget = AudioVoiceLangTarget & {
+  styleKey: string;
+};
+
+/** Cibles persona × langue avec texte de médiation non vide. */
+export function buildMediationVoiceTargets(
+  artworkId: string,
+  personas: readonly MediationPersonaRef[],
+  descriptionsByLang: Record<string, Record<string, string>>,
+  languages: readonly string[],
+): MediationVoiceTarget[] {
+  const targets: MediationVoiceTarget[] = [];
+  for (const persona of personas) {
+    const promptStyleId = persona.promptStyleId?.trim();
+    if (!promptStyleId) continue;
+    for (const lng of languages) {
+      const langKey = normLangCode(lng);
+      const text = (descriptionsByLang[langKey]?.[persona.key] ?? descriptionsByLang[lng]?.[persona.key] ?? "").trim();
+      if (!text) continue;
+      targets.push({
+        lang: langKey,
+        text_id: artworkId,
+        prompt_style_id: promptStyleId,
+        styleKey: persona.key,
+      });
+    }
+  }
+  return targets;
+}
+
+function isAudioJobQueued(
+  job: Pick<AudioGenJob, "text_id" | "lang" | "prompt_style_id" | "gender">,
+): boolean {
+  const matches = (j: AudioGenJob) =>
+    j.text_id.trim() === job.text_id.trim()
+    && normLangCode(j.lang) === normLangCode(job.lang)
+    && j.prompt_style_id.trim() === job.prompt_style_id.trim()
+    && j.gender === job.gender;
+  if (audioJobQueue.some(matches)) return true;
+  for (const running of runningAudioJobs) {
+    if (matches(running)) return true;
+  }
+  return false;
+}
+
+type VoiceSlotFilePick = Pick<AudioFile, "status" | "storage_path" | "updated_at" | "created_at">;
+
+function voiceSlotNeedsGeneration(
+  file: VoiceSlotFilePick | undefined,
+  queuedJob?: Pick<AudioGenJob, "text_id" | "lang" | "prompt_style_id" | "gender">,
+): boolean {
+  if (queuedJob && isAudioJobQueued(queuedJob)) return false;
+  const status = fileToVoiceStatus(file);
+  if (status === "ready") return false;
+  if (status === "generating" || status === "pending") return false;
+  return true;
+}
+
+export type MediationVoiceFillState = {
+  totalExpected: number;
+  readyCount: number;
+  missingCount: number;
+  inProgressCount: number;
+  allReady: boolean;
+};
+
+function countMediationVoiceSlots(
+  targets: MediationVoiceTarget[],
+  files: AudioFile[],
+): MediationVoiceFillState {
+  let totalExpected = 0;
+  let readyCount = 0;
+  let missingCount = 0;
+  let inProgressCount = 0;
+
+  for (const target of targets) {
+    const langKey = normLangCode(target.lang);
+    for (const gender of ["F", "M"] as const) {
+      totalExpected += 1;
+      const jobRef = {
+        text_id: target.text_id,
+        lang: langKey,
+        prompt_style_id: target.prompt_style_id,
+        gender,
+      };
+      const file = files.find(
+        (f) =>
+          f.text_id === target.text_id
+          && normLangCode(f.lang) === langKey
+          && f.prompt_style_id === target.prompt_style_id
+          && f.gender === gender,
+      );
+
+      const status = fileToVoiceStatus(file);
+      if (status === "ready") {
+        readyCount += 1;
+      } else if (status === "generating" || status === "pending" || isAudioJobQueued(jobRef)) {
+        inProgressCount += 1;
+      } else if (voiceSlotNeedsGeneration(file, jobRef)) {
+        missingCount += 1;
+      }
+    }
+  }
+
+  return {
+    totalExpected,
+    readyCount,
+    missingCount,
+    inProgressCount,
+    allReady: totalExpected > 0 && readyCount === totalExpected,
+  };
+}
+
+/** État de complétion des voix médiation (F+M par persona × langue). */
+export async function fetchMediationVoiceFillState(params: {
+  artworkId: string;
+  personas: readonly MediationPersonaRef[];
+  languages: readonly string[];
+  descriptionsByLang: Record<string, Record<string, string>>;
+}): Promise<MediationVoiceFillState> {
+  const { artworkId, personas, languages, descriptionsByLang } = params;
+  const targets = buildMediationVoiceTargets(artworkId, personas, descriptionsByLang, languages);
+  if (targets.length === 0) {
+    return { totalExpected: 0, readyCount: 0, missingCount: 0, inProgressCount: 0, allReady: false };
+  }
+
+  const files = await getAudioFiles(artworkId, "mediation");
+  return countMediationVoiceSlots(targets, files);
+}
+
+/** Enfile uniquement les voix F/M manquantes (ignore les ✓ et celles déjà en cours). */
+export async function triggerMissingMediationVoices(params: {
+  artworkId: string;
+  personas: readonly MediationPersonaRef[];
+  languages: readonly string[];
+  descriptionsByLang: Record<string, Record<string, string>>;
+}): Promise<{ jobCount: number; cellKeys: string[] }> {
+  const { artworkId, personas, languages, descriptionsByLang } = params;
+  const targets = buildMediationVoiceTargets(artworkId, personas, descriptionsByLang, languages);
+  if (targets.length === 0) return { jobCount: 0, cellKeys: [] };
+
+  const files = await getAudioFiles(artworkId, "mediation");
+  const jobs: AudioGenJob[] = [];
+  const cellKeys = new Set<string>();
+
+  for (const target of targets) {
+    const langKey = normLangCode(target.lang);
+    for (const gender of ["F", "M"] as const) {
+      const job: AudioGenJob = {
+        text_id: target.text_id,
+        text_type: "mediation",
+        lang: langKey,
+        prompt_style_id: target.prompt_style_id,
+        gender,
+        mediation_style_key: target.styleKey,
+      };
+      const file = files.find(
+        (f) =>
+          f.text_id === target.text_id
+          && normLangCode(f.lang) === langKey
+          && f.prompt_style_id === target.prompt_style_id
+          && f.gender === gender,
+      );
+      if (!voiceSlotNeedsGeneration(file, job)) continue;
+      jobs.push(job);
+      cellKeys.add(audioVoiceCellKey(langKey, target.prompt_style_id));
+    }
+  }
+
+  if (jobs.length > 0) enqueueAudioGenerationJobs(jobs);
+  return { jobCount: jobs.length, cellKeys: [...cellKeys] };
+}
+
 export function buildMediationStylePromptStyleMap(
   styleTabs: Array<{ key: string; promptStyleId?: string | null }>,
 ): Record<string, string> {

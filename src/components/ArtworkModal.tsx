@@ -12,6 +12,7 @@ import {
   cancelAudioGenerationForCell,
   triggerMediationAudioBatchForChanges,
   triggerMediationAudioForPersonaLang,
+  triggerMissingMediationVoices,
   audioVoiceCellKey,
   mediationLangNeedsAudioGeneration,
   triggerMediationAudioForLang,
@@ -1283,69 +1284,46 @@ export function ArtworkModal({
       setMediationAudioDialogOpen(true);
 
       if (options?.triggerGeneration) {
-        const cellsToQueue: string[] = [];
-        for (const lng of activeMediationLangs) {
-          const text = (descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim();
-          if (!text) continue;
-          triggerMediationAudioForPersonaLang({
-            artworkId: persistedArtworkId,
-            lang: lng,
-            styleKey: tab.key,
-            prompt_style_id: tab.promptStyleId,
-          });
-          cellsToQueue.push(audioVoiceCellKey(lng, tab.promptStyleId));
-        }
-        if (cellsToQueue.length > 0) {
+        void triggerMissingMediationVoices({
+          artworkId: persistedArtworkId,
+          personas: [{ key: tab.key, promptStyleId: tab.promptStyleId }],
+          languages: activeMediationLangs,
+          descriptionsByLang,
+        }).then(({ jobCount, cellKeys }) => {
+          if (jobCount <= 0 || cellKeys.length === 0) return;
           setAudioOptimisticCells((prev) => {
             const next = new Set(prev);
-            for (const cell of cellsToQueue) next.add(cell);
+            for (const cell of cellKeys) next.add(cell);
             return [...next];
           });
           setAudioStatusRefreshKey((k) => k + 1);
-        }
+        });
       }
     },
     [persistedArtworkId, descriptionsByLang, activeMediationLangs],
   );
 
-  const handleGenerateAllMediationVoices = useCallback(() => {
+  const handleFillMissingMediationVoices = useCallback(async () => {
     if (!persistedArtworkId) return;
-    const cellsToQueue: string[] = [];
-    for (const tab of styleTabs ?? []) {
-      if (!tab.promptStyleId?.trim()) continue;
-      for (const lng of activeMediationLangs) {
-        const text = (descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim();
-        if (!text) continue;
-        triggerMediationAudioForPersonaLang({
-          artworkId: persistedArtworkId,
-          lang: lng,
-          styleKey: tab.key,
-          prompt_style_id: tab.promptStyleId,
-        });
-        cellsToQueue.push(audioVoiceCellKey(lng, tab.promptStyleId));
-      }
-    }
-    if (cellsToQueue.length > 0) {
+    const personas = (styleTabs ?? []).map((tab) => ({
+      key: tab.key,
+      promptStyleId: tab.promptStyleId,
+    }));
+    const { jobCount, cellKeys } = await triggerMissingMediationVoices({
+      artworkId: persistedArtworkId,
+      personas,
+      languages: activeMediationLangs,
+      descriptionsByLang,
+    });
+    if (jobCount > 0 && cellKeys.length > 0) {
       setAudioOptimisticCells((prev) => {
         const next = new Set(prev);
-        for (const cell of cellsToQueue) next.add(cell);
+        for (const cell of cellKeys) next.add(cell);
         return [...next];
       });
       setAudioStatusRefreshKey((k) => k + 1);
     }
   }, [persistedArtworkId, styleTabs, activeMediationLangs, descriptionsByLang]);
-
-  const canGenerateAllMediationVoices = useMemo(() => {
-    for (const tab of styleTabs ?? []) {
-      if (!tab.promptStyleId?.trim()) continue;
-      for (const lng of activeMediationLangs) {
-        if ((descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim()) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }, [styleTabs, activeMediationLangs, descriptionsByLang]);
 
   const mediationStyleMap = useMemo(
     () => buildMediationStylePromptStyleMap(styleTabs ?? []),
@@ -2706,8 +2684,7 @@ export function ArtworkModal({
         }
         onRetryCell={handlePersonaAudioRetryCell}
         onCancelCell={handlePersonaAudioCancelCell}
-        onGenerateAll={handleGenerateAllMediationVoices}
-        generateAllDisabled={!canGenerateAllMediationVoices}
+        onFillMissing={handleFillMissingMediationVoices}
       />
     ) : null}
     <AddArtistDialog

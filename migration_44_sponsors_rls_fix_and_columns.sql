@@ -1,4 +1,6 @@
 -- migration_44_sponsors_rls_fix_and_columns.sql
+-- ⚠️ Les politiques RLS ci-dessous utilisent auth.jwt() -> user_metadata (alerte linter 0015).
+--    Appliquer ensuite migration_74_sponsors_rls_no_user_metadata.sql en production.
 -- Corrections :
 --   1. Ajout des colonnes manquantes (amount, currency)
 --   2. Remplacement des politiques RLS pour inclure les admins globaux (role_id 1-3)

@@ -145,7 +145,8 @@
     "title": "Génération audio — médiation",
     "desc": "Suivi de toutes les voix par persona et par langue.",
     "close": "Fermer",
-    "generate_all": "Générer toutes les voix",
+    "fill_missing": "Compléter les voix manquantes",
+    "all_voices_ready": "Toutes les voix ont été générées",
     "background_hint": "Vous pouvez fermer : les générations continueront à se faire en arrière-plan."
   },
   "audio_voice_status": {
