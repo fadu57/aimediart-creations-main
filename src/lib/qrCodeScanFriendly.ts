@@ -60,10 +60,53 @@ export function buildQrScannerCameraConfig(): Html5QrcodeCameraScanConfig {
   };
 }
 
+/** Taille minimale (px) de la zone vidéo avant html5-qrcode.start(). */
+const QR_READER_MIN_PX = 80;
+
+export class QrScannerAbortedError extends Error {
+  constructor() {
+    super("Scanner interrompu.");
+    this.name = "QrScannerAbortedError";
+  }
+}
+
+export type QrWebcamScannerStartOptions = {
+  /** Retourne false si le composant est démonté ou l'utilisateur a quitté — pas d'erreur remontée. */
+  shouldContinue?: () => boolean;
+};
+
+function getQrReaderElement(elementId: string): HTMLElement | null {
+  return document.getElementById(elementId);
+}
+
+/** Même critère que waitForQrReaderLayout (getBoundingClientRect, pas clientWidth). */
+export function isQrReaderLayoutReady(elementId: string, minPx = QR_READER_MIN_PX): boolean {
+  const el = getQrReaderElement(elementId);
+  if (!el) return false;
+  const { width, height } = el.getBoundingClientRect();
+  return width >= minPx && height >= minPx;
+}
+
 function assertQrReaderElementReady(elementId: string): void {
-  const el = document.getElementById(elementId);
-  if (!el || el.clientWidth < 1 || el.clientHeight < 1) {
+  if (!isQrReaderLayoutReady(elementId)) {
     throw new Error("Zone scanner non prête.");
+  }
+}
+
+async function ensureQrReaderReady(
+  elementId: string,
+  shouldContinue?: () => boolean,
+): Promise<void> {
+  for (let i = 0; i < 8; i++) {
+    if (shouldContinue && !shouldContinue()) throw new QrScannerAbortedError();
+    if (isQrReaderLayoutReady(elementId)) return;
+    await delay(80);
+  }
+  try {
+    await waitForQrReaderLayout(elementId, 5000);
+  } catch (e) {
+    if (shouldContinue && !shouldContinue()) throw new QrScannerAbortedError();
+    throw e;
   }
 }
 
@@ -118,10 +161,7 @@ export function waitForQrReaderLayout(elementId: string, timeoutMs = 4000): Prom
       else reject(new Error("Zone scanner non prête."));
     };
 
-    const isReady = () => {
-      const { width, height } = el.getBoundingClientRect();
-      return width >= 80 && height >= 80;
-    };
+    const isReady = () => isQrReaderLayoutReady(elementId);
 
     if (isReady()) {
       finish(true);
@@ -195,10 +235,13 @@ async function runQrWebcamScannerStart(
   scanConfig: Html5QrcodeCameraScanConfig,
   onSuccess: (decodedText: string) => void,
   onError?: (errorMessage: string) => void,
+  options?: QrWebcamScannerStartOptions,
 ): Promise<QrWebcamScannerSession> {
-  await waitForQrReaderLayout(elementId);
+  const shouldContinue = options?.shouldContinue;
+
+  await ensureQrReaderReady(elementId, shouldContinue);
   await waitForQrScannerIdle(qr);
-  assertQrReaderElementReady(elementId);
+  if (shouldContinue && !shouldContinue()) throw new QrScannerAbortedError();
 
   const onScanError = onError ?? (() => undefined);
   const attempts = await buildQrScannerCameraAttempts();
@@ -206,15 +249,17 @@ async function runQrWebcamScannerStart(
 
   let lastError: unknown;
   for (let i = 0; i < attempts.length; i++) {
+    if (shouldContinue && !shouldContinue()) throw new QrScannerAbortedError();
+
     if (i > 0) {
       await waitForQrScannerIdle(qr);
       await delay(300);
-      assertQrReaderElementReady(elementId);
+      await ensureQrReaderReady(elementId, shouldContinue);
     }
 
     const config = attempts[i];
     try {
-      assertQrReaderElementReady(elementId);
+      await ensureQrReaderReady(elementId, shouldContinue);
       await qr.start(config, scanConfig, onSuccess, onScanError);
       if (import.meta.env.DEV) {
         console.debug("[scanner] caméra démarrée", { config });
@@ -240,9 +285,12 @@ export function startQrWebcamScanner(
   scanConfig: Html5QrcodeCameraScanConfig,
   onSuccess: (decodedText: string) => void,
   onError?: (errorMessage: string) => void,
+  options?: QrWebcamScannerStartOptions,
 ): Promise<QrWebcamScannerSession> {
   const previous = startChainByReader.get(qr) ?? Promise.resolve();
-  const run = previous.catch(() => undefined).then(() => runQrWebcamScannerStart(qr, elementId, scanConfig, onSuccess, onError));
+  const run = previous.catch(() => undefined).then(() =>
+    runQrWebcamScannerStart(qr, elementId, scanConfig, onSuccess, onError, options)
+  );
   startChainByReader.set(qr, run.then(() => undefined));
   return run;
 }

@@ -11,6 +11,7 @@ import {
   createHtml5QrcodeReader,
   safeStopQrScanner,
   scanQrFromImageFile,
+  QrScannerAbortedError,
   startQrWebcamScanner,
 } from "@/lib/qrCodeScanFriendly";
 import {
@@ -52,6 +53,7 @@ const WorkScanner = () => {
   const lastInvalidScanToastRef = useRef(0);
   const cameraSessionRef = useRef<NativeCameraQrSession | null>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
 
   const exitTarget = useMemo(
     () => (expoId ? `/scan?expo_id=${encodeURIComponent(expoId)}` : "/scan"),
@@ -136,7 +138,14 @@ const WorkScanner = () => {
       } else {
         const qr = getOrCreateFileQrReader();
         await safeStopQrScanner(qr);
-        await startQrWebcamScanner(qr, QR_READER_ELEMENT_ID, buildQrScannerCameraConfig(), handleQrDecoded);
+        await startQrWebcamScanner(
+          qr,
+          QR_READER_ELEMENT_ID,
+          buildQrScannerCameraConfig(),
+          handleQrDecoded,
+          undefined,
+          { shouldContinue: () => mountedRef.current },
+        );
         try {
           const capabilities = qr.getRunningTrackCapabilities();
           setTorchSupported(Boolean(capabilities?.torch));
@@ -161,6 +170,8 @@ const WorkScanner = () => {
         }
       }, 7000);
     } catch (e) {
+      if (e instanceof QrScannerAbortedError || !mountedRef.current) return;
+
       const msg = e instanceof Error ? e.message : "Accès caméra impossible.";
       const isInsecureContext = typeof window !== "undefined" && !window.isSecureContext;
       if (import.meta.env.DEV) {
@@ -219,7 +230,9 @@ const WorkScanner = () => {
   );
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       cameraSessionRef.current?.stop();
       cameraSessionRef.current = null;
       if (assistTimeoutRef.current !== null) {
@@ -237,10 +250,16 @@ const WorkScanner = () => {
     if (cameraReady || startingCameraRef.current) return;
     if (autostartAttemptedRef.current) return;
     autostartAttemptedRef.current = true;
+    let innerFrameId = 0;
     const frameId = requestAnimationFrame(() => {
-      void startCamera();
+      innerFrameId = requestAnimationFrame(() => {
+        void startCamera();
+      });
     });
-    return () => cancelAnimationFrame(frameId);
+    return () => {
+      cancelAnimationFrame(frameId);
+      if (innerFrameId) cancelAnimationFrame(innerFrameId);
+    };
   }, [cameraAutoStartEnabled, cameraReady, startCamera]);
 
   const toggleTorch = async () => {
