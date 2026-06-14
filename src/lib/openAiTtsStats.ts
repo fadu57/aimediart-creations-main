@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 export type OpenAiTtsMonthStats = {
   costUsd: number;
-  mp3Count: number;
+  audioFileCount: number;
   avgCostUsd: number;
   byGender: { F: number; M: number };
   byTextType: { bio: number; mediation: number };
@@ -21,7 +21,7 @@ export function currentCalendarMonthStartLocal(): string {
 
 const EMPTY_STATS: OpenAiTtsMonthStats = {
   costUsd: 0,
-  mp3Count: 0,
+  audioFileCount: 0,
   avgCostUsd: 0,
   byGender: { F: 0, M: 0 },
   byTextType: { bio: 0, mediation: 0 },
@@ -65,12 +65,12 @@ export async function fetchOpenAiTtsMonthStats(
     else if (tt === "mediation") byTextType.mediation += 1;
   }
 
-  const mp3Count = fileRows.length;
+  const audioFileCount = fileRows.length;
 
   return {
     costUsd,
-    mp3Count,
-    avgCostUsd: mp3Count > 0 ? costUsd / mp3Count : 0,
+    audioFileCount,
+    avgCostUsd: audioFileCount > 0 ? costUsd / audioFileCount : 0,
     byGender,
     byTextType,
   };

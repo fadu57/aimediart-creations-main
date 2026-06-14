@@ -1,8 +1,9 @@
+// Journalisation erreurs client — organisateur et visiteur (session_start | session_ping | session_end | error)
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsPreflightResponse, jsonResponse } from "../_shared/cors.ts";
 
-type Action = "session_start" | "session_end" | "error";
+type Action = "session_start" | "session_end" | "session_ping" | "error";
 type Audience = "visitor" | "organizer";
 
 type RequestBody = {
@@ -86,6 +87,7 @@ serve(async (req: Request) => {
   const userAgent = clampText(body.user_agent ?? req.headers.get("user-agent"), 500);
   const locale = clampText(body.locale, 32);
   const timezone = clampText(body.timezone, 64);
+  const nowIso = new Date().toISOString();
 
   if (action === "session_start") {
     const { data: existing } = await admin.from(sessionsTable).select("id").eq("id", sessionId).maybeSingle();
@@ -97,6 +99,7 @@ serve(async (req: Request) => {
           last_page_url: pageUrl ?? undefined,
           auth_user_id: authUserId ?? undefined,
           agency_id: agencyId ?? undefined,
+          last_activity_at: nowIso,
         })
         .eq("id", sessionId);
       return jsonResponse({ ok: true, action, audience, reused: true });
@@ -109,6 +112,7 @@ serve(async (req: Request) => {
       last_page_url: pageUrl,
       locale,
       timezone,
+      last_activity_at: nowIso,
     };
     if (audience === "visitor") {
       insertRow.visitor_client_id = visitorClientId;
@@ -137,12 +141,29 @@ serve(async (req: Request) => {
     return jsonResponse({ ok: true, action, audience });
   }
 
+  if (action === "session_ping") {
+    const { error } = await admin
+      .from(sessionsTable)
+      .update({
+        last_activity_at: nowIso,
+        last_page_url: pageUrl ?? undefined,
+      })
+      .eq("id", sessionId)
+      .is("ended_at", null);
+    if (error) {
+      console.error("[log-client-error] session_ping:", error.message);
+      return jsonResponse({ error: "Échec heartbeat session.", details: error.message }, 500);
+    }
+    return jsonResponse({ ok: true, action, audience });
+  }
+
   if (action === "session_end") {
     const { error } = await admin
       .from(sessionsTable)
       .update({
-        ended_at: new Date().toISOString(),
+        ended_at: nowIso,
         last_page_url: pageUrl ?? undefined,
+        last_activity_at: nowIso,
       })
       .eq("id", sessionId);
     if (error) {
@@ -180,6 +201,7 @@ serve(async (req: Request) => {
         last_page_url: pageUrl,
         locale,
         timezone,
+        last_activity_at: nowIso,
       };
       if (audience === "visitor") {
         insertRow.visitor_client_id = visitorClientId;
@@ -204,7 +226,10 @@ serve(async (req: Request) => {
       return jsonResponse({ error: "Échec enregistrement erreur.", details: error.message }, 500);
     }
 
-    await admin.from(sessionsTable).update({ last_page_url: pageUrl ?? undefined }).eq("id", sessionId);
+    await admin
+      .from(sessionsTable)
+      .update({ last_page_url: pageUrl ?? undefined, last_activity_at: nowIso })
+      .eq("id", sessionId);
 
     return jsonResponse({ ok: true, action, audience });
   }

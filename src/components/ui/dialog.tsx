@@ -32,15 +32,17 @@ export type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPri
   hideCloseButton?: boolean;
   /** Rend le modal sans Portal (utile pour l'inspection visuelle dans l'éditeur). */
   renderInPlace?: boolean;
+  /** Classes supplémentaires pour l'overlay (ex. z-index pour modal empilé). */
+  overlayClassName?: string;
 };
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, hideCloseButton = true, renderInPlace = false, ...props }, ref) => {
+>(({ className, children, hideCloseButton = true, renderInPlace = false, overlayClassName, ...props }, ref) => {
   const content = (
     <>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         ref={ref}
         className={cn(

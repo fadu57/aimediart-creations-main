@@ -9,12 +9,15 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
 import {
   buildMediationStylePromptStyleMap,
+  cancelAudioGenerationForCell,
   triggerMediationAudioBatchForChanges,
+  triggerMediationAudioForPersonaLang,
+  audioVoiceCellKey,
   mediationLangNeedsAudioGeneration,
   triggerMediationAudioForLang,
 } from "@/services/audioService";
 import { AudioPlayer } from "@/components/AudioPlayer";
-import { AudioVoiceLangStatus } from "@/components/AudioVoiceLangStatus";
+import { MediationPersonaAudioDialog } from "@/components/MediationPersonaAudioDialog";
 import { generatePersonasBatchWithRetry } from "@/lib/mediationBatchGenerate";
 import { analyzeArtworkImage, type ImageAnalysisPersonaItem } from "@/services/imageAnalysisService";
 import { supabase } from "@/lib/supabase";
@@ -120,6 +123,10 @@ type ArtworkModalProps = {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   artworkId?: string | null;
+  /** Ouvre le modal voix dès que l'œuvre est chargée (ex. depuis le catalogue). */
+  openMediationAudioOnLoad?: boolean;
+  /** Ferme la fiche œuvre quand le modal voix se ferme (retour catalogue). */
+  closeOnMediationAudioClose?: boolean;
 };
 
 type ArtistOption = {
@@ -523,7 +530,14 @@ function ArtworkModalIdentityRow({
   );
 }
 
-export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: ArtworkModalProps) {
+export function ArtworkModal({
+  open,
+  onOpenChange,
+  onSuccess,
+  artworkId,
+  openMediationAudioOnLoad = false,
+  closeOnMediationAudioClose = false,
+}: ArtworkModalProps) {
   const { t, i18n } = useTranslation("artwork_modal");
   const { role_id, agency_id, expo_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
@@ -559,7 +573,8 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
   const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [audioStatusRefreshKey, setAudioStatusRefreshKey] = useState(0);
-  const [audioOptimisticLangs, setAudioOptimisticLangs] = useState<string[]>([]);
+  const [audioOptimisticCells, setAudioOptimisticCells] = useState<string[]>([]);
+  const [mediationAudioDialogOpen, setMediationAudioDialogOpen] = useState(false);
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
   const [activeTab, setActiveTab] = useState<DescriptionKey>("enfant");
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
@@ -668,6 +683,7 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
       setMediationProgress(null);
       setMediationOptionalLang(null);
       setAnalyzeProgress(null);
+      setMediationAudioDialogOpen(false);
       return;
     }
     setMediationEditLang(mediationPrimaryLang);
@@ -1183,6 +1199,11 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     }
   }, [activeMediationLangs, activeMediationLangSet, mediationEditLang]);
 
+  useEffect(() => {
+    if (!open || !openMediationAudioOnLoad || artworkDraftLoading || !persistedArtworkId) return;
+    setMediationAudioDialogOpen(true);
+  }, [open, openMediationAudioOnLoad, artworkDraftLoading, persistedArtworkId]);
+
   /** À l’édition : resynchroniser la langue optionnelle si plusieurs langues ont du contenu. */
   useEffect(() => {
     if (!open || artworkDraftLoading || !isEditingExisting) return;
@@ -1219,39 +1240,117 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
     return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
   }, [isAllLanguagesMode, mediationOptionalLang, mediationPrimaryLang, t]);
 
-  const mediationAudioTargetsByLang = useMemo(() => {
-    const map: Record<
-      string,
-      Array<{ lang: string; text_id: string; prompt_style_id: string }> | null
-    > = {};
-    if (!persistedArtworkId) return map;
-    for (const lng of MEDIATION_UI_LANGS) {
-      const byStyle = descriptionsByLang[lng] ?? {};
-      const targets: Array<{ lang: string; text_id: string; prompt_style_id: string }> = [];
-      for (const tab of styleTabs ?? []) {
-        const prompt_style_id = tab.promptStyleId?.trim();
-        const text = (byStyle[tab.key] ?? "").trim();
-        if (!prompt_style_id || !text) continue;
-        targets.push({ lang: lng, text_id: persistedArtworkId, prompt_style_id });
+  const handlePersonaAudioRetryCell = useCallback(
+    (lang: string, styleKey: string, promptStyleId: string) => {
+      if (!persistedArtworkId || !promptStyleId) return;
+      const lng = lang.trim().toLowerCase().slice(0, 2) as MediationUiLang;
+      triggerMediationAudioForPersonaLang({
+        artworkId: persistedArtworkId,
+        lang: lng,
+        styleKey,
+        prompt_style_id: promptStyleId,
+      });
+      const cellKey = audioVoiceCellKey(lng, promptStyleId);
+      setAudioOptimisticCells((prev) => (prev.includes(cellKey) ? prev : [...prev, cellKey]));
+      setAudioStatusRefreshKey((k) => k + 1);
+    },
+    [persistedArtworkId],
+  );
+
+  const handlePersonaAudioCancelCell = useCallback(
+    async (lang: string, promptStyleId: string) => {
+      if (!persistedArtworkId || !promptStyleId.trim()) return;
+      const lng = lang.trim().toLowerCase().slice(0, 2) as MediationUiLang;
+      const cellKey = audioVoiceCellKey(lng, promptStyleId);
+      await cancelAudioGenerationForCell({
+        text_id: persistedArtworkId,
+        text_type: "mediation",
+        lang: lng,
+        prompt_style_id: promptStyleId,
+      });
+      setAudioOptimisticCells((prev) => prev.filter((key) => key !== cellKey));
+      setAudioStatusRefreshKey((k) => k + 1);
+    },
+    [persistedArtworkId],
+  );
+
+  const openPersonaAudioDialog = useCallback(
+    (
+      tab: { key: string; promptStyleId: string; label: string },
+      options?: { triggerGeneration?: boolean },
+    ) => {
+      if (!persistedArtworkId || !tab.promptStyleId?.trim()) return;
+      setMediationAudioDialogOpen(true);
+
+      if (options?.triggerGeneration) {
+        const cellsToQueue: string[] = [];
+        for (const lng of activeMediationLangs) {
+          const text = (descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim();
+          if (!text) continue;
+          triggerMediationAudioForPersonaLang({
+            artworkId: persistedArtworkId,
+            lang: lng,
+            styleKey: tab.key,
+            prompt_style_id: tab.promptStyleId,
+          });
+          cellsToQueue.push(audioVoiceCellKey(lng, tab.promptStyleId));
+        }
+        if (cellsToQueue.length > 0) {
+          setAudioOptimisticCells((prev) => {
+            const next = new Set(prev);
+            for (const cell of cellsToQueue) next.add(cell);
+            return [...next];
+          });
+          setAudioStatusRefreshKey((k) => k + 1);
+        }
       }
-      map[lng] = targets.length > 0 ? targets : null;
+    },
+    [persistedArtworkId, descriptionsByLang, activeMediationLangs],
+  );
+
+  const handleGenerateAllMediationVoices = useCallback(() => {
+    if (!persistedArtworkId) return;
+    const cellsToQueue: string[] = [];
+    for (const tab of styleTabs ?? []) {
+      if (!tab.promptStyleId?.trim()) continue;
+      for (const lng of activeMediationLangs) {
+        const text = (descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim();
+        if (!text) continue;
+        triggerMediationAudioForPersonaLang({
+          artworkId: persistedArtworkId,
+          lang: lng,
+          styleKey: tab.key,
+          prompt_style_id: tab.promptStyleId,
+        });
+        cellsToQueue.push(audioVoiceCellKey(lng, tab.promptStyleId));
+      }
     }
-    return map;
-  }, [persistedArtworkId, descriptionsByLang, styleTabs]);
+    if (cellsToQueue.length > 0) {
+      setAudioOptimisticCells((prev) => {
+        const next = new Set(prev);
+        for (const cell of cellsToQueue) next.add(cell);
+        return [...next];
+      });
+      setAudioStatusRefreshKey((k) => k + 1);
+    }
+  }, [persistedArtworkId, styleTabs, activeMediationLangs, descriptionsByLang]);
+
+  const canGenerateAllMediationVoices = useMemo(() => {
+    for (const tab of styleTabs ?? []) {
+      if (!tab.promptStyleId?.trim()) continue;
+      for (const lng of activeMediationLangs) {
+        if ((descriptionsByLang[lng]?.[tab.key as MediationDescriptionKey] ?? "").trim()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [styleTabs, activeMediationLangs, descriptionsByLang]);
 
   const mediationStyleMap = useMemo(
     () => buildMediationStylePromptStyleMap(styleTabs ?? []),
     [styleTabs],
   );
-
-  const mediationPromptStyleLabels = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const tab of styleTabs ?? []) {
-      const id = tab.promptStyleId?.trim();
-      if (id) map[id] = tab.label;
-    }
-    return map;
-  }, [styleTabs]);
 
   const updateMediationBaseline = useCallback(
     (byLang: Record<MediationUiLang, Record<MediationDescriptionKey, string>>) => {
@@ -1888,11 +1987,20 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
           "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]",
         )}
       >
-        <DialogTitle className="sr-only">{isEditingExisting ? t("title_edit") : t("title_new")}</DialogTitle>
+        <DialogTitle className="sr-only">
+          {isEditingExisting ? t("title_edit") : t("title_new")}
+          {title.trim() ? ` — ${title.trim()}` : ""}
+        </DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
               {isEditingExisting ? t("title_edit") : t("title_new")}
+              {title.trim() ? (
+                <>
+                  {" "}
+                  <strong className="font-bold">{title.trim()}</strong>
+                </>
+              ) : null}
             </h2>
             <div className="flex items-center gap-2">
               <Button
@@ -2392,9 +2500,18 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                     descriptionsByLang: serializeMediationDescriptionsByLang(descriptionsByLang),
                     stylePromptStyleIds: mediationStyleMap,
                   });
-                  setAudioOptimisticLangs((prev) =>
-                    prev.includes(langKey) ? prev : [...prev, langKey],
-                  );
+                  const cellsToQueue: string[] = [];
+                  for (const tab of styleTabs ?? []) {
+                    if (!tab.promptStyleId?.trim()) continue;
+                    const text = (descriptionsByLang[langKey as MediationUiLang]?.[tab.key] ?? "").trim();
+                    if (!text) continue;
+                    cellsToQueue.push(audioVoiceCellKey(langKey, tab.promptStyleId));
+                  }
+                  setAudioOptimisticCells((prev) => {
+                    const next = new Set(prev);
+                    for (const cell of cellsToQueue) next.add(cell);
+                    return [...next];
+                  });
                   setAudioStatusRefreshKey((k) => k + 1);
                 }}
               >
@@ -2449,30 +2566,6 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
               </Button>
               );
             })}
-            <AudioVoiceLangStatus
-              languages={MEDIATION_UI_LANGS}
-              text_type="mediation"
-              targetsByLang={mediationAudioTargetsByLang}
-              refreshKey={audioStatusRefreshKey}
-              optimisticLangs={audioOptimisticLangs}
-              onOptimisticLangDone={(lang) =>
-                setAudioOptimisticLangs((prev) => prev.filter((l) => l !== lang))
-              }
-              promptStyleLabels={mediationPromptStyleLabels}
-              onRetryLang={(lang) => {
-                if (!persistedArtworkId) return;
-                const lng = lang.trim().toLowerCase().slice(0, 2) as MediationUiLang;
-                triggerMediationAudioForLang({
-                  artworkId: persistedArtworkId,
-                  lang: lng,
-                  descriptionsByLang: serializeMediationDescriptionsByLang(descriptionsByLang),
-                  stylePromptStyleIds: mediationStyleMap,
-                });
-                setAudioOptimisticLangs((prev) => (prev.includes(lng) ? prev : [...prev, lng]));
-                setAudioStatusRefreshKey((k) => k + 1);
-              }}
-              className="min-w-0 flex-1"
-            />
           </div>
           <p className="text-xs text-muted-foreground">{mediationLangHelp}</p>
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
@@ -2566,14 +2659,19 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
                   placeholder={t("tab_version_placeholder", { label: placeholderLabel })}
                 />
                 {persistedArtworkId && tab.promptStyleId ? (
-                  <AudioPlayer
-                    text_id={persistedArtworkId}
-                    text_type="mediation"
-                    lang={mediationEditLang}
-                    prompt_style_id={tab.promptStyleId}
-                    variant="onLight"
-                    className="mt-2"
-                  />
+                  <div className="mt-2">
+                    <AudioPlayer
+                      text_id={persistedArtworkId}
+                      text_type="mediation"
+                      lang={mediationEditLang}
+                      prompt_style_id={tab.promptStyleId}
+                      variant="onLight"
+                      onGenerateClick={() =>
+                        openPersonaAudioDialog(tab, { triggerGeneration: true })
+                      }
+                      onManageVoicesClick={() => openPersonaAudioDialog(tab)}
+                    />
+                  </div>
                 ) : null}
               </TabsContent>
               );
@@ -2584,6 +2682,34 @@ export function ArtworkModal({ open, onOpenChange, onSuccess, artworkId }: Artwo
 
       </DialogContent>
     </Dialog>
+    {persistedArtworkId ? (
+      <MediationPersonaAudioDialog
+        open={mediationAudioDialogOpen}
+        onOpenChange={(next) => {
+          setMediationAudioDialogOpen(next);
+          if (!next && closeOnMediationAudioClose) {
+            onOpenChange(false);
+          }
+        }}
+        artworkId={persistedArtworkId}
+        personas={(styleTabs ?? []).map((tab) => ({
+          key: tab.key,
+          label: tab.label,
+          promptStyleId: tab.promptStyleId,
+        }))}
+        languages={activeMediationLangs}
+        descriptionsByLang={descriptionsByLang}
+        refreshKey={audioStatusRefreshKey}
+        optimisticCells={audioOptimisticCells}
+        onOptimisticCellDone={(cellKey) =>
+          setAudioOptimisticCells((prev) => prev.filter((key) => key !== cellKey))
+        }
+        onRetryCell={handlePersonaAudioRetryCell}
+        onCancelCell={handlePersonaAudioCancelCell}
+        onGenerateAll={handleGenerateAllMediationVoices}
+        generateAllDisabled={!canGenerateAllMediationVoices}
+      />
+    ) : null}
     <AddArtistDialog
       open={artistDialogOpen}
       onOpenChange={setArtistDialogOpen}

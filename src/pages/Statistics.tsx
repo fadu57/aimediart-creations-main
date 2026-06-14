@@ -33,6 +33,7 @@ import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAge
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
 import { cn } from "@/lib/utils";
+import { BACKOFFICE_FORM_CONTROL_CLASS } from "@/lib/costLabels";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import {
   ArrowDown,
@@ -1928,7 +1929,7 @@ const Statistics = () => {
               <select
                 id="statistics-scope-org"
                 name="statistics_scope_organization"
-                className="block w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
                 disabled={!canEditAgencyScope}
                 value={selectedAgencyId === "all" ? "all" : selectedAgencyId}
                 onChange={(e) => {
@@ -1966,7 +1967,7 @@ const Statistics = () => {
             <select
               id="statistics-scope-expo"
               name="statistics_scope_exposition"
-              className="block w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
               disabled={!canDrillExpo}
               value={expoSelectValue}
               onChange={(e) => {
@@ -2000,7 +2001,7 @@ const Statistics = () => {
                     setManualPreviewDateFrom(v);
                     if (manualPreviewDateTo && v > manualPreviewDateTo) setManualPreviewDateTo("");
                   }}
-                  className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  className={BACKOFFICE_FORM_CONTROL_CLASS}
                   title={t("preview.dateFrom")}
                 />
                 <input
@@ -2009,7 +2010,7 @@ const Statistics = () => {
                   min={manualPreviewDateFrom || undefined}
                   max={todayYmd}
                   onChange={(e) => setManualPreviewDateTo(e.target.value)}
-                  className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  className={BACKOFFICE_FORM_CONTROL_CLASS}
                   title={t("preview.dateTo")}
                 />
               </div>
@@ -2023,7 +2024,7 @@ const Statistics = () => {
               <select
                 id="statistics-scope-artist"
                 name="statistics_scope_artist"
-                className="block w-full mt-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
                 disabled={artistOptions.length === 0}
                 value={selectedArtistId}
                 onChange={(e) => setSelectedArtistId(e.target.value)}
@@ -2434,7 +2435,7 @@ const Statistics = () => {
             <select
               id="stats-pdf-paper"
               name="statistics_pdf_paper_format"
-              className="block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              className={BACKOFFICE_FORM_CONTROL_CLASS}
               value={selectedPdfPaper}
               onChange={(e) => setSelectedPdfPaper(e.target.value as PdfPaperFormat)}
             >

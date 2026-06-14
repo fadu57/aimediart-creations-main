@@ -24,7 +24,7 @@ export type ClientErrorSource =
 
 type LogPayload = {
   audience: ErrorLogAudience;
-  action: "session_start" | "session_end" | "error";
+  action: "session_start" | "session_end" | "session_ping" | "error";
   session_id: string;
   visitor_client_id?: string | null;
   auth_user_id?: string | null;
@@ -73,6 +73,12 @@ const AUDIENCE_CONFIG: Record<ErrorLogAudience, AudienceConfig> = {
   },
 };
 
+/** Intervalle heartbeat présence : organisateur plus espacé (travail de fond). */
+const HEARTBEAT_MS: Record<ErrorLogAudience, number> = {
+  organizer: 3 * 60 * 1000,
+  visitor: 60 * 1000,
+};
+
 let visitorHandlersInstalled = false;
 let organizerHandlersInstalled = false;
 let globalToastHookInstalled = false;
@@ -87,10 +93,29 @@ function cfg(audience: ErrorLogAudience): AudienceConfig {
   return AUDIENCE_CONFIG[audience];
 }
 
+const SESSION_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidSessionId(id: string | null | undefined): id is string {
+  return Boolean(id?.trim() && SESSION_UUID_RE.test(id.trim()));
+}
+
+function clearStoredSession(audience: ErrorLogAudience): void {
+  const c = cfg(audience);
+  window.sessionStorage.removeItem(c.sessionKey);
+  window.sessionStorage.removeItem(c.endedKey);
+  window.sessionStorage.removeItem(c.reportedKey);
+}
+
 function readSessionId(audience: ErrorLogAudience): string | null {
   if (typeof window === "undefined") return null;
   const id = window.sessionStorage.getItem(cfg(audience).sessionKey)?.trim();
-  return id || null;
+  if (!id) return null;
+  if (!isValidSessionId(id)) {
+    clearStoredSession(audience);
+    return null;
+  }
+  return id;
 }
 
 function writeSessionId(audience: ErrorLogAudience, id: string): void {
@@ -122,7 +147,17 @@ function createSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  // Fallback UUID v4 si randomUUID indisponible (la colonne DB est uuid).
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function currentPageUrl(): string {
@@ -144,6 +179,8 @@ function isClientErrorLoggingEnabled(): boolean {
 async function postLog(payload: LogPayload, preferKeepalive = false): Promise<void> {
   if (!isClientErrorLoggingEnabled()) return;
 
+  const isPing = payload.action === "session_ping";
+
   if (preferKeepalive && typeof fetch !== "undefined") {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -159,7 +196,7 @@ async function postLog(payload: LogPayload, preferKeepalive = false): Promise<vo
         body: JSON.stringify(payload),
         keepalive: true,
       }).catch(() => {
-        remoteLoggingAvailable = false;
+        if (!isPing) remoteLoggingAvailable = false;
       });
       return;
     }
@@ -168,15 +205,17 @@ async function postLog(payload: LogPayload, preferKeepalive = false): Promise<vo
   try {
     const { error } = await supabase.functions.invoke("log-client-error", { body: payload });
     if (error) {
-      remoteLoggingAvailable = false;
-      if (import.meta.env.DEV) {
-        console.warn("[clientErrorLogging] journalisation désactivée (Edge Function indisponible).");
+      if (!isPing) {
+        remoteLoggingAvailable = false;
+        if (import.meta.env.DEV) {
+          console.warn("[clientErrorLogging] journalisation désactivée (Edge Function indisponible).");
+        }
       }
     } else {
       remoteLoggingAvailable = true;
     }
   } catch {
-    remoteLoggingAvailable = false;
+    if (!isPing) remoteLoggingAvailable = false;
   }
 }
 
@@ -268,6 +307,29 @@ export async function endClientErrorSession(
     },
     preferKeepalive,
   );
+}
+
+/** Heartbeat présence — uniquement si l'onglet est visible. */
+export function pingClientErrorSession(
+  audience: ErrorLogAudience,
+  options?: CaptureOptions,
+): void {
+  if (typeof window === "undefined") return;
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+
+  const sessionId = readSessionId(audience);
+  if (!sessionId || isSessionMarkedEnded(audience)) return;
+
+  void postLog({
+    audience,
+    action: "session_ping",
+    session_id: sessionId,
+    visitor_client_id: resolveClientId(audience),
+    auth_user_id: options?.authUserId ?? null,
+    agency_id: options?.agencyId ?? null,
+    expo_id: readExpoIdFromUrl(),
+    page_url: currentPageUrl(),
+  });
 }
 
 export async function logClientError(
@@ -423,9 +485,22 @@ export function installClientErrorLogCapture(
     void endClientErrorSession(audience, true);
   };
 
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      pingClientErrorSession(audience, options);
+    }
+  };
+
+  const heartbeatTimer = window.setInterval(
+    () => pingClientErrorSession(audience, options),
+    HEARTBEAT_MS[audience],
+  );
+  pingClientErrorSession(audience, options);
+
   window.addEventListener("error", onWindowError);
   window.addEventListener("unhandledrejection", onUnhandledRejection);
   window.addEventListener("pagehide", onPageHide);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT") {
@@ -462,6 +537,8 @@ export function installClientErrorLogCapture(
     window.removeEventListener("error", onWindowError);
     window.removeEventListener("unhandledrejection", onUnhandledRejection);
     window.removeEventListener("pagehide", onPageHide);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.clearInterval(heartbeatTimer);
     authListener.subscription.unsubscribe();
     uninstallToastErrorCapture(audience);
     if (c.handlersFlag === "visitor") visitorHandlersInstalled = false;

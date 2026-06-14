@@ -37,6 +37,8 @@ import SettingsSuiviTemps from "./pages/SettingsSuiviTemps";
 import SettingsSuiviTokens from "./pages/SettingsSuiviTokens";
 import SettingsVisitorErrors from "./pages/SettingsVisitorErrors";
 import SettingsOrganizerErrors from "./pages/SettingsOrganizerErrors";
+import SettingsOnlinePresence from "./pages/SettingsOnlinePresence";
+import SettingsPresenceThresholds from "./pages/SettingsPresenceThresholds";
 import { VisitorErrorLogCapture } from "./components/visitor/VisitorErrorLogCapture";
 import { OrganizerErrorLogCapture } from "./components/organizer/OrganizerErrorLogCapture";
 import Agencies from "./pages/Agencies";
@@ -320,6 +322,8 @@ const AppRoutes = () => (
           <Route path="suivi_tokens" element={<SettingsSuiviTokens />} />
           <Route path="suivi_erreurs_visiteurs" element={<SettingsVisitorErrors />} />
           <Route path="suivi_erreurs_organisateurs" element={<SettingsOrganizerErrors />} />
+          <Route path="settings/qui-est-en-ligne" element={<SettingsOnlinePresence />} />
+          <Route path="settings/presence-seuils" element={<SettingsPresenceThresholds />} />
           <Route path="setting" element={<Navigate to="/settings" replace />} />
           <Route path="*" element={<NotFound />} />
         </Route>

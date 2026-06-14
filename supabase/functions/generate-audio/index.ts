@@ -130,7 +130,7 @@ serve(async (req) => {
     const voiceId     = gender === "F" ? style.voice_f : style.voice_m;
     const personaVibe = style.persona_vibe ?? "";
 
-    const storagePath = `${text_type}/${text_id}/${lang}/${prompt_style_id}_${gender}.mp3`;
+    const storagePath = `${text_type}/${text_id}/${lang}/${prompt_style_id}_${gender}.m4a`;
 
     await supabase.from("audio_files").upsert({
       text_id,
@@ -160,7 +160,7 @@ serve(async (req) => {
         voice:           voiceId,
         input:           textContent,
         instructions:    personaVibe,
-        response_format: "mp3",
+        response_format: "aac",
       }),
     });
 
@@ -175,7 +175,7 @@ serve(async (req) => {
 
     const { error: uploadError } = await supabase.storage
       .from("audio-guides")
-      .upload(storagePath, audioBuffer, { contentType: "audio/mpeg", upsert: true });
+      .upload(storagePath, audioBuffer, { contentType: "audio/mp4", upsert: true });
 
     if (uploadError) throw new Error(`Storage upload : ${uploadError.message}`);
 

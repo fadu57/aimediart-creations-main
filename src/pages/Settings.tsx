@@ -55,8 +55,9 @@ import {
 } from "@/lib/charsToOutputTokens";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
-import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2, Sparkles } from "lucide-react";
+import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Shield, Bell, BrainCircuit, Users, Trash2, Sparkles, Activity } from "lucide-react";
 import RetentionSettings from "@/components/settings/RetentionSettings";
+import PresenceThresholdSettings from "@/components/settings/PresenceThresholdSettings";
 import { AiModelControlPanel } from "@/components/settings/AiModelControlPanel";
 
 type SettingSection = {
@@ -339,6 +340,12 @@ export default function SettingsPage() {
       icon: Trash2,
     },
     {
+      id: "presence-seuils",
+      title: t("section_presence_thresholds_title"),
+      description: t("section_presence_thresholds_desc"),
+      icon: Activity,
+    },
+    {
       id: "prompts-ia",
       title: t("section_prompts_title"),
       description: t("section_prompts_desc"),
@@ -497,12 +504,15 @@ export default function SettingsPage() {
     if (!canAccessGeneralSettings) {
       base = base.filter((s) => s.id !== "retention" && s.id !== "ai-control");
     }
+    if (role_id !== 1) {
+      base = base.filter((s) => s.id !== "presence-seuils");
+    }
     const q = search.trim().toLowerCase();
     if (!q) return base;
     return base.filter((section) => {
       return section.title.toLowerCase().includes(q) || section.description.toLowerCase().includes(q);
     });
-  }, [search, canAccessGeneralSettings, sectionsCatalog]);
+  }, [search, canAccessGeneralSettings, sectionsCatalog, role_id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1750,6 +1760,8 @@ export default function SettingsPage() {
                       <AiModelControlPanel appSettingsRows={appSettingsRows} onRefreshRows={refreshPromptsData} />
                     ) : section.id === "retention" ? (
                       <RetentionSettings roleId={role_id} />
+                    ) : section.id === "presence-seuils" ? (
+                      <PresenceThresholdSettings roleId={role_id} />
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         {t("section_wip")}

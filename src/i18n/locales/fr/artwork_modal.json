@@ -138,7 +138,15 @@
     "voice_f": "Voix F",
     "voice_m": "Voix M",
     "play_f": "Lire voix féminine",
-    "play_m": "Lire voix masculine"
+    "play_m": "Lire voix masculine",
+    "manage_voices": "Gérer les voix"
+  },
+  "audio_generate_dialog": {
+    "title": "Génération audio — médiation",
+    "desc": "Suivi de toutes les voix par persona et par langue.",
+    "close": "Fermer",
+    "generate_all": "Générer toutes les voix",
+    "background_hint": "Vous pouvez fermer : les générations continueront à se faire en arrière-plan."
   },
   "audio_voice_status": {
     "label": "Voix générées",
@@ -149,6 +157,10 @@
     "progress_generating": "{{ready}}/{{total}} · {{active}} en cours",
     "progress_errors": "{{ready}}/{{total}} · {{error}} erreur(s)",
     "progress_errors_pending": "{{ready}}/{{total}} · {{error}} erreur(s) · {{pending}} en attente",
-    "retry_lang": "Relancer la génération audio pour cette langue"
+    "retry_lang": "Relancer la génération audio pour cette langue",
+    "cancel_lang": "Arrêter la génération pour cette langue",
+    "continue_lang": "Poursuivre la génération audio pour cette langue",
+    "no_text": "Aucun texte de médiation",
+    "no_persona_audio": "Persona non configuré pour l'audio"
   }
 }

@@ -28,8 +28,14 @@ export type AudioFile = {
 
 const AUDIO_BUCKET = "audio-guides";
 const SIGNED_URL_TTL_SEC = 3600;
-const AUDIO_GEN_CONCURRENCY = 2;
+/** Appels parallèles vers generate-audio (16 voix/langue ≈ 3–4 vagues à 5). */
+const AUDIO_GEN_CONCURRENCY = Math.max(
+  1,
+  Math.min(8, Number(import.meta.env.VITE_AUDIO_GEN_CONCURRENCY) || 5),
+);
 const STALE_GENERATING_MS = 3 * 60 * 1000;
+const INVOKE_TIMEOUT_MS = 120_000;
+const CANCELLED_ERROR_MSG = "Génération annulée — relancez si besoin.";
 
 function normLangCode(raw: string): string {
   return raw.trim().toLowerCase().slice(0, 2);
@@ -49,12 +55,39 @@ type AudioGenJob = {
 type QueuedAudioGenJob = AudioGenJob & {
   resolve: () => void;
   reject: (reason?: unknown) => void;
+  /** Compteur client déjà décrémenté à l'annulation (évite double décrément au finally). */
+  cancelled?: boolean;
 };
 
 const audioJobQueue: QueuedAudioGenJob[] = [];
+const runningAudioJobs = new Set<QueuedAudioGenJob>();
 let audioJobsRunning = 0;
 const pendingJobsByLang = new Map<string, number>();
+/** File + invocations en cours, par œuvre × langue × style vocal. */
+const pendingJobsByScope = new Map<string, number>();
+/** Invokes Edge encore actifs mais annulés côté UI — réécriture en erreur à la fin. */
+const cancelledAudioScopes = new Set<string>();
 const queueListeners = new Set<() => void>();
+
+function jobScopeKey(job: Pick<AudioGenJob, "text_id" | "lang" | "prompt_style_id">): string {
+  return `${job.text_id.trim()}|${normLangCode(job.lang)}|${job.prompt_style_id.trim()}`;
+}
+
+type AudioJobFilter = {
+  text_id?: string;
+  lang?: string;
+  prompt_style_id?: string;
+};
+
+function audioJobMatchesFilter(job: AudioGenJob, filter?: AudioJobFilter): boolean {
+  if (!filter) return true;
+  if (filter.text_id?.trim() && job.text_id.trim() !== filter.text_id.trim()) return false;
+  if (filter.lang && normLangCode(job.lang) !== normLangCode(filter.lang)) return false;
+  if (filter.prompt_style_id?.trim() && job.prompt_style_id.trim() !== filter.prompt_style_id.trim()) {
+    return false;
+  }
+  return true;
+}
 
 function notifyAudioQueue(): void {
   queueListeners.forEach((fn) => fn());
@@ -75,27 +108,232 @@ export function getPendingAudioJobsByLang(): Readonly<Record<string, number>> {
   return out;
 }
 
-function bumpPendingLang(lang: string, delta: number): void {
-  const key = normLangCode(lang);
-  const next = (pendingJobsByLang.get(key) ?? 0) + delta;
-  if (next <= 0) pendingJobsByLang.delete(key);
-  else pendingJobsByLang.set(key, next);
+/** Jobs en file ou en cours pour une œuvre, clé UI `${lang}|${prompt_style_id}`. */
+export function getPendingAudioJobsByCell(text_id: string): Readonly<Record<string, number>> {
+  const prefix = `${text_id.trim()}|`;
+  const out: Record<string, number> = {};
+  for (const [scopeKey, count] of pendingJobsByScope) {
+    if (count <= 0 || !scopeKey.startsWith(prefix)) continue;
+    const [, lang, promptStyleId] = scopeKey.split("|");
+    if (!lang || !promptStyleId) continue;
+    out[audioVoiceCellKey(lang, promptStyleId)] = count;
+  }
+  return out;
+}
+
+export function hasPendingAudioForArtwork(text_id: string): boolean {
+  const id = text_id.trim();
+  if (!id) return false;
+  const prefix = `${id}|`;
+  for (const [scopeKey, count] of pendingJobsByScope) {
+    if (count > 0 && scopeKey.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/** Œuvres avec au moins un job audio en file ou en cours d'invocation. */
+export function getArtworkIdsWithPendingAudio(): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const [scopeKey, count] of pendingJobsByScope) {
+    if (count <= 0) continue;
+    const artworkId = scopeKey.split("|")[0]?.trim();
+    if (artworkId) ids.add(artworkId);
+  }
+  return ids;
+}
+
+function bumpMapCount(map: Map<string, number>, key: string, delta: number): void {
+  const next = (map.get(key) ?? 0) + delta;
+  if (next <= 0) map.delete(key);
+  else map.set(key, next);
+}
+
+function bumpPendingForJob(job: AudioGenJob, delta: number): void {
+  bumpMapCount(pendingJobsByScope, jobScopeKey(job), delta);
+  bumpMapCount(pendingJobsByLang, normLangCode(job.lang), delta);
   notifyAudioQueue();
+}
+
+function markJobCancelled(job: QueuedAudioGenJob, isRunning: boolean): void {
+  if (job.cancelled) return;
+  job.cancelled = true;
+  bumpPendingForJob(job, -1);
+  if (isRunning) {
+    cancelledAudioScopes.add(jobScopeKey(job));
+  }
+}
+
+/**
+ * Retire les jobs correspondant au filtre (file + invocations déjà lancées).
+ * Les appels Edge en cours ne sont pas interrompus côté réseau ; l'UI se met à jour tout de suite.
+ */
+export function clearAudioGenerationJobs(filter?: AudioJobFilter): number {
+  let removed = 0;
+  const kept: QueuedAudioGenJob[] = [];
+
+  for (const job of audioJobQueue) {
+    if (!audioJobMatchesFilter(job, filter)) {
+      kept.push(job);
+      continue;
+    }
+    removed += 1;
+    markJobCancelled(job, false);
+    job.reject(new Error(CANCELLED_ERROR_MSG));
+  }
+
+  audioJobQueue.length = 0;
+  audioJobQueue.push(...kept);
+
+  for (const job of runningAudioJobs) {
+    if (!audioJobMatchesFilter(job, filter)) continue;
+    removed += 1;
+    markJobCancelled(job, true);
+  }
+
+  notifyAudioQueue();
+  return removed;
+}
+
+/** @deprecated Préférer `clearAudioGenerationJobs({ lang })`. */
+export function clearAudioGenerationQueue(lang?: string): number {
+  return clearAudioGenerationJobs(lang ? { lang } : undefined);
+}
+
+async function markCancelledAudioRowsInDb(params: {
+  text_id: string;
+  text_type: AudioTextType;
+  lang?: string;
+  prompt_style_id?: string;
+}): Promise<void> {
+  const text_id = params.text_id.trim();
+  const langKey = params.lang ? normLangCode(params.lang) : null;
+  const promptStyleId = params.prompt_style_id?.trim() ?? null;
+  if (!text_id) return;
+
+  let query = supabase
+    .from("audio_files")
+    .select("id, lang, prompt_style_id, status")
+    .eq("text_id", text_id)
+    .eq("text_type", params.text_type)
+    .in("status", ["generating", "pending"]);
+
+  if (promptStyleId) {
+    query = query.eq("prompt_style_id", promptStyleId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[audioService] markCancelledAudioRowsInDb:", error);
+    return;
+  }
+
+  const ids = (data ?? [])
+    .filter((row) => {
+      if (langKey && normLangCode(String(row.lang ?? "")) !== langKey) return false;
+      if (promptStyleId && String(row.prompt_style_id ?? "").trim() !== promptStyleId) return false;
+      return true;
+    })
+    .map((row) => row.id as string);
+
+  if (ids.length === 0) return;
+
+  const { error: updateError } = await supabase
+    .from("audio_files")
+    .update({
+      status: "error",
+      error_message: CANCELLED_ERROR_MSG,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", ids);
+
+  if (updateError) {
+    console.error("[audioService] markCancelledAudioRowsInDb update:", updateError);
+  }
+}
+
+/**
+ * Annule une cellule persona × langue (file client + statuts DB + compteur UI).
+ */
+export async function cancelAudioGenerationForCell(params: {
+  text_id: string;
+  text_type: AudioTextType;
+  lang: string;
+  prompt_style_id: string;
+}): Promise<void> {
+  const text_id = params.text_id?.trim();
+  const langKey = normLangCode(params.lang);
+  const prompt_style_id = params.prompt_style_id?.trim();
+  if (!text_id || !langKey || !prompt_style_id) return;
+
+  clearAudioGenerationJobs({ text_id, lang: langKey, prompt_style_id });
+  await markCancelledAudioRowsInDb({
+    text_id,
+    text_type: params.text_type,
+    lang: langKey,
+    prompt_style_id,
+  });
+}
+
+/**
+ * Annule la file + marque en base les voix « generating/pending » de la langue.
+ * Permet de relancer via ↻ sans attendre le timeout (3 min).
+ */
+export async function cancelAudioGenerationForLang(params: {
+  text_id: string;
+  text_type: AudioTextType;
+  lang: string;
+}): Promise<void> {
+  const text_id = params.text_id?.trim();
+  const langKey = normLangCode(params.lang);
+  if (!text_id || !langKey) return;
+
+  clearAudioGenerationJobs({ text_id, lang: langKey });
+  await markCancelledAudioRowsInDb({
+    text_id,
+    text_type: params.text_type,
+    lang: langKey,
+  });
 }
 
 function pumpAudioQueue(): void {
   while (audioJobsRunning < AUDIO_GEN_CONCURRENCY && audioJobQueue.length > 0) {
     const job = audioJobQueue.shift()!;
     audioJobsRunning++;
+    runningAudioJobs.add(job);
     void invokeGenerateAudio(job)
-      .then(() => job.resolve())
+      .then(() => {
+        if (!job.cancelled) job.resolve();
+      })
       .catch((e) => {
-        console.error("[audioService] invokeGenerateAudio:", e);
-        job.reject(e);
+        if (!job.cancelled) {
+          console.error("[audioService] invokeGenerateAudio:", e);
+          job.reject(e);
+        }
       })
       .finally(() => {
         audioJobsRunning--;
-        bumpPendingLang(job.lang, -1);
+        runningAudioJobs.delete(job);
+        if (!job.cancelled) bumpPendingForJob(job, -1);
+
+        const scopeKey = jobScopeKey(job);
+        if (cancelledAudioScopes.has(scopeKey)) {
+          void markCancelledAudioRowsInDb({
+            text_id: job.text_id,
+            text_type: job.text_type,
+            lang: job.lang,
+            prompt_style_id: job.prompt_style_id,
+          }).finally(() => {
+            let stillRunning = false;
+            for (const running of runningAudioJobs) {
+              if (jobScopeKey(running) === scopeKey) {
+                stillRunning = true;
+                break;
+              }
+            }
+            if (!stillRunning) cancelledAudioScopes.delete(scopeKey);
+          });
+        }
+
         pumpAudioQueue();
       });
   }
@@ -105,7 +343,7 @@ function pumpAudioQueue(): void {
 function enqueueAudioGenerationJob(job: AudioGenJob): Promise<void> {
   return new Promise((resolve, reject) => {
     audioJobQueue.push({ ...job, resolve, reject });
-    bumpPendingLang(job.lang, 1);
+    bumpPendingForJob(job, 1);
     pumpAudioQueue();
   });
 }
@@ -119,7 +357,7 @@ function enqueueAudioGenerationJobs(jobs: AudioGenJob[]): void {
       resolve: () => {},
       reject: (e) => console.error("[audioService] enqueueAudioGenerationJobs:", e),
     });
-    bumpPendingLang(job.lang, 1);
+    bumpPendingForJob(job, 1);
   }
   pumpAudioQueue();
 }
@@ -174,7 +412,15 @@ export async function resolveBioPromptStyleId(): Promise<string | null> {
 }
 
 async function invokeGenerateAudio(job: AudioGenJob): Promise<void> {
-  const { data, error } = await supabase.functions.invoke("generate-audio", { body: job });
+  const invokePromise = supabase.functions.invoke("generate-audio", { body: job });
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    window.setTimeout(
+      () => reject(new Error("Délai dépassé (120 s) — Edge Function ou OpenAI TTS")),
+      INVOKE_TIMEOUT_MS,
+    );
+  });
+
+  const { data, error } = await Promise.race([invokePromise, timeoutPromise]);
   if (error) throw error;
 
   const body = data as { success?: boolean; error?: string } | null;
@@ -203,6 +449,20 @@ export async function triggerAudioGeneration(params: {
   if (failed?.status === "rejected") {
     console.error("[audioService] triggerAudioGeneration:", failed.reason);
   }
+}
+
+/** Déclenche F + M pour une cellule persona × langue. */
+export function triggerMediationAudioForPersonaLang(params: {
+  artworkId: string;
+  lang: string;
+  styleKey: string;
+  prompt_style_id: string;
+}): void {
+  const { artworkId, lang, styleKey, prompt_style_id } = params;
+  if (!artworkId?.trim() || !prompt_style_id?.trim()) return;
+  enqueueAudioGenerationJobs(
+    collectMediationVoiceJobs(artworkId, lang, styleKey, prompt_style_id),
+  );
 }
 
 function triggerMediationAudioCell(
@@ -323,7 +583,7 @@ export function buildMediationStylePromptStyleMap(
   return map;
 }
 
-/** URL signée (1 h) pour lecture du MP3. */
+/** URL signée (1 h) pour lecture du fichier audio (M4A/AAC). */
 export async function getAudioUrl(storage_path: string): Promise<string> {
   const path = storage_path.trim();
   if (!path) throw new Error("storage_path vide");
@@ -338,7 +598,7 @@ export async function getAudioUrl(storage_path: string): Promise<string> {
   return data.signedUrl;
 }
 
-export type VoiceGenderStatus = "ready" | "generating" | "pending" | "error" | "none";
+export type VoiceGenderStatus = "ready" | "generating" | "pending" | "partial" | "error" | "none";
 
 export type LangVoiceStatus = {
   F: VoiceGenderStatus;
@@ -390,7 +650,7 @@ function aggregateGenderStatus(slots: VoiceGenderStatus[]): VoiceGenderStatus {
   if (slots.some((s) => s === "generating" || s === "pending")) return "generating";
   if (slots.length > 0 && slots.every((s) => s === "ready")) return "ready";
   if (slots.some((s) => s === "error")) return "error";
-  if (slots.some((s) => s === "ready")) return "pending";
+  if (slots.some((s) => s === "ready")) return "partial";
   return "none";
 }
 
@@ -510,6 +770,89 @@ export async function fetchAudioVoiceStatusMap(
       M: aggregateGenderStatus(bucket.mSlots),
       progress: bucket.progress,
       errors: bucket.errors,
+    };
+  }
+
+  return result;
+}
+
+/** Clé persona × langue pour le suivi audio granulaire. */
+export function audioVoiceCellKey(lang: string, prompt_style_id: string): string {
+  return `${normLangCode(lang)}|${prompt_style_id.trim()}`;
+}
+
+/** Statut F/M par cellule persona × langue (sans agrégation inter-personas). */
+export async function fetchAudioVoiceStatusMapByCell(
+  text_type: AudioTextType,
+  targets: AudioVoiceLangTarget[],
+): Promise<Record<string, LangVoiceAggregate>> {
+  const validTargets = targets.filter(
+    (t) => t.text_id?.trim() && t.prompt_style_id?.trim() && t.lang?.trim(),
+  );
+  if (validTargets.length === 0) return {};
+
+  const textIds = [...new Set(validTargets.map((t) => t.text_id))];
+  const { data, error } = await supabase
+    .from("audio_files")
+    .select(
+      "text_id, lang, prompt_style_id, gender, status, storage_path, updated_at, created_at, error_message",
+    )
+    .eq("text_type", text_type)
+    .in("text_id", textIds);
+
+  if (error) {
+    console.error("[audioService] fetchAudioVoiceStatusMapByCell:", error);
+    return {};
+  }
+
+  const files = (data ?? []) as Array<{
+    text_id: string;
+    lang: string;
+    prompt_style_id: string;
+    gender: AudioGender;
+    status: AudioFileStatus;
+    storage_path: string | null;
+    updated_at: string | null;
+    created_at: string | null;
+    error_message: string | null;
+  }>;
+
+  const result: Record<string, LangVoiceAggregate> = {};
+
+  for (const target of validTargets) {
+    const cellKey = audioVoiceCellKey(target.lang, target.prompt_style_id);
+    const langKey = normLangCode(target.lang);
+    const fSlots: VoiceGenderStatus[] = [];
+    const mSlots: VoiceGenderStatus[] = [];
+    const progress: LangVoiceProgress = { ready: 0, total: 0, generating: 0, error: 0 };
+    const errors: AudioVoiceErrorDetail[] = [];
+
+    for (const gender of ["F", "M"] as const) {
+      const match = files.find(
+        (f) =>
+          f.text_id === target.text_id &&
+          normLangCode(f.lang) === langKey &&
+          f.prompt_style_id === target.prompt_style_id &&
+          f.gender === gender,
+      );
+      const status = fileToVoiceStatus(match);
+      countProgressSlot(progress, status);
+      if (status === "error") {
+        errors.push({
+          gender,
+          prompt_style_id: target.prompt_style_id,
+          message: resolveSlotErrorMessage(match, status),
+        });
+      }
+      if (gender === "F") fSlots.push(status);
+      else mSlots.push(status);
+    }
+
+    result[cellKey] = {
+      F: aggregateGenderStatus(fSlots),
+      M: aggregateGenderStatus(mSlots),
+      progress,
+      errors,
     };
   }
 

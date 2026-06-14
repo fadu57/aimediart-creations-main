@@ -38,8 +38,16 @@ export type CostFilters = {
   provider?: string;
   apiName?: string;
   modelName?: string;
+  operationName?: string;
   status?: string;
   currency?: string;
+};
+
+export type CostEventsTotals = {
+  totalCost: number;
+  totalInputUnits: number;
+  totalOutputUnits: number;
+  currency: string;
 };
 
 export type CostSummary = {
@@ -68,6 +76,7 @@ export type CostSelectOptions = {
   providers: string[];
   apiNames: string[];
   modelNames: string[];
+  operationNames: string[];
   statuses: string[];
   currencies: string[];
 };
@@ -161,6 +170,7 @@ function applyFilters(q: SupabaseQuery, filters: CostFilters): SupabaseQuery {
   if (filters.provider)  q = q.eq("provider",  filters.provider);
   if (filters.apiName)   q = q.eq("api_name",   filters.apiName);
   if (filters.modelName) q = q.eq("model_name", filters.modelName);
+  if (filters.operationName) q = q.eq("operation_name", filters.operationName);
   if (filters.status)    q = q.eq("status",     filters.status);
   if (filters.currency)  q = q.eq("currency",   filters.currency);
   return q;
@@ -188,6 +198,41 @@ export async function getCostEvents(
   const { data, error, count } = await q;
   if (error) return { data: [], count: 0, error: error.message };
   return { data: (data ?? []) as CostEvent[], count: count ?? 0, error: null };
+}
+
+/** Totaux filtrés (coût + unités) pour la ligne de synthèse du tableau. */
+export async function getCostEventsTotals(filters: CostFilters): Promise<CostEventsTotals> {
+  let q = supabase
+    .from("ai_usage_events")
+    .select("cost_estimated, input_units, output_units, currency");
+
+  q = applyFilters(q, filters);
+
+  const { data, error } = await q;
+  if (error || !Array.isArray(data)) {
+    return { totalCost: 0, totalInputUnits: 0, totalOutputUnits: 0, currency: "EUR" };
+  }
+
+  type Row = {
+    cost_estimated: number;
+    input_units: number | null;
+    output_units: number | null;
+    currency: string;
+  };
+
+  let totalCost = 0;
+  let totalInputUnits = 0;
+  let totalOutputUnits = 0;
+  let currency = "EUR";
+
+  for (const r of data as Row[]) {
+    totalCost += Number(r.cost_estimated) || 0;
+    if (r.input_units != null) totalInputUnits += Number(r.input_units) || 0;
+    if (r.output_units != null) totalOutputUnits += Number(r.output_units) || 0;
+    if (r.currency) currency = r.currency;
+  }
+
+  return { totalCost, totalInputUnits, totalOutputUnits, currency };
 }
 
 /** Calcule les indicateurs synthétiques (KPIs). */
@@ -304,16 +349,24 @@ export async function getCostTimeSeries(filters: CostFilters): Promise<CostTimeS
 export async function getCostSelectOptions(): Promise<CostSelectOptions> {
   const { data, error } = await supabase
     .from("ai_usage_events")
-    .select("tool_type, provider, api_name, model_name, status, currency")
+    .select("tool_type, provider, api_name, model_name, operation_name, status, currency")
     .limit(500);
 
   if (error || !Array.isArray(data)) {
-    return { toolTypes: [], providers: [], apiNames: [], modelNames: [], statuses: [], currencies: [] };
+    return {
+      toolTypes: [],
+      providers: [],
+      apiNames: [],
+      modelNames: [],
+      operationNames: [],
+      statuses: [],
+      currencies: [],
+    };
   }
 
   type Row = {
     tool_type: string; provider: string; api_name: string | null;
-    model_name: string | null; status: string; currency: string;
+    model_name: string | null; operation_name: string | null; status: string; currency: string;
   };
   const rows = data as Row[];
 
@@ -325,6 +378,7 @@ export async function getCostSelectOptions(): Promise<CostSelectOptions> {
     providers:  uniq([...KNOWN_COST_PROVIDER_KEYS, ...rows.map((r) => r.provider)]),
     apiNames:   uniq(rows.map((r) => r.api_name)),
     modelNames: uniq(rows.map((r) => r.model_name)),
+    operationNames: uniq(rows.map((r) => r.operation_name)),
     statuses:   uniq(rows.map((r) => r.status)),
     currencies: uniq(rows.map((r) => r.currency)),
   };

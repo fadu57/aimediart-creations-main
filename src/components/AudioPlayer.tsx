@@ -43,13 +43,19 @@ type AudioPlayerProps = {
 
   variant?: "onDark" | "onLight";
 
-  /** Vue visiteur : lecture MP3 uniquement, pas de génération. */
+  /** Vue visiteur : lecture audio uniquement, pas de génération. */
 
   playOnly?: boolean;
 
   /** Boutons Voix F/M plus petits, alignés sur une seule ligne. */
 
   compact?: boolean;
+
+  /** Ouvre le dialogue de génération (fiche œuvre) au lieu de lancer F+M sur la langue courante. */
+  onGenerateClick?: () => void;
+
+  /** Bouton pour rouvrir le dialogue lorsque des voix existent déjà. */
+  onManageVoicesClick?: () => void;
 
 };
 
@@ -99,7 +105,7 @@ function pickFileStrict(
 
 
 
-/** Cherche un MP3 prêt : langue demandée → fr → autre ; style exact → autre style. */
+/** Cherche un fichier audio prêt : langue demandée → fr → autre ; style exact → autre style. */
 
 function pickFileForPlay(files: AudioFile[], gender: AudioGender, lang: string, prompt_style_id: string) {
 
@@ -210,6 +216,10 @@ export function AudioPlayer({
   playOnly = false,
 
   compact = false,
+
+  onGenerateClick,
+
+  onManageVoicesClick,
 
 }: AudioPlayerProps) {
 
@@ -492,7 +502,10 @@ export function AudioPlayer({
 
             disabled={generating || !text_id || !prompt_style_id}
 
-            onClick={handleGenerate}
+            onClick={() => {
+              if (onGenerateClick) onGenerateClick();
+              else handleGenerate();
+            }}
 
           >
 
@@ -629,6 +642,19 @@ export function AudioPlayer({
         );
 
       })}
+
+      {!playOnly && onManageVoicesClick ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className={cn("h-8 gap-1.5 text-xs", btnClass)}
+          onClick={onManageVoicesClick}
+        >
+          <Volume2 className="h-3.5 w-3.5" aria-hidden />
+          {t("audio_player.manage_voices")}
+        </Button>
+      ) : null}
 
     </div>
 

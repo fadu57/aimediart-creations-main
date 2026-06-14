@@ -19,12 +19,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
-  getCostTimeSeries, getCostSelectOptions, exportCostsCsv, formatCost, formatUsdToEurHint,
+  getCostTimeSeries, getCostSelectOptions, getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
-  type CostEvent, type CostFilters, type CostSummary,
+  type CostEvent, type CostFilters, type CostSummary, type CostEventsTotals,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
   type CostSort, type CostSortColumn,
 } from "@/lib/costs";
+import {
+  BACKOFFICE_FORM_CONTROL_CLASS,
+  costEventStatusLabel,
+  costOperationLabel,
+  costToolTypeLabel,
+} from "@/lib/costLabels";
 import { supabase } from "@/lib/supabase";
 import { getUsdToEurRate } from "@/lib/fxRates";
 import {
@@ -261,7 +267,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 
 const EMPTY_FILTERS: CostFilters = {
   dateFrom: "", dateTo: "", toolType: "", provider: "",
-  apiName: "", modelName: "", status: "", currency: "",
+  apiName: "", modelName: "", operationName: "", status: "", currency: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -286,7 +292,53 @@ function chartDateFr(iso: string): string {
   return `${m[3]}/${m[2]}`;
 }
 
-function statusBadge(status: string) {
+function costWithEurHint(
+  value: number,
+  currency: string,
+  usdEurRate: number | null,
+  decimals = 2,
+): string {
+  const formatted = formatCost(value, currency, decimals);
+  if (currency.toUpperCase() === "USD" && usdEurRate != null && usdEurRate > 0) {
+    return `${formatted} (${formatUsdToEurHint(value, usdEurRate, decimals)})`;
+  }
+  return formatted;
+}
+
+function CostAmountCell({
+  value,
+  currency,
+  usdEurRate,
+  decimals = 2,
+  showEurHint = true,
+}: {
+  value: number;
+  currency: string;
+  usdEurRate: number | null;
+  decimals?: number;
+  showEurHint?: boolean;
+}) {
+  const cur = currency || "EUR";
+  const eurHint =
+    showEurHint &&
+    cur.toUpperCase() === "USD" &&
+    usdEurRate != null &&
+    usdEurRate > 0
+      ? formatUsdToEurHint(value, usdEurRate, decimals)
+      : null;
+  return (
+    <span className="inline-flex flex-col gap-0.5 leading-tight">
+      <span>{formatCost(value, cur, decimals)}</span>
+      {eurHint ? (
+        <span className="text-[10px] font-normal text-emerald-700/90 dark:text-emerald-400/90">
+          {eurHint}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function statusBadge(status: string, label: string) {
   const classes: Record<string, string> = {
     success: "bg-green-100 text-green-800",
     error:   "bg-red-100 text-red-700",
@@ -294,8 +346,8 @@ function statusBadge(status: string) {
     timeout: "bg-orange-100 text-orange-700",
   };
   return (
-    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${classes[status] ?? "bg-muted text-muted-foreground"}`}>
-      {status}
+    <span className={`inline-flex items-center rounded px-1 py-0 text-[10px] font-medium leading-tight ${classes[status] ?? "bg-muted text-muted-foreground"}`}>
+      {label}
     </span>
   );
 }
@@ -351,8 +403,7 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
     onChange({ ...filters, [key]: value });
   }
 
-  const inputClass =
-    "block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  const inputClass = BACKOFFICE_FORM_CONTROL_CLASS;
   const labelClass = "block text-xs font-medium text-muted-foreground mb-1";
 
   return (
@@ -387,7 +438,9 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
           <label className={labelClass}>{t("couts.filter_tool_type")}</label>
           <select value={filters.toolType ?? ""} onChange={(e) => set("toolType", e.target.value)} className={inputClass}>
             <option value="">{t("couts.filter_all")}</option>
-            {options.toolTypes.map((v) => <option key={v} value={v}>{v}</option>)}
+            {options.toolTypes.map((v) => (
+              <option key={v} value={v}>{costToolTypeLabel(v, t)}</option>
+            ))}
           </select>
         </div>
 
@@ -416,7 +469,9 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
           <label className={labelClass}>{t("couts.filter_status")}</label>
           <select value={filters.status ?? ""} onChange={(e) => set("status", e.target.value)} className={inputClass}>
             <option value="">{t("couts.filter_all")}</option>
-            {options.statuses.map((v) => <option key={v} value={v}>{v}</option>)}
+            {options.statuses.map((v) => (
+              <option key={v} value={v}>{costEventStatusLabel(v, t)}</option>
+            ))}
           </select>
         </div>
 
@@ -615,6 +670,159 @@ function ProjectDbActivitySection() {
   );
 }
 
+type DateFilterMode = "day" | "interval";
+
+type EventsTableFiltersProps = {
+  filters: CostFilters;
+  options: CostSelectOptions;
+  onChange: (filters: CostFilters) => void;
+  loading: boolean;
+};
+
+function EventsTableFilters({ filters, options, onChange, loading }: EventsTableFiltersProps) {
+  const { t } = useTranslation("settings");
+  const [dateMode, setDateMode] = useState<DateFilterMode>(() =>
+    filters.dateFrom && filters.dateFrom === filters.dateTo ? "day" : "interval",
+  );
+
+  const inputClass = BACKOFFICE_FORM_CONTROL_CLASS;
+  const labelClass = "block text-xs font-medium text-muted-foreground mb-1";
+
+  const set = (key: keyof CostFilters, value: string) => {
+    onChange({ ...filters, [key]: value });
+  };
+
+  const handleDateModeChange = (mode: DateFilterMode) => {
+    setDateMode(mode);
+    if (mode === "day" && filters.dateFrom) {
+      onChange({ ...filters, dateTo: filters.dateFrom });
+    }
+  };
+
+  const handleDayDateChange = (value: string) => {
+    onChange({ ...filters, dateFrom: value, dateTo: value });
+  };
+
+  return (
+    <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="sm:col-span-2 lg:col-span-1">
+          <label className={labelClass}>{t("couts.filter_date")}</label>
+          <div className="mb-2 flex gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleDateModeChange("day")}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                dateMode === "day"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-white/20 bg-[#1e1e1e] text-[#f0f0f0]/70 hover:text-[#f0f0f0]",
+              )}
+            >
+              {t("couts.filter_date_mode_day")}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleDateModeChange("interval")}
+              className={cn(
+                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                dateMode === "interval"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-white/20 bg-[#1e1e1e] text-[#f0f0f0]/70 hover:text-[#f0f0f0]",
+              )}
+            >
+              {t("couts.filter_date_mode_interval")}
+            </button>
+          </div>
+          {dateMode === "day" ? (
+            <input
+              type="date"
+              value={filters.dateFrom ?? ""}
+              max={TODAY}
+              disabled={loading}
+              onChange={(e) => handleDayDateChange(e.target.value)}
+              className={inputClass}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={filters.dateFrom ?? ""}
+                max={filters.dateTo || TODAY}
+                disabled={loading}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  set("dateFrom", v);
+                  if (filters.dateTo && v > filters.dateTo) onChange({ ...filters, dateFrom: v, dateTo: "" });
+                }}
+                className={inputClass}
+                aria-label={t("couts.filter_date_from")}
+              />
+              <input
+                type="date"
+                value={filters.dateTo ?? ""}
+                min={filters.dateFrom || undefined}
+                max={TODAY}
+                disabled={loading}
+                onChange={(e) => set("dateTo", e.target.value)}
+                className={inputClass}
+                aria-label={t("couts.filter_date_to")}
+              />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className={labelClass}>{t("couts.col_provider")}</label>
+          <select
+            value={filters.provider ?? ""}
+            disabled={loading}
+            onChange={(e) => set("provider", e.target.value)}
+            className={inputClass}
+          >
+            <option value="">{t("couts.filter_all")}</option>
+            {options.providers.map((v) => (
+              <option key={v} value={v}>{costProviderDisplayName(v)}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>{t("couts.col_operation")}</label>
+          <select
+            value={filters.operationName ?? ""}
+            disabled={loading}
+            onChange={(e) => set("operationName", e.target.value)}
+            className={inputClass}
+          >
+            <option value="">{t("couts.filter_all")}</option>
+            {options.operationNames.map((v) => (
+              <option key={v} value={v}>{costOperationLabel(v, t)}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>{t("couts.col_status")}</label>
+          <select
+            value={filters.status ?? ""}
+            disabled={loading}
+            onChange={(e) => set("status", e.target.value)}
+            className={inputClass}
+          >
+            <option value="">{t("couts.filter_all")}</option>
+            {options.statuses.map((v) => (
+              <option key={v} value={v}>{costEventStatusLabel(v, t)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type CostsTableProps = {
   events: CostEvent[];
   loading: boolean;
@@ -626,6 +834,9 @@ type CostsTableProps = {
   onPageChange: (p: number) => void;
   onExport: () => void;
   currency: string;
+  totals: CostEventsTotals | null;
+  loadingTotals: boolean;
+  usdEurRate: number | null;
 };
 
 const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[] = [
@@ -665,7 +876,7 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
   const SortIcon = active ? (sort.ascending ? ArrowUp : ArrowDown) : ArrowUpDown;
 
   return (
-    <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap">
+    <th className="px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">
       <button
         type="button"
         onClick={() => onSort(column)}
@@ -684,6 +895,7 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
 
 function CostsTable({
   events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, currency,
+  totals, loadingTotals, usdEurRate,
 }: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -733,7 +945,20 @@ function CostsTable({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border/50">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[900px] table-fixed text-sm">
+          <colgroup>
+            <col className="w-[108px]" />
+            <col className="w-[68px]" />
+            <col className="w-[84px]" />
+            <col className="w-[88px]" />
+            <col className="w-[88px]" />
+            <col className="w-[88px]" />
+            <col className="w-[54px]" />
+            <col className="w-[54px]" />
+            <col className="w-[56px]" />
+            <col className="w-[64px]" />
+            <col className="w-[100px]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-border/50 bg-muted/40">
               {COST_TABLE_SORTABLE_COLUMNS.map(({ column, labelKey }) => (
@@ -760,12 +985,35 @@ function CostsTable({
                 return (
                   <th
                     key={labelKey}
-                    className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground whitespace-nowrap"
+                    className="px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground"
                   >
                     {t(labelKey)}
                   </th>
                 );
               })}
+            </tr>
+            <tr className="border-b border-border/50 bg-muted/25">
+              <td colSpan={5} className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("couts.table_totals_label")}
+              </td>
+              <td className="px-2 py-1.5 font-mono text-xs font-semibold text-primary">
+                {loadingTotals ? (
+                  "…"
+                ) : (
+                  <CostAmountCell
+                    value={totals?.totalCost ?? 0}
+                    currency={totals?.currency ?? currency}
+                    usdEurRate={usdEurRate}
+                  />
+                )}
+              </td>
+              <td className="px-1.5 py-1.5 text-right font-mono text-[11px] font-semibold whitespace-nowrap">
+                {loadingTotals ? "…" : (totals?.totalInputUnits ?? 0).toLocaleString("fr-FR")}
+              </td>
+              <td className="px-1.5 py-1.5 text-right font-mono text-[11px] font-semibold whitespace-nowrap">
+                {loadingTotals ? "…" : (totals?.totalOutputUnits ?? 0).toLocaleString("fr-FR")}
+              </td>
+              <td colSpan={3} />
             </tr>
           </thead>
           <tbody>
@@ -774,29 +1022,40 @@ function CostsTable({
                 key={e.id}
                 className={`border-b border-border/30 transition-colors hover:bg-muted/20 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
               >
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground font-mono">
+                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono truncate leading-tight" title={frDate(e.created_at)}>
                   {frDate(e.created_at)}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                    {e.tool_type}
+                <td className="px-2 py-1 truncate leading-tight">
+                  <span className="rounded bg-primary/10 px-1 py-0 text-[10px] font-medium text-primary">
+                    {costToolTypeLabel(e.tool_type, t)}
                   </span>
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap font-medium">{e.provider}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{e.model_name ?? "—"}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs">{e.operation_name ?? "—"}</td>
-                <td className="px-3 py-2 whitespace-nowrap font-mono font-semibold text-primary">
-                  {formatCost(e.cost_estimated, e.currency, 6)}
+                <td className="px-2 py-1 text-xs font-medium truncate leading-tight" title={costProviderDisplayName(e.provider)}>
+                  {costProviderDisplayName(e.provider)}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-mono">
+                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight" title={e.model_name ?? undefined}>
+                  {e.model_name ?? "—"}
+                </td>
+                <td className="px-2 py-1 text-[11px] truncate leading-tight" title={e.operation_name ?? undefined}>
+                  {e.operation_name ? costOperationLabel(e.operation_name, t) : "—"}
+                </td>
+                <td className="px-2 py-1 font-mono text-xs font-semibold text-primary leading-tight">
+                  <CostAmountCell
+                    value={e.cost_estimated}
+                    currency={e.currency}
+                    usdEurRate={usdEurRate}
+                    showEurHint={false}
+                  />
+                </td>
+                <td className="px-1.5 py-1 text-[11px] text-right font-mono whitespace-nowrap leading-tight">
                   {e.input_units != null ? e.input_units.toLocaleString("fr-FR") : "—"}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-right font-mono">
+                <td className="px-1.5 py-1 text-[11px] text-right font-mono whitespace-nowrap leading-tight">
                   {e.output_units != null ? e.output_units.toLocaleString("fr-FR") : "—"}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{e.unit_type ?? "—"}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{statusBadge(e.status)}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground max-w-[120px] truncate">
+                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight">{e.unit_type ?? "—"}</td>
+                <td className="px-2 py-1 truncate leading-tight">{statusBadge(e.status, costEventStatusLabel(e.status, t))}</td>
+                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight" title={e.source ?? undefined}>
                   {e.source ?? "—"}
                 </td>
               </tr>
@@ -1173,10 +1432,23 @@ type OpenAiTtsStatsBlockProps = {
   stats: OpenAiTtsMonthStats | null;
   loading: boolean;
   compact?: boolean;
+  usdEurRate?: number | null;
 };
 
-function OpenAiTtsStatsBlock({ stats, loading, compact }: OpenAiTtsStatsBlockProps) {
+function OpenAiTtsStatsBlock({ stats, loading, compact, usdEurRate: usdEurRateProp = null }: OpenAiTtsStatsBlockProps) {
   const { t } = useTranslation("settings");
+  const [usdEurRateLocal, setUsdEurRateLocal] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (usdEurRateProp != null) return;
+    let cancelled = false;
+    void getUsdToEurRate().then((rate) => {
+      if (!cancelled) setUsdEurRateLocal(rate);
+    });
+    return () => { cancelled = true; };
+  }, [usdEurRateProp]);
+
+  const usdEurRate = usdEurRateProp ?? usdEurRateLocal;
 
   if (loading) {
     return (
@@ -1189,7 +1461,7 @@ function OpenAiTtsStatsBlock({ stats, loading, compact }: OpenAiTtsStatsBlockPro
 
   if (!stats) return null;
 
-  const empty = stats.mp3Count === 0 && stats.costUsd === 0;
+  const empty = stats.audioFileCount === 0 && stats.costUsd === 0;
 
   return (
     <div className={cn(
@@ -1208,12 +1480,14 @@ function OpenAiTtsStatsBlock({ stats, loading, compact }: OpenAiTtsStatsBlockPro
       ) : (
         <div className="flex flex-col gap-1.5 text-muted-foreground">
           <p>
-            {t("providers.tts_openai_month_cost", { cost: formatCost(stats.costUsd, "USD", 4) })}
+            {t("providers.tts_openai_month_cost", {
+              cost: costWithEurHint(stats.costUsd, "USD", usdEurRate, 2),
+            })}
           </p>
           <p>
             {t("providers.tts_openai_month_mp3", {
-              count: stats.mp3Count,
-              avg: formatCost(stats.avgCostUsd, "USD", 4),
+              count: stats.audioFileCount,
+              avg: costWithEurHint(stats.avgCostUsd, "USD", usdEurRate, 2),
             })}
           </p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -1230,9 +1504,9 @@ function OpenAiTtsStatsBlock({ stats, loading, compact }: OpenAiTtsStatsBlockPro
   );
 }
 
-type OpenAiTtsSummaryCardProps = { refreshKey: number };
+type OpenAiTtsSummaryCardProps = { refreshKey: number; usdEurRate: number | null };
 
-function OpenAiTtsSummaryCard({ refreshKey }: OpenAiTtsSummaryCardProps) {
+function OpenAiTtsSummaryCard({ refreshKey, usdEurRate }: OpenAiTtsSummaryCardProps) {
   const { t } = useTranslation("settings");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<OpenAiTtsMonthStats | null>(null);
@@ -1260,7 +1534,7 @@ function OpenAiTtsSummaryCard({ refreshKey }: OpenAiTtsSummaryCardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <OpenAiTtsStatsBlock stats={stats} loading={loading} />
+        <OpenAiTtsStatsBlock stats={stats} loading={loading} usdEurRate={usdEurRate} />
       </CardContent>
     </Card>
   );
@@ -2159,8 +2433,10 @@ export default function SettingsCouts() {
   const [byProvider, setByProvider] = useState<CostBreakdownItem[]>([]);
   const [timeSeries, setTimeSeries] = useState<CostTimeSeriesPoint[]>([]);
   const [options,  setOptions]  = useState<CostSelectOptions>({
-    toolTypes: [], providers: [], apiNames: [], modelNames: [], statuses: [], currencies: [],
+    toolTypes: [], providers: [], apiNames: [], modelNames: [], operationNames: [], statuses: [], currencies: [],
   });
+  const [eventsTotals, setEventsTotals] = useState<CostEventsTotals | null>(null);
+  const [loadingEventsTotals, setLoadingEventsTotals] = useState(true);
 
   const [loadingEvents,  setLoadingEvents]  = useState(true);
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -2204,6 +2480,22 @@ export default function SettingsCouts() {
 
     return () => { cancelled = true; };
   }, [filters, page, sort, costsRefreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingEventsTotals(true);
+    getCostEventsTotals(filters)
+      .then((totals) => {
+        if (!cancelled) {
+          setEventsTotals(totals);
+          setLoadingEventsTotals(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingEventsTotals(false);
+      });
+    return () => { cancelled = true; };
+  }, [filters, costsRefreshKey]);
 
   // ---- Chargement KPIs ----
   useEffect(() => {
@@ -2369,7 +2661,7 @@ export default function SettingsCouts() {
         </div>
       )}
 
-      <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} />
+      <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} usdEurRate={usdEurRate} />
 
       {/* Graphiques */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -2450,6 +2742,12 @@ export default function SettingsCouts() {
           <CardTitle className="text-sm font-medium">{t("couts.table_title")}</CardTitle>
         </CardHeader>
         <CardContent>
+          <EventsTableFilters
+            filters={filters}
+            options={options}
+            onChange={handleFiltersChange}
+            loading={loadingEvents}
+          />
           <CostsTable
             events={events}
             loading={loadingEvents}
@@ -2461,6 +2759,9 @@ export default function SettingsCouts() {
             onPageChange={setPage}
             onExport={handleExport}
             currency={currency}
+            totals={eventsTotals}
+            loadingTotals={loadingEventsTotals}
+            usdEurRate={usdEurRate}
           />
         </CardContent>
       </Card>

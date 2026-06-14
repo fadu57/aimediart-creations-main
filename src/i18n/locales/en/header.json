@@ -14,6 +14,8 @@
   "settings_submenu_suivis": "Tracking",
   "settings_submenu_couts": "Costs",
   "settings_submenu_suivi_temps": "Time",
+  "settings_submenu_online_presence": "Who is online",
+  "settings_submenu_presence_thresholds": "Presence thresholds",
   "settings_submenu_suivi_tokens": "Tokens",
   "settings_submenu_error_logs": "Logs",
   "settings_submenu_error_logs_visitors": "Visitors",

@@ -350,6 +350,28 @@
     @apply border-border bg-white text-neutral-900 hover:bg-neutral-100 hover:text-neutral-950;
   }
 
+  /**
+   * Champs date / select sur fond back-office sombre (#121212) :
+   * le texte clair hérité du conteneur ne doit pas se retrouver sur fond clair.
+   */
+  .backoffice-form-control {
+    @apply block w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring;
+    border-color: rgb(255 255 255 / 0.2);
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+    color-scheme: dark;
+  }
+
+  .backoffice-form-control:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .backoffice-form-control option {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+  }
+
   .text-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
     -webkit-background-clip: text;

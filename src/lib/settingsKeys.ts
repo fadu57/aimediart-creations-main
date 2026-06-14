@@ -11,6 +11,8 @@ export const SETTINGS_KEYS = {
   visitorsBehavior: "settings_visitors_behavior",
   notifications: "settings_notifications",
   securityMatrix: "settings_security_matrix",
+  /** Seuils présence en ligne (organisateur / visiteur). */
+  presenceThresholds: "settings_presence_thresholds",
 } as const;
 
 /** `single_plus_optional` : langue UI (+ 1 langue optionnelle en fiche). `all_languages` : FR, EN, DE, ES, IT. */
@@ -63,6 +65,22 @@ export type SettingsNotifications = {
   webhook_url: string;
   frequency_batch_seconds: number;
   content_detail: string;
+};
+
+export type SettingsPresenceThresholds = {
+  organizer: {
+    activeMinutes: 30 | 60 | 120;
+    abandonedHours: 4 | 12 | 24;
+  };
+  visitor: {
+    activeMinutes: 15 | 20 | 120;
+    abandonedHours: 2 | 3 | 4;
+  };
+};
+
+export const DEFAULT_PRESENCE_THRESHOLDS: SettingsPresenceThresholds = {
+  organizer: { activeMinutes: 30, abandonedHours: 4 },
+  visitor: { activeMinutes: 20, abandonedHours: 2 },
 };
 
 export type SecurityMatrixPermissions = {

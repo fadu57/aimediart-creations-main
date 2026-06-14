@@ -8,8 +8,11 @@ import {
   Coins,
   Euro,
   Settings,
+  Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 import {
   DropdownMenu,
@@ -36,6 +39,12 @@ const ERROR_LOG_LINKS = [
   { to: "/suivi_erreurs_organisateurs", labelKey: "settings_submenu_error_logs_organizers" },
 ] as const;
 
+const ONLINE_PRESENCE_LINK = {
+  to: "/settings/qui-est-en-ligne",
+  labelKey: "settings_submenu_online_presence",
+  Icon: Users,
+} as const;
+
 type SettingsMenuDropdownProps = {
   triggerClassName?: string;
   variant?: "header" | "fab";
@@ -49,8 +58,12 @@ export function SettingsMenuDropdown({
 }: SettingsMenuDropdownProps) {
   const { t } = useTranslation("header");
   const location = useLocation();
+  const { role_id } = useAuthUser();
+  const showOnlinePresence = role_id === 1;
 
-  const suiviActive = SUIVI_LINKS.some((link) => location.pathname.startsWith(link.to));
+  const suiviActive =
+    SUIVI_LINKS.some((link) => location.pathname.startsWith(link.to)) ||
+    (showOnlinePresence && location.pathname.startsWith(ONLINE_PRESENCE_LINK.to));
   const errorLogsActive = ERROR_LOG_LINKS.some((link) => location.pathname.startsWith(link.to));
   const trashActive = SETTINGS_TRASH_MENU_LINKS.some((link) => location.pathname.startsWith(link.to));
   const paramsActive = location.pathname === "/settings";
@@ -88,6 +101,19 @@ export function SettingsMenuDropdown({
             {t(labelKey)}
           </NavLink>
         ))}
+        {showOnlinePresence && (
+          <NavLink
+            to={ONLINE_PRESENCE_LINK.to}
+            className={cn(
+              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
+              location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) && "font-medium text-[#E63946]",
+            )}
+            onClick={onNavigate}
+          >
+            <ONLINE_PRESENCE_LINK.Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
+            {t(ONLINE_PRESENCE_LINK.labelKey)}
+          </NavLink>
+        )}
 
         <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {t("settings_submenu_error_logs")}
@@ -177,6 +203,20 @@ export function SettingsMenuDropdown({
                 </Link>
               </DropdownMenuItem>
             ))}
+            {showOnlinePresence && (
+              <DropdownMenuItem asChild>
+                <Link
+                  to={ONLINE_PRESENCE_LINK.to}
+                  className={cn(
+                    "flex items-center gap-2",
+                    location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) && "font-medium text-[#E63946]",
+                  )}
+                >
+                  <ONLINE_PRESENCE_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
+                  {t(ONLINE_PRESENCE_LINK.labelKey)}
+                </Link>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 

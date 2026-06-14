@@ -14,6 +14,8 @@
   "settings_submenu_suivis": "Suivis",
   "settings_submenu_couts": "Coûts",
   "settings_submenu_suivi_temps": "Temps",
+  "settings_submenu_online_presence": "Qui est en ligne",
+  "settings_submenu_presence_thresholds": "Seuils de présence",
   "settings_submenu_suivi_tokens": "Tokens",
   "settings_submenu_error_logs": "Logs",
   "settings_submenu_error_logs_visitors": "Visiteurs",

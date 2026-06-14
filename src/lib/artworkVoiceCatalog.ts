@@ -8,8 +8,11 @@ import {
 export type ArtworkVoiceCatalogSummary = {
   readyCount: number;
   expectedCount: number;
+  generatingCount: number;
   langsLabel: string;
   isComplete: boolean;
+  /** Au moins une voix en statut pending/generating en base. */
+  isGenerating: boolean;
 };
 
 type AudioFileRow = {
@@ -23,7 +26,7 @@ function normLang(raw: string): string {
   return raw.trim().toLowerCase().slice(0, 2);
 }
 
-/** Nombre de MP3 attendus (cellules lang×persona × F/M). */
+/** Nombre de fichiers audio attendus (cellules lang×persona × F/M). */
 export function countExpectedMediationVoices(descriptionI18n: unknown): number {
   const byLang = normalizeArtworkDescriptionToByLang(descriptionI18n);
   let total = 0;
@@ -54,18 +57,24 @@ export function summarizeArtworkMediationVoices(
 ): ArtworkVoiceCatalogSummary {
   const expectedCount = countExpectedMediationVoices(descriptionI18n);
   const filledLangs = getMediationFilledUiLangs(descriptionI18n);
-  const readyFiles = audioFiles.filter(
-    (f) => f.text_id === artworkId && f.status === "ready" && !!f.storage_path?.trim(),
+  const artworkFiles = audioFiles.filter((f) => f.text_id === artworkId);
+  const readyFiles = artworkFiles.filter(
+    (f) => f.status === "ready" && !!f.storage_path?.trim(),
   );
   const readyCount = readyFiles.length;
+  const generatingCount = artworkFiles.filter(
+    (f) => f.status === "generating" || f.status === "pending",
+  ).length;
   const voiceLangs = langsWithReadyVoices(filledLangs, readyFiles);
   const langsLabel = voiceLangs.map((L) => L.toUpperCase()).join(" - ");
 
   return {
     readyCount,
     expectedCount,
+    generatingCount,
     langsLabel,
     isComplete: expectedCount > 0 && readyCount >= expectedCount,
+    isGenerating: generatingCount > 0,
   };
 }
 

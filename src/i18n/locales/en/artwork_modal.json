@@ -137,7 +137,15 @@
     "voice_f": "Voice F",
     "voice_m": "Voice M",
     "play_f": "Play female voice",
-    "play_m": "Play male voice"
+    "play_m": "Play male voice",
+    "manage_voices": "Manage voices"
+  },
+  "audio_generate_dialog": {
+    "title": "Audio generation — mediation",
+    "desc": "Track all voices by persona and language.",
+    "close": "Close",
+    "generate_all": "Generate all voices",
+    "background_hint": "You can close this dialog — generation will continue in the background."
   },
   "audio_voice_status": {
     "label": "Generated voices",
@@ -148,6 +156,10 @@
     "progress_generating": "{{ready}}/{{total}} · {{active}} in progress",
     "progress_errors": "{{ready}}/{{total}} · {{error}} error(s)",
     "progress_errors_pending": "{{ready}}/{{total}} · {{error}} error(s) · {{pending}} pending",
-    "retry_lang": "Retry audio generation for this language"
+    "retry_lang": "Retry audio generation for this language",
+    "cancel_lang": "Stop audio generation for this language",
+    "continue_lang": "Continue audio generation for this language",
+    "no_text": "No mediation text",
+    "no_persona_audio": "Persona not configured for audio"
   }
 }

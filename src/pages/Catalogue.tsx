@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtworkModal } from "@/components/ArtworkModal";
+import { getArtworkIdsWithPendingAudio, getPendingAudioJobsByLang, subscribeAudioQueue } from "@/services/audioService";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Plus, Search, Loader2, X, RefreshCw, Undo2 } from "lucide-react";
+import { Plus, Search, Loader2, X, RefreshCw, Undo2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import QRCode from "qrcode";
@@ -129,6 +130,11 @@ function artworkMatchesExpoFilter(
   return legacy !== "" && raw === legacy;
 }
 
+/** Largeur commune des badges IA (image, médiations, voix) en bas de carte. */
+const CATALOG_IA_BADGE_WIDTH_CLASS = "w-[14.5rem]";
+const catalogIaBadgeClass =
+  "inline-flex w-full min-w-0 items-center rounded-full border px-3 py-0.5 text-left text-[11px] font-medium";
+
 const Catalogue = () => {
   const { t } = useTranslation("catalogue");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,6 +143,12 @@ const Catalogue = () => {
   const [voiceSummaryByArtwork, setVoiceSummaryByArtwork] = useState<
     Record<string, ArtworkVoiceCatalogSummary>
   >({});
+  const [pendingAudioArtworkIds, setPendingAudioArtworkIds] = useState<ReadonlySet<string>>(
+    () => new Set(getArtworkIdsWithPendingAudio()),
+  );
+  const artworksRef = useRef<ArtworkRow[]>([]);
+  const voiceSummaryRef = useRef(voiceSummaryByArtwork);
+  voiceSummaryRef.current = voiceSummaryByArtwork;
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
   const [selectedExpoFilter, setSelectedExpoFilter] = useState(
     () => searchParams.get("expo")?.trim() || "all",
@@ -146,6 +158,7 @@ const Catalogue = () => {
   const [error, setError] = useState<string | null>(null);
   const [artworkModalOpen, setArtworkModalOpen] = useState(false);
   const [editingArtworkId, setEditingArtworkId] = useState<string | null>(null);
+  const [voicesEntryFromCatalogue, setVoicesEntryFromCatalogue] = useState(false);
   const [œuvresNavigationType, setOeuvresNavigationType] = useState("single_scan_sequence");
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
@@ -333,6 +346,37 @@ const Catalogue = () => {
     setExpoOptions(mapped);
   }, [role_id, userAgencyId, userExpoId, scope]);
 
+  const fetchVoiceSummariesForRows = useCallback(
+    async (rows: ArtworkRow[]): Promise<Record<string, ArtworkVoiceCatalogSummary>> => {
+      const artworkIds = rows.map((r) => r.artwork_id).filter(Boolean);
+      if (artworkIds.length === 0) return {};
+
+      const { data: audioRows, error: audioError } = await supabase
+        .from("audio_files")
+        .select("text_id, lang, status, storage_path")
+        .eq("text_type", "mediation")
+        .in("text_id", artworkIds);
+
+      if (audioError) {
+        console.error("[Catalogue] audio_files:", audioError);
+        return {};
+      }
+
+      return buildArtworkVoiceCatalogMap(rows, audioRows ?? []);
+    },
+    [],
+  );
+
+  const refreshVoiceSummaries = useCallback(async () => {
+    const rows = artworksRef.current;
+    if (rows.length === 0) {
+      setVoiceSummaryByArtwork({});
+      return;
+    }
+    const voiceMap = await fetchVoiceSummariesForRows(rows);
+    setVoiceSummaryByArtwork(voiceMap);
+  }, [fetchVoiceSummariesForRows]);
+
   const loadCatalogue = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -408,30 +452,72 @@ const Catalogue = () => {
       expo_id: row.artwork_expo_id ?? null,
     }));
 
-    const artworkIds = normalizedRows.map((r) => r.artwork_id).filter(Boolean);
-    let voiceMap: Record<string, ArtworkVoiceCatalogSummary> = {};
-    if (artworkIds.length > 0) {
-      const { data: audioRows, error: audioError } = await supabase
-        .from("audio_files")
-        .select("text_id, lang, status, storage_path")
-        .eq("text_type", "mediation")
-        .in("text_id", artworkIds);
-      if (audioError) {
-        console.error("[Catalogue] audio_files:", audioError);
-      } else {
-        voiceMap = buildArtworkVoiceCatalogMap(normalizedRows, audioRows ?? []);
-      }
-    }
+    const voiceMap = await fetchVoiceSummariesForRows(normalizedRows);
 
     setVoiceSummaryByArtwork(voiceMap);
     setArtworks(normalizedRows);
+    artworksRef.current = normalizedRows;
 
     setLoading(false);
-  }, [scope, role_id, role_name, userAgencyId, userExpoId, isAdminFullAccess]);
+  }, [scope, role_id, role_name, userAgencyId, userExpoId, isAdminFullAccess, fetchVoiceSummariesForRows, t]);
 
   useEffect(() => {
     void loadCatalogue();
   }, [loadCatalogue]);
+
+  /** Met à jour les badges voix pendant la génération audio (file client + polling). */
+  useEffect(() => {
+    const VOICE_POLL_MS = 2500;
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+    let pollId: ReturnType<typeof setInterval> | null = null;
+
+    const hasInProgressVoices = () => {
+      if (Object.values(getPendingAudioJobsByLang()).some((count) => count > 0)) return true;
+      return Object.values(voiceSummaryRef.current).some((summary) => summary.isGenerating);
+    };
+
+    const stopPolling = () => {
+      if (pollId !== null) {
+        clearInterval(pollId);
+        pollId = null;
+      }
+    };
+
+    const syncPolling = () => {
+      if (hasInProgressVoices()) {
+        if (pollId === null) {
+          pollId = setInterval(() => {
+            void refreshVoiceSummaries().then(() => {
+              syncPolling();
+            });
+          }, VOICE_POLL_MS);
+        }
+      } else if (pollId !== null) {
+        stopPolling();
+        void refreshVoiceSummaries();
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (debounceId !== null) clearTimeout(debounceId);
+      debounceId = setTimeout(() => {
+        debounceId = null;
+        setPendingAudioArtworkIds(new Set(getArtworkIdsWithPendingAudio()));
+        void refreshVoiceSummaries();
+        syncPolling();
+      }, 350);
+    };
+
+    scheduleRefresh();
+
+    const unsubscribe = subscribeAudioQueue(scheduleRefresh);
+
+    return () => {
+      unsubscribe();
+      if (debounceId !== null) clearTimeout(debounceId);
+      stopPolling();
+    };
+  }, [refreshVoiceSummaries]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -460,11 +546,19 @@ const Catalogue = () => {
 
   const openCreateArtwork = () => {
     setEditingArtworkId(null);
+    setVoicesEntryFromCatalogue(false);
     setArtworkModalOpen(true);
   };
 
   const openEditArtwork = (id: string) => {
     setEditingArtworkId(id);
+    setVoicesEntryFromCatalogue(false);
+    setArtworkModalOpen(true);
+  };
+
+  const openArtworkVoicesModal = (id: string) => {
+    setEditingArtworkId(id);
+    setVoicesEntryFromCatalogue(true);
     setArtworkModalOpen(true);
   };
 
@@ -924,13 +1018,18 @@ const Catalogue = () => {
           const voiceSummary = voiceSummaryByArtwork[aw.artwork_id] ?? {
             readyCount: 0,
             expectedCount: 0,
+            generatingCount: 0,
             langsLabel: "",
             isComplete: false,
+            isGenerating: false,
           };
           const hasExpectedVoices = voiceSummary.expectedCount > 0;
-          const voiceBadgeComplete = voiceSummary.isComplete;
+          const voiceIsGenerating =
+            voiceSummary.isGenerating || pendingAudioArtworkIds.has(aw.artwork_id);
+          const voiceBadgeComplete = voiceSummary.isComplete && !voiceIsGenerating;
           const voiceBadgePartial =
             hasExpectedVoices &&
+            !voiceIsGenerating &&
             voiceSummary.readyCount > 0 &&
             voiceSummary.readyCount < voiceSummary.expectedCount;
 
@@ -1076,10 +1175,15 @@ const Catalogue = () => {
                       {t("btn_visitor_visual")}
                     </Button>
                     </div>
-                    <div className="flex w-full shrink-0 flex-col items-end gap-2 pt-3 mt-auto">
+                    <div
+                      className={cn(
+                        "ml-auto flex max-w-full shrink-0 flex-col items-stretch gap-2 pt-3 mt-auto",
+                        CATALOG_IA_BADGE_WIDTH_CLASS,
+                      )}
+                    >
                     <span
                       className={cn(
-                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        catalogIaBadgeClass,
                         hasImageAnalysis
                           ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                           : "border-[#E63946] bg-[#E63946] text-white",
@@ -1089,7 +1193,7 @@ const Catalogue = () => {
                     </span>
                     <span
                       className={cn(
-                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        catalogIaBadgeClass,
                         hasGeneratedMediation
                           ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                           : "border-[#E63946] bg-[#E63946] text-white",
@@ -1101,29 +1205,81 @@ const Catalogue = () => {
                       })}
                     </span>
                     <span
+                      role={hasExpectedVoices ? "button" : undefined}
+                      tabIndex={hasExpectedVoices ? 0 : undefined}
                       className={cn(
-                        "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                        catalogIaBadgeClass,
                         !hasExpectedVoices
                           ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
-                          : voiceBadgeComplete
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                            : voiceBadgePartial
-                              ? "border-amber-300 bg-amber-50 text-amber-800"
-                              : "border-[#E63946] bg-[#E63946] text-white",
+                          : voiceIsGenerating
+                            ? "border-amber-400 bg-amber-50 text-amber-900"
+                            : voiceBadgeComplete
+                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                              : voiceBadgePartial
+                                ? "border-amber-300 bg-amber-50 text-amber-800"
+                                : "border-[#E63946] bg-[#E63946] text-white",
+                        hasExpectedVoices &&
+                          "cursor-pointer justify-between gap-1.5 transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60",
                       )}
+                      aria-label={
+                        hasExpectedVoices
+                          ? voiceIsGenerating
+                            ? t("badge_ia_voice_generating_aria")
+                            : t("badge_ia_voice_open_aria")
+                          : undefined
+                      }
+                      onClick={
+                        hasExpectedVoices
+                          ? (e) => {
+                              e.stopPropagation();
+                              openArtworkVoicesModal(aw.artwork_id);
+                            }
+                          : undefined
+                      }
+                      onKeyDown={
+                        hasExpectedVoices
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openArtworkVoicesModal(aw.artwork_id);
+                              }
+                            }
+                          : undefined
+                      }
                     >
-                      {!hasExpectedVoices
-                        ? t("badge_ia_voice_none")
-                        : voiceBadgePartial
-                          ? t("badge_ia_voice_partial", {
-                              ready: voiceSummary.readyCount,
-                              expected: voiceSummary.expectedCount,
-                              langs: voiceSummary.langsLabel || mediationLangsLabel,
-                            })
-                          : t("badge_ia_voice", {
-                              count: voiceSummary.readyCount,
-                              langs: voiceSummary.langsLabel || mediationLangsLabel,
-                            })}
+                      <span className="min-w-0 truncate">
+                        {!hasExpectedVoices
+                          ? t("badge_ia_voice_none")
+                          : voiceIsGenerating
+                            ? voiceSummary.readyCount > 0
+                              ? t("badge_ia_voice_generating_partial", {
+                                  ready: voiceSummary.readyCount,
+                                  expected: voiceSummary.expectedCount,
+                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
+                                })
+                              : t("badge_ia_voice_generating")
+                            : voiceBadgePartial
+                              ? t("badge_ia_voice_partial", {
+                                  ready: voiceSummary.readyCount,
+                                  expected: voiceSummary.expectedCount,
+                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
+                                })
+                              : t("badge_ia_voice", {
+                                  count: voiceSummary.readyCount,
+                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
+                                })}
+                      </span>
+                      {voiceIsGenerating || hasExpectedVoices ? (
+                        <span className="ml-1 flex shrink-0 items-center gap-1">
+                          {voiceIsGenerating ? (
+                            <Loader2 className="h-3 w-3 animate-spin opacity-80" aria-hidden />
+                          ) : null}
+                          {hasExpectedVoices ? (
+                            <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
+                          ) : null}
+                        </span>
+                      ) : null}
                     </span>
                     </div>
                   </div>
@@ -1224,8 +1380,16 @@ const Catalogue = () => {
 
       <ArtworkModal
         open={artworkModalOpen}
-        onOpenChange={setArtworkModalOpen}
+        onOpenChange={(next) => {
+          setArtworkModalOpen(next);
+          if (!next) {
+            setVoicesEntryFromCatalogue(false);
+            void loadCatalogue();
+          }
+        }}
         artworkId={editingArtworkId}
+        openMediationAudioOnLoad={voicesEntryFromCatalogue}
+        closeOnMediationAudioClose={voicesEntryFromCatalogue}
         onSuccess={() => {
           void loadCatalogue();
           void loadExpoOptions();
