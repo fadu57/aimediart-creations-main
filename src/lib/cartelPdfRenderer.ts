@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { QR_CODE_PRINT_OPTIONS } from "@/lib/qrCodeScanFriendly";
 
 import {
+  CARTEL_REF_WIDTH_MM,
   cartelScaleForSlot,
   getCartelFormat,
   getCartelSlots,
@@ -100,8 +101,11 @@ function renderCartelInSlot(
 
   const logoMarginY = slotY + 5 * scale;
   const logoMarginX = slotX + 4 * scale;
-  const scaledLogoW = logoWidthMm * scale;
-  const scaledLogoH = logoHeightMm * scale;
+  // Formats carrés : l’échelle globale suit la hauteur A6 (148 mm) et réduisait le logo
+  // plus que le reste ; on aligne sa taille sur la largeur du slot (comme en A6 portrait).
+  const logoScale = slotW / CARTEL_REF_WIDTH_MM;
+  const scaledLogoW = logoWidthMm * logoScale;
+  const scaledLogoH = logoHeightMm * logoScale;
   pdf.addImage(logoImg, "PNG", logoMarginX, logoMarginY, scaledLogoW, scaledLogoH, undefined, "NONE");
 
   const artistFontSize = 16 * scale;

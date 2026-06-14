@@ -25,6 +25,11 @@ import {
 } from "@/services/audioService";
 
 import { useIndoorAudioGuard } from "@/hooks/useIndoorAudioGuard";
+import {
+  claimMediationAudioPlayback,
+  interruptMediationAudioPlayback,
+  releaseMediationAudioPlayback,
+} from "@/lib/mediationAudioPlayback";
 import { cn } from "@/lib/utils";
 
 
@@ -236,6 +241,26 @@ export function AudioPlayer({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const stopPlaybackRef = useRef<() => void>(() => {});
+
+  stopPlaybackRef.current = () => {
+
+    audioRef.current?.pause();
+
+    audioRef.current = null;
+
+    setPlayingGender(null);
+
+    releaseMediationAudioPlayback(stopPlaybackRef.current);
+
+  };
+
+  const stopPlayback = useCallback(() => {
+
+    stopPlaybackRef.current();
+
+  }, []);
+
 
 
   const refresh = useCallback(async () => {
@@ -310,33 +335,19 @@ export function AudioPlayer({
 
     return () => {
 
-      audioRef.current?.pause();
-
-      audioRef.current = null;
+      stopPlayback();
 
     };
 
-  }, []);
-
-
-
-  const stopPlayback = () => {
-
-    audioRef.current?.pause();
-
-    audioRef.current = null;
-
-    setPlayingGender(null);
-
-  };
+  }, [stopPlayback]);
 
 
 
   useEffect(() => {
 
-    return audioGuard.registerPauseCallback(() => stopPlayback());
+    return audioGuard.registerPauseCallback(stopPlayback);
 
-  }, [audioGuard]);
+  }, [audioGuard, stopPlayback]);
 
 
 
@@ -366,6 +377,8 @@ export function AudioPlayer({
 
 
 
+    interruptMediationAudioPlayback();
+
     stopPlayback();
 
     try {
@@ -378,13 +391,15 @@ export function AudioPlayer({
 
       setPlayingGender(gender);
 
-      audio.onended = () => setPlayingGender(null);
+      claimMediationAudioPlayback(stopPlaybackRef.current);
+
+      audio.onended = () => stopPlayback();
 
       audio.onerror = () => {
 
         console.error("[AudioPlayer] lecture impossible");
 
-        setPlayingGender(null);
+        stopPlayback();
 
       };
 
@@ -394,7 +409,7 @@ export function AudioPlayer({
 
       console.error("[AudioPlayer] getAudioUrl:", e);
 
-      setPlayingGender(null);
+      stopPlayback();
 
     }
 
