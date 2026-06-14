@@ -34,6 +34,7 @@ import Statistics from "./pages/Statistics";
 import SettingsPage from "./pages/Settings";
 import SettingsCouts from "./pages/SettingsCouts";
 import SettingsSuiviTemps from "./pages/SettingsSuiviTemps";
+import SettingsSupabaseMonitoring from "./pages/SettingsSupabaseMonitoring";
 import SettingsSuiviTokens from "./pages/SettingsSuiviTokens";
 import SettingsVisitorErrors from "./pages/SettingsVisitorErrors";
 import SettingsOrganizerErrors from "./pages/SettingsOrganizerErrors";
@@ -319,6 +320,7 @@ const AppRoutes = () => (
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/couts" element={<SettingsCouts />} />
           <Route path="suivi_temps" element={<SettingsSuiviTemps />} />
+          <Route path="suivi_supabase" element={<SettingsSupabaseMonitoring />} />
           <Route path="suivi_tokens" element={<SettingsSuiviTokens />} />
           <Route path="suivi_erreurs_visiteurs" element={<SettingsVisitorErrors />} />
           <Route path="suivi_erreurs_organisateurs" element={<SettingsOrganizerErrors />} />

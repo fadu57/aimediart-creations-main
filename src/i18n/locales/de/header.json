@@ -17,6 +17,7 @@
   "settings_submenu_online_presence": "Wer ist online",
   "settings_submenu_presence_thresholds": "Anwesenheitsschwellen",
   "settings_submenu_suivi_tokens": "Tokens",
+  "settings_submenu_supabase_db": "Supabase",
   "settings_submenu_error_logs": "Logs",
   "settings_submenu_error_logs_visitors": "Besucher",
   "settings_submenu_error_logs_organizers": "Organisator",

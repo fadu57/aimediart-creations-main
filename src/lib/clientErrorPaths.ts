@@ -32,6 +32,7 @@ const ORGANIZER_PATH_PREFIXES = [
   "/statistiques",
   "/settings",
   "/suivi_temps",
+  "/suivi_supabase",
   "/suivi_tokens",
   "/suivi_erreurs_visiteurs",
   "/suivi_erreurs_organisateurs",

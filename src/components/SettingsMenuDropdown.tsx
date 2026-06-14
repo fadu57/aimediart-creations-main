@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Clock,
   Coins,
+  Database,
   Euro,
   Settings,
   Users,
@@ -32,6 +33,7 @@ const SUIVI_LINKS = [
   { to: "/settings/couts", labelKey: "settings_submenu_couts", Icon: Euro },
   { to: "/suivi_tokens", labelKey: "settings_submenu_suivi_tokens", Icon: Coins },
   { to: "/suivi_temps", labelKey: "settings_submenu_suivi_temps", Icon: Clock },
+  { to: "/suivi_supabase", labelKey: "settings_submenu_supabase_db", Icon: Database },
 ] as const;
 
 const ERROR_LOG_LINKS = [

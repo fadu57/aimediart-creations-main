@@ -481,5 +481,94 @@
     "saving": "Speichern…",
     "saved": "Schwellenwerte gespeichert.",
     "link_online_page": "Wer ist online anzeigen"
+  },
+  "supabase_monitoring": {
+    "back_settings": "Einstellungen",
+    "page_title": "Supabase-Observability — Datenbank",
+    "page_sub": "Infrastrukturmetriken und große Objekte, analog zum Supabase Studio-Dashboard.",
+    "refresh": "Aktualisieren",
+    "fetched_at": "Zuletzt aktualisiert: {{at}}",
+    "open_studio": "In Supabase öffnen",
+    "error_title": "Fehler",
+    "infra_unavailable_title": "Infrastrukturdiagramme nicht verfügbar",
+    "infra_unavailable_default": "Zeitreihen erfordern die Supabase Management API.",
+    "config_hint": "Secret SB_MGMT_ACCESS_TOKEN via « supabase secrets set SB_MGMT_ACCESS_TOKEN=… » setzen und supabase-db-monitoring neu deployen.",
+    "section_infra": "Infrastrukturmetriken",
+    "no_series": "Keine Daten für diesen Zeitraum.",
+    "empty_objects": "Keine großen Objekte erkannt.",
+    "range_24h": "24 Std.",
+    "range_7d": "7 T.",
+    "range_30d": "30 T.",
+    "kpi_db_size": "Datenbankgröße",
+    "kpi_connections": "Aktive Verbindungen",
+    "kpi_objects": "Gelistete Objekte",
+    "large_objects_title": "Große Objekte",
+    "col_object": "Objekt",
+    "col_kind": "Typ",
+    "col_size": "Gesamtgröße",
+    "col_data": "Daten",
+    "col_index": "Index",
+    "col_share": "Anteil",
+    "kind_table": "Tabelle",
+    "kind_index": "Index",
+    "kind_toast": "TOAST",
+    "kind_matview": "Mat. View",
+    "kind_sequence": "Sequenz",
+    "charts": {
+      "disk_size": "Speicherplatz",
+      "memory_commitment": "Speicher-Commitment",
+      "ram_usage": "Speichernutzung",
+      "cpu_usage": "CPU-Auslastung",
+      "network": "Netzwerkdurchsatz",
+      "disk_iops": "Festplatten-IOPS",
+      "disk_throughput": "Festplatten-Durchsatz",
+      "connections": "Datenbankverbindungen"
+    },
+    "series": {
+      "disk-size": {
+        "disk_fs_used_system": "System",
+        "disk_fs_used_wal": "WAL",
+        "pg_database_size": "Datenbank",
+        "disk_fs_size": "Festplattengröße"
+      },
+      "memory-commitment": {
+        "ram_commit_used": "Committed",
+        "ram_commit_limit": "Commit-Limit"
+      },
+      "ram-usage": {
+        "ram_usage_used": "Genutzt",
+        "ram_usage_cache_and_buffers": "Cache + Puffer",
+        "ram_usage_free": "Frei",
+        "ram_usage_total": "RAM gesamt"
+      },
+      "cpu-usage": {
+        "cpu_usage_busy_user": "Benutzer",
+        "cpu_usage_busy_system": "System",
+        "cpu_usage_busy_iowait": "I/O-Wartezeit",
+        "cpu_usage_busy_irqs": "IRQ",
+        "cpu_usage_busy_other": "Sonstige"
+      },
+      "network-throughput": {
+        "network_receive_bytes": "Eingehend",
+        "network_transmit_bytes": "Ausgehend"
+      },
+      "disk-iops": {
+        "disk_iops_read": "Lesen",
+        "disk_iops_write": "Schreiben"
+      },
+      "disk-throughput": {
+        "disk_bytes_read": "Lesen",
+        "disk_bytes_written": "Schreiben"
+      },
+      "connections": {
+        "client_connections_postgres": "Postgres",
+        "client_connections_authenticator": "PostgREST",
+        "client_connections_supabase_auth_admin": "Auth",
+        "client_connections_supabase_storage_admin": "Storage",
+        "client_connections_supabase_admin": "Reserviert",
+        "client_connections_other": "Andere Rollen",
+        "pg_stat_database_num_backends": "Verbindungen gesamt"
+      }
+    }
   }
 }
