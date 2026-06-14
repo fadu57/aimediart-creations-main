@@ -12,8 +12,8 @@ import {
   buildMediationVoiceTargets,
   fetchAudioVoiceStatusMapByCell,
   getPendingAudioJobsByCell,
+  scheduleAutoRetryAudioJob,
   subscribeAudioQueue,
-  type AudioVoiceLangTarget,
   type LangVoiceAggregate,
   type VoiceGenderStatus,
 } from "@/services/audioService";
@@ -72,7 +72,7 @@ function buildMediationVoiceTargetsForStatus(
   personas: readonly MediationPersonaEntry[],
   descriptionsByLang: Record<string, Record<string, string>>,
   languages: readonly string[],
-): AudioVoiceLangTarget[] {
+) {
   return buildMediationVoiceTargets(artworkId, personas, descriptionsByLang, languages);
 }
 
@@ -366,6 +366,29 @@ export function MediationAllVoicesStatus({
       }
     }
   }, [statusMap, pendingByCell, optimisticSet, onOptimisticCellDone]);
+
+  /** Relance auto (30 s) chaque voix F/M en erreur, une par une. */
+  useEffect(() => {
+    for (const target of targets) {
+      const cellKey = audioVoiceCellKey(target.lang, target.prompt_style_id);
+      const st = statusMap[cellKey];
+      if (!st || st.errors.length === 0) continue;
+
+      const queued = pendingByCell[cellKey] ?? 0;
+      if (queued > 0 || st.progress.generating > 0) continue;
+
+      for (const err of st.errors) {
+        scheduleAutoRetryAudioJob({
+          text_id: target.text_id,
+          text_type: "mediation",
+          lang: target.lang,
+          prompt_style_id: target.prompt_style_id,
+          gender: err.gender,
+          mediation_style_key: target.styleKey,
+        });
+      }
+    }
+  }, [targets, statusMap, pendingByCell]);
 
   return (
     <div className={cn("flex w-full flex-col gap-4", className)} aria-label={t("audio_voice_status.aria")}>

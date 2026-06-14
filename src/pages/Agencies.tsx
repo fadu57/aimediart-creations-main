@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Building2, Plus, X } from "lucide-react";
+import { Building2, GalleryVerticalEnd, Plus, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,13 +88,15 @@ function AgencyExpoList({ expos }: { expos: ExpoBrief[] }) {
   };
 
   return (
-    <ul className="mt-2 space-y-1 text-sm pointer-events-auto">
+    <ul className="mt-2 grid grid-cols-[max-content_250px_2rem_max-content] items-center gap-x-3 gap-y-1 text-sm pointer-events-auto">
       {EXPO_TIMING_CATEGORY_ORDER.flatMap((cat) =>
-        grouped[cat].map((ex) => (
-          <li key={ex.id} className="flex items-center gap-3 min-w-0">
+        grouped[cat].map((ex) => {
+          const expoTitle = ex.expo_name?.trim() || ex.id;
+          return (
+          <li key={ex.id} className="contents">
             <span
               className={cn(
-                "inline-flex w-fit max-w-full shrink-0 items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
+                "inline-flex w-fit max-w-full items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
                 badgeClass[cat],
               )}
             >
@@ -102,19 +104,30 @@ function AgencyExpoList({ expos }: { expos: ExpoBrief[] }) {
             </span>
             <Link
               to={`/expos?expo=${encodeURIComponent(ex.id)}`}
-              className="min-w-0 flex-1 text-primary underline-offset-2 hover:underline"
+              className="block w-[250px] max-w-[250px] min-w-0 truncate text-primary underline-offset-2 hover:underline"
+              title={expoTitle}
               onClick={(e) => e.stopPropagation()}
             >
-              {ex.expo_name?.trim() || ex.id}
+              {expoTitle}
             </Link>
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <Link
+              to={`/catalogue?expo=${encodeURIComponent(ex.id)}`}
+              className="inline-flex h-8 w-8 items-center justify-center justify-self-center rounded-md text-primary hover:bg-primary/10"
+              title={t("page.viewCatalogue")}
+              aria-label={t("page.viewCatalogue")}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GalleryVerticalEnd className="h-4 w-4" aria-hidden />
+            </Link>
+            <span className="text-right text-xs text-muted-foreground">
               {formatExpoDatesLabel(ex.date_expo_du, ex.date_expo_au, i18n.language, t, {
                 range: "expos.dateRange",
                 permanent: "expos.permanentExpo",
               })}
             </span>
           </li>
-        )),
+          );
+        }),
       )}
     </ul>
   );

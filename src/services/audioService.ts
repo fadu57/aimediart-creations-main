@@ -35,6 +35,7 @@ const AUDIO_GEN_CONCURRENCY = Math.max(
 );
 const STALE_GENERATING_MS = 3 * 60 * 1000;
 const INVOKE_TIMEOUT_MS = 120_000;
+const AUDIO_AUTO_RETRY_DELAY_MS = 30_000;
 const CANCELLED_ERROR_MSG = "Génération annulée — relancez si besoin.";
 
 function normLangCode(raw: string): string {
@@ -68,6 +69,60 @@ const pendingJobsByScope = new Map<string, number>();
 /** Invokes Edge encore actifs mais annulés côté UI — réécriture en erreur à la fin. */
 const cancelledAudioScopes = new Set<string>();
 const queueListeners = new Set<() => void>();
+/** Timers de relance auto (30 s) après échec d'une voix F ou M. */
+const pendingAutoRetryTimerIds = new Map<string, number>();
+
+type VoiceJobIdentity = Pick<
+  AudioGenJob,
+  "text_id" | "text_type" | "lang" | "prompt_style_id" | "gender"
+>;
+
+function voiceJobIdentityKey(job: VoiceJobIdentity): string {
+  return `${job.text_type}|${job.text_id.trim()}|${normLangCode(job.lang)}|${job.prompt_style_id.trim()}|${job.gender}`;
+}
+
+function isVoiceJobActive(job: VoiceJobIdentity): boolean {
+  if (isAudioJobQueued(job)) return true;
+  for (const running of runningAudioJobs) {
+    if (voiceJobIdentityKey(running) === voiceJobIdentityKey(job)) return true;
+  }
+  return false;
+}
+
+/** Annule la relance auto programmée pour une voix précise. */
+function clearAutoRetryAudioJob(job: VoiceJobIdentity): void {
+  const key = voiceJobIdentityKey(job);
+  const timerId = pendingAutoRetryTimerIds.get(key);
+  if (timerId !== undefined) {
+    window.clearTimeout(timerId);
+    pendingAutoRetryTimerIds.delete(key);
+  }
+}
+
+/** Annule les relances auto (toutes les voix d'une cellule ou d'une œuvre). */
+export function clearAutoRetryAudioJobsForScope(params: {
+  text_id: string;
+  text_type?: AudioTextType;
+  lang?: string;
+  prompt_style_id?: string;
+}): void {
+  const textId = params.text_id.trim();
+  const textType = params.text_type;
+  const langKey = params.lang ? normLangCode(params.lang) : null;
+  const promptStyleId = params.prompt_style_id?.trim() ?? null;
+
+  for (const key of [...pendingAutoRetryTimerIds.keys()]) {
+    const [jobTextType, jobTextId, jobLang, jobPromptStyleId] = key.split("|");
+    if (jobTextId !== textId) continue;
+    if (textType && jobTextType !== textType) continue;
+    if (langKey && jobLang !== langKey) continue;
+    if (promptStyleId && jobPromptStyleId !== promptStyleId) continue;
+
+    const timerId = pendingAutoRetryTimerIds.get(key);
+    if (timerId !== undefined) window.clearTimeout(timerId);
+    pendingAutoRetryTimerIds.delete(key);
+  }
+}
 
 function jobScopeKey(job: Pick<AudioGenJob, "text_id" | "lang" | "prompt_style_id">): string {
   return `${job.text_id.trim()}|${normLangCode(job.lang)}|${job.prompt_style_id.trim()}`;
@@ -265,6 +320,12 @@ export async function cancelAudioGenerationForCell(params: {
   const prompt_style_id = params.prompt_style_id?.trim();
   if (!text_id || !langKey || !prompt_style_id) return;
 
+  clearAutoRetryAudioJobsForScope({
+    text_id,
+    text_type: params.text_type,
+    lang: langKey,
+    prompt_style_id,
+  });
   clearAudioGenerationJobs({ text_id, lang: langKey, prompt_style_id });
   await markCancelledAudioRowsInDb({
     text_id,
@@ -302,12 +363,16 @@ function pumpAudioQueue(): void {
     runningAudioJobs.add(job);
     void invokeGenerateAudio(job)
       .then(() => {
-        if (!job.cancelled) job.resolve();
+        if (!job.cancelled) {
+          clearAutoRetryAudioJob(job);
+          job.resolve();
+        }
       })
       .catch((e) => {
         if (!job.cancelled) {
           console.error("[audioService] invokeGenerateAudio:", e);
           job.reject(e);
+          scheduleAutoRetryAudioJob(job);
         }
       })
       .finally(() => {
@@ -367,8 +432,9 @@ function collectMediationVoiceJobs(
   lang: string,
   styleKey: string,
   prompt_style_id: string,
+  genders: readonly AudioGender[] = ["F", "M"],
 ): AudioGenJob[] {
-  return (["F", "M"] as const).map((gender) => ({
+  return genders.map((gender) => ({
     text_id: artworkId,
     text_type: "mediation" as const,
     lang,
@@ -460,8 +526,35 @@ export function triggerMediationAudioForPersonaLang(params: {
 }): void {
   const { artworkId, lang, styleKey, prompt_style_id } = params;
   if (!artworkId?.trim() || !prompt_style_id?.trim()) return;
+  clearAutoRetryAudioJobsForScope({
+    text_id: artworkId,
+    text_type: "mediation",
+    lang,
+    prompt_style_id,
+  });
   enqueueAudioGenerationJobs(
     collectMediationVoiceJobs(artworkId, lang, styleKey, prompt_style_id),
+  );
+}
+
+/** Déclenche une seule voix (F ou M) pour une cellule persona × langue. */
+export function triggerMediationAudioForVoice(params: {
+  artworkId: string;
+  lang: string;
+  styleKey: string;
+  prompt_style_id: string;
+  gender: AudioGender;
+}): void {
+  const { artworkId, lang, styleKey, prompt_style_id, gender } = params;
+  if (!artworkId?.trim() || !prompt_style_id?.trim()) return;
+  clearAutoRetryAudioJobsForScope({
+    text_id: artworkId,
+    text_type: "mediation",
+    lang,
+    prompt_style_id,
+  });
+  enqueueAudioGenerationJobs(
+    collectMediationVoiceJobs(artworkId, lang, styleKey, prompt_style_id, [gender]),
   );
 }
 
@@ -633,6 +726,45 @@ function voiceSlotNeedsGeneration(
   if (status === "ready") return false;
   if (status === "generating" || status === "pending") return false;
   return true;
+}
+
+function voiceSlotShouldAutoRetry(
+  file: VoiceSlotFilePick | undefined,
+  job: VoiceJobIdentity,
+): boolean {
+  if (isVoiceJobActive(job)) return false;
+  const status = fileToVoiceStatus(file);
+  if (status === "ready") return false;
+  if (status === "generating" || status === "pending") return false;
+  return true;
+}
+
+/** Programme une relance automatique 30 s après un échec (une voix F ou M). */
+export function scheduleAutoRetryAudioJob(job: AudioGenJob): void {
+  if (typeof window === "undefined") return;
+
+  const key = voiceJobIdentityKey(job);
+  if (pendingAutoRetryTimerIds.has(key) || isVoiceJobActive(job)) return;
+
+  const timerId = window.setTimeout(() => {
+    pendingAutoRetryTimerIds.delete(key);
+    void (async () => {
+      const files = await getAudioFiles(job.text_id, job.text_type);
+      const file = files.find(
+        (f) =>
+          normLangCode(f.lang) === normLangCode(job.lang)
+          && f.prompt_style_id === job.prompt_style_id
+          && f.gender === job.gender,
+      );
+      if (!voiceSlotShouldAutoRetry(file, job)) return;
+      if (import.meta.env.DEV) {
+        console.info("[audioService] relance auto voix après erreur:", key);
+      }
+      enqueueAudioGenerationJobs([job]);
+    })();
+  }, AUDIO_AUTO_RETRY_DELAY_MS);
+
+  pendingAutoRetryTimerIds.set(key, timerId);
 }
 
 export type MediationVoiceFillState = {
