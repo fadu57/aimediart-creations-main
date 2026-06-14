@@ -67,6 +67,8 @@ import { GoogleBillingCard } from "@/components/admin/GoogleBillingCard";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchOpenAiTtsMonthStats, type OpenAiTtsMonthStats } from "@/lib/openAiTtsStats";
+import { OPENAI_BILLING_URL, OPENAI_USAGE_URL } from "@/lib/openAiTtsCost";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 // ---------------------------------------------------------------------------
 // Types — Fournisseurs
@@ -408,7 +410,7 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
 
   return (
     <div className="rounded-xl border border-border/50 bg-card/60 p-4 backdrop-blur-sm">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         {/* Date début */}
         <div>
           <label className={labelClass}>{t("couts.filter_date_from")}</label>
@@ -451,6 +453,17 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
             <option value="">{t("couts.filter_all")}</option>
             {options.providers.map((v) => (
               <option key={v} value={v}>{costProviderDisplayName(v)}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Opération */}
+        <div>
+          <label className={labelClass}>{t("couts.col_operation")}</label>
+          <select value={filters.operationName ?? ""} onChange={(e) => set("operationName", e.target.value)} className={inputClass}>
+            <option value="">{t("couts.filter_all")}</option>
+            {options.operationNames.map((v) => (
+              <option key={v} value={v}>{costOperationLabel(v, t)}</option>
             ))}
           </select>
         </div>
@@ -667,159 +680,6 @@ function ProjectDbActivitySection() {
         )}
       </CardContent>
     </Card>
-  );
-}
-
-type DateFilterMode = "day" | "interval";
-
-type EventsTableFiltersProps = {
-  filters: CostFilters;
-  options: CostSelectOptions;
-  onChange: (filters: CostFilters) => void;
-  loading: boolean;
-};
-
-function EventsTableFilters({ filters, options, onChange, loading }: EventsTableFiltersProps) {
-  const { t } = useTranslation("settings");
-  const [dateMode, setDateMode] = useState<DateFilterMode>(() =>
-    filters.dateFrom && filters.dateFrom === filters.dateTo ? "day" : "interval",
-  );
-
-  const inputClass = BACKOFFICE_FORM_CONTROL_CLASS;
-  const labelClass = "block text-xs font-medium text-muted-foreground mb-1";
-
-  const set = (key: keyof CostFilters, value: string) => {
-    onChange({ ...filters, [key]: value });
-  };
-
-  const handleDateModeChange = (mode: DateFilterMode) => {
-    setDateMode(mode);
-    if (mode === "day" && filters.dateFrom) {
-      onChange({ ...filters, dateTo: filters.dateFrom });
-    }
-  };
-
-  const handleDayDateChange = (value: string) => {
-    onChange({ ...filters, dateFrom: value, dateTo: value });
-  };
-
-  return (
-    <div className="mb-4 rounded-lg border border-border/40 bg-muted/20 p-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="sm:col-span-2 lg:col-span-1">
-          <label className={labelClass}>{t("couts.filter_date")}</label>
-          <div className="mb-2 flex gap-2">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleDateModeChange("day")}
-              className={cn(
-                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                dateMode === "day"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-white/20 bg-[#1e1e1e] text-[#f0f0f0]/70 hover:text-[#f0f0f0]",
-              )}
-            >
-              {t("couts.filter_date_mode_day")}
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleDateModeChange("interval")}
-              className={cn(
-                "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                dateMode === "interval"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-white/20 bg-[#1e1e1e] text-[#f0f0f0]/70 hover:text-[#f0f0f0]",
-              )}
-            >
-              {t("couts.filter_date_mode_interval")}
-            </button>
-          </div>
-          {dateMode === "day" ? (
-            <input
-              type="date"
-              value={filters.dateFrom ?? ""}
-              max={TODAY}
-              disabled={loading}
-              onChange={(e) => handleDayDateChange(e.target.value)}
-              className={inputClass}
-            />
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="date"
-                value={filters.dateFrom ?? ""}
-                max={filters.dateTo || TODAY}
-                disabled={loading}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  set("dateFrom", v);
-                  if (filters.dateTo && v > filters.dateTo) onChange({ ...filters, dateFrom: v, dateTo: "" });
-                }}
-                className={inputClass}
-                aria-label={t("couts.filter_date_from")}
-              />
-              <input
-                type="date"
-                value={filters.dateTo ?? ""}
-                min={filters.dateFrom || undefined}
-                max={TODAY}
-                disabled={loading}
-                onChange={(e) => set("dateTo", e.target.value)}
-                className={inputClass}
-                aria-label={t("couts.filter_date_to")}
-              />
-            </div>
-          )}
-        </div>
-
-        <div>
-          <label className={labelClass}>{t("couts.col_provider")}</label>
-          <select
-            value={filters.provider ?? ""}
-            disabled={loading}
-            onChange={(e) => set("provider", e.target.value)}
-            className={inputClass}
-          >
-            <option value="">{t("couts.filter_all")}</option>
-            {options.providers.map((v) => (
-              <option key={v} value={v}>{costProviderDisplayName(v)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelClass}>{t("couts.col_operation")}</label>
-          <select
-            value={filters.operationName ?? ""}
-            disabled={loading}
-            onChange={(e) => set("operationName", e.target.value)}
-            className={inputClass}
-          >
-            <option value="">{t("couts.filter_all")}</option>
-            {options.operationNames.map((v) => (
-              <option key={v} value={v}>{costOperationLabel(v, t)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className={labelClass}>{t("couts.col_status")}</label>
-          <select
-            value={filters.status ?? ""}
-            disabled={loading}
-            onChange={(e) => set("status", e.target.value)}
-            className={inputClass}
-          >
-            <option value="">{t("couts.filter_all")}</option>
-            {options.statuses.map((v) => (
-              <option key={v} value={v}>{costEventStatusLabel(v, t)}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1461,11 +1321,11 @@ function OpenAiTtsStatsBlock({ stats, loading, compact, usdEurRate: usdEurRatePr
 
   if (!stats) return null;
 
-  const empty = stats.audioFileCount === 0 && stats.costUsd === 0;
+  const empty = stats.apiCallCount === 0 && stats.costRecalculatedUsd === 0;
 
   return (
     <div className={cn(
-      "space-y-2 leading-snug",
+      "space-y-3 leading-snug",
       compact ? "text-[11px]" : "text-xs",
     )}
     >
@@ -1475,21 +1335,77 @@ function OpenAiTtsStatsBlock({ stats, loading, compact, usdEurRate: usdEurRatePr
       {!compact && (
         <p className="text-muted-foreground">{t("providers.tts_openai_note")}</p>
       )}
+
+      <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-[11px] text-muted-foreground space-y-1.5">
+        <p className="font-medium text-foreground/90">{t("providers.tts_openai_billing_disclaimer_title")}</p>
+        <p>{t("providers.tts_openai_billing_disclaimer_body")}</p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
+          <a
+            href={OPENAI_USAGE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            {t("providers.tts_openai_link_usage")}
+            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+          </a>
+          <a
+            href={OPENAI_BILLING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            {t("providers.tts_openai_link_billing")}
+            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+          </a>
+        </div>
+      </div>
+
       {empty ? (
         <p className="text-muted-foreground">{t("providers.tts_openai_month_empty")}</p>
       ) : (
-        <div className="flex flex-col gap-1.5 text-muted-foreground">
-          <p>
-            {t("providers.tts_openai_month_cost", {
-              cost: costWithEurHint(stats.costUsd, "USD", usdEurRate, 2),
+        <div className="flex flex-col gap-2 text-muted-foreground">
+          <p className="font-medium text-foreground/90">
+            {t("providers.tts_openai_cost_recalculated", {
+              cost: costWithEurHint(stats.costRecalculatedUsd, "USD", usdEurRate, 2),
             })}
           </p>
+          {Math.abs(stats.costLoggedUsd - stats.costRecalculatedUsd) > 0.01 ? (
+            <p className="text-[11px]">
+              {t("providers.tts_openai_cost_logged_legacy", {
+                cost: costWithEurHint(stats.costLoggedUsd, "USD", usdEurRate, 2),
+              })}
+            </p>
+          ) : null}
           <p>
             {t("providers.tts_openai_month_mp3", {
               count: stats.audioFileCount,
-              avg: costWithEurHint(stats.avgCostUsd, "USD", usdEurRate, 2),
+              avg: costWithEurHint(stats.avgCostUsd, "USD", usdEurRate, 3),
             })}
           </p>
+          <p className="text-[11px]">
+            {t("providers.tts_openai_reconciliation_calls", {
+              apiCalls: stats.apiCallCount,
+              uniqueCells: stats.uniqueVoiceCells,
+            })}
+          </p>
+          {stats.regenerationExtraCalls > 0 ? (
+            <p className="text-[11px] text-amber-800/90 dark:text-amber-200/90">
+              {t("providers.tts_openai_regenerations_summary", {
+                extra: stats.regenerationExtraCalls,
+                cost: costWithEurHint(stats.regenerationExtraCostRecalculatedUsd, "USD", usdEurRate, 2),
+              })}
+            </p>
+          ) : null}
+          {stats.unloggedReadyFiles > 0 ? (
+            <p className="text-[11px] text-destructive">
+              {t("providers.tts_openai_unlogged_warning", { count: stats.unloggedReadyFiles })}
+            </p>
+          ) : (
+            <p className="text-[11px] text-emerald-700/90">
+              {t("providers.tts_openai_reconciliation_ok")}
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             <span>{t("providers.tts_openai_gender_f", { count: stats.byGender.F })}</span>
             <span>{t("providers.tts_openai_gender_m", { count: stats.byGender.M })}</span>
@@ -1498,6 +1414,43 @@ function OpenAiTtsStatsBlock({ stats, loading, compact, usdEurRate: usdEurRatePr
             <span>{t("providers.tts_openai_type_bio", { count: stats.byTextType.bio })}</span>
             <span>{t("providers.tts_openai_type_mediation", { count: stats.byTextType.mediation })}</span>
           </div>
+
+          {stats.regenerations.length > 0 && !compact ? (
+            <div className="mt-1 rounded-md border border-border/40 overflow-hidden">
+              <p className="bg-muted/30 px-2 py-1.5 text-[11px] font-medium text-foreground">
+                {t("providers.tts_openai_regenerations_table_title")}
+              </p>
+              <div className="max-h-40 overflow-y-auto">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="border-b border-border/30 text-left text-muted-foreground">
+                      <th className="px-2 py-1 font-medium">{t("providers.tts_openai_regen_col_type")}</th>
+                      <th className="px-2 py-1 font-medium">{t("providers.tts_openai_regen_col_lang")}</th>
+                      <th className="px-2 py-1 font-medium">{t("providers.tts_openai_regen_col_calls")}</th>
+                      <th className="px-2 py-1 font-medium text-right">{t("providers.tts_openai_regen_col_extra_cost")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.regenerations.map((row) => (
+                      <tr key={row.cellKey} className="border-b border-border/20 last:border-0">
+                        <td className="px-2 py-1 capitalize">{row.textType || "—"}</td>
+                        <td className="px-2 py-1 uppercase">{row.lang}</td>
+                        <td className="px-2 py-1">
+                          {t("providers.tts_openai_regen_calls_detail", {
+                            total: row.callCount,
+                            extra: row.extraCalls,
+                          })}
+                        </td>
+                        <td className="px-2 py-1 text-right font-mono">
+                          {costWithEurHint(row.costRecalculatedUsd, "USD", usdEurRate, 2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -1963,9 +1916,10 @@ function ProviderBackfillDialog({ providerKey, onOpenChange, loading, onSubmit }
 
 type ProvidersSectionProps = {
   onCostsRefresh?: () => void;
+  showOpenAiTtsReconciliation?: boolean;
 };
 
-function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
+function ProvidersSection({ onCostsRefresh, showOpenAiTtsReconciliation = false }: ProvidersSectionProps) {
   const { t } = useTranslation("settings");
 
   const [providers, setProviders] = useState<CostProvider[]>([]);
@@ -2210,7 +2164,7 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
                     {p.provider_key === "google_tts" && (
                       <GoogleTtsMonthlyEstimate refreshKey={ttsRefreshKey} />
                     )}
-                    {p.provider_key === "openai" && (
+                    {p.provider_key === "openai" && showOpenAiTtsReconciliation && (
                       <OpenAiTtsMonthlyEstimate refreshKey={ttsRefreshKey} />
                     )}
                     {p.provider_key === "google_gemini" && !p.cost_import_supported && (
@@ -2421,6 +2375,8 @@ function ProvidersSection({ onCostsRefresh }: ProvidersSectionProps) {
 
 export default function SettingsCouts() {
   const { t } = useTranslation("settings");
+  const { role_id } = useAuthUser();
+  const showOpenAiTtsReconciliation = role_id === 1;
 
   // ---- State ----
   const [filters, setFilters] = useState<CostFilters>(EMPTY_FILTERS);
@@ -2661,7 +2617,9 @@ export default function SettingsCouts() {
         </div>
       )}
 
-      <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} usdEurRate={usdEurRate} />
+      {showOpenAiTtsReconciliation ? (
+        <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} usdEurRate={usdEurRate} />
+      ) : null}
 
       {/* Graphiques */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -2742,12 +2700,6 @@ export default function SettingsCouts() {
           <CardTitle className="text-sm font-medium">{t("couts.table_title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <EventsTableFilters
-            filters={filters}
-            options={options}
-            onChange={handleFiltersChange}
-            loading={loadingEvents}
-          />
           <CostsTable
             events={events}
             loading={loadingEvents}
@@ -2770,7 +2722,10 @@ export default function SettingsCouts() {
       <GoogleBillingCard />
 
       {/* Section Fournisseurs */}
-      <ProvidersSection onCostsRefresh={refreshCostData} />
+      <ProvidersSection
+        onCostsRefresh={refreshCostData}
+        showOpenAiTtsReconciliation={showOpenAiTtsReconciliation}
+      />
     </div>
   );
 }
