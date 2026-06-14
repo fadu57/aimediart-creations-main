@@ -101,6 +101,19 @@ export function recalculateOpenAiTtsEventCostUsd(event: UsageEventLike): number 
   }).totalUsd;
 }
 
+type CostEventLike = UsageEventLike & {
+  provider?: string;
+  tool_type?: string;
+};
+
+/** Coût affiché / agrégé : recalcule OpenAI TTS legacy, sinon cost_estimated en base. */
+export function effectiveCostEstimatedUsd(event: CostEventLike): number {
+  if (event.provider === "openai" && event.tool_type === "tts") {
+    return recalculateOpenAiTtsEventCostUsd(event);
+  }
+  return Number(event.cost_estimated) || 0;
+}
+
 export function voiceCellKeyFromMetadata(meta: Record<string, unknown> | null | undefined): string {
   const m = meta ?? {};
   return `${String(m.text_id ?? "")}|${String(m.lang ?? "")}|${String(m.prompt_style_id ?? "")}|${String(m.gender ?? "")}`;

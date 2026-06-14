@@ -21,6 +21,7 @@ import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
   getCostTimeSeries, getCostSelectOptions, getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
+  effectiveCostEstimatedUsd,
   type CostEvent, type CostFilters, type CostSummary, type CostEventsTotals,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
   type CostSort, type CostSortColumn,
@@ -901,7 +902,7 @@ function CostsTable({
                 </td>
                 <td className="px-2 py-1 font-mono text-xs font-semibold text-primary leading-tight">
                   <CostAmountCell
-                    value={e.cost_estimated}
+                    value={effectiveCostEstimatedUsd(e)}
                     currency={e.currency}
                     usdEurRate={usdEurRate}
                     showEurHint={false}

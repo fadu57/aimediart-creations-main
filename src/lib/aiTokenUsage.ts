@@ -5,6 +5,7 @@
 import i18n from "@/i18n/config";
 import { supabase } from "@/lib/supabase";
 import { usageAggregationKey } from "@/lib/aiUsageModelId";
+import { effectiveCostEstimatedUsd } from "@/lib/openAiTtsCost";
 
 export type TokenPeriod = "day" | "week" | "month";
 
@@ -257,7 +258,13 @@ export function summarizeTtsUsageRecap(rows: AiUsageLogRow[]): TtsUsageRecapItem
     const tool = (r.tool_type ?? r.metadata?.tool_type ?? "tts").toString().trim() || "tts";
     const key = `${provider}::${tool}`;
     const inputUnits = Math.max(0, Number(r.total_tokens ?? r.prompt_tokens ?? 0));
-    const cost = Math.max(0, Number(r.cost_estimated ?? r.metadata?.cost_estimated ?? 0));
+    const cost = effectiveCostEstimatedUsd({
+      provider,
+      tool_type: tool,
+      cost_estimated: r.cost_estimated,
+      input_units: inputUnits,
+      metadata: r.metadata,
+    });
     const cur = map.get(key) ?? { provider, tool, inputUnits: 0, costUsd: 0, callCount: 0 };
     cur.inputUnits += inputUnits;
     cur.costUsd += cost;

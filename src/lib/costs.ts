@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "./supabase";
+import { effectiveCostEstimatedUsd } from "./openAiTtsCost";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -204,7 +205,7 @@ export async function getCostEvents(
 export async function getCostEventsTotals(filters: CostFilters): Promise<CostEventsTotals> {
   let q = supabase
     .from("ai_usage_events")
-    .select("cost_estimated, input_units, output_units, currency");
+    .select("cost_estimated, input_units, output_units, currency, provider, tool_type, metadata");
 
   q = applyFilters(q, filters);
 
@@ -218,6 +219,9 @@ export async function getCostEventsTotals(filters: CostFilters): Promise<CostEve
     input_units: number | null;
     output_units: number | null;
     currency: string;
+    provider: string;
+    tool_type: string;
+    metadata: Record<string, unknown> | null;
   };
 
   let totalCost = 0;
@@ -226,7 +230,7 @@ export async function getCostEventsTotals(filters: CostFilters): Promise<CostEve
   let currency = "EUR";
 
   for (const r of data as Row[]) {
-    totalCost += Number(r.cost_estimated) || 0;
+    totalCost += effectiveCostEstimatedUsd(r);
     if (r.input_units != null) totalInputUnits += Number(r.input_units) || 0;
     if (r.output_units != null) totalOutputUnits += Number(r.output_units) || 0;
     if (r.currency) currency = r.currency;
@@ -239,7 +243,7 @@ export async function getCostEventsTotals(filters: CostFilters): Promise<CostEve
 export async function getCostSummary(filters: CostFilters): Promise<CostSummary> {
   let q = supabase
     .from("ai_usage_events")
-    .select("cost_estimated, currency, provider, tool_type");
+    .select("cost_estimated, currency, provider, tool_type, input_units, metadata");
 
   q = applyFilters(q, filters);
 
@@ -248,7 +252,14 @@ export async function getCostSummary(filters: CostFilters): Promise<CostSummary>
     return { totalCost: 0, callCount: 0, avgCostPerCall: 0, topProvider: null, topTool: null, currency: "EUR" };
   }
 
-  type Row = { cost_estimated: number; currency: string; provider: string; tool_type: string };
+  type Row = {
+    cost_estimated: number;
+    currency: string;
+    provider: string;
+    tool_type: string;
+    input_units: number | null;
+    metadata: Record<string, unknown> | null;
+  };
   const rows = data as Row[];
 
   let totalCost = 0;
@@ -257,7 +268,7 @@ export async function getCostSummary(filters: CostFilters): Promise<CostSummary>
   let currency = "EUR";
 
   for (const r of rows) {
-    totalCost += Number(r.cost_estimated) || 0;
+    totalCost += effectiveCostEstimatedUsd(r);
     providerCount.set(r.provider, (providerCount.get(r.provider) ?? 0) + 1);
     toolCount.set(r.tool_type, (toolCount.get(r.tool_type) ?? 0) + 1);
     if (r.currency) currency = r.currency;
@@ -273,17 +284,25 @@ export async function getCostSummary(filters: CostFilters): Promise<CostSummary>
 
 /** Répartition des coûts par fournisseur. */
 export async function getCostBreakdownByProvider(filters: CostFilters): Promise<CostBreakdownItem[]> {
-  let q = supabase.from("ai_usage_events").select("provider, cost_estimated");
+  let q = supabase
+    .from("ai_usage_events")
+    .select("provider, tool_type, cost_estimated, input_units, metadata");
   q = applyFilters(q, filters);
 
   const { data, error } = await q;
   if (error || !Array.isArray(data)) return [];
 
-  type Row = { provider: string; cost_estimated: number };
+  type Row = {
+    provider: string;
+    tool_type: string;
+    cost_estimated: number;
+    input_units: number | null;
+    metadata: Record<string, unknown> | null;
+  };
   const by = new Map<string, { cost: number; count: number }>();
   for (const r of data as Row[]) {
     const cur = by.get(r.provider) ?? { cost: 0, count: 0 };
-    cur.cost += Number(r.cost_estimated) || 0;
+    cur.cost += effectiveCostEstimatedUsd(r);
     cur.count += 1;
     by.set(r.provider, cur);
   }
@@ -295,17 +314,25 @@ export async function getCostBreakdownByProvider(filters: CostFilters): Promise<
 
 /** Répartition des coûts par type d'outil. */
 export async function getCostBreakdownByTool(filters: CostFilters): Promise<CostBreakdownItem[]> {
-  let q = supabase.from("ai_usage_events").select("tool_type, cost_estimated");
+  let q = supabase
+    .from("ai_usage_events")
+    .select("tool_type, provider, cost_estimated, input_units, metadata");
   q = applyFilters(q, filters);
 
   const { data, error } = await q;
   if (error || !Array.isArray(data)) return [];
 
-  type Row = { tool_type: string; cost_estimated: number };
+  type Row = {
+    tool_type: string;
+    provider: string;
+    cost_estimated: number;
+    input_units: number | null;
+    metadata: Record<string, unknown> | null;
+  };
   const by = new Map<string, { cost: number; count: number }>();
   for (const r of data as Row[]) {
     const cur = by.get(r.tool_type) ?? { cost: 0, count: 0 };
-    cur.cost += Number(r.cost_estimated) || 0;
+    cur.cost += effectiveCostEstimatedUsd(r);
     cur.count += 1;
     by.set(r.tool_type, cur);
   }
@@ -319,7 +346,7 @@ export async function getCostBreakdownByTool(filters: CostFilters): Promise<Cost
 export async function getCostTimeSeries(filters: CostFilters): Promise<CostTimeSeriesPoint[]> {
   let q = supabase
     .from("ai_usage_events")
-    .select("created_at, cost_estimated")
+    .select("created_at, cost_estimated, provider, tool_type, input_units, metadata")
     .order("created_at", { ascending: true });
 
   q = applyFilters(q, filters);
@@ -327,12 +354,19 @@ export async function getCostTimeSeries(filters: CostFilters): Promise<CostTimeS
   const { data, error } = await q;
   if (error || !Array.isArray(data)) return [];
 
-  type Row = { created_at: string; cost_estimated: number };
+  type Row = {
+    created_at: string;
+    cost_estimated: number;
+    provider: string;
+    tool_type: string;
+    input_units: number | null;
+    metadata: Record<string, unknown> | null;
+  };
   const byDate = new Map<string, { cost: number; count: number }>();
   for (const r of data as Row[]) {
     const date = r.created_at.slice(0, 10);
     const cur = byDate.get(date) ?? { cost: 0, count: 0 };
-    cur.cost += Number(r.cost_estimated) || 0;
+    cur.cost += effectiveCostEstimatedUsd(r);
     cur.count += 1;
     byDate.set(date, cur);
   }
@@ -400,7 +434,7 @@ export function exportCostsCsv(events: CostEvent[]): void {
     e.created_at.slice(0, 19).replace("T", " "),
     e.tool_type, e.provider,
     e.api_name ?? "", e.model_name ?? "", e.operation_name ?? "",
-    e.cost_estimated.toFixed(8), e.currency, e.status,
+    effectiveCostEstimatedUsd(e).toFixed(8), e.currency, e.status,
     e.input_units ?? "", e.output_units ?? "", e.unit_type ?? "",
     e.source ?? "", e.request_id ?? "",
   ].map(esc).join(","));
@@ -420,6 +454,8 @@ export function exportCostsCsv(events: CostEvent[]): void {
 // ---------------------------------------------------------------------------
 
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" };
+
+export { effectiveCostEstimatedUsd };
 
 export function formatCost(value: number, currency = "EUR", decimals = 4): string {
   const sym = CURRENCY_SYMBOLS[currency] ?? currency;
