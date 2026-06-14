@@ -7,6 +7,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,10 +26,16 @@ import {
   type DbMonitoringInfra,
   type MonitoringChartDef,
 } from "@/lib/supabaseDbMonitoring";
+import {
+  getChartReferenceLines,
+  SUPABASE_PLAN_LIMITS,
+  type SupabasePlanId,
+} from "@/lib/supabasePlanLimits";
 
 type Props = {
   infra: DbMonitoringInfra;
   locale: string;
+  planId: SupabasePlanId;
 };
 
 function seriesLabel(
@@ -99,11 +106,52 @@ function yAxisTick(chart: MonitoringChartDef, v: number): string {
   }
 }
 
-function MonitoringChartCard({ chart, infra, locale }: { chart: MonitoringChartDef; infra: DbMonitoringInfra; locale: string }) {
+function computeYMax(
+  rows: Array<Record<string, string | number | null>>,
+  chart: MonitoringChartDef,
+  refLines: ReturnType<typeof getChartReferenceLines>,
+): number | [number, number] {
+  if (chart.format === "percent") return [0, 100];
+
+  let max = 0;
+  const stacked = chart.series.filter((s) => !s.omitFromStack);
+  for (const row of rows) {
+    if (stacked.length > 1 && chart.kind === "stackedBar") {
+      let stackSum = 0;
+      for (const s of stacked) {
+        const v = Number(row[s.attribute] ?? 0);
+        if (Number.isFinite(v)) stackSum += v;
+      }
+      max = Math.max(max, stackSum);
+    } else {
+      for (const s of chart.series) {
+        const v = Number(row[s.attribute] ?? 0);
+        if (Number.isFinite(v)) max = Math.max(max, v);
+      }
+    }
+  }
+  for (const ref of refLines) max = Math.max(max, ref.value);
+  return max > 0 ? max * 1.12 : (refLines[0]?.value ?? 1) * 1.12;
+}
+
+function MonitoringChartCard({
+  chart,
+  infra,
+  locale,
+  planId,
+}: {
+  chart: MonitoringChartDef;
+  infra: DbMonitoringInfra;
+  locale: string;
+  planId: SupabasePlanId;
+}) {
   const { t } = useTranslation("settings");
+  const plan = SUPABASE_PLAN_LIMITS[planId];
+  const refLines = useMemo(() => getChartReferenceLines(chart.id, plan), [chart.id, plan]);
   const rows = useMemo(() => buildChartRows(infra, chart), [infra, chart]);
   const stackedSeries = chart.series.filter((s) => !s.omitFromStack);
   const headline = headlineValue(infra, chart);
+  const yDomain = useMemo(() => computeYMax(rows, chart, refLines), [rows, chart, refLines]);
 
   if (!rows.length) {
     return (
@@ -131,6 +179,7 @@ function MonitoringChartCard({ chart, infra, locale }: { chart: MonitoringChartD
         tick={{ fontSize: 10 }}
         width={58}
         tickFormatter={(v) => yAxisTick(chart, Number(v))}
+        domain={Array.isArray(yDomain) ? yDomain : [0, yDomain]}
       />
       <Tooltip
         content={(
@@ -159,6 +208,20 @@ function MonitoringChartCard({ chart, infra, locale }: { chart: MonitoringChartD
           {chart.kind === "line" ? (
             <LineChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
               {commonAxis}
+              {refLines.map((ref) => (
+                <ReferenceLine
+                  key={ref.labelKey}
+                  y={ref.value}
+                  stroke={ref.stroke ?? "#E63946"}
+                  strokeDasharray={ref.strokeDasharray ?? "4 4"}
+                  label={{
+                    value: t(ref.labelKey),
+                    position: "insideTopRight",
+                    fontSize: 10,
+                    fill: ref.stroke ?? "#E63946",
+                  }}
+                />
+              ))}
               {stackedSeries.map((s) => (
                 <Line
                   key={s.attribute}
@@ -174,6 +237,20 @@ function MonitoringChartCard({ chart, infra, locale }: { chart: MonitoringChartD
           ) : (
             <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 4 }}>
               {commonAxis}
+              {refLines.map((ref) => (
+                <ReferenceLine
+                  key={ref.labelKey}
+                  y={ref.value}
+                  stroke={ref.stroke ?? "#E63946"}
+                  strokeDasharray={ref.strokeDasharray ?? "4 4"}
+                  label={{
+                    value: t(ref.labelKey),
+                    position: "insideTopRight",
+                    fontSize: 10,
+                    fill: ref.stroke ?? "#E63946",
+                  }}
+                />
+              ))}
               {stackedSeries.map((s) => (
                 <Bar
                   key={s.attribute}
@@ -191,11 +268,11 @@ function MonitoringChartCard({ chart, infra, locale }: { chart: MonitoringChartD
   );
 }
 
-export function SupabaseDbMonitoringCharts({ infra, locale }: Props) {
+export function SupabaseDbMonitoringCharts({ infra, locale, planId }: Props) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {MONITORING_CHART_DEFS.map((chart) => (
-        <MonitoringChartCard key={chart.id} chart={chart} infra={infra} locale={locale} />
+        <MonitoringChartCard key={chart.id} chart={chart} infra={infra} locale={locale} planId={planId} />
       ))}
     </div>
   );

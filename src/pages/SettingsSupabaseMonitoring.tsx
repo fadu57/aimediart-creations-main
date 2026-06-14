@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { SupabaseDbMonitoringCharts } from "@/components/settings/SupabaseDbMonitoringCharts";
+import { SupabasePlanQuotas } from "@/components/settings/SupabasePlanQuotas";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,17 @@ import {
   type MonitoringRangeHours,
   type SupabaseDbMonitoringPayload,
 } from "@/lib/supabaseDbMonitoring";
+import {
+  loadStoredPlanId,
+  storePlanId,
+  SUPABASE_PLAN_LIMITS,
+  usageRatio,
+  usageStatus,
+  type SupabasePlanId,
+} from "@/lib/supabasePlanLimits";
 import { cn } from "@/lib/utils";
+
+const PLAN_OPTIONS: SupabasePlanId[] = ["free", "pro"];
 
 const RANGE_OPTIONS: { hours: MonitoringRangeHours; labelKey: string }[] = [
   { hours: 24, labelKey: "supabase_monitoring.range_24h" },
@@ -50,7 +61,8 @@ export default function SettingsSupabaseMonitoring() {
   const { loading: authLoading, role_id } = useAuthUser();
   const canAccess = role_id === 1 || role_id === 2 || role_id === 3;
 
-  const [rangeHours, setRangeHours] = useState<MonitoringRangeHours>(24);
+  const [rangeHours, setRangeHours] = useState<MonitoringRangeHours>(168);
+  const [planId, setPlanId] = useState<SupabasePlanId>(() => loadStoredPlanId());
   const [data, setData] = useState<SupabaseDbMonitoringPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,24 +89,43 @@ export default function SettingsSupabaseMonitoring() {
 
   const snapshot = data?.snapshot;
   const infra = data?.infra;
+  const plan = SUPABASE_PLAN_LIMITS[planId];
+
+  const handlePlanChange = (next: SupabasePlanId) => {
+    setPlanId(next);
+    storePlanId(next);
+  };
 
   const kpis = useMemo(() => {
     if (!snapshot) return [];
+    const dbRatio = usageRatio(snapshot.database_size_bytes, plan.database_bytes);
+    const connRatio = usageRatio(snapshot.active_connections, plan.max_db_connections);
+    const dbStat = usageStatus(dbRatio);
+    const connStat = usageStatus(connRatio);
+
     return [
       {
         label: t("supabase_monitoring.kpi_db_size"),
-        value: formatBytes(snapshot.database_size_bytes),
+        value: `${formatBytes(snapshot.database_size_bytes)} / ${formatBytes(plan.database_bytes)}`,
+        sub: `${Math.round(dbRatio * 100)} % ${t("supabase_monitoring.quota_of_plan")}`,
+        status: dbStat,
       },
       {
         label: t("supabase_monitoring.kpi_connections"),
-        value: `${snapshot.active_connections} / ${snapshot.max_connections}`,
+        value: `${snapshot.active_connections} / ${plan.max_db_connections}`,
+        sub: t("supabase_monitoring.kpi_connections_sub", {
+          pgMax: snapshot.max_connections,
+        }),
+        status: connStat,
       },
       {
         label: t("supabase_monitoring.kpi_objects"),
         value: String(snapshot.large_objects?.length ?? 0),
+        sub: t("supabase_monitoring.kpi_objects_sub"),
+        status: "ok" as const,
       },
     ];
-  }, [snapshot, t]);
+  }, [snapshot, plan, t]);
 
   if (authLoading) {
     return (
@@ -127,6 +158,23 @@ export default function SettingsSupabaseMonitoring() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-md border bg-muted/30 p-0.5">
+            {PLAN_OPTIONS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className={cn(
+                  "rounded px-3 py-1.5 text-xs font-medium transition-colors",
+                  planId === id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => handlePlanChange(id)}
+              >
+                {t(SUPABASE_PLAN_LIMITS[id].labelKey)}
+              </button>
+            ))}
+          </div>
           <div className="flex rounded-md border bg-muted/30 p-0.5">
             {RANGE_OPTIONS.map(({ hours, labelKey }) => (
               <button
@@ -191,16 +239,29 @@ export default function SettingsSupabaseMonitoring() {
       )}
 
       {snapshot && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {kpis.map((kpi) => (
-            <Card key={kpi.label}>
-              <CardContent className="pt-4">
-                <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                <p className="text-xl font-semibold">{kpi.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {kpis.map((kpi) => (
+              <Card key={kpi.label}>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                  <p className={cn(
+                    "text-xl font-semibold",
+                    kpi.status === "critical" && "text-destructive",
+                    kpi.status === "warn" && "text-amber-600 dark:text-amber-500",
+                  )}
+                  >
+                    {kpi.value}
+                  </p>
+                  {kpi.sub && (
+                    <p className="mt-1 text-xs text-muted-foreground">{kpi.sub}</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <SupabasePlanQuotas planId={planId} snapshot={snapshot} />
+        </>
       )}
 
       {loading && !data && (
@@ -212,7 +273,7 @@ export default function SettingsSupabaseMonitoring() {
       {infra?.available && infra.data.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t("supabase_monitoring.section_infra")}</h2>
-          <SupabaseDbMonitoringCharts infra={infra} locale={locale} />
+          <SupabaseDbMonitoringCharts infra={infra} locale={locale} planId={planId} />
         </section>
       )}
 
