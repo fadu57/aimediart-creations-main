@@ -225,11 +225,18 @@ export default function Header() {
           : "fixed top-0 left-0 z-50 w-full border-b border-border/40 bg-white/80 backdrop-blur-md shadow-sm"
       }
     >
+      {!isDesktopHeader && (
+        <div
+          className={`fab-backdrop ${isFabOpen ? "active" : ""}`}
+          aria-hidden={!isFabOpen}
+          onClick={() => setIsFabOpen(false)}
+        />
+      )}
       <div
         className={
           isVisitorPage
             ? "mx-auto flex min-h-[4rem] w-full max-w-[375px] items-center justify-between gap-1.5 px-1.5 sm:gap-2 sm:px-3"
-            : "mx-auto flex min-h-[4.25rem] w-full max-w-[1200px] items-center justify-between px-4 py-1"
+            : "mx-auto flex min-h-[4.25rem] w-full max-w-[1200px] items-center justify-between gap-2 px-2 py-1 sm:px-4"
         }
       >
         <div className="header-left flex min-w-0 flex-1 items-center gap-[15px]">
@@ -253,7 +260,7 @@ export default function Header() {
               </select>
             </div>
             {!isDesktopHeader && (
-              <span className="whitespace-nowrap text-[11px] text-gray-700">
+              <span className="hidden min-[400px]:inline whitespace-nowrap text-[11px] text-gray-700">
                 {t("greeting")}
                 {session ? (
                   <>
@@ -358,108 +365,105 @@ export default function Header() {
             </span>
           </div>
         )}
-      </div>
-      {!isDesktopHeader && (
-        <>
-          <div
-            className={`fab-backdrop ${isFabOpen ? "active" : ""}`}
-            aria-hidden={!isFabOpen}
-            onClick={() => setIsFabOpen(false)}
-          />
-          <div className={`fab-container fab-top-right ${isFabOpen ? "active" : ""}`}>
-          <div className="fab-links">
-            {canSeeHomeMenu && (
-              <NavLink to={homePath} className="fab-item" title={t("nav_home")} onClick={() => setIsFabOpen(false)}>
-                <House className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("nav_home")}</span>
-              </NavLink>
-            )}
-            {hasFullHeader &&
-              HEADER_NAV_ITEMS.map((item) => {
-                if (item.key === "menu_home") return null;
-                if (hideOrganisationNav && item.key === "menu_agence") return null;
-                if (!can(item.key)) return null;
-                const icon =
-                  item.key === "menu_home" ? (
-                    <House className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_agence" ? (
-                    <Building2 className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_user" ? (
-                    <Users className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_expos" ? (
-                    <GalleryVerticalEnd className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_artiste" ? (
-                    <UserPlus className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_catalogue" ? (
-                    <GalleryVerticalEnd className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : item.key === "menu_stats" ? (
-                    <BarChart3 className="h-5 w-5 text-[#121212]" aria-hidden />
-                  ) : (
-                    <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
+        {!isDesktopHeader && (
+          <div className={`fab-container fab-top-right fab-in-header shrink-0 ${isFabOpen ? "active" : ""}`}>
+            <div className="fab-links">
+              {canSeeHomeMenu && (
+                <NavLink to={homePath} className="fab-item" title={t("nav_home")} onClick={() => setIsFabOpen(false)}>
+                  <House className="h-5 w-5 text-[#121212]" aria-hidden />
+                  <span className="fab-item-label">{t("nav_home")}</span>
+                </NavLink>
+              )}
+              {hasFullHeader &&
+                HEADER_NAV_ITEMS.map((item) => {
+                  if (item.key === "menu_home") return null;
+                  if (hideOrganisationNav && item.key === "menu_agence") return null;
+                  if (!can(item.key)) return null;
+                  const icon =
+                    item.key === "menu_home" ? (
+                      <House className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_agence" ? (
+                      <Building2 className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_user" ? (
+                      <Users className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_expos" ? (
+                      <GalleryVerticalEnd className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_artiste" ? (
+                      <UserPlus className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_catalogue" ? (
+                      <GalleryVerticalEnd className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : item.key === "menu_stats" ? (
+                      <BarChart3 className="h-5 w-5 text-[#121212]" aria-hidden />
+                    ) : (
+                      <Settings className="h-5 w-5 text-[#121212]" aria-hidden />
+                    );
+                  return (
+                    <NavLink key={`fab-nav-${item.key}`} to={item.to} className="fab-item" title={t(navKey(item.label))} onClick={() => setIsFabOpen(false)}>
+                      {icon}
+                      <span className="fab-item-label">{t(navKey(item.label))}</span>
+                    </NavLink>
                   );
-                return (
-                  <NavLink key={`fab-nav-${item.key}`} to={item.to} className="fab-item" title={t(navKey(item.label))} onClick={() => setIsFabOpen(false)}>
-                    {icon}
-                    <span className="fab-item-label">{t(navKey(item.label))}</span>
-                  </NavLink>
-                );
-              })}
-            {hasFullHeader && canSeeSettings && (
-              <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
-            )}
-            <div className="fab-item px-2" title={t("language_label")}>
-              <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
-                <span className={activeLanguage.flagClass} aria-hidden />
-                <select
-                  id="languageSelector"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as UiLanguage)}
-                  className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
-                  aria-label={t("language_label")}
-                  title={t("language_label")}
-                >
-                  {UI_LANGUAGE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                })}
+              {hasFullHeader && canSeeSettings && (
+                <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
+              )}
+              <div className="fab-item px-2" title={t("language_label")}>
+                <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
+                  <span className={activeLanguage.flagClass} aria-hidden />
+                  <select
+                    id="languageSelectorFab"
+                    value={language}
+                    onChange={(e) => {
+                      setLanguage(e.target.value as UiLanguage);
+                      setIsFabOpen(false);
+                    }}
+                    className="fab-language-selector h-8 w-full bg-transparent text-xs font-semibold outline-none"
+                    aria-label={t("language_label")}
+                    title={t("language_label")}
+                  >
+                    {UI_LANGUAGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              {session && !isAuthFormPage ? (
+                <button
+                  type="button"
+                  className="fab-item"
+                  title={t("logout")}
+                  onClick={() => {
+                    setIsFabOpen(false);
+                    void handleLogout();
+                  }}
+                >
+                  <LogOut className="h-5 w-5 text-[#121212]" aria-hidden />
+                  <span className="fab-item-label">{t("logout")}</span>
+                </button>
+              ) : (
+                <NavLink to="/login" className="fab-item" title={t("login")} onClick={() => setIsFabOpen(false)}>
+                  <LogIn className="h-5 w-5 text-[#121212]" aria-hidden />
+                  <span className="fab-item-label">{t("login")}</span>
+                </NavLink>
+              )}
             </div>
-            {session && !isAuthFormPage ? (
-              <button
-                type="button"
-                className="fab-item"
-                title={t("logout")}
-                onClick={() => {
-                  setIsFabOpen(false);
-                  void handleLogout();
-                }}
-              >
-                <LogOut className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("logout")}</span>
-              </button>
-            ) : (
-              <NavLink to="/login" className="fab-item" title={t("login")} onClick={() => setIsFabOpen(false)}>
-                <LogIn className="h-5 w-5 text-[#121212]" aria-hidden />
-                <span className="fab-item-label">{t("login")}</span>
-              </NavLink>
-            )}
+            <button
+              type="button"
+              className="fab-main"
+              aria-label={isFabOpen ? "Fermer le menu" : "Ouvrir le menu"}
+              aria-expanded={isFabOpen}
+              onClick={() => {
+                setIsFabOpen((prev) => !prev);
+                if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(50);
+              }}
+            >
+              {isFabOpen ? <X className="h-6 w-6 text-white" aria-hidden /> : <Menu className="h-6 w-6 text-white" aria-hidden />}
+            </button>
           </div>
-          <button
-            type="button"
-            className="fab-main"
-            aria-label={isFabOpen ? "Fermer le menu" : "Ouvrir le menu"}
-            onClick={() => {
-              setIsFabOpen((prev) => !prev);
-              if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(50);
-            }}
-          >
-            {isFabOpen ? <X className="h-6 w-6 text-white" aria-hidden /> : <Menu className="h-6 w-6 text-white" aria-hidden />}
-          </button>
-        </div>
-        </>
-      )}
+        )}
+      </div>
     </header>
   );
 }

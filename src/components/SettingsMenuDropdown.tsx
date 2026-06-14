@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   AlertTriangle,
@@ -47,11 +48,29 @@ const ONLINE_PRESENCE_LINK = {
   Icon: Users,
 } as const;
 
+type FabSection = "suivis" | "errors" | "trash";
+
 type SettingsMenuDropdownProps = {
   triggerClassName?: string;
   variant?: "header" | "fab";
   onNavigate?: () => void;
 };
+
+function resolveInitialFabSection(
+  suiviActive: boolean,
+  errorLogsActive: boolean,
+  trashActive: boolean,
+): FabSection | null {
+  if (suiviActive) return "suivis";
+  if (errorLogsActive) return "errors";
+  if (trashActive) return "trash";
+  return null;
+}
+
+const fabRowClass =
+  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium hover:bg-muted/60";
+const fabSubLinkClass =
+  "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60";
 
 export function SettingsMenuDropdown({
   triggerClassName,
@@ -71,86 +90,140 @@ export function SettingsMenuDropdown({
   const paramsActive = location.pathname === "/settings";
   const menuActive = paramsActive || suiviActive || errorLogsActive || trashActive;
 
+  const [openFabSection, setOpenFabSection] = useState<FabSection | null>(() =>
+    resolveInitialFabSection(suiviActive, errorLogsActive, trashActive),
+  );
+
+  const toggleFabSection = (section: FabSection) => {
+    setOpenFabSection((prev) => (prev === section ? null : section));
+  };
+
+  const handleFabNavigate = () => {
+    onNavigate?.();
+  };
+
   if (variant === "fab") {
     return (
-      <div className="fab-item flex-col items-stretch gap-1 px-2 py-2">
+      <div className="fab-item fab-item-stack flex-col items-stretch gap-0.5 px-1 py-1.5">
         <NavLink
           to="/settings"
           className={cn(
-            "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted/60",
+            fabRowClass,
             paramsActive && "font-medium text-[#E63946]",
           )}
-          onClick={onNavigate}
+          onClick={handleFabNavigate}
         >
           <Settings className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span>{t("settings_submenu_params")}</span>
         </NavLink>
 
-        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("settings_submenu_suivis")}
-        </p>
-        {SUIVI_LINKS.map(({ to, labelKey, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={cn(
-              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
-              location.pathname.startsWith(to) && "font-medium text-[#E63946]",
+        <button
+          type="button"
+          className={cn(fabRowClass, suiviActive && "text-[#E63946]")}
+          aria-expanded={openFabSection === "suivis"}
+          onClick={() => toggleFabSection("suivis")}
+        >
+          <BarChart3 className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_suivis")}</span>
+          <ChevronDown
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "suivis" && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+        {openFabSection === "suivis" && (
+          <div className="flex flex-col gap-0.5 pb-1">
+            {SUIVI_LINKS.map(({ to, labelKey, Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={cn(
+                  fabSubLinkClass,
+                  location.pathname.startsWith(to) && "font-medium text-[#E63946]",
+                )}
+                onClick={handleFabNavigate}
+              >
+                <Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
+                {t(labelKey)}
+              </NavLink>
+            ))}
+            {showOnlinePresence && (
+              <NavLink
+                to={ONLINE_PRESENCE_LINK.to}
+                className={cn(
+                  fabSubLinkClass,
+                  location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) && "font-medium text-[#E63946]",
+                )}
+                onClick={handleFabNavigate}
+              >
+                <ONLINE_PRESENCE_LINK.Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
+                {t(ONLINE_PRESENCE_LINK.labelKey)}
+              </NavLink>
             )}
-            onClick={onNavigate}
-          >
-            <Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
-            {t(labelKey)}
-          </NavLink>
-        ))}
-        {showOnlinePresence && (
-          <NavLink
-            to={ONLINE_PRESENCE_LINK.to}
-            className={cn(
-              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
-              location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) && "font-medium text-[#E63946]",
-            )}
-            onClick={onNavigate}
-          >
-            <ONLINE_PRESENCE_LINK.Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
-            {t(ONLINE_PRESENCE_LINK.labelKey)}
-          </NavLink>
+          </div>
         )}
 
-        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("settings_submenu_error_logs")}
-        </p>
-        {ERROR_LOG_LINKS.map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            className={cn(
-              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
-              location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
-            )}
-            onClick={onNavigate}
-          >
-            <AlertTriangle className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
-            {t(link.labelKey)}
-          </NavLink>
-        ))}
+        <button
+          type="button"
+          className={cn(fabRowClass, errorLogsActive && "text-[#E63946]")}
+          aria-expanded={openFabSection === "errors"}
+          onClick={() => toggleFabSection("errors")}
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_error_logs")}</span>
+          <ChevronDown
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "errors" && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+        {openFabSection === "errors" && (
+          <div className="flex flex-col gap-0.5 pb-1">
+            {ERROR_LOG_LINKS.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={cn(
+                  fabSubLinkClass,
+                  location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
+                )}
+                onClick={handleFabNavigate}
+              >
+                <AlertTriangle className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
+                {t(link.labelKey)}
+              </NavLink>
+            ))}
+          </div>
+        )}
 
-        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("settings_submenu_trash")}
-        </p>
-        {SETTINGS_TRASH_MENU_LINKS.map((link) => (
-          <Link
-            key={link.id}
-            to={link.to}
-            className={cn(
-              "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60",
-              location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
-            )}
-            onClick={onNavigate}
-          >
-            {t(link.labelKey)}
-          </Link>
-        ))}
+        <button
+          type="button"
+          className={cn(fabRowClass, trashActive && "text-[#E63946]")}
+          aria-expanded={openFabSection === "trash"}
+          onClick={() => toggleFabSection("trash")}
+        >
+          <ArchiveRestore className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_trash")}</span>
+          <ChevronDown
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "trash" && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+        {openFabSection === "trash" && (
+          <div className="flex flex-col gap-0.5 pb-1">
+            {SETTINGS_TRASH_MENU_LINKS.map((link) => (
+              <Link
+                key={link.id}
+                to={link.to}
+                className={cn(
+                  fabSubLinkClass,
+                  location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
+                )}
+                onClick={handleFabNavigate}
+              >
+                {t(link.labelKey)}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

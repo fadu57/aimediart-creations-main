@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { UserRound, X, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources, readMetaString } from "@/lib/birthProfile";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
@@ -190,6 +191,28 @@ async function uploadUserPhoto(file: File, userId?: string | null): Promise<stri
   }
   const prepared = await prepareImageForSupabaseUpload(file);
   return uploadBackofficeUserPhoto(uid, prepared, prepared.name);
+}
+
+function UserListAvatar({
+  userId,
+  seedAvatarUrl,
+  authUser,
+}: {
+  userId: string;
+  seedAvatarUrl?: string | null;
+  authUser: User | null;
+}) {
+  const avatarUrl = useProfileAvatar(userId, authUser, 0, seedAvatarUrl);
+
+  return (
+    <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/40">
+      <ProfileAvatarImage
+        src={avatarUrl}
+        className="h-full w-full object-cover"
+        iconClassName="h-12 w-12"
+      />
+    </div>
+  );
 }
 
 type RpcUserWithRolesRow = {
@@ -2101,19 +2124,7 @@ const Users = ({
                 }
               }}
             >
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border/70 bg-muted/40">
-                {toPublicStorageUrl(u.avatar_url) ? (
-                  <img
-                    src={toPublicStorageUrl(u.avatar_url)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <UserRound className="h-12 w-12 text-muted-foreground" aria-hidden />
-                )}
-              </div>
+              <UserListAvatar userId={u.id} seedAvatarUrl={u.avatar_url} authUser={authUser} />
               <div className="min-w-0 flex-1 space-y-1">
                 <h3 className="font-serif font-bold text-lg">{userFullName(u)}</h3>
                 {u.username?.trim() ? (

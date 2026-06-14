@@ -3,7 +3,10 @@ import {
   buildPhotoObjectPath,
   publicUrlForStorageObject,
 } from "@/lib/storagePaths";
+import { supabase } from "@/lib/supabase";
 import { parseSupabaseStorageObjectRef } from "@/lib/supabaseStorage";
+
+const USER_PHOTO_EXTENSIONS = ["webp", "png", "jpg", "jpeg"] as const;
 
 const USER_PHOTO_SEGMENT = /\/photos\/users\/([0-9a-f-]{36})\.[a-z0-9]+$/i;
 const LEGACY_USER_PHOTO_SEGMENT = /\/(?:artist-photos|selfies)\/users(?:\/photos)?\/([0-9a-f-]{36})\.[a-z0-9]+$/i;
@@ -45,20 +48,51 @@ function extensionFromPhotoUrl(url: string): string {
   return ext && /^[a-z0-9]{2,5}$/.test(ext) ? ext : "webp";
 }
 
+/** Supprime les variantes photos/users/{userId}.* obsolètes après un upload. */
+export async function removeStaleUserPhotoExtensions(userId: string, keepExt: string): Promise<void> {
+  const uid = userId.trim();
+  const keep = keepExt.replace(/^\./, "").toLowerCase();
+  if (!uid || !keep) return;
+
+  const paths = USER_PHOTO_EXTENSIONS.filter((ext) => ext !== keep).map((ext) =>
+    buildPhotoObjectPath("users", uid, ext),
+  );
+  if (!paths.length) return;
+
+  try {
+    await supabase.storage.from(STORAGE_BUCKET_PHOTOS).remove(paths);
+  } catch {
+    /* nettoyage best-effort */
+  }
+}
+
+async function headOk(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** True si l'URL est utilisable (HEAD ok pour le storage Supabase, sinon conservée telle quelle). */
+export async function isAvatarUrlAvailable(url: string | null | undefined): Promise<boolean> {
+  const raw = (url ?? "").trim();
+  if (!raw) return false;
+  const ref = parseSupabaseStorageObjectRef(raw);
+  if (!ref) return true;
+  return headOk(raw);
+}
+
 /** Vérifie si photos/users/{userId}.{ext} existe déjà (bucket public). */
 export async function findCanonicalUserPhotoPublicUrl(userId: string): Promise<string | null> {
   const uid = userId.trim();
   if (!uid) return null;
 
-  for (const ext of ["webp", "png", "jpg", "jpeg"] as const) {
+  for (const ext of USER_PHOTO_EXTENSIONS) {
     const path = buildPhotoObjectPath("users", uid, ext);
     const publicUrl = publicUrlForStorageObject(STORAGE_BUCKET_PHOTOS, path);
-    try {
-      const res = await fetch(publicUrl, { method: "HEAD" });
-      if (res.ok) return publicUrl;
-    } catch {
-      /* réseau / CORS — on essaie l'extension suivante */
-    }
+    if (await headOk(publicUrl)) return publicUrl;
   }
   return null;
 }

@@ -1,11 +1,12 @@
 import type { User } from "@supabase/supabase-js";
 
-import { readAvatarFromMeta } from "@/lib/supabaseStorage";
+import { parseSupabaseStorageObjectRef, readAvatarFromMeta } from "@/lib/supabaseStorage";
 import { supabase } from "@/lib/supabase";
 import { fetchUserEditDetails } from "@/lib/userEditDetails";
 import {
   findCanonicalUserPhotoPublicUrl,
   isArtistCatalogPhotoUrl,
+  isAvatarUrlAvailable,
   isCanonicalUserPhotoUrl,
 } from "@/lib/userPhotoUrl";
 
@@ -64,9 +65,17 @@ async function readFreshAuthAvatar(userId: string): Promise<string | null> {
   return readAvatarFromMeta(data.user.user_metadata as Record<string, unknown> | undefined) || null;
 }
 
+/** Retourne l'URL si elle est valide (profiles = source de vérité, pas le scan storage). */
+async function acceptAvatarIfAvailable(url: string | null | undefined): Promise<string | null> {
+  const normalized = normalizeAvatarCandidate(url);
+  if (!normalized) return null;
+  if (await isAvatarUrlAvailable(normalized)) return normalized;
+  return null;
+}
+
 /**
  * Résout l'URL photo — même chaîne que enrichUserRowForEdit (Users.tsx).
- * Ordre : hints → profiles → get_user_edit_details → auth → RPC (URLs en base uniquement)
+ * Ordre : profiles.avatar_url (base) → autres sources en base → scan storage en dernier recours.
  */
 export async function resolveUserAvatarUrl(
   userId: string,
@@ -76,15 +85,10 @@ export async function resolveUserAvatarUrl(
   const uid = userId.trim();
   if (!uid) return null;
 
-  const canonicalExisting = await findCanonicalUserPhotoPublicUrl(uid);
-  if (canonicalExisting) {
-    return canonicalExisting;
-  }
-
-  const fromHint = pickUserAvatarUrl(uid, hints?.seedAvatarUrl, hints?.profileAvatarUrl);
-  if (fromHint) {
-    return fromHint;
-  }
+  const fromHint = await acceptAvatarIfAvailable(
+    pickUserAvatarUrl(uid, hints?.profileAvatarUrl, hints?.seedAvatarUrl),
+  );
+  if (fromHint) return fromHint;
 
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
@@ -96,7 +100,7 @@ export async function resolveUserAvatarUrl(
     console.warn("[userAvatar] lecture profiles.avatar_url :", profileErr.message);
   }
 
-  const fromProfile = normalizeAvatarCandidate(
+  const fromProfile = await acceptAvatarIfAvailable(
     (profile as { avatar_url?: string | null } | null)?.avatar_url,
   );
   if (fromProfile) {
@@ -111,24 +115,39 @@ export async function resolveUserAvatarUrl(
   }
 
   const details = await fetchUserEditDetails(uid);
-  const fromDetails = normalizeAvatarCandidate(details?.avatar_url);
+  const fromDetails = await acceptAvatarIfAvailable(details?.avatar_url);
   if (fromDetails) return fromDetails;
 
   const isSelf = sessionUser?.id === uid;
   if (isSelf) {
-    const fromFreshAuth = await readFreshAuthAvatar(uid);
+    const fromFreshAuth = await acceptAvatarIfAvailable(await readFreshAuthAvatar(uid));
     if (fromFreshAuth) return fromFreshAuth;
 
-    const fromMeta = readAvatarFromMeta(sessionUser?.user_metadata as Record<string, unknown> | undefined);
+    const fromMeta = await acceptAvatarIfAvailable(
+      readAvatarFromMeta(sessionUser?.user_metadata as Record<string, unknown> | undefined),
+    );
     if (fromMeta) return fromMeta;
   }
 
   const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
   if (!rpcErr && Array.isArray(rpcData)) {
     const row = (rpcData as RpcAvatarRow[]).find((entry) => rpcRowUserId(entry) === uid);
-    const fromTeamRpc = readAvatarFromRpcRow(row);
+    const fromTeamRpc = await acceptAvatarIfAvailable(readAvatarFromRpcRow(row));
     if (fromTeamRpc) return fromTeamRpc;
   }
+
+  // Dernier recours : fichier orphelin dans storage (sans avatar_url fiable en base).
+  const canonicalExisting = await findCanonicalUserPhotoPublicUrl(uid);
+  if (canonicalExisting) return canonicalExisting;
+
+  // URL en base mais HEAD en échec (réseau) : afficher quand même si présente.
+  const fallback = pickUserAvatarUrl(uid, hints?.profileAvatarUrl, hints?.seedAvatarUrl);
+  if (fallback) return fallback;
+
+  const profileRaw = normalizeAvatarCandidate(
+    (profile as { avatar_url?: string | null } | null)?.avatar_url,
+  );
+  if (profileRaw && !parseSupabaseStorageObjectRef(profileRaw)) return profileRaw;
 
   return null;
 }

@@ -43,7 +43,8 @@ import { useDashboardProfile, type DashboardTeamMember } from "@/hooks/useDashbo
 import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { ProfileAvatarImage, resolveProfileAvatarSource } from "@/components/ProfileAvatarImage";
+import { ProfileAvatarImage } from "@/components/ProfileAvatarImage";
+import { resolveProfileAvatarSource } from "@/lib/resolveProfileAvatarSource";
 import {
   canAssignExpoToMember,
   canCreateUsers,

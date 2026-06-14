@@ -1257,9 +1257,9 @@ const VisitorViewCore = () => {
   return (
     <div className={`visitor-page-shell ${isEmbedded ? "embedded-view" : ""} min-h-screen overflow-x-hidden bg-[#121212] text-[#F0F0F0]`}>
       {/* Mobile header */}
-      <div className={`œuvre-fixed-header overflow-hidden border-b border-white/10 ${isEmbedded ? "py-1" : "py-1.5"}`}>
-        <div className="flex min-w-0 w-full items-center justify-between px-[15px]">
-          <div className="flex basis-auto shrink-0 grow-0 items-center gap-2 overflow-hidden">
+      <div className={`œuvre-fixed-header overflow-visible border-b border-white/10 ${isEmbedded ? "py-1" : "py-1.5"}`}>
+        <div className="flex min-w-0 w-full items-center justify-between gap-1 px-2 sm:px-[15px]">
+          <div className="flex min-w-0 basis-auto shrink items-center gap-1.5 overflow-hidden sm:gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[15%] bg-accent shadow-sm">
               <span className="inline-flex animate-logo-heart">
                 <Heart className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.25} />
@@ -1270,7 +1270,7 @@ const VisitorViewCore = () => {
               <p className="text-[10px] font-semibold italic text-[#E63946]">{t("tagline")}</p>
             </div>
           </div>
-          <div className="flex min-w-0 grow basis-auto flex-col items-center justify-center gap-1 px-2">
+          <div className="flex min-w-0 max-w-[42%] grow basis-auto flex-col items-center justify-center gap-1 px-0.5 sm:max-w-[220px] sm:px-2">
             {isAnonymousVisitor && (
               <button
                 type="button"
@@ -1306,12 +1306,12 @@ const VisitorViewCore = () => {
               ) : null}
             </div>
           </div>
-          {!isEmbedded && (
-          <div className={`fab-container œuvre-navi basis-auto shrink-0 grow-0 ${isFabOpen ? "active" : ""}`}>
+          <div className={`fab-container œuvre-navi z-[10001] basis-auto shrink-0 grow-0 ${isFabOpen ? "active" : ""}`}>
             <button
               type="button"
               className="fab-main shrink-0"
               aria-label={isFabOpen ? t("aria_close_menu") : t("aria_open_menu")}
+              aria-expanded={isFabOpen}
               onClick={() => {
                 setIsFabOpen((prev) => !prev);
                 if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
@@ -1432,7 +1432,6 @@ const VisitorViewCore = () => {
               )}
             </div>
           </div>
-          )}
         </div>
       </div>
       <div

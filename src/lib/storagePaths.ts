@@ -66,9 +66,12 @@ export async function uploadCatalogArtistPhoto(
 }
 
 export async function uploadBackofficeUserPhoto(userId: string, file: File | Blob, fileName?: string): Promise<string> {
+  const { removeStaleUserPhotoExtensions } = await import("@/lib/userPhotoUrl");
   const ext = fileName ? extensionFromFileName(fileName) : "webp";
   const path = buildPhotoObjectPath("users", userId, ext);
-  return uploadToStorageBucket(STORAGE_BUCKET_PHOTOS, path, file, { upsert: true });
+  const url = await uploadToStorageBucket(STORAGE_BUCKET_PHOTOS, path, file, { upsert: true });
+  await removeStaleUserPhotoExtensions(userId, ext);
+  return url;
 }
 
 export async function uploadVisitorSelfiePhoto(userId: string, file: File | Blob, fileName?: string): Promise<string> {

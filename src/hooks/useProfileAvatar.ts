@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 
-import { resolveProfileAvatarSource } from "@/components/ProfileAvatarImage";
+import { resolveProfileAvatarSource } from "@/lib/resolveProfileAvatarSource";
 import { resolveUserAvatarUrl } from "@/lib/userAvatar";
 
 /** Charge l'avatar avec la même logique que la fiche utilisateur (Users.tsx). */
