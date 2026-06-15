@@ -258,7 +258,7 @@
   },
   "wakatime": {
     "back_settings": "Impostazioni",
-    "page_title": "Monitoraggio tempo (WakaTime)",
+    "page_title": "Monitoraggio tempo",
     "page_sub": "Tempo di codifica registrato da WakaTime.",
     "refresh": "Aggiorna",
     "fetched_at": "Ultimo aggiornamento: {{at}}",
@@ -504,7 +504,10 @@
     "kpi_connections_sub": "max Postgres interno: {{pgMax}}",
     "kpi_objects": "Oggetti elencati",
     "kpi_objects_sub": "top 50 per dimensione",
-    "plans": { "free": "Free", "pro": "Pro" },
+    "plans": {
+      "free": "Free",
+      "pro": "Pro"
+    },
     "quota_section_title": "Limiti piano {{plan}}",
     "quota_section_sub": "Quote Supabase (vedi pricing). Metriche non tracciate: solo limite.",
     "quota_database": "Database",

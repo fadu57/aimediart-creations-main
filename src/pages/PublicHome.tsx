@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { PublicVitrineShell, AIMEDIART_WORD_RED, BRAND_RED, BRAND_RED_DARK } from "@/components/PublicVitrineShell";
+import { OrganisationConnexionContent } from "@/components/OrganisationConnexionContent";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -220,14 +221,82 @@ function planSummary(plan: string | null, t: TFunction): string {
 function SurfaceCardShell({
   decorations,
   children,
+  backgroundImage,
+  backgroundImageAlt,
+  backgroundGradient = "left",
+  backgroundImageLayout = "side-fade",
 }: {
-  decorations: ReactNode;
+  decorations?: ReactNode;
   children: ReactNode;
+  backgroundImage?: string;
+  backgroundImageAlt?: string;
+  backgroundGradient?: "left" | "right";
+  /** side-fade : photo sur le côté (connexion) ; full-width : photo entière sur toute la largeur */
+  backgroundImageLayout?: "side-fade" | "full-width";
 }) {
+  const defaultDecorations = (
+    <>
+      <div
+        className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
+        aria-hidden
+      />
+      <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+      <div
+        className="pointer-events-none absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
+        aria-hidden
+      />
+    </>
+  );
+
   return (
     <div className="mx-2 my-3 sm:mx-3 sm:my-4">
       <div className="relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.06)] sm:p-10 lg:p-12">
-        {decorations}
+        {backgroundImage ? (
+          backgroundImageLayout === "full-width" ? (
+            <>
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 w-full [mask-image:linear-gradient(to_bottom,black_0%,black_32%,rgba(0,0,0,0.85)_48%,rgba(0,0,0,0.45)_62%,transparent_88%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_32%,rgba(0,0,0,0.85)_48%,rgba(0,0,0,0.45)_62%,transparent_88%)]"
+                aria-hidden
+              >
+                <img
+                  src={backgroundImage}
+                  alt=""
+                  className="block h-auto w-full object-contain object-top"
+                  loading="lazy"
+                  aria-hidden
+                />
+              </div>
+              <div
+                className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_28%,rgba(250,248,245,0.35)_52%,#faf8f5_78%,#faf8f5_100%)]"
+                aria-hidden
+              />
+            </>
+          ) : (
+            <>
+              <img
+                src={backgroundImage}
+                alt={backgroundImageAlt ?? ""}
+                className={cn(
+                  "pointer-events-none absolute inset-0 h-full w-full object-cover",
+                  backgroundGradient === "right" ? "object-left" : "object-right",
+                )}
+                loading="lazy"
+                aria-hidden={!backgroundImageAlt}
+              />
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-0",
+                  backgroundGradient === "right"
+                    ? "bg-gradient-to-l from-[#faf8f5] from-[34%] via-[#faf8f5]/90 to-[#faf8f5]/25"
+                    : "bg-gradient-to-r from-[#faf8f5] from-[34%] via-[#faf8f5]/90 to-[#faf8f5]/25",
+                )}
+                aria-hidden
+              />
+            </>
+          )
+        ) : (
+          decorations ?? defaultDecorations
+        )}
         <div className="relative z-10">{children}</div>
       </div>
     </div>
@@ -241,6 +310,10 @@ function Section({
   title,
   children,
   surfaceCard = false,
+  backgroundImage,
+  backgroundImageAlt,
+  backgroundGradient = "left",
+  backgroundImageLayout = "side-fade",
 }: {
   id: string;
   eyebrow?: string;
@@ -250,6 +323,10 @@ function Section({
   children: ReactNode;
   /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
   surfaceCard?: boolean;
+  backgroundImage?: string;
+  backgroundImageAlt?: string;
+  backgroundGradient?: "left" | "right";
+  backgroundImageLayout?: "side-fade" | "full-width";
 }) {
   const inner = (
     <>
@@ -271,22 +348,28 @@ function Section({
   );
 
   return (
-    <section id={id} className="scroll-mt-[68px] pb-16 pt-6 sm:pb-24 sm:pt-8">
+    <section id={id} className="scroll-mt-[68px] pb-0 pt-3">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
         {surfaceCard ? (
           <SurfaceCardShell
+            backgroundImage={backgroundImage}
+            backgroundImageAlt={backgroundImageAlt}
+            backgroundGradient={backgroundGradient}
+            backgroundImageLayout={backgroundImageLayout}
             decorations={
-              <>
-                <div
-                  className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
-                  aria-hidden
-                />
-                <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
-                <div
-                  className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
-                  aria-hidden
-                />
-              </>
+              backgroundImage ? undefined : (
+                <>
+                  <div
+                    className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] ph-animate-shimmer blur-2xl"
+                    aria-hidden
+                  />
+                  <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+                  <div
+                    className="absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
+                    aria-hidden
+                  />
+                </>
+              )
             }
           >
             {inner}
@@ -392,7 +475,7 @@ export default function PublicHome() {
   return (
     <PublicVitrineShell vitrinePathPrefix="">
         <div>
-        <section id="accueil" className="scroll-mt-[68px] pb-14 pt-20 sm:pb-18 lg:pt-6">
+        <section id="accueil" className="scroll-mt-[68px] pb-0 pt-0">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <SurfaceCardShell
               decorations={
@@ -407,7 +490,8 @@ export default function PublicHome() {
                 {t("hero.eyebrow")}
               </p>
               <h1 className="mt-4 max-w-[18ch] font-serif text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]">
-                {t("hero.title")}
+                <span className="block">{t("hero.title_line1")}</span>
+                <span className="block">{t("hero.title_line2")}</span>
               </h1>
               <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.12rem]" style={{ whiteSpace: "pre-line" }}>
                 {highlightAimediartWord(t("hero.intro_1"))}
@@ -778,18 +862,10 @@ export default function PublicHome() {
           surfaceCard
           id="tarifs"
           title={t("tarifs.title")}
+          backgroundImage={tarifsPhoto}
+          backgroundImageAlt={t("tarifs.image_alt")}
+          backgroundImageLayout="full-width"
         >
-          <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
-                src={tarifsPhoto}
-                alt={t("tarifs.image_alt")}
-                className="home-hero-image"
-                loading="lazy"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
-            </div>
-          </figure>
           <div className="rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -1069,6 +1145,10 @@ export default function PublicHome() {
             </div>
           </div>
         </Section>
+
+        <section id="connectivite" className="scroll-mt-[68px]">
+          <OrganisationConnexionContent />
+        </section>
 
         </div>
     </PublicVitrineShell>

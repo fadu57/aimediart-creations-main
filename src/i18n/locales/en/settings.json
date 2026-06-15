@@ -272,7 +272,7 @@
   },
   "wakatime": {
     "back_settings": "Settings",
-    "page_title": "Time tracking (WakaTime)",
+    "page_title": "Time tracking",
     "page_sub": "Coding time logged by the WakaTime extension.",
     "refresh": "Refresh",
     "fetched_at": "Last updated: {{at}}",

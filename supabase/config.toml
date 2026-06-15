@@ -76,7 +76,16 @@ entrypoint = "./functions/check-ai-limits/index.ts"
 verify_jwt = false
 entrypoint = "./functions/google-tts/index.ts"
 
+[functions.connected-expo-quote]
+verify_jwt = false
+entrypoint = "./functions/connected-expo-quote/index.ts"
+
 [functions.sync-google-billing]
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/sync-google-billing/index.ts"
+
+[functions.supabase-db-monitoring]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/supabase-db-monitoring/index.ts"

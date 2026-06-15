@@ -258,7 +258,7 @@
   },
   "wakatime": {
     "back_settings": "Einstellungen",
-    "page_title": "Zeiterfassung (WakaTime)",
+    "page_title": "Zeiterfassung",
     "page_sub": "Vom WakaTime-Plugin erfasste Coding-Zeit.",
     "refresh": "Aktualisieren",
     "fetched_at": "Zuletzt aktualisiert: {{at}}",
@@ -504,7 +504,10 @@
     "kpi_connections_sub": "internes Postgres-Max.: {{pgMax}}",
     "kpi_objects": "Gelistete Objekte",
     "kpi_objects_sub": "Top 50 nach Größe",
-    "plans": { "free": "Free", "pro": "Pro" },
+    "plans": {
+      "free": "Free",
+      "pro": "Pro"
+    },
     "quota_section_title": "Limits Tarif {{plan}}",
     "quota_section_sub": "Supabase-Kontingente (siehe Pricing). Nicht gemessene Metriken zeigen nur das Limit.",
     "quota_database": "Datenbank",

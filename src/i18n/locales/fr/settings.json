@@ -436,7 +436,7 @@
   },
   "wakatime": {
     "back_settings": "Paramètres",
-    "page_title": "Suivi du temps (WakaTime)",
+    "page_title": "Suivi du temps",
     "page_sub": "Temps de codage enregistré par l'extension WakaTime.",
     "refresh": "Actualiser",
     "fetched_at": "Dernière mise à jour : {{at}}",

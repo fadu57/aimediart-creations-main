@@ -19,7 +19,7 @@ const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: 
   { value: "it", label: "IT", flagClass: "fi fi-it" },
 ];
 
-const ANCHOR_IDS = ["accueil", "exposition-vivante", "parcours", "tarifs", "accessibilite", "contact"] as const;
+const ANCHOR_IDS = ["accueil", "exposition-vivante", "parcours", "tarifs", "accessibilite", "connectivite"] as const;
 
 function LogoMark({ compact }: { compact?: boolean }) {
   return (
@@ -61,34 +61,55 @@ function FloatingNav({
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((o) => o.value === language) ?? UI_LANGUAGE_OPTIONS[0];
 
   const navClassName =
-    "group inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring lg:gap-1 lg:px-1.5 lg:py-1 lg:text-[13px] lg:leading-tight";
+    "group inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring lg:gap-0.5 lg:rounded lg:px-1 lg:py-0.5 lg:text-[11px] lg:leading-tight xl:px-1.5 xl:text-[12px]";
 
   const NavItems = (
-    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-0.5 xl:gap-1">
-      {ANCHOR_IDS.map((id) =>
-        vitrinePathPrefix ? (
+    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-0">
+      {ANCHOR_IDS.map((id) => {
+        const label = t(`nav.anchor_${id.replace(/-/g, "_")}`);
+        const dot = (
+          <span
+            className="h-2 w-2 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946] lg:h-1.5 lg:w-1.5"
+            aria-hidden
+          />
+        );
+
+        if (id === "connectivite") {
+          return vitrinePathPrefix ? (
+            <Link
+              key={id}
+              to={`${vitrinePathPrefix}#connectivite`}
+              className={navClassName}
+              onClick={() => setIsMobileOpen(false)}
+            >
+              {dot}
+              {label}
+            </Link>
+          ) : (
+            <a key={id} href="#connectivite" className={navClassName} onClick={() => setIsMobileOpen(false)}>
+              {dot}
+              {label}
+            </a>
+          );
+        }
+
+        return vitrinePathPrefix ? (
           <Link
             key={id}
             to={`${vitrinePathPrefix}#${id}`}
             className={navClassName}
             onClick={() => setIsMobileOpen(false)}
           >
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946] lg:h-1.5 lg:w-1.5"
-              aria-hidden
-            />
-            {t(`nav.anchor_${id.replace(/-/g, "_")}`)}
+            {dot}
+            {label}
           </Link>
         ) : (
           <a key={id} href={`#${id}`} className={navClassName} onClick={() => setIsMobileOpen(false)}>
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946] lg:h-1.5 lg:w-1.5"
-              aria-hidden
-            />
-            {t(`nav.anchor_${id.replace(/-/g, "_")}`)}
+            {dot}
+            {label}
           </a>
-        ),
-      )}
+        );
+      })}
     </nav>
   );
 
@@ -115,15 +136,15 @@ function FloatingNav({
             </div>
           </div>
           <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 lg:flex">
-            <div className="max-w-full rounded-xl border border-neutral-200 bg-[#faf9f7] px-1 py-0.5 sm:px-1.5 sm:py-1">
+            <div className="max-w-full rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
               {NavItems}
             </div>
             <Link
               to="/login"
-              className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-2.5 py-1.5 text-[11px] font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring lg:px-2 lg:py-1 lg:text-[12px]"
             >
               {t("nav.login")}
-              <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
+              <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
             </Link>
           </div>
           <button

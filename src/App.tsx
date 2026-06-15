@@ -68,6 +68,7 @@ import NotFound from "./pages/NotFound";
 import WorkScanner from "./pages/WorkScanner";
 import PublicHome from "./pages/PublicHome";
 import PublicHomeCommencer from "./pages/PublicHomeCommencer";
+import OrganisationConnexion from "./pages/OrganisationConnexion";
 import CgvPage from "./pages/CgvPage";
 import CookiesPage from "./pages/CookiesPage";
 import PrivacyPage from "./pages/PrivacyPage";
@@ -242,6 +243,8 @@ const AppRoutes = () => (
     {/* Landing marketing publique (sans header) */}
     <Route path="/organisation" element={<PublicHome />} />
     <Route path="/organisation/commencer" element={<PublicHomeCommencer />} />
+    <Route path="/organisation/connexion" element={<OrganisationConnexion />} />
+    <Route path="/connexion" element={<Navigate to="/organisation#connectivite" replace />} />
     {/* Rétrocompatibilité anciens liens /home */}
     <Route path="/home" element={<Navigate to="/organisation" replace />} />
     <Route path="/home/commencer" element={<Navigate to="/organisation/commencer" replace />} />
@@ -321,6 +324,7 @@ const AppRoutes = () => (
           <Route path="settings/couts" element={<SettingsCouts />} />
           <Route path="suivi_temps" element={<SettingsSuiviTemps />} />
           <Route path="suivi_supabase" element={<SettingsSupabaseMonitoring />} />
+          <Route path="suivi_vercel" element={<Navigate to="/settings" replace />} />
           <Route path="suivi_tokens" element={<SettingsSuiviTokens />} />
           <Route path="suivi_erreurs_visiteurs" element={<SettingsVisitorErrors />} />
           <Route path="suivi_erreurs_organisateurs" element={<SettingsOrganizerErrors />} />

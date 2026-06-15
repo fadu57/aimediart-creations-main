@@ -1,4 +1,4 @@
-﻿{
+{
   "nav": {
     "open_menu": "Ouvrir le menu",
     "close_menu": "Fermer le menu",
@@ -11,11 +11,13 @@
     "anchor_parcours": "Parcours",
     "anchor_tarifs": "Tarifs",
     "anchor_accessibilite": "Accessibilité",
-    "anchor_contact": "Contact"
+    "anchor_connectivite": "Connectivité"
   },
   "hero": {
     "eyebrow": "Feedback invisible · Exposition vivante",
     "title": "Quand l'expo respire avec ses visiteurs",
+    "title_line1": "Quand l'expo respire",
+    "title_line2": "avec ses visiteurs",
     "cta_discover": "Découvrir la vision",
     "cta_parcours": "Le parcours visiteur",
     "feature_qr_label": "QR-Code sans application",
@@ -57,7 +59,7 @@
   },
   "live": {
     "eyebrow": "L'avantage LIVE",
-    "title": "Une scénographie qui réagit\u00a0: une canopée du climat émotionnel",
+    "title": "Une scénographie qui réagit : une canopée du climat émotionnel",
     "canopy_caption": "Ce que vous voyez ici est une métaphore animée : une canopée qui pulse au rythme collectif — comme votre mur pourrait pulser au rythme des visites.",
     "canopy_cta": "Cliquer sur le bloc ci-dessous pour ouvrir la projection dans un nouvel onglet (TV / projecteur).",
     "text_1": "La plupart des outils livrent des chiffres le lendemain. AIMEDIArt joue la carte du direct : le feedback n'est plus une corvée de fin de visite, il devient le carburant de l'exposition elle-même.",
@@ -120,7 +122,7 @@
     "data_note_2": "Si vous souhaitez conserver votre catalogue et vos fiches d'œuvres pour une future exposition, l'abonnement Annuel est la solution la plus sereine (et la plus économique sur la durée !)",
     "loading": "Chargement des tarifs…",
     "error_title": "Tarifs indisponibles",
-    "error_text": "V\u00e9rifiez la connexion Supabase, la pr\u00e9sence de la table \u003ccode\u003epricing\u003c/code\u003e et les droits RLS en lecture.",
+    "error_text": "Vérifiez la connexion Supabase, la présence de la table <code>pricing</code> et les droits RLS en lecture.",
     "empty": "Aucune offre trouvée dans la table pricing.",
     "empty_hint": "Vérifiez que la table contient des lignes et exécutez la policy SQL <code>pricing_public_anon_select</code> (fichier supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Sélectionner votre option",
@@ -143,19 +145,19 @@
     "capacity_unlimited": "∞ œuvres · ∞ visiteurs",
     "capacity_oeuvres": "{{count}} œuvres maxi",
     "capacity_visitors": "{{count}} visiteurs maxi",
-    "per_month": "\u20ac/mois",
-    "per_year": "\u20ac/an",
-    "plan_name_etincelle": "\u00c9tincelle",
+    "per_month": "€/mois",
+    "per_year": "€/an",
+    "plan_name_etincelle": "Étincelle",
     "plan_name_atelier": "Atelier",
     "plan_name_horizon": "Horizon",
     "plan_name_rayonnement": "Rayonnement",
-    "plan_summary_etincelle": "Exposition port\u00e9e par une s\u00e9lection resserre\u0301e d\u2019\u0153uvres",
-    "plan_summary_atelier": "Catalogue fixe, m\u00e9diation enrichie tout au long de l\u2019expo",
-    "plan_summary_horizon": "Projets multiples, catalogue \u00e9volutif, structure ambitieuse",
-    "plan_summary_rayonnement": "Grand \u00e9v\u00e9nement sur mesure \u2014 capacit\u00e9 et accompagnement illimit\u00e9s"
+    "plan_summary_etincelle": "Exposition portée par une sélection resserrée d’œuvres",
+    "plan_summary_atelier": "Catalogue fixe, médiation enrichie tout au long de l’expo",
+    "plan_summary_horizon": "Projets multiples, catalogue évolutif, structure ambitieuse",
+    "plan_summary_rayonnement": "Grand événement sur mesure — capacité et accompagnement illimités"
   },
   "access": {
-    "intro": "Scan près de l\u2019œuvre, aucune application à installer : la web-app s\u2019ouvre, propose des profils de lecture (enfant, expert, poète, langage simplifié\u2026) ou suit la langue du téléphone, puis ramène le visiteur vers le feedback sans jamais casser la déambulation.",
+    "intro": "Scan près de l’œuvre, aucune application à installer : la web-app s’ouvre, propose des profils de lecture (enfant, expert, poète, langage simplifié…) ou suit la langue du téléphone, puis ramène le visiteur vers le feedback sans jamais casser la déambulation.",
     "eyebrow": "Connexion sans friction",
     "title": "Un parcours qui s'adapte à chaque regard",
     "image_alt": "Visiteur senior avec canne parcourant une exposition photographique aux murs blancs",
@@ -185,5 +187,96 @@
     "terms": "Conditions d’utilisation",
     "ai_policy": "Politique IA",
     "login": "Connexion"
+  },
+  "connexion": {
+    "promo_link": "Exposition connectée : Ne laissez plus le réseau limiter votre créativité",
+    "back": "Retour à la vitrine",
+    "title_line1": "Exposition VRAIMENT connectée ?",
+    "title_line2": "Ne laissez plus le réseau limiter votre créativité",
+    "sections": {
+      "challenge": {
+        "title": "Le défi : une connectivité absente, une expérience compromise",
+        "image_alt": "Visiteur agacé dans une galerie d'exposition, smartphone sans réseau",
+        "body": "Organiser une exposition immersive est un travail de longue haleine. Pourtant, une fois sur place, un obstacle majeur peut ruiner vos efforts : <bold>l'absence ou l'instabilité du réseau Wi-Fi.</bold>\n\nDans les lieux d'exposition, les murs épais, les structures métalliques ou simplement la saturation des réseaux publics empêchent souvent vos visiteurs d'accéder à votre contenu interactif, audioguides ou applications dédiées. Une expérience qui se coupe, un chargement qui tourne à l'infini, et c'est l'engagement de votre public qui s'effrite. Ne laissez pas la technique devenir le frein de votre exposition."
+      },
+      "solution": {
+        "title": "La solution AIMEDIArt - Votre infrastructure Wi-Fi privée et autonome",
+        "title_prefix": "La solution",
+        "title_line2": "Votre infrastructure Wi-Fi privée et autonome",
+        "image_alt": "Schéma infrastructure Wi-Fi locale : routeur, switch PoE, points d'accès et galerie",
+        "intro": "Chez AIMEDIArt, nous pouvons vous proposer en option une infrastructure propriétaire. Vous investissez dans votre propre outil de travail, une solution clé en main conçue pour durer et vous accompagner sur tous vos projets, quel que soit le lieu.",
+        "bullets": {
+          "freedom": "<bold>Liberté totale</bold> : Vous possédez votre matériel. Une fois l'exposition terminée, le système est conçu pour être « réinitialisé » en un clin d'œil.",
+          "reuse": "<bold>Réutilisabilité infinie</bold> : Démontez, transportez, et redéployez votre kit dans une nouvelle galerie, un salon professionnel ou un espace culturel. Votre configuration reste sauvegardée, prête à être activée pour votre prochaine scénographie.",
+          "performance": "<bold>Performance garantie</bold> : Profitez d'une technologie Wi-Fi haute densité, totalement indépendante de la connexion internet du lieu ou de la 5G, garantissant une fluidité parfaite à vos visiteurs."
+        }
+      },
+      "packs": {
+        "title": "Une solution modulable - Des configurations adaptées à vos besoins",
+        "title_line1": "Une solution modulable",
+        "title_line2": "Des configurations adaptées à vos besoins",
+        "intro": "Parce que chaque exposition a ses propres contraintes d'espace, nous avons conçu des packs évolutifs pour couvrir toutes les surfaces efficacement :",
+        "estimate_label": "Estimation * de",
+        "estimate_footnote": "*Estimations coût du matériel HT sans main d'œuvre de mise en place. Pour plus de précisions, utilisez le bouton DEVIS PERSONNALISÉ ci-dessous",
+        "estimate_button_aria": "Demander un devis pour {{pack}}",
+        "items": {
+          "solo": {
+            "title": "Pack Solo (1 borne)",
+            "desc": "Idéal pour une petite salle, un stand ou une zone spécifique jusqu'à 150 m².",
+            "estimate": "450 € à 550 €"
+          },
+          "standard": {
+            "title": "Pack Standard (4 bornes)",
+            "desc": "Parfait pour une grande galerie ou un plateau ouvert, couvrant jusqu'à 600 m² avec une stabilité de connexion optimale pour tous vos visiteurs.",
+            "estimate": "1100 € à 1300 €"
+          },
+          "grand": {
+            "title": "Pack Grand Espace (jusqu'à 8 bornes)",
+            "desc": "Conçu pour les vastes salles d'exposition, les parcours multi-espaces ou les sites complexes, couvrant jusqu'à 1 200 m² et plus, avec une gestion ultra-fluide des flux importants.",
+            "estimate": "1900 € à 2200 €"
+          }
+        }
+      },
+      "simplicity": {
+        "title": "La simplicité avant tout - Prêt à l'emploi",
+        "image_alt": "Schéma Plug & Play : serveur local, switch PoE et points d'accès Wi-Fi dans une galerie",
+        "intro": "Nous savons que votre expertise est artistique, pas technique. C'est pourquoi notre installation a été pensée pour être accessible à tous :",
+        "bullets": {
+          "plug_play": "<bold>Plug & Play</bold> : Un seul « cerveau » de contrôle, un switch intuitif et une mise en place par câble simplifiée.",
+          "speed": "<bold>Rapidité de déploiement</bold> : Votre exposition est prête à accueillir le public en moins d'une heure.",
+          "discretion": "<bold>Discrétion absolue</bold> : Nos bornes Wi-Fi sont conçues pour se fondre dans le décor de votre galerie, laissant la vedette à vos œuvres."
+        },
+        "outro": "Avec AIMEDIArt, vous investissez dans une solution durable qui garantit à votre public une immersion totale, sans aucune coupure, où que vous soyez."
+      }
+    },
+    "quote": {
+      "cta_prefix": "Vous voulez obtenir un devis personnalisé ?",
+      "cta_link": "Cliquer ICI"
+    },
+    "form": {
+      "title": "Demande de devis - Pack connexion",
+      "required_hint": "*champs obligatoires",
+      "org_name": "Nom de mon organisation",
+      "contact_name": "Prénom et nom de contact",
+      "contact_email": "Adresse mail de contact",
+      "address": "Adresse postale",
+      "zip_code": "Code postal",
+      "city": "Ville",
+      "contact_phone": "Tél. de contact",
+      "need_description": "Description de mon besoin (type de salle, surfaces, …)",
+      "floor_plan": "Je vous envoie un plan de ma salle ou de mon lieu d'exposition",
+      "floor_plan_accept": "Fichiers acceptés : .pdf, .png, .jpg",
+      "cancel": "Annuler",
+      "submit": "Envoyer",
+      "success_title": "Demande envoyée",
+      "success_body": "Merci ! Votre demande de devis a bien été transmise. Notre équipe vous recontactera rapidement.",
+      "success_ok": "OK",
+      "error_required": "Veuillez remplir tous les champs obligatoires.",
+      "error_email": "Adresse e-mail invalide.",
+      "error_auth": "Session expirée. Reconnectez-vous.",
+      "error_table": "Enregistrement impossible : appliquez migration_78 sur Supabase.",
+      "error_submit": "Envoi impossible : {{message}}",
+      "warn_floor_plan": "Demande enregistrée, mais le plan n'a pas pu être téléversé."
+    }
   }
 }

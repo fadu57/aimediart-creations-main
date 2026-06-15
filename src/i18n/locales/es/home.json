@@ -1,4 +1,4 @@
-﻿{
+{
   "nav": {
     "open_menu": "Abrir menú",
     "close_menu": "Cerrar menú",
@@ -11,11 +11,13 @@
     "anchor_parcours": "Recorrido",
     "anchor_tarifs": "Tarifas",
     "anchor_accessibilite": "Accesibilidad",
-    "anchor_contact": "Contacto"
+    "anchor_connectivite": "Conectividad"
   },
   "hero": {
     "eyebrow": "Feedback invisible · Exposición viva",
     "title": "Cuando la exposición respira con sus visitantes",
+    "title_line1": "Cuando la exposición respira",
+    "title_line2": "con sus visitantes",
     "cta_discover": "Descubrir la visión",
     "cta_parcours": "El recorrido del visitante",
     "feature_qr_label": "Código QR sin aplicación",
@@ -57,7 +59,7 @@
   },
   "live": {
     "eyebrow": "La ventaja LIVE",
-    "title": "Una escenografía que reacciona:\u00a0un dosel del clima emocional",
+    "title": "Una escenografía que reacciona: un dosel del clima emocional",
     "canopy_caption": "Lo que ves aquí es una metáfora animada: un dosel que pulsa al ritmo colectivo — como tu muro podría pulsar al ritmo de las visitas.",
     "canopy_cta": "Haz clic en el bloque de abajo para abrir la proyección en una nueva pestaña (TV / proyector).",
     "text_1": "La mayoría de las herramientas entregan cifras al día siguiente. AIMEDIArt apuesta por el directo: el feedback ya no es una tarea tediosa al final de la visita, sino el combustible de la propia exposición.",
@@ -120,7 +122,7 @@
     "data_note_2": "Si deseas conservar tu catálogo y fichas de obras para una futura exposición, la suscripción Anual es la solución más tranquila (y económica a largo plazo).",
     "loading": "Cargando tarifas…",
     "error_title": "Tarifas no disponibles",
-    "error_text": "Compruebe la conexi\u00f3n Supabase, la presencia de la tabla \u003ccode\u003epricing\u003c/code\u003e y los permisos RLS de lectura.",
+    "error_text": "Compruebe la conexión Supabase, la presencia de la tabla <code>pricing</code> y los permisos RLS de lectura.",
     "empty": "No se encontró ninguna oferta en la tabla de tarifas.",
     "empty_hint": "Compruebe que la tabla tiene filas y ejecute la política SQL <code>pricing_public_anon_select</code> (archivo supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Seleccionar tu opción",
@@ -143,19 +145,19 @@
     "capacity_unlimited": "∞ obras · ∞ visitantes",
     "capacity_oeuvres": "{{count}} obras máx.",
     "capacity_visitors": "{{count}} visitantes máx.",
-    "per_month": "\u20ac/mes",
-    "per_year": "\u20ac/a\u00f1o",
+    "per_month": "€/mes",
+    "per_year": "€/año",
     "plan_name_etincelle": "Chispa",
     "plan_name_atelier": "Taller",
     "plan_name_horizon": "Horizonte",
     "plan_name_rayonnement": "Radiancia",
-    "plan_summary_etincelle": "Exposici\u00f3n con una selecci\u00f3n concentrada de obras",
-    "plan_summary_atelier": "Cat\u00e1logo fijo, mediaci\u00f3n enriquecida a lo largo de la expo",
-    "plan_summary_horizon": "Proyectos m\u00faltiples, cat\u00e1logo evolutivo, estructura ambiciosa",
-    "plan_summary_rayonnement": "Gran evento a medida \u2014 capacidad y acompa\u00f1amiento ilimitados"
+    "plan_summary_etincelle": "Exposición con una selección concentrada de obras",
+    "plan_summary_atelier": "Catálogo fijo, mediación enriquecida a lo largo de la expo",
+    "plan_summary_horizon": "Proyectos múltiples, catálogo evolutivo, estructura ambiciosa",
+    "plan_summary_rayonnement": "Gran evento a medida — capacidad y acompañamiento ilimitados"
   },
   "access": {
-    "intro": "Escanea junto a la obra, sin aplicación que instalar: la web-app se abre, propone perfiles de lectura (niño, experto, poeta, lenguaje simplificado\u2026) o sigue el idioma del teléfono, y lleva de vuelta al visitante hacia el feedback sin interrumpir el recorrido.",
+    "intro": "Escanea junto a la obra, sin aplicación que instalar: la web-app se abre, propone perfiles de lectura (niño, experto, poeta, lenguaje simplificado…) o sigue el idioma del teléfono, y lleva de vuelta al visitante hacia el feedback sin interrumpir el recorrido.",
     "eyebrow": "Conexión sin fricción",
     "title": "Un recorrido que se adapta a cada mirada",
     "image_alt": "Visitante mayor con bastón recorriendo una exposición fotográfica en paredes blancas",
@@ -185,5 +187,96 @@
     "terms": "Condiciones de uso",
     "ai_policy": "Política IA",
     "login": "Acceso"
+  },
+  "connexion": {
+    "promo_link": "Exposición conectada: no deje que la red limite su creatividad",
+    "back": "Volver a la organización",
+    "title_line1": "¿Exposición REALMENTE conectada?",
+    "title_line2": "No deje que la red limite su creatividad",
+    "sections": {
+      "challenge": {
+        "title": "El reto: conectividad ausente",
+        "image_alt": "Visitante molesto en una galería de exposición, smartphone sin red",
+        "body": "Organizar una exposición inmersiva requiere mucho trabajo. En el lugar, <bold>la ausencia o inestabilidad del Wi-Fi</bold> puede arruinar la experiencia. Muros gruesos, estructuras metálicas o redes saturadas impiden el acceso al contenido interactivo."
+      },
+      "solution": {
+        "title": "La solución AIMEDIArt",
+        "title_prefix": "La solución",
+        "title_line2": "Su infraestructura Wi-Fi privada y autónoma",
+        "image_alt": "Esquema de infraestructura Wi-Fi local: router, switch PoE, puntos de acceso y galería",
+        "intro": "Ofrecemos una infraestructura propia opcional, llave en mano y reutilizable.",
+        "bullets": {
+          "freedom": "<bold>Libertad total</bold>: usted posee el material y puede reiniciar el sistema rápidamente.",
+          "reuse": "<bold>Reutilización infinita</bold> en nuevas galerías o ferias.",
+          "performance": "<bold>Rendimiento garantizado</bold>: Wi-Fi de alta densidad, independiente del internet del lugar."
+        }
+      },
+      "packs": {
+        "title": "Solución modular",
+        "title_line1": "Solución modular",
+        "title_line2": "Configuraciones adaptadas a sus necesidades",
+        "intro": "Packs adaptados a cada superficie:",
+        "estimate_label": "Estimación * de",
+        "estimate_footnote": "*Estimaciones del coste del material sin IVA, sin mano de obra de instalación. Para más precisión, utilice el botón PRESUPUESTO PERSONALIZADO más abajo",
+        "estimate_button_aria": "Solicitar presupuesto para {{pack}}",
+        "items": {
+          "solo": {
+            "title": "Pack Solo (1 punto)",
+            "desc": "Hasta 150 m².",
+            "estimate": "450 € a 550 €"
+          },
+          "standard": {
+            "title": "Pack Estándar (4 puntos)",
+            "desc": "Hasta 600 m².",
+            "estimate": "1100 € a 1300 €"
+          },
+          "grand": {
+            "title": "Pack Gran Espacio (hasta 8 puntos)",
+            "desc": "Desde 1.200 m².",
+            "estimate": "1900 € a 2200 €"
+          }
+        }
+      },
+      "simplicity": {
+        "title": "Simplicidad — Listo para usar",
+        "image_alt": "Esquema Plug & Play: servidor local, switch PoE y puntos de acceso Wi-Fi en una galería",
+        "intro": "Instalación accesible para todos:",
+        "bullets": {
+          "plug_play": "<bold>Plug & Play</bold> con un único cerebro de control.",
+          "speed": "<bold>Rapidez de despliegue</bold>: listo en menos de una hora.",
+          "discretion": "<bold>Discreción absoluta</bold>: puntos de acceso discretos."
+        },
+        "outro": "Con AIMEDIArt, inversión durable para una inmersión total sin cortes."
+      }
+    },
+    "quote": {
+      "cta_prefix": "¿Desea un presupuesto personalizado?",
+      "cta_link": "Haga clic AQUÍ"
+    },
+    "form": {
+      "title": "Solicitud de presupuesto - Pack conexión",
+      "required_hint": "*campos obligatorios",
+      "org_name": "Nombre de mi organización",
+      "contact_name": "Nombre y apellidos",
+      "contact_email": "Correo electrónico",
+      "address": "Dirección postal",
+      "zip_code": "Código postal",
+      "city": "Ciudad",
+      "contact_phone": "Teléfono",
+      "need_description": "Descripción de mi necesidad",
+      "floor_plan": "Le envío un plano de mi sala o lugar de exposición",
+      "floor_plan_accept": "Archivos aceptados: .pdf, .png, .jpg",
+      "cancel": "Cancelar",
+      "submit": "Enviar",
+      "success_title": "Solicitud enviada",
+      "success_body": "¡Gracias! Su solicitud ha sido enviada.",
+      "success_ok": "OK",
+      "error_required": "Complete los campos obligatorios.",
+      "error_email": "Correo inválido.",
+      "error_auth": "Sesión expirada.",
+      "error_table": "Error: aplique migration_78.",
+      "error_submit": "Error: {{message}}",
+      "warn_floor_plan": "Solicitud guardada sin plano."
+    }
   }
 }

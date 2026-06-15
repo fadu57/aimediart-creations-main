@@ -1,4 +1,4 @@
-﻿{
+{
   "nav": {
     "open_menu": "Menü öffnen",
     "close_menu": "Menü schließen",
@@ -11,11 +11,13 @@
     "anchor_parcours": "Rundgang",
     "anchor_tarifs": "Preise",
     "anchor_accessibilite": "Zugänglichkeit",
-    "anchor_contact": "Kontakt"
+    "anchor_connectivite": "Konnektivität"
   },
   "hero": {
     "eyebrow": "Unsichtbares Feedback · Lebendige Ausstellung",
     "title": "Wenn die Ausstellung mit ihren Besuchern atmet",
+    "title_line1": "Wenn die Ausstellung atmet",
+    "title_line2": "mit ihren Besuchern",
     "cta_discover": "Vision entdecken",
     "cta_parcours": "Der Besucherrundgang",
     "feature_qr_label": "QR-Code – keine App nötig",
@@ -57,7 +59,7 @@
   },
   "live": {
     "eyebrow": "Der LIVE-Vorteil",
-    "title": "Eine Szenografie, die reagiert:\u00a0ein Baldachin des emotionalen Klimas",
+    "title": "Eine Szenografie, die reagiert: ein Baldachin des emotionalen Klimas",
     "canopy_caption": "Was Sie hier sehen, ist eine animierte Metapher: ein Baldachin, der im kollektiven Rhythmus pulsiert – wie Ihre Wand im Rhythmus der Besuche pulsieren könnte.",
     "canopy_cta": "Klicken Sie auf den Block unten, um die Projektion in einem neuen Tab zu öffnen (TV / Projektor).",
     "text_1": "Die meisten Tools liefern Zahlen am nächsten Tag. AIMEDIArt setzt auf Live: Feedback ist keine lästige Pflicht am Ende des Besuchs mehr, sondern wird zum Treibstoff der Ausstellung selbst.",
@@ -120,7 +122,7 @@
     "data_note_2": "Wenn Sie Ihren Katalog für eine zukünftige Ausstellung erhalten möchten, ist das Jahresabonnement die ruhigste (und wirtschaftlichste) Lösung.",
     "loading": "Preise werden geladen…",
     "error_title": "Preise nicht verfügbar",
-    "error_text": "Supabase-Verbindung pr\u00fcfen: Tabelle \u003ccode\u003epricing\u003c/code\u003e vorhanden und RLS-Leserechte korrekt.",
+    "error_text": "Supabase-Verbindung prüfen: Tabelle <code>pricing</code> vorhanden und RLS-Leserechte korrekt.",
     "empty": "Kein Angebot in der Preistabelle gefunden.",
     "empty_hint": "Prüfen Sie, ob die Tabelle Daten enthält, und führen Sie die SQL-Policy <code>pricing_public_anon_select</code> aus (Datei supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Option auswählen",
@@ -143,19 +145,19 @@
     "capacity_unlimited": "∞ Kunstwerke · ∞ Besucher",
     "capacity_oeuvres": "{{count}} Kunstwerke max.",
     "capacity_visitors": "{{count}} Besucher max.",
-    "per_month": "\u20ac/Monat",
-    "per_year": "\u20ac/Jahr",
+    "per_month": "€/Monat",
+    "per_year": "€/Jahr",
     "plan_name_etincelle": "Funke",
     "plan_name_atelier": "Atelier",
     "plan_name_horizon": "Horizont",
     "plan_name_rayonnement": "Strahlkraft",
     "plan_summary_etincelle": "Ausstellung mit einer kompakten Werkauswahl",
-    "plan_summary_atelier": "Fester Katalog, bereicherte Mediation w\u00e4hrend der Ausstellung",
+    "plan_summary_atelier": "Fester Katalog, bereicherte Mediation während der Ausstellung",
     "plan_summary_horizon": "Mehrere Projekte, wachsender Katalog, ambitionierte Struktur",
-    "plan_summary_rayonnement": "Gro\u00dfes Ma\u00dfereignis \u2014 unbegrenzte Kapazit\u00e4t und Begleitung"
+    "plan_summary_rayonnement": "Großes Maßereignis — unbegrenzte Kapazität und Begleitung"
   },
   "access": {
-    "intro": "Scan beim Kunstwerk, keine App erforderlich: die Web-App öffnet sich, bietet Leseprofile an (Kind, Experte, Dichter, einfache Sprache\u2026) oder folgt der Telefonsprache und führt den Besucher anschließend zurück zum Feedback, ohne den Rundgang zu unterbrechen.",
+    "intro": "Scan beim Kunstwerk, keine App erforderlich: die Web-App öffnet sich, bietet Leseprofile an (Kind, Experte, Dichter, einfache Sprache…) oder folgt der Telefonsprache und führt den Besucher anschließend zurück zum Feedback, ohne den Rundgang zu unterbrechen.",
     "eyebrow": "Reibungslose Verbindung",
     "title": "Ein Rundgang, der sich jedem Blick anpasst",
     "image_alt": "Älterer Besucher mit Gehstock in einer Fotoausstellung an weißen Wänden",
@@ -185,5 +187,96 @@
     "terms": "Nutzungsbedingungen",
     "ai_policy": "KI-Richtlinie",
     "login": "Anmeldung"
+  },
+  "connexion": {
+    "promo_link": "Vernetzte Ausstellung: Lassen Sie sich von der Netzwerkqualität nicht bremsen",
+    "back": "Zurück zur Organisation",
+    "title_line1": "WIRKLICH vernetzte Ausstellung?",
+    "title_line2": "Lassen Sie sich von der Netzwerkqualität nicht bremsen",
+    "sections": {
+      "challenge": {
+        "title": "Die Herausforderung: fehlende Konnektivität",
+        "image_alt": "Genervter Besucher in einer Galerie, Smartphone ohne Netzempfang",
+        "body": "Eine immersive Ausstellung zu organisieren ist langwierig. Vor Ort kann <bold>fehlendes oder instabiles WLAN</bold> Ihre Arbeit untergraben. Dicke Wände, Metallstrukturen oder überlastete öffentliche Netze verhindern oft den Zugang zu interaktiven Inhalten, Audioguides oder Apps. Lassen Sie Technik nicht zum Engpass werden."
+      },
+      "solution": {
+        "title": "Die AIMEDIArt-Lösung — Eigene WLAN-Infrastruktur",
+        "title_prefix": "Die Lösung",
+        "title_line2": "Eigene WLAN-Infrastruktur",
+        "image_alt": "Diagramm der lokalen WLAN-Infrastruktur: Router, PoE-Switch, Access Points und Galerie",
+        "intro": "AIMEDIArt bietet optional eine proprietäre Infrastruktur — eine schlüsselfertige Lösung für alle Ihre Projekte.",
+        "bullets": {
+          "freedom": "<bold>Volle Freiheit</bold>: Sie besitzen die Hardware und können das System nach der Ausstellung schnell zurücksetzen.",
+          "reuse": "<bold>Unbegrenzte Wiederverwendung</bold>: Abbauen, transportieren und in einer neuen Galerie erneut einsetzen.",
+          "performance": "<bold>Garantierte Leistung</bold>: Hochdichtes WLAN, unabhängig vom Internet des Ortes oder 5G."
+        }
+      },
+      "packs": {
+        "title": "Modulare Lösung",
+        "title_line1": "Modulare Lösung",
+        "title_line2": "Konfigurationen für jeden Bedarf",
+        "intro": "Skalierbare Pakete für jede Fläche:",
+        "estimate_label": "Schätzung * von",
+        "estimate_footnote": "*Materialkostenschätzungen zzgl. MwSt., ohne Installationsarbeit. Für mehr Genauigkeit nutzen Sie die Schaltfläche INDIVIDUELLES ANGEBOT unten",
+        "estimate_button_aria": "Angebot anfordern für {{pack}}",
+        "items": {
+          "solo": {
+            "title": "Solo-Paket (1 Access Point)",
+            "desc": "Bis 150 m².",
+            "estimate": "450 € bis 550 €"
+          },
+          "standard": {
+            "title": "Standard-Paket (4 Access Points)",
+            "desc": "Bis 600 m².",
+            "estimate": "1100 € bis 1300 €"
+          },
+          "grand": {
+            "title": "Großraum-Paket (bis 8 Access Points)",
+            "desc": "Ab 1.200 m² und mehr.",
+            "estimate": "1900 € bis 2200 €"
+          }
+        }
+      },
+      "simplicity": {
+        "title": "Einfachheit — Sofort einsatzbereit",
+        "image_alt": "Plug-&-Play-Schema: lokaler Server, PoE-Switch und WLAN-Access-Points in einer Galerie",
+        "intro": "Installation für alle zugänglich:",
+        "bullets": {
+          "plug_play": "<bold>Plug & Play</bold> mit zentralem Controller und Switch.",
+          "speed": "<bold>Schnelle Bereitstellung</bold>: Bereit in weniger als einer Stunde.",
+          "discretion": "<bold>Absolute Diskretion</bold>: Dezente Access Points, die sich in die Galerie einfügen."
+        },
+        "outro": "Mit AIMEDIArt investieren Sie in eine dauerhafte Lösung für totale Immersion ohne Unterbrechung."
+      }
+    },
+    "quote": {
+      "cta_prefix": "Persönliches Angebot gewünscht?",
+      "cta_link": "HIER klicken"
+    },
+    "form": {
+      "title": "Angebotsanfrage - Verbindungspaket",
+      "required_hint": "*Pflichtfelder",
+      "org_name": "Name meiner Organisation",
+      "contact_name": "Vor- und Nachname",
+      "contact_email": "E-Mail",
+      "address": "Postanschrift",
+      "zip_code": "PLZ",
+      "city": "Stadt",
+      "contact_phone": "Telefon",
+      "need_description": "Beschreibung meines Bedarfs",
+      "floor_plan": "Ich sende Ihnen einen Plan meines Raums oder Ausstellungsorts",
+      "floor_plan_accept": "Akzeptierte Dateien: .pdf, .png, .jpg",
+      "cancel": "Abbrechen",
+      "submit": "Senden",
+      "success_title": "Anfrage gesendet",
+      "success_body": "Vielen Dank! Ihre Anfrage wurde übermittelt.",
+      "success_ok": "OK",
+      "error_required": "Bitte alle Pflichtfelder ausfüllen.",
+      "error_email": "Ungültige E-Mail.",
+      "error_auth": "Sitzung abgelaufen.",
+      "error_table": "Speichern fehlgeschlagen: migration_78 anwenden.",
+      "error_submit": "Senden fehlgeschlagen: {{message}}",
+      "warn_floor_plan": "Anfrage gespeichert, Grundriss-Upload fehlgeschlagen."
+    }
   }
 }

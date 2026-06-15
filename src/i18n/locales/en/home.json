@@ -1,4 +1,4 @@
-﻿{
+{
   "nav": {
     "open_menu": "Open menu",
     "close_menu": "Close menu",
@@ -11,11 +11,13 @@
     "anchor_parcours": "Journey",
     "anchor_tarifs": "Pricing",
     "anchor_accessibilite": "Accessibility",
-    "anchor_contact": "Contact"
+    "anchor_connectivite": "Connectivity"
   },
   "hero": {
     "eyebrow": "Invisible feedback · Living exhibition",
     "title": "When the exhibition breathes with its visitors",
+    "title_line1": "When the exhibition breathes",
+    "title_line2": "with its visitors",
     "cta_discover": "Discover the vision",
     "cta_parcours": "The visitor journey",
     "feature_qr_label": "QR code — no app needed",
@@ -57,7 +59,7 @@
   },
   "live": {
     "eyebrow": "The LIVE advantage",
-    "title": "A scenography that reacts:\u00a0a canopy of emotional climate",
+    "title": "A scenography that reacts: a canopy of emotional climate",
     "canopy_caption": "What you see here is an animated metaphor: a canopy pulsing at the collective rhythm — as your wall could pulse at the rhythm of visits.",
     "canopy_cta": "Click on the block below to open the projection in a new tab (TV / projector).",
     "text_1": "Most tools deliver numbers the next day. AIMEDIArt plays the live card: feedback is no longer an end-of-visit chore, it becomes the fuel of the exhibition itself.",
@@ -120,7 +122,7 @@
     "data_note_2": "If you wish to keep your catalogue and artwork files for a future exhibition, the Annual subscription is the most serene (and economical over time!) solution.",
     "loading": "Loading pricing…",
     "error_title": "Pricing unavailable",
-    "error_text": "Check the Supabase connection, the presence of the \u003ccode\u003epricing\u003c/code\u003e table and RLS read permissions.",
+    "error_text": "Check the Supabase connection, the presence of the <code>pricing</code> table and RLS read permissions.",
     "empty": "No offer found in the pricing table.",
     "empty_hint": "Check that the table has rows and run the <code>pricing_public_anon_select</code> SQL policy (file supabase/sql/pricing_public_anon_select.sql).",
     "select_option_label": "Select your option",
@@ -143,8 +145,8 @@
     "capacity_unlimited": "∞ artworks · ∞ visitors",
     "capacity_oeuvres": "{{count}} artworks max",
     "capacity_visitors": "{{count}} visitors max",
-    "per_month": "\u20ac/month",
-    "per_year": "\u20ac/year",
+    "per_month": "€/month",
+    "per_year": "€/year",
     "plan_name_etincelle": "Spark",
     "plan_name_atelier": "Studio",
     "plan_name_horizon": "Horizon",
@@ -152,10 +154,10 @@
     "plan_summary_etincelle": "Exhibition powered by a focused selection of works",
     "plan_summary_atelier": "Fixed catalogue, enriched mediation throughout the exhibition",
     "plan_summary_horizon": "Multiple projects, evolving catalogue, ambitious structure",
-    "plan_summary_rayonnement": "Major tailor-made event \u2014 unlimited capacity and support"
+    "plan_summary_rayonnement": "Major tailor-made event — unlimited capacity and support"
   },
   "access": {
-    "intro": "Scan near the artwork, no app to install: the web-app opens, offers reading profiles (child, expert, poet, plain language\u2026) or follows the phone\u2019s language, then brings the visitor back to feedback without ever breaking their flow.",
+    "intro": "Scan near the artwork, no app to install: the web-app opens, offers reading profiles (child, expert, poet, plain language…) or follows the phone’s language, then brings the visitor back to feedback without ever breaking their flow.",
     "eyebrow": "Frictionless connection",
     "title": "A journey that adapts to every gaze",
     "image_alt": "Senior visitor with a cane browsing a photographic exhibition on white walls",
@@ -185,5 +187,96 @@
     "terms": "Terms of Use",
     "ai_policy": "AI Policy",
     "login": "Login"
+  },
+  "connexion": {
+    "promo_link": "Connected exhibition: Don't let the network limit your creativity",
+    "back": "Back to the showcase",
+    "title_line1": "A TRULY connected exhibition?",
+    "title_line2": "Don't let the network limit your creativity",
+    "sections": {
+      "challenge": {
+        "title": "The challenge: no connectivity, a compromised experience",
+        "image_alt": "Frustrated visitor in an art gallery, smartphone with no network signal",
+        "body": "Organising an immersive exhibition is a long-term effort. Yet on site, a major obstacle can undermine your work: <bold>missing or unstable Wi-Fi.</bold>\n\nIn exhibition venues, thick walls, metal structures or simply overcrowded public networks often prevent visitors from accessing your interactive content, audio guides or dedicated apps. A cut-off experience, endless loading — and audience engagement fades. Don't let technology become the bottleneck of your exhibition."
+      },
+      "solution": {
+        "title": "The AIMEDIArt solution — Your private, standalone Wi-Fi infrastructure",
+        "title_prefix": "The solution",
+        "title_line2": "Your private, standalone Wi-Fi infrastructure",
+        "image_alt": "Local Wi-Fi infrastructure diagram: router, PoE switch, access points and gallery",
+        "intro": "At AIMEDIArt, we can offer you a proprietary infrastructure as an option. You invest in your own working tool — a turnkey solution built to last and support every project, wherever the venue.",
+        "bullets": {
+          "freedom": "<bold>Total freedom</bold>: You own your hardware. Once the exhibition ends, the system is designed to be reset in a snap.",
+          "reuse": "<bold>Endless reuse</bold>: Dismantle, transport and redeploy your kit in a new gallery, trade fair or cultural space. Your configuration stays saved, ready for your next scenography.",
+          "performance": "<bold>Guaranteed performance</bold>: High-density Wi-Fi technology, fully independent of the venue's internet or 5G, ensuring a smooth experience for every visitor."
+        }
+      },
+      "packs": {
+        "title": "A modular solution — Configurations tailored to your needs",
+        "title_line1": "A modular solution",
+        "title_line2": "Configurations tailored to your needs",
+        "intro": "Because every exhibition has its own spatial constraints, we designed scalable packs to cover all floor areas effectively:",
+        "estimate_label": "Estimate * of",
+        "estimate_footnote": "*Material cost estimates excl. VAT, excluding installation labour. For a more precise quote, use the CUSTOM QUOTE button below",
+        "estimate_button_aria": "Request a quote for {{pack}}",
+        "items": {
+          "solo": {
+            "title": "Solo Pack (1 access point)",
+            "desc": "Ideal for a small room, booth or dedicated zone up to 150 m².",
+            "estimate": "€450 to €550"
+          },
+          "standard": {
+            "title": "Standard Pack (4 access points)",
+            "desc": "Perfect for a large gallery or open floor, covering up to 600 m² with optimal connection stability.",
+            "estimate": "€1,100 to €1,300"
+          },
+          "grand": {
+            "title": "Large Space Pack (up to 8 access points)",
+            "desc": "Designed for vast exhibition halls, multi-space routes or complex sites, covering 1,200 m² and beyond with smooth high-traffic handling.",
+            "estimate": "€1,900 to €2,200"
+          }
+        }
+      },
+      "simplicity": {
+        "title": "Simplicity first — Ready to use",
+        "image_alt": "Plug & Play diagram: local server, PoE switch and Wi-Fi access points in a gallery",
+        "intro": "We know your expertise is artistic, not technical. That's why our setup is designed to be accessible to everyone:",
+        "bullets": {
+          "plug_play": "<bold>Plug & Play</bold>: One control hub, an intuitive switch and simplified wired setup.",
+          "speed": "<bold>Fast deployment</bold>: Your exhibition is ready for the public in under an hour.",
+          "discretion": "<bold>Total discretion</bold>: Our Wi-Fi access points blend into your gallery décor, keeping the focus on your artworks."
+        },
+        "outro": "With AIMEDIArt, you invest in a durable solution that guarantees your audience total immersion, without interruption, wherever you are."
+      }
+    },
+    "quote": {
+      "cta_prefix": "Want a personalised quote?",
+      "cta_link": "Click HERE"
+    },
+    "form": {
+      "title": "Quote request - Connection pack",
+      "required_hint": "*required fields",
+      "org_name": "Organisation name",
+      "contact_name": "Contact first and last name",
+      "contact_email": "Contact email address",
+      "address": "Postal address",
+      "zip_code": "Postcode",
+      "city": "City",
+      "contact_phone": "Contact phone",
+      "need_description": "Description of my needs (room type, floor area, …)",
+      "floor_plan": "I'm sending you a plan of my room or exhibition venue",
+      "floor_plan_accept": "Accepted files: .pdf, .png, .jpg",
+      "cancel": "Cancel",
+      "submit": "Send",
+      "success_title": "Request sent",
+      "success_body": "Thank you! Your quote request has been submitted. Our team will contact you shortly.",
+      "success_ok": "OK",
+      "error_required": "Please fill in all required fields.",
+      "error_email": "Invalid email address.",
+      "error_auth": "Session expired. Please sign in again.",
+      "error_table": "Unable to save: apply migration_78 on Supabase.",
+      "error_submit": "Unable to send: {{message}}",
+      "warn_floor_plan": "Request saved, but the floor plan could not be uploaded."
+    }
   }
 }
