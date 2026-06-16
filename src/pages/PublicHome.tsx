@@ -954,6 +954,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       <Card
                         className={cn(
                           "rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
+                          !isHighlight && testerBadgeCount === 2 && "h-[303px]",
                           isHighlight && "ring-1 ring-[rgba(168,23,29,0.22)]",
                         )}
                       >

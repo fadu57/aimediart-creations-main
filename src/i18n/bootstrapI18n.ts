@@ -1,8 +1,7 @@
 import { initReactI18next } from "react-i18next";
 
 import {
-  ALL_I18N_NAMESPACES,
-  APP_NAMESPACES,
+  SUPPORTED_LANGS,
   VITRINE_CORE_NAMESPACES,
   VITRINE_LEGAL_NAMESPACES,
   getInitialLanguage,
@@ -11,6 +10,7 @@ import {
 } from "./constants";
 import i18n from "./instance";
 import { loadI18nNamespaces } from "./loadNamespaces";
+import { appResources } from "./appResources";
 import { vitrineCoreResources } from "./vitrineResources";
 
 let initialized = false;
@@ -38,6 +38,10 @@ async function ensureInitialized(extraNs: string[] = []): Promise<void> {
     ns,
     defaultNS: "header",
     interpolation: { escapeValue: false },
+    react: {
+      useSuspense: false,
+      bindI18nStore: "added removed",
+    },
   });
 
   if (extraNs.length > 0) {
@@ -71,18 +75,26 @@ export async function ensureVitrineNamespacesForPath(pathname: string): Promise<
   loadedLegalNamespaces.add(legalNs);
 }
 
+function addAppResourceBundles(): void {
+  for (const lng of SUPPORTED_LANGS) {
+    const bundle = appResources[lng];
+    for (const [ns, resources] of Object.entries(bundle)) {
+      if (!i18n.hasResourceBundle(lng, ns)) {
+        i18n.addResourceBundle(lng, ns, resources, true, true);
+      }
+    }
+  }
+}
+
 /** Charge tous les namespaces (backoffice, visiteur, etc.). */
 export async function ensureFullI18n(): Promise<void> {
   await ensureInitialized();
 
   if (fullNamespacesLoaded) return;
 
-  const remaining = ALL_I18N_NAMESPACES.filter(
-    (ns) => !VITRINE_CORE_NAMESPACES.includes(ns as (typeof VITRINE_CORE_NAMESPACES)[number]),
-  );
-
-  await loadI18nNamespaces(remaining);
+  addAppResourceBundles();
+  await loadI18nNamespaces([...VITRINE_LEGAL_NAMESPACES]);
   fullNamespacesLoaded = true;
 }
 
-export { isPublicMarketingPath, APP_NAMESPACES, VITRINE_LEGAL_NAMESPACES };
+export { isPublicMarketingPath, VITRINE_LEGAL_NAMESPACES };
