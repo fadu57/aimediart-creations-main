@@ -47,16 +47,11 @@ export default defineConfig(({ mode }) => {
   build: {
     rollupOptions: {
       output: {
+        // Découpage minimal : uniquement libs lourdes et isolées (évite les cycles charts/i18n).
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
-          if (id.includes("p5")) return "p5";
+          if (id.includes("/p5/") || id.includes("\\p5\\")) return "p5";
           if (id.includes("three") || id.includes("vanta")) return "three-vanta";
-          if (id.includes("recharts") || id.includes("d3-")) return "charts";
-          if (id.includes("@supabase")) return "supabase";
-          if (id.includes("leaflet") || id.includes("react-leaflet")) return "leaflet";
-          if (id.includes("i18next") || id.includes("react-i18next")) return "i18n";
-          if (id.includes("@radix-ui")) return "radix";
-          if (id.includes("lucide-react")) return "icons";
         },
       },
     },
