@@ -123,7 +123,7 @@ export function UiLanguageProvider({ children }: { children: React.ReactNode }) 
     let cancelled = false;
 
     const loadTranslations = async () => {
-      const enableDbLanguageTable = import.meta.env.VITE_ENABLE_DB_LANGUAGE_TABLE === "true";
+      const enableDbLanguageTable = import.meta.env?.VITE_ENABLE_DB_LANGUAGE_TABLE === "true";
       if (!enableDbLanguageTable) {
         // Par défaut on évite l'appel réseau vers `language` (absente sur plusieurs environnements).
         setTranslationsByFrench(new Map());
@@ -149,7 +149,7 @@ export function UiLanguageProvider({ children }: { children: React.ReactNode }) 
           setTranslationsByFrench(new Map());
           return;
         }
-        if (import.meta.env.DEV) {
+        if (import.meta.env?.DEV) {
           console.warn("[i18n] impossible de charger la table language:", error?.message);
         }
         return;
@@ -198,7 +198,7 @@ export function useUiLanguage() {
   const ctx = useContext(UiLanguageContext);
   if (!ctx) {
     // Tolérance HMR (Vite) : le Header peut se remonter avant le Provider après un hot reload.
-    if (import.meta.env.DEV) {
+    if (import.meta.env?.DEV) {
       return {
         language: DEFAULT_UI_LANGUAGE,
         setLanguage: () => {},

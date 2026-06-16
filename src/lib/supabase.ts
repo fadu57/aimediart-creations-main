@@ -1,13 +1,23 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@types/supabase";
 
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@types/supabase";
+
+/** Vite (navigateur) ou variables process (prérendu Node). */
+function readEnv(key: "VITE_SUPABASE_URL" | "VITE_SUPABASE_ANON_KEY"): string {
+  const fromVite = typeof import.meta !== "undefined" ? import.meta.env?.[key]?.trim() : "";
+  if (fromVite) return fromVite;
+  return process.env[key]?.trim() ?? "";
+}
+
 let client: SupabaseClient<Database> | null = null;
 
 function getSupabaseClient(): SupabaseClient<Database> {
   if (client) return client;
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
+  const supabaseUrl = readEnv("VITE_SUPABASE_URL");
+  const supabaseAnonKey = readEnv("VITE_SUPABASE_ANON_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
@@ -29,12 +39,10 @@ export const supabase: SupabaseClient<Database> = new Proxy({} as SupabaseClient
 });
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    import.meta.env.VITE_SUPABASE_URL?.trim() && import.meta.env.VITE_SUPABASE_ANON_KEY?.trim(),
-  );
+  return Boolean(readEnv("VITE_SUPABASE_URL") && readEnv("VITE_SUPABASE_ANON_KEY"));
 }
 
-if (import.meta.env.DEV) {
-  const url = import.meta.env.VITE_SUPABASE_URL;
+if (import.meta.env?.DEV) {
+  const url = readEnv("VITE_SUPABASE_URL");
   console.debug("[Supabase] URL projet :", url ?? "(VITE_SUPABASE_URL non défini)");
 }

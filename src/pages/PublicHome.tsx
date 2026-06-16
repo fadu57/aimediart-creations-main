@@ -1,4 +1,10 @@
 ﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  fetchPublicHomeData,
+  getOrganisationInitialData,
+  type PricingRow,
+  type PublicHomeInitialData,
+} from "@/lib/organisation/publicHomeData";
 import type { TFunction } from "i18next";
 import { Link } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
@@ -19,7 +25,6 @@ import {
 import { PublicVitrineShell, AIMEDIART_WORD_RED, BRAND_RED, BRAND_RED_DARK } from "@/components/PublicVitrineShell";
 import { OrganisationConnexionContent } from "@/components/OrganisationConnexionContent";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ForestCanopySketch } from "@/components/ForestCanopySketch";
@@ -31,22 +36,9 @@ import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
 
-/**
- * Ligne `pricing` Supabase (lecture vitrine).
- * Colonnes générées : `pricing_annuel`, `pricing_annual_remis`, `éco_annuel` — lecture seule.
- */
-type PricingRow = {
-  pricing_label: string | null;
-  pricing_plan: string | null;
-  pricing_max_oeuvres: number | null;
-  /** Nom réel en base : `princing_max_visitors` (faute volontaire). */
-  princing_max_visitors: number | null;
-  pricing_is_unlimited: boolean | null;
-  pricing_monthly_ttc_eur: number | null;
-  pricing_annuel: number | null;
-  pricing_annual_remis: number | null;
-  /** Économie annuelle (mappé depuis `éco_annuel` ou `eco_annuel`). */
-  eco_annuel: number | null;
+export type PublicHomeProps = {
+  /** Données pré-chargées (prérendu build ou Server Component). */
+  initialData?: PublicHomeInitialData | null;
 };
 
 function highlightAimediartWord(text: string): ReactNode {
@@ -80,16 +72,6 @@ function formatMonthlyTtcDisplay(value: number | null | undefined, t: TFunction,
   if (!Number.isFinite(n)) return t("tarifs.sur_devis");
   if (n === 0) return t("tarifs.gratuit");
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n)}\u00a0${t("tarifs.per_month")}`;
-}
-
-function toPricingNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number" && !Number.isNaN(value)) return value;
-  if (typeof value === "string" && value.trim() !== "") {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
 }
 
 function normalizePlan(plan: string | null): string {
@@ -382,65 +364,52 @@ function Section({
   );
 }
 
-export default function PublicHome() {
+export default function PublicHome({ initialData: initialDataProp }: PublicHomeProps = {}) {
   const { t, i18n } = useTranslation("home");
-  const [pricingLoading, setPricingLoading] = useState(true);
+  const resolvedInitialData = useMemo(
+    () => initialDataProp ?? getOrganisationInitialData(),
+    [initialDataProp],
+  );
+  const [pricingLoading, setPricingLoading] = useState(!resolvedInitialData);
   const [pricingError, setPricingError] = useState<string | null>(null);
-  const [pricingRows, setPricingRows] = useState<PricingRow[]>([]);
+  const [pricingRows, setPricingRows] = useState<PricingRow[]>(resolvedInitialData?.pricingRows ?? []);
   const [selectedVariantByPlan, setSelectedVariantByPlan] = useState<Record<string, number>>({});
-  const [promptIcons, setPromptIcons] = useState<string[]>([]);
+  const [promptIcons, setPromptIcons] = useState<string[]>(resolvedInitialData?.promptIcons ?? []);
 
   useEffect(() => {
+    if (resolvedInitialData) return;
+
     let cancelled = false;
     const run = async () => {
-      setPricingLoading(true);
-      setPricingError(null);
-      const sb = supabase as unknown as {
-        from: (table: string) => {
-          select: (columns: string) => Promise<{ data: unknown; error: { message?: string } | null }>;
-        };
-      };
-      const pricingColumns =
-        "pricing_label,pricing_plan,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel";
-      const [pricingRes, promptIconsRes] = await Promise.all([
-        sb.from("pricing").select(pricingColumns),
-        sb.from("prompt_style").select("icon"),
-      ]);
-      if (cancelled) return;
-      if (pricingRes.error) {
-        setPricingError(pricingRes.error.message || "Chargement des tarifs impossible.");
-        setPricingRows([]);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
+      if (!supabaseUrl || !anonKey) {
+        setPricingError("Configuration Supabase manquante.");
         setPricingLoading(false);
         return;
       }
-      const iconRows = (promptIconsRes.data as Array<{ icon?: string | null }> | null) ?? [];
-      const cleanedIcons = [...new Set(iconRows.map((r) => (r.icon ?? "").trim()).filter(Boolean))];
-      setPromptIcons(cleanedIcons.slice(0, 8));
-      const rawPricingRows = (pricingRes.data as Record<string, unknown>[] | null) ?? [];
-      const normalizedPricingRows: PricingRow[] = rawPricingRows.map((row) => {
-        const r = row as Record<string, unknown>;
-        const ecoFromDb = toPricingNumber(r["éco_annuel"] ?? r.eco_annuel);
-        return {
-          pricing_label: typeof row.pricing_label === "string" || row.pricing_label === null ? (row.pricing_label as string | null) : null,
-          pricing_plan: typeof row.pricing_plan === "string" || row.pricing_plan === null ? (row.pricing_plan as string | null) : null,
-          pricing_max_oeuvres: toPricingNumber(row.pricing_max_oeuvres),
-          princing_max_visitors: toPricingNumber(row.princing_max_visitors),
-          pricing_is_unlimited:
-            row.pricing_is_unlimited === true ? true : row.pricing_is_unlimited === false ? false : null,
-          pricing_monthly_ttc_eur: toPricingNumber(row.pricing_monthly_ttc_eur),
-          pricing_annuel: toPricingNumber(row.pricing_annuel),
-          pricing_annual_remis: toPricingNumber(row.pricing_annual_remis),
-          eco_annuel: ecoFromDb,
-        };
-      });
-      setPricingRows(normalizedPricingRows);
-      setPricingLoading(false);
+
+      setPricingLoading(true);
+      setPricingError(null);
+      try {
+        const data = await fetchPublicHomeData(supabaseUrl, anonKey);
+        if (cancelled) return;
+        setPricingRows(data.pricingRows);
+        setPromptIcons(data.promptIcons);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : "Chargement des tarifs impossible.";
+        setPricingError(message);
+        setPricingRows([]);
+      } finally {
+        if (!cancelled) setPricingLoading(false);
+      }
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resolvedInitialData]);
 
   const groupedPlans = useMemo(() => {
     const rows = [...pricingRows].filter(

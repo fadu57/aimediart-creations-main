@@ -9,8 +9,8 @@
   "scripts": {
     "dev": "vite",
     "dev:all": "vite",
-    "build": "vite build",
-    "vercel-build": "vite build",
+    "build": "vite build && node --import ./scripts/prerender-register.mjs --import tsx scripts/prerender-organisation.tsx",
+    "vercel-build": "vite build && node --import ./scripts/prerender-register.mjs --import tsx scripts/prerender-organisation.tsx",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

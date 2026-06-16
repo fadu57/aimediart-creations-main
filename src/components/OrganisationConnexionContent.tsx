@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { createElement, useState, type ReactNode } from "react";
 import { ArrowRight, Wifi } from "lucide-react";
 import { useTranslation, Trans } from "react-i18next";
 
@@ -14,7 +14,7 @@ const PACK_KEYS = ["solo", "standard", "grand"] as const;
 const SOLUTION_BULLETS = ["freedom", "reuse", "performance"] as const;
 const SIMPLICITY_BULLETS = ["plug_play", "speed", "discretion"] as const;
 
-const CONNEXION_BOLD = <strong className="font-semibold text-foreground" />;
+const CONNEXION_BOLD = createElement("strong", { className: "font-semibold text-foreground" });
 
 function highlightAimediartBold(text: string): ReactNode {
   const parts = text.split(/(AIMEDIArt)/g);
