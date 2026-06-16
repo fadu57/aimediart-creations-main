@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, lazy, Suspense, type CSSProperties, type ReactNode } from "react";
 import {
   fetchPublicHomeData,
   getOrganisationInitialData,
@@ -23,11 +23,12 @@ import {
 } from "lucide-react";
 
 import { PublicVitrineShell, AIMEDIART_WORD_RED, BRAND_RED, BRAND_RED_DARK } from "@/components/PublicVitrineShell";
-import { OrganisationConnexionContent } from "@/components/OrganisationConnexionContent";
+import { LazyWhenVisible } from "@/components/ui/LazyWhenVisible";
+import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ForestCanopySketch } from "@/components/ForestCanopySketch";
+
 import expositionVivantePhoto from "@/assets/exposition-vivante.png";
 import oreilleAttentivePhoto from "@/assets/oreille-attentive.png";
 import outputCreatifPhoto from "@/assets/output-creatif.png";
@@ -35,6 +36,13 @@ import parcoursPhoto from "@/assets/parcours.png";
 import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
+
+const ForestCanopySketch = lazy(() =>
+  import("@/components/ForestCanopySketch").then((m) => ({ default: m.ForestCanopySketch })),
+);
+const OrganisationConnexionContent = lazy(() =>
+  import("@/components/OrganisationConnexionContent").then((m) => ({ default: m.OrganisationConnexionContent })),
+);
 
 export type PublicHomeProps = {
   /** Données pré-chargées (prérendu build ou Server Component). */
@@ -240,7 +248,7 @@ function SurfaceCardShell({
                 className="pointer-events-none absolute inset-x-0 top-0 w-full [mask-image:linear-gradient(to_bottom,black_0%,black_32%,rgba(0,0,0,0.85)_48%,rgba(0,0,0,0.45)_62%,transparent_88%)] [-webkit-mask-image:linear-gradient(to_bottom,black_0%,black_32%,rgba(0,0,0,0.85)_48%,rgba(0,0,0,0.45)_62%,transparent_88%)]"
                 aria-hidden
               >
-                <img
+                <OptimizedImage
                   src={backgroundImage}
                   alt=""
                   className="block h-auto w-full object-contain object-top"
@@ -255,7 +263,7 @@ function SurfaceCardShell({
             </>
           ) : (
             <>
-              <img
+              <OptimizedImage
                 src={backgroundImage}
                 alt={backgroundImageAlt ?? ""}
                 className={cn(
@@ -473,6 +481,16 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               <p className="mt-4 max-w-[88ch] text-[1rem] leading-[1.75] text-foreground/78 sm:text-[1.05rem]" style={{ whiteSpace: "pre-line" }}>
                 {t("hero.intro_2")}
               </p>
+              <figure className="mt-6 overflow-hidden rounded-2xl border border-neutral-300/70 bg-white">
+                <OptimizedImage
+                  src={UNSPLASH_HERO_IMAGE}
+                  alt={t("hero.image_alt")}
+                  className="h-48 w-full object-cover object-center sm:h-60"
+                  priority
+                  width={1060}
+                  height={360}
+                />
+              </figure>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <a href="#exposition-vivante" className="w-full sm:w-auto">
                   <Button
@@ -521,14 +539,6 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   </p>
                 </article>
               </div>
-              <figure className="mt-8 overflow-hidden rounded-2xl border border-neutral-300/70 bg-white">
-                <img
-                  src={UNSPLASH_HERO_IMAGE}
-                  alt={t("hero.image_alt")}
-                  className="h-48 w-full object-cover object-center sm:h-60"
-                  loading="eager"
-                />
-              </figure>
               <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
                 {t("hero.quote")}
               </blockquote>
@@ -548,11 +558,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           </div>
           <figure className="mt-8 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
+              <OptimizedImage
                 src={expositionVivantePhoto}
                 alt={t("exposition.image_alt")}
                 className="home-hero-image"
                 loading="lazy"
+                width={1010}
+                height={288}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
@@ -573,11 +585,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             </div>
             <div className="w-full min-w-0 text-left lg:flex lg:h-[350px] lg:w-[300px] lg:shrink-0 lg:flex-col lg:items-end lg:justify-end lg:text-right">
               <figure className="ml-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
-                <img
+                <OptimizedImage
                   src={oreilleAttentivePhoto}
                   alt={t("oreille.image_alt")}
                   className="aspect-[4/3] w-full max-w-[300px] overflow-visible object-cover object-center object-bottom sm:aspect-[5/4] lg:aspect-auto lg:h-[350px] lg:min-h-[350px] lg:w-[300px]"
                   loading="lazy"
+                  width={300}
+                  height={350}
                 />
               </figure>
             </div>
@@ -634,11 +648,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           </div>
           <figure className="mt-10 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
+              <OptimizedImage
                 src={outputCreatifPhoto}
                 alt={t("output.image_alt")}
                 className="home-hero-image"
                 loading="lazy"
+                width={1010}
+                height={288}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
@@ -662,7 +678,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <p className="relative z-10 mt-5 w-full text-right text-sm font-semibold italic text-red-500 sm:text-base">
               {t("live.canopy_cta")}
             </p>
-            <ForestCanopySketch className="relative mt-3 w-full overflow-hidden rounded-lg bg-black/20" />
+            <LazyWhenVisible minHeight={150}>
+              <Suspense fallback={<div className="relative mt-3 w-full rounded-lg bg-black/20" style={{ minHeight: 150 }} aria-hidden />}>
+                <ForestCanopySketch className="relative mt-3 w-full overflow-hidden rounded-lg bg-black/20" />
+              </Suspense>
+            </LazyWhenVisible>
           </div>
         </Section>
 
@@ -729,11 +749,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
         >
           <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
+              <OptimizedImage
                 src={parcoursPhoto}
                 alt={t("parcours.image_alt")}
                 className="home-hero-image"
                 loading="lazy"
+                width={1010}
+                height={288}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
@@ -816,11 +838,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             </article>
             <article className="rounded-3xl border border-neutral-300/70 bg-white p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("parcours.benefices_label")}</p>
-              <img
+              <OptimizedImage
                 src={UNSPLASH_DASHBOARD_IMAGE}
                 alt={t("parcours.benefices_image_alt")}
                 className="mt-3 h-32 w-full rounded-xl border border-neutral-200 object-cover"
                 loading="lazy"
+                width={800}
+                height={128}
               />
               <div className="mt-3 grid gap-2">
                 {[
@@ -1065,11 +1089,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
 
           <figure className="mb-4 mt-8 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
+              <OptimizedImage
                 src={accessibilitePhoto}
                 alt={t("access.image_alt")}
                 className="home-hero-image"
                 loading="lazy"
+                width={1010}
+                height={288}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
@@ -1097,11 +1123,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
         <Section surfaceCard id="contact" eyebrow={t("contact.eyebrow")} title={t("contact.title")}>
           <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <img
+              <OptimizedImage
                 src={contactPhoto}
                 alt={t("contact.image_alt")}
                 className="home-hero-image"
                 loading="lazy"
+                width={1010}
+                height={288}
               />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
             </div>
@@ -1129,9 +1157,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           </div>
         </Section>
 
-        <section id="connectivite" className="scroll-mt-[68px]">
-          <OrganisationConnexionContent />
-        </section>
+        <LazyWhenVisible className="scroll-mt-[68px]" minHeight={320}>
+          <section id="connectivite">
+            <Suspense fallback={<div className="mx-auto w-full max-w-[1060px] px-5 py-16 sm:px-6" aria-hidden style={{ minHeight: 320 }} />}>
+              <OrganisationConnexionContent />
+            </Suspense>
+          </section>
+        </LazyWhenVisible>
 
     </PublicVitrineShell>
   );

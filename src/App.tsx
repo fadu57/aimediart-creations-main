@@ -21,72 +21,30 @@ import { RequireBackoffice } from "./components/RequireBackoffice";
 import { NavigationMatrixProvider } from "./providers/NavigationMatrixProvider";
 import { UiLanguageProvider } from "./providers/UiLanguageProvider";
 import { useAuthUser } from "./hooks/useAuthUser";
-import Dashboard from "./pages/admin/Dashboard";
-import Prompts from "./pages/admin/Prompts";
-import Artists from "./pages/Artists";
-import Artists2 from "./pages/Artists2";
-import EditArtist from "./pages/EditArtist";
-import ArtistsCorbeille from "./pages/ArtistsCorbeille";
-import Catalogue from "./pages/admin/Catalogue";
-import Catalogue2 from "./pages/Catalogue2";
-import CatalogueCorbeille from "./pages/CatalogueCorbeille";
-import Statistics from "./pages/Statistics";
-import SettingsPage from "./pages/Settings";
-import SettingsCouts from "./pages/SettingsCouts";
-import SettingsSuiviTemps from "./pages/SettingsSuiviTemps";
-import SettingsSupabaseMonitoring from "./pages/SettingsSupabaseMonitoring";
-import SettingsSuiviTokens from "./pages/SettingsSuiviTokens";
-import SettingsVisitorErrors from "./pages/SettingsVisitorErrors";
-import SettingsOrganizerErrors from "./pages/SettingsOrganizerErrors";
-import SettingsOnlinePresence from "./pages/SettingsOnlinePresence";
-import SettingsPresenceThresholds from "./pages/SettingsPresenceThresholds";
 import { VisitorErrorLogCapture } from "./components/visitor/VisitorErrorLogCapture";
 import { OrganizerErrorLogCapture } from "./components/organizer/OrganizerErrorLogCapture";
-import Agencies from "./pages/Agencies";
-import Agencies2 from "./pages/Agencies2";
-import AgenciesCorbeille from "./pages/AgenciesCorbeille";
-import Expos from "./pages/Expos";
-import Expos2 from "./pages/Expos2";
-import ExposVisitors from "./pages/ExposVisitors";
-import ExposVisitorDetail from "./pages/ExposVisitorDetail";
-import ExposSponsors from "./pages/ExposSponsors";
-import VisiteursCorbeille from "./pages/VisiteursCorbeille";
-import ExposCorbeille from "./pages/ExposCorbeille";
-import Users from "./pages/Users";
-import Utilisateurs from "./pages/Utilisateurs";
-import UtilisateursCorbeille from "./pages/UtilisateursCorbeille";
-import ArtworkDetail from "./pages/visitor/ArtworkDetail";
-import Intro from "./pages/visitor/Intro";
-import ScanWork2 from "./pages/visitor/ScanWork2";
-import Summary from "./pages/visitor/Summary";
-import VisitorRegister from "./pages/visitor/Register";
-import RegisterVisitor from "./pages/visitor/RegisterVisitor";
-import Login from "./pages/Login";
-import RegisterSaaS from "./pages/RegisterSaaS";
-import ResetPassword from "./pages/ResetPassword";
-import NotFound from "./pages/NotFound";
-import WorkScanner from "./pages/WorkScanner";
-import PublicHome from "./pages/PublicHome";
-import PublicHomeCommencer from "./pages/PublicHomeCommencer";
-import OrganisationConnexion from "./pages/OrganisationConnexion";
-import CgvPage from "./pages/CgvPage";
-import CookiesPage from "./pages/CookiesPage";
-import PrivacyPage from "./pages/PrivacyPage";
-import TermsPage from "./pages/TermsPage";
-import AiPolicyPage from "./pages/AiPolicyPage";
-import ExpoCastPage from "./pages/ExpoCastPage";
-import OeuvresArtiste from "./pages/OeuvresArtiste";
-import WelcomeLanding from "./pages/WelcomeLanding";
-import VisitorWelcome from "./pages/visitor/VisitorWelcome";
-import ExposVisitorAudioMonitor from "./pages/ExposVisitorAudioMonitor";
-import LegalStaticPage from "./pages/LegalStaticPage";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { getAudienceChoice } from "./lib/audienceChoice";
 import { isVisitorRole } from "./lib/authUser";
 import { Loader2 } from "lucide-react";
-import { useLayoutEffect } from "react";
+import { Suspense, useEffect, useLayoutEffect } from "react";
+import * as Pages from "./routes/lazyPages";
+import {
+  ensureFullI18n,
+  ensureVitrineNamespacesForPath,
+  isPublicMarketingPath,
+} from "@/i18n/bootstrapI18n";
 
 const queryClient = new QueryClient();
+
+function RouteLoadingFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />
+      <span className="sr-only">Chargement…</span>
+    </div>
+  );
+}
 
 /**
  * URLs du type https://domaine.fr//scan?... ont un pathname "//scan" (double slash après l’hôte).
@@ -109,6 +67,21 @@ function NormalizeMultipleSlashPathname() {
       { replace: true },
     );
   }, [location.hash, location.pathname, location.search, navigate]);
+
+  return null;
+}
+
+/** Charge les namespaces i18n selon la route (vitrine légère vs backoffice complet). */
+function I18nRouteLoader() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (isPublicMarketingPath(pathname)) {
+      void ensureVitrineNamespacesForPath(pathname);
+      return;
+    }
+    void ensureFullI18n();
+  }, [pathname]);
 
   return null;
 }
@@ -199,7 +172,7 @@ function ScanEntryRedirect() {
   const [searchParams] = useSearchParams();
   const target = buildVisitorLandingPath(searchParams);
   if (target) return <Navigate to={target} replace />;
-  return <Intro />;
+  return <Pages.Intro />;
 }
 
 function RootEntryRoute() {
@@ -239,28 +212,29 @@ function RootEntryRoute() {
  * - autres routes : `RequireBackoffice` (session + rôle gestion)
  */
 const AppRoutes = () => (
+  <Suspense fallback={<RouteLoadingFallback />}>
   <Routes>
     {/* Landing marketing publique (sans header) */}
-    <Route path="/organisation" element={<PublicHome />} />
-    <Route path="/organisation/commencer" element={<PublicHomeCommencer />} />
-    <Route path="/organisation/connexion" element={<OrganisationConnexion />} />
+    <Route path="/organisation" element={<Pages.PublicHome />} />
+    <Route path="/organisation/commencer" element={<Pages.PublicHomeCommencer />} />
+    <Route path="/organisation/connexion" element={<Pages.OrganisationConnexion />} />
     <Route path="/connexion" element={<Navigate to="/organisation#connectivite" replace />} />
     {/* Rétrocompatibilité anciens liens /home */}
     <Route path="/home" element={<Navigate to="/organisation" replace />} />
     <Route path="/home/commencer" element={<Navigate to="/organisation/commencer" replace />} />
-    <Route path="/cgv" element={<CgvPage />} />
-    <Route path="/cookies" element={<CookiesPage />} />
-    <Route path="/privacy" element={<PrivacyPage />} />
-    <Route path="/terms" element={<TermsPage />} />
-    <Route path="/ai-policy" element={<AiPolicyPage />} />
-    <Route path="/expo" element={<ExpoCastPage />} />
+    <Route path="/cgv" element={<Pages.CgvPage />} />
+    <Route path="/cookies" element={<Pages.CookiesPage />} />
+    <Route path="/privacy" element={<Pages.PrivacyPage />} />
+    <Route path="/terms" element={<Pages.TermsPage />} />
+    <Route path="/ai-policy" element={<Pages.AiPolicyPage />} />
+    <Route path="/expo" element={<Pages.ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
       <Route index element={<RootEntryRoute />} />
-      <Route path="login" element={<Login />} />
-      <Route path="signup" element={<RegisterSaaS />} />
-      <Route path="reset-password" element={<ResetPassword />} />
-      <Route path="legal/cgv" element={<LegalStaticPage variant="cgv" />} />
-      <Route path="legal/rgpd" element={<LegalStaticPage variant="rgpd" />} />
+      <Route path="login" element={<Pages.Login />} />
+      <Route path="signup" element={<Pages.RegisterSaaS />} />
+      <Route path="reset-password" element={<Pages.ResetPassword />} />
+      <Route path="legal/cgv" element={<Pages.LegalStaticPage variant="cgv" />} />
+      <Route path="legal/rgpd" element={<Pages.LegalStaticPage variant="rgpd" />} />
       {/* Redirects rétrocompatibilité anciens QR codes */}
       <Route path="Oeuvre" element={<Navigate to="/artwork" replace />} />
       <Route path="Œuvre" element={<Navigate to="/artwork" replace />} />
@@ -269,73 +243,74 @@ const AppRoutes = () => (
       <Route path="œuvre/:artworkId" element={<OeuvreToArtworkRedirect />} />
       <Route element={<VisitorShell />}>
         <Route path="scan" element={<ScanEntryRedirect />} />
-        <Route path="scan-work1" element={<WorkScanner />} />
+        <Route path="scan-work1" element={<Pages.WorkScanner />} />
         <Route path="scan-work-first" element={<Navigate to="/scan-work1" replace />} />
-        <Route path="scan-work2" element={<ScanWork2 />} />
-        <Route path="summary" element={<Summary />} />
+        <Route path="scan-work2" element={<Pages.ScanWork2 />} />
+        <Route path="summary" element={<Pages.Summary />} />
         <Route path="scan-work" element={<Navigate to="/scan-work1" replace />} />
-        <Route path="register" element={<VisitorRegister />} />
-        <Route path="register_visitor" element={<RegisterVisitor />} />
-        <Route path="visitor" element={<VisitorWelcome />} />
+        <Route path="register" element={<Pages.VisitorRegister />} />
+        <Route path="register_visitor" element={<Pages.RegisterVisitor />} />
+        <Route path="visitor" element={<Pages.VisitorWelcome />} />
         <Route element={<OeuvrePageAccessGuard />}>
           <Route element={<ArtworkEntryGate />}>
             <Route path="artworks" element={<ArtworksListRedirect />} />
             <Route path="artworks/:artworkId" element={<OeuvreToArtworkRedirect />} />
-            <Route path="artwork" element={<ArtworkDetail />} />
-            <Route path="artwork/:artworkId" element={<ArtworkDetail />} />
-            <Route path="visitor/:artworkId" element={<ArtworkDetail />} />
+            <Route path="artwork" element={<Pages.ArtworkDetail />} />
+            <Route path="artwork/:artworkId" element={<Pages.ArtworkDetail />} />
+            <Route path="visitor/:artworkId" element={<Pages.ArtworkDetail />} />
           </Route>
-          <Route path="artworks_artist" element={<OeuvresArtiste />} />
-          <Route path="artworks_artist/:artistId" element={<OeuvresArtiste />} />
+          <Route path="artworks_artist" element={<Pages.OeuvresArtiste />} />
+          <Route path="artworks_artist/:artistId" element={<Pages.OeuvresArtiste />} />
         </Route>
       </Route>
       <Route element={<RequireBackoffice />}>
         <Route element={<AdminShell />}>
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="dashboard" element={<Pages.Dashboard />} />
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="artistes" element={<Artists />} />
-          <Route path="artistes/artistes2" element={<Artists2 />} />
-          <Route path="artistes-corbeille" element={<ArtistsCorbeille />} />
-          <Route path="artistes/:id" element={<EditArtist />} />
-          <Route path="artist/edit/:id" element={<EditArtist />} />
-          <Route path="catalogue" element={<Catalogue />} />
-          <Route path="catalogue/catalogue2" element={<Catalogue2 />} />
-          <Route path="agencies" element={<Agencies />} />
-          <Route path="agencies/agencies2" element={<Agencies2 />} />
-          <Route path="agencies-corbeille" element={<AgenciesCorbeille />} />
-          <Route path="user" element={<Users />} />
-          <Route path="user/utilisateurs" element={<Utilisateurs />} />
-          <Route path="user/users-corbeille" element={<UtilisateursCorbeille />} />
+          <Route path="artistes" element={<Pages.Artists />} />
+          <Route path="artistes/artistes2" element={<Pages.Artists2 />} />
+          <Route path="artistes-corbeille" element={<Pages.ArtistsCorbeille />} />
+          <Route path="artistes/:id" element={<Pages.EditArtist />} />
+          <Route path="artist/edit/:id" element={<Pages.EditArtist />} />
+          <Route path="catalogue" element={<Pages.Catalogue />} />
+          <Route path="catalogue/catalogue2" element={<Pages.Catalogue2 />} />
+          <Route path="agencies" element={<Pages.Agencies />} />
+          <Route path="agencies/agencies2" element={<Pages.Agencies2 />} />
+          <Route path="agencies-corbeille" element={<Pages.AgenciesCorbeille />} />
+          <Route path="user" element={<Pages.Users />} />
+          <Route path="user/utilisateurs" element={<Pages.Utilisateurs />} />
+          <Route path="user/users-corbeille" element={<Pages.UtilisateursCorbeille />} />
           <Route path="user/utilisateurs-corbeille" element={<Navigate to="/utilisateurs-corbeille" replace />} />
-          <Route path="utilisateurs-corbeille" element={<UtilisateursCorbeille />} />
-          <Route path="expos" element={<Expos />} />
-          <Route path="expos/expos2" element={<Expos2 />} />
-          <Route path="expos/visitors" element={<ExposVisitors />} />
-          <Route path="expos/visitors/:id" element={<ExposVisitorDetail />} />
-          <Route path="expos/visitor-audio" element={<ExposVisitorAudioMonitor />} />
-          <Route path="expos/sponsors" element={<ExposSponsors />} />
-          <Route path="visiteurs-corbeille" element={<VisiteursCorbeille />} />
-          <Route path="expos-corbeille" element={<ExposCorbeille />} />
-          <Route path="prompts" element={<Prompts />} />
-          <Route path="catalogue-corbeille" element={<CatalogueCorbeille />} />
+          <Route path="utilisateurs-corbeille" element={<Pages.UtilisateursCorbeille />} />
+          <Route path="expos" element={<Pages.Expos />} />
+          <Route path="expos/expos2" element={<Pages.Expos2 />} />
+          <Route path="expos/visitors" element={<Pages.ExposVisitors />} />
+          <Route path="expos/visitors/:id" element={<Pages.ExposVisitorDetail />} />
+          <Route path="expos/visitor-audio" element={<Pages.ExposVisitorAudioMonitor />} />
+          <Route path="expos/sponsors" element={<Pages.ExposSponsors />} />
+          <Route path="visiteurs-corbeille" element={<Pages.VisiteursCorbeille />} />
+          <Route path="expos-corbeille" element={<Pages.ExposCorbeille />} />
+          <Route path="prompts" element={<Pages.Prompts />} />
+          <Route path="catalogue-corbeille" element={<Pages.CatalogueCorbeille />} />
           <Route path="qr-codes" element={<Navigate to="/catalogue" replace />} />
-          <Route path="statistiques" element={<Statistics />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="settings/couts" element={<SettingsCouts />} />
-          <Route path="suivi_temps" element={<SettingsSuiviTemps />} />
-          <Route path="suivi_supabase" element={<SettingsSupabaseMonitoring />} />
+          <Route path="statistiques" element={<Pages.Statistics />} />
+          <Route path="settings" element={<Pages.SettingsPage />} />
+          <Route path="settings/couts" element={<Pages.SettingsCouts />} />
+          <Route path="suivi_temps" element={<Pages.SettingsSuiviTemps />} />
+          <Route path="suivi_supabase" element={<Pages.SettingsSupabaseMonitoring />} />
           <Route path="suivi_vercel" element={<Navigate to="/settings" replace />} />
-          <Route path="suivi_tokens" element={<SettingsSuiviTokens />} />
-          <Route path="suivi_erreurs_visiteurs" element={<SettingsVisitorErrors />} />
-          <Route path="suivi_erreurs_organisateurs" element={<SettingsOrganizerErrors />} />
-          <Route path="settings/qui-est-en-ligne" element={<SettingsOnlinePresence />} />
-          <Route path="settings/presence-seuils" element={<SettingsPresenceThresholds />} />
+          <Route path="suivi_tokens" element={<Pages.SettingsSuiviTokens />} />
+          <Route path="suivi_erreurs_visiteurs" element={<Pages.SettingsVisitorErrors />} />
+          <Route path="suivi_erreurs_organisateurs" element={<Pages.SettingsOrganizerErrors />} />
+          <Route path="settings/qui-est-en-ligne" element={<Pages.SettingsOnlinePresence />} />
+          <Route path="settings/presence-seuils" element={<Pages.SettingsPresenceThresholds />} />
           <Route path="setting" element={<Navigate to="/settings" replace />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<Pages.NotFound />} />
         </Route>
       </Route>
     </Route>
   </Routes>
+  </Suspense>
 );
 
 const App = () => {
@@ -362,6 +337,7 @@ const App = () => {
           <UiLanguageProvider>
             <NavigationMatrixProvider>
               <NormalizeMultipleSlashPathname />
+              <I18nRouteLoader />
               <VisitorErrorLogCapture />
               <OrganizerErrorLogCapture />
               <AppRoutes />

@@ -1,3 +1,5 @@
+import "flag-icons/css/flag-icons.min.css";
+
 import { cn } from "@/lib/utils";
 
 type CountryFlagIconProps = {

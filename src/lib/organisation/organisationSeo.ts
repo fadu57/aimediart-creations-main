@@ -11,6 +11,9 @@ export const ORGANISATION_META_DESCRIPTION =
 
 export const ORGANISATION_OG_IMAGE_PATH = "/landing-hero-new.png";
 
+export const ORGANISATION_LCP_IMAGE_PATH = ORGANISATION_OG_IMAGE_PATH;
+export const ORGANISATION_LCP_WEBP_PATH = ORGANISATION_LCP_IMAGE_PATH.replace(/\.png$/i, ".webp");
+
 export const ORGANISATION_KEYWORDS =
   "médiation exposition, art-médiation, QR code musée, visite virtuelle, émotions visiteurs, galerie, musée, IA culturelle, AIMEDIArt";
 
@@ -124,6 +127,11 @@ export function escapeHtmlAttribute(value: string): string {
 /** Injecte / remplace les balises <head> SEO pour dist/organisation/index.html */
 export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload): string {
   const jsonLd = JSON.stringify(buildOrganisationJsonLd(seo)).replace(/</g, "\\u003c");
+  const lcpWebpUrl = `${seo.siteOrigin}${ORGANISATION_LCP_WEBP_PATH}`;
+  const performanceHints = `
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+    <link rel="preload" as="image" type="image/webp" href="${escapeHtmlAttribute(lcpWebpUrl)}" fetchpriority="high" />`;
   const headBlock = `
     <title>${escapeHtmlAttribute(seo.title)}</title>
     <meta name="description" content="${escapeHtmlAttribute(seo.description)}" />
@@ -155,7 +163,7 @@ export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload
 
   out = out.replace(
     /<meta name="viewport"[^>]*\/?>/i,
-    (match) => `${match}\n${headBlock}`,
+    (match) => `${match}\n${performanceHints}\n${headBlock}`,
   );
 
   return out;

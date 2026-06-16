@@ -1,22 +1,16 @@
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
+import { LanguageFlag } from "@/components/LanguageFlag";
+import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
-
-export const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
-  { value: "fr", label: "FR", flagClass: "fi fi-fr" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
-  { value: "en", label: "EN", flagClass: "fi fi-gb" },
-  { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "it", label: "IT", flagClass: "fi fi-it" },
-];
 
 type UiLanguageSelectorProps = {
   className?: string;
   selectClassName?: string;
 };
 
-/** Sélecteur de langue UI (drapeau + liste), même principe que le header général. */
+/** Sélecteur de langue UI (drapeau emoji + liste), sans dépendance flag-icons. */
 export function UiLanguageSelector({ className, selectClassName }: UiLanguageSelectorProps) {
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("header");
@@ -24,7 +18,7 @@ export function UiLanguageSelector({ className, selectClassName }: UiLanguageSel
 
   return (
     <div className={cn("inline-flex items-center gap-1 rounded-md border border-border bg-white px-1.5", className)}>
-      <span className={activeLanguage.flagClass} aria-hidden />
+      <LanguageFlag lang={activeLanguage.value} />
       <select
         id="visitorLanguageSelector"
         value={language}
@@ -42,3 +36,6 @@ export function UiLanguageSelector({ className, selectClassName }: UiLanguageSel
     </div>
   );
 }
+
+// Rétrocompatibilité des imports existants
+export { UI_LANGUAGE_OPTIONS };

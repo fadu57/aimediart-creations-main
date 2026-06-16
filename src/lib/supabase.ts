@@ -1,9 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@types/supabase";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@types/supabase";
-
 /** Vite (navigateur) ou variables process (prérendu Node). */
 function readEnv(key: "VITE_SUPABASE_URL" | "VITE_SUPABASE_ANON_KEY"): string {
   const fromVite = typeof import.meta !== "undefined" ? import.meta.env?.[key]?.trim() : "";

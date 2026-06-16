@@ -52,6 +52,8 @@ import {
 import { getVisitorAnonymousProfile, type VisitorAnonymousProfile } from "@/lib/visitorAnonymousProfile";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
+import { LanguageFlag } from "@/components/LanguageFlag";
+import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 
 type QuickFeedbackHint = "both" | "emotion" | "heart";
 
@@ -171,14 +173,6 @@ function triggerHeartConfetti(): void {
     origin: { y: 0.6 },
   });
 }
-
-const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
-  { value: "fr", label: "FR", flagClass: "fi fi-fr" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
-  { value: "en", label: "EN", flagClass: "fi fi-gb" },
-  { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "it", label: "IT", flagClass: "fi fi-it" },
-];
 
 function mediationStyleTextForLang(raw: unknown, styleKey: string, lang: MediationUiLang): string {
   const bucket = getMediationLangBucketFromRaw(raw, lang);
@@ -1374,7 +1368,7 @@ const VisitorViewCore = () => {
               {languageOptionsForArtwork.length > 0 && (
                 <div className="fab-item fab-language-item px-2" aria-label={t("aria_language")}>
                   <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
-                    <span className={activeLanguage.flagClass} aria-hidden />
+                    <LanguageFlag lang={activeLanguage.value} />
                     <select
                       id="languageSelector"
                       value={language}

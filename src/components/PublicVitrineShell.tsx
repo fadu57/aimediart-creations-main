@@ -4,20 +4,14 @@ import { useTranslation } from "react-i18next";
 import { ChevronRight, Heart, Menu, X } from "lucide-react";
 
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
+import { LanguageFlag } from "@/components/LanguageFlag";
+import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { cn } from "@/lib/utils";
 
 export const BRAND_RED = "hsl(0 65% 48%)";
 export const BRAND_RED_DARK = "hsl(0 62% 38%)";
 /** Rouge marque pour le mot « AIMEDIArt » sur la vitrine */
 export const AIMEDIART_WORD_RED = "text-[#E63946]";
-
-const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
-  { value: "fr", label: "FR", flagClass: "fi fi-fr" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
-  { value: "en", label: "EN", flagClass: "fi fi-gb" },
-  { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "it", label: "IT", flagClass: "fi fi-it" },
-];
 
 const ANCHOR_IDS = ["accueil", "exposition-vivante", "parcours", "tarifs", "accessibilite", "connectivite"] as const;
 
@@ -120,7 +114,7 @@ function FloatingNav({
           <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
             <LogoMark compact />
             <div className="inline-flex items-center gap-1 rounded-lg border border-neutral-300/80 bg-white px-2 py-1.5 shadow-sm">
-              <span className={activeLanguage.flagClass} aria-hidden />
+              <LanguageFlag lang={activeLanguage.value} />
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as UiLanguage)}
@@ -191,7 +185,7 @@ function FloatingNav({
                   <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
                 </Link>
                 <div className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
-                  <span className={activeLanguage.flagClass} aria-hidden />
+                  <LanguageFlag lang={activeLanguage.value} />
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value as UiLanguage)}
@@ -223,6 +217,9 @@ function VantaCloudsBackground() {
 
     let effect: { destroy: () => void } | null = null;
     let mounted = true;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const initVanta = async () => {
       try {
         const THREE = await import("three");
@@ -250,16 +247,35 @@ function VantaCloudsBackground() {
         console.error("[PublicVitrineShell] Initialisation Vanta Clouds impossible:", error);
       }
     };
-    void initVanta();
+
+    const scheduleVanta = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(() => void initVanta(), { timeout: 2500 });
+      } else {
+        timeoutId = setTimeout(() => void initVanta(), 1200);
+      }
+    };
+
+    scheduleVanta();
 
     return () => {
       mounted = false;
+      if (idleId !== undefined && typeof window.cancelIdleCallback === "function") {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
       effect?.destroy();
       effect = null;
     };
   }, []);
 
-  return <div ref={vantaRef} className="fixed inset-0 z-0" aria-hidden />;
+  return (
+    <div
+      ref={vantaRef}
+      className="fixed inset-0 z-0 bg-gradient-to-b from-sky-100/80 via-white to-white"
+      aria-hidden
+    />
+  );
 }
 
 function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/organisation" }) {

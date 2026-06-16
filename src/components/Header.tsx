@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { SettingsMenuDropdown } from "@/components/SettingsMenuDropdown";
+import { LanguageFlag } from "@/components/LanguageFlag";
+import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 
 /** Effet verre sur les pastilles du menu desktop (aperçu navigateur). */
 const HEADER_NAV_PILL_BLUR = "backdrop-blur-[12px]";
@@ -47,13 +49,6 @@ function navKey(label: string): string {
   }
   return label;
 }
-const UI_LANGUAGE_OPTIONS: Array<{ value: UiLanguage; label: string; flagClass: string }> = [
-  { value: "fr", label: "FR", flagClass: "fi fi-fr" },
-  { value: "de", label: "DE", flagClass: "fi fi-de" },
-  { value: "en", label: "EN", flagClass: "fi fi-gb" },
-  { value: "es", label: "ES", flagClass: "fi fi-es" },
-  { value: "it", label: "IT", flagClass: "fi fi-it" },
-];
 
 function Logo({
   compact,
@@ -243,7 +238,7 @@ export default function Header() {
           <Logo compact={isAuthFormPage} role_name={role_name} role_id={role_id} />
           <div className="user-controls flex flex-col items-start gap-1">
             <div className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-1.5">
-              <span className={activeLanguage.flagClass} aria-hidden />
+              <LanguageFlag lang={activeLanguage.value} />
               <select
                 id="languageSelector"
                 value={language}
@@ -409,7 +404,7 @@ export default function Header() {
               )}
               <div className="fab-item px-2" title={t("language_label")}>
                 <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
-                  <span className={activeLanguage.flagClass} aria-hidden />
+                  <LanguageFlag lang={activeLanguage.value} />
                   <select
                     id="languageSelectorFab"
                     value={language}

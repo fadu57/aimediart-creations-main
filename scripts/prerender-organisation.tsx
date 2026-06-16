@@ -11,6 +11,7 @@ import { I18nextProvider } from "react-i18next";
 import { MemoryRouter } from "react-router-dom";
 
 import i18n from "../src/i18n/config";
+import { initI18nForPath } from "../src/i18n/bootstrapI18n";
 import frHome from "../src/i18n/locales/fr/home.json";
 import {
   auditPrerenderedHtml,
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  await initI18nForPath("/organisation");
   await i18n.changeLanguage("fr");
   const initialData = await fetchPublicHomeData(supabaseUrl, anonKey);
 
