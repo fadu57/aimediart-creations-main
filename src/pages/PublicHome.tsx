@@ -443,8 +443,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
 
   return (
     <PublicVitrineShell vitrinePathPrefix="">
-        <div>
-        <section id="accueil" className="scroll-mt-[68px] pb-0 pt-0">
+        <section id="accueil" className="scroll-mt-[68px] pb-0 pt-0" aria-labelledby="hero-title">
           <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
             <SurfaceCardShell
               decorations={
@@ -458,9 +457,15 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               <p className="mt-2 max-w-[52ch] text-[11px] font-semibold uppercase tracking-[0.18em] text-[#E63946]/90">
                 {t("hero.eyebrow")}
               </p>
-              <h1 className="mt-4 max-w-[18ch] font-serif text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]">
+              <h1
+                id="hero-title"
+                className="mt-4 max-w-[18ch] font-serif text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]"
+              >
                 <span className="block">{t("hero.title_line1")}</span>
                 <span className="block">{t("hero.title_line2")}</span>
+                <span className="sr-only">
+                  {" — médiation d'exposition par QR code et intelligence artificielle pour musées, galeries et lieux culturels"}
+                </span>
               </h1>
               <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.12rem]" style={{ whiteSpace: "pre-line" }}>
                 {highlightAimediartWord(t("hero.intro_1"))}
@@ -485,18 +490,18 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 </a>
               </div>
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float ph-fold-card">
-                  <div className="text-xs font-bold tracking-[0.12em] text-muted-foreground">{t("hero.feature_qr_label")}</div>
+                <article className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float ph-fold-card">
+                  <p className="text-xs font-bold tracking-[0.12em] text-muted-foreground">{t("hero.feature_qr_label")}</p>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <div className="max-w-[18ch] text-sm leading-relaxed text-foreground/85">{t("hero.feature_qr_text")}</div>
+                    <p className="max-w-[18ch] text-sm leading-relaxed text-foreground/85">{t("hero.feature_qr_text")}</p>
                     <div className="shrink-0 rounded-lg border border-neutral-200 bg-neutral-50 p-2" aria-hidden>
                       <QrCode className="h-6 w-6 text-[#9d2525]" />
                     </div>
                   </div>
-                </div>
-                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float-delayed ph-fold-card">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{t("hero.feature_lang_label")}</div>
-                  <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">{t("hero.feature_lang_text")}</div>
+                </article>
+                <article className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float-delayed ph-fold-card">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{t("hero.feature_lang_label")}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{t("hero.feature_lang_text")}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5" aria-label="Icônes des modes de langage">
                     {(promptIcons.length > 0 ? promptIcons : ["🎓", "🪶", "🧒", "✨"]).map((icon, idx) => (
                       <span
@@ -508,13 +513,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       </span>
                     ))}
                   </div>
-                </div>
-                <div className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float ph-fold-card">
-                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{t("hero.feature_hearts_label")}</div>
-                  <div className="mt-1.5 text-sm leading-relaxed text-foreground/85">
+                </article>
+                <article className="rounded-2xl border border-neutral-300/70 bg-white/95 p-4 ph-animate-float ph-fold-card">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">{t("hero.feature_hearts_label")}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">
                     {t("hero.feature_hearts_text")}
-                  </div>
-                </div>
+                  </p>
+                </article>
               </div>
               <figure className="mt-8 overflow-hidden rounded-2xl border border-neutral-300/70 bg-white">
                 <img
@@ -587,6 +592,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
         >
           <p className="max-w-[72ch] text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">{t("output.intro")}</p>
           <div className="mt-8 grid gap-5 md:grid-cols-3">
+            <article>
             <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-violet-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 ph-fold-card">
               <CardHeader className="pb-2">
                 <div className="mb-3 flex h-24 items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-400/25 via-fuchsia-400/20 to-transparent ph-animate-float">
@@ -595,9 +601,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <CardTitle className="font-serif text-lg">{t("output.card_nuage_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
-                {t("output.card_nuage_text")}
+                <p>{t("output.card_nuage_text")}</p>
               </CardContent>
             </Card>
+            </article>
+            <article>
             <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-rose-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 ph-fold-card">
               <CardHeader className="pb-2">
                 <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-rose-300/25 to-amber-100/40 ph-animate-float-delayed">
@@ -606,9 +614,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <CardTitle className="font-serif text-lg">{t("output.card_murmures_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
-                {highlightAimediartWord(t("output.card_murmures_text"))}
+                <p>{highlightAimediartWord(t("output.card_murmures_text"))}</p>
               </CardContent>
             </Card>
+            </article>
+            <article>
             <Card className="group rounded-3xl border-neutral-300/70 bg-gradient-to-b from-sky-50/90 to-white shadow-[0_12px_28px_rgba(0,0,0,0.06)] transition-transform duration-300 ph-fold-card">
               <CardHeader className="pb-2">
                 <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-400/30 to-emerald-300/15">
@@ -617,9 +627,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <CardTitle className="font-serif text-lg">{t("output.card_thermometre_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
-                {t("output.card_thermometre_text")}
+                <p>{t("output.card_thermometre_text")}</p>
               </CardContent>
             </Card>
+            </article>
           </div>
           <figure className="mt-10 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
@@ -762,7 +773,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 icon: HeartHandshake,
               },
             ].map((x) => (
-              <Card key={x.id} className="relative rounded-3xl border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.05)] ph-fold-card">
+              <article key={x.id} aria-labelledby={`${x.id}-title`}>
+              <Card className="relative rounded-3xl border-neutral-300/70 bg-white shadow-[0_10px_22px_rgba(0,0,0,0.05)] ph-fold-card">
                 <CardHeader className="pb-2">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{x.step}</p>
@@ -770,20 +782,21 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       <x.icon className="h-4 w-4 text-foreground/70" aria-hidden />
                     </div>
                   </div>
-                  <CardTitle className="font-serif text-xl">{x.title}</CardTitle>
+                  <CardTitle id={`${x.id}-title`} className="font-serif text-xl">{x.title}</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm leading-relaxed text-foreground/80" style={{ whiteSpace: "pre-line" }}>
-                  {x.text}
+                <CardContent className="text-sm leading-relaxed text-foreground/80">
+                  <p style={{ whiteSpace: "pre-line" }}>{x.text}</p>
                   {x.id === "step2" ? (
                     <p className="mt-2 text-[11px] italic text-muted-foreground" style={{ whiteSpace: "normal" }}>{t("parcours.step2_falc_note")}</p>
                   ) : null}
                 </CardContent>
               </Card>
+              </article>
             ))}
           </div>
 
           <div className="mt-10 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
+            <article className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.commissaire_eyebrow")}</p>
               <h3 className="mt-2 font-serif text-2xl font-semibold tracking-tight">{t("parcours.commissaire_title")}</h3>
               <p className="mt-3 text-sm leading-relaxed text-foreground/80">{t("parcours.commissaire_text")}</p>
@@ -795,13 +808,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   { id: "kpi_retours", kpi: "+31%", label: t("parcours.kpi_retours_label") },
                 ].map((item) => (
                   <div key={item.id} className="rounded-2xl border border-neutral-200 bg-white p-3">
-                    <div className="font-serif text-xl leading-none text-foreground">{item.kpi}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{item.label}</div>
+                    <p className="font-serif text-xl leading-none text-foreground">{item.kpi}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="rounded-3xl border border-neutral-300/70 bg-white p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
+            </article>
+            <article className="rounded-3xl border border-neutral-300/70 bg-white p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("parcours.benefices_label")}</p>
               <img
                 src={UNSPLASH_DASHBOARD_IMAGE}
@@ -818,11 +831,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-2 rounded-xl bg-neutral-50 p-3">
                     <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <span className="text-sm leading-relaxed text-foreground/80">{item}</span>
+                    <p className="text-sm leading-relaxed text-foreground/80">{item}</p>
                   </div>
                 ))}
               </div>
-            </div>
+            </article>
           </div>
 
         </Section>
@@ -838,13 +851,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           <div className="rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <div className="text-sm font-semibold">{t("tarifs.monthly_label")}</div>
+                <h3 className="text-sm font-semibold">{t("tarifs.monthly_label")}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-foreground/80">
                   {t("tarifs.monthly_text")}
                 </p>
               </div>
               <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <div className="text-sm font-semibold">{t("tarifs.annual_label")}</div>
+                <h3 className="text-sm font-semibold">{t("tarifs.annual_label")}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-foreground/80">
                   {t("tarifs.annual_text")}
                 </p>
@@ -913,8 +926,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       badgeLabel = testerBadgeCount === 2 ? t("tarifs.badge_sublimer") : t("tarifs.badge_tester");
                     }
                     return (
+                      <article key={planKey} aria-labelledby={`plan-title-${planKey}`}>
                       <Card
-                        key={planKey}
                         className={cn(
                           "rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
                           isHighlight && "ring-1 ring-[rgba(168,23,29,0.22)]",
@@ -941,7 +954,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                               </Button>
                             </Link>
                           </div>
-                          <CardTitle className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
+                          <CardTitle id={`plan-title-${planKey}`} className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
                           <p className="text-sm leading-relaxed text-muted-foreground">
                             {highlightAimediartWord(subtitle)}
                           </p>
@@ -1030,6 +1043,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                           ) : null}
                         </CardContent>
                       </Card>
+                      </article>
                     );
                   });
                   })()}
@@ -1067,15 +1081,15 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               { id: "card3", title: t("access.card3_title"), text: t("access.card3_text") },
               { id: "card4", title: t("access.card4_title"), text: t("access.card4_text") },
             ].map((x, i) => (
-              <div
+              <article
                 key={x.id}
                 className={`rounded-2xl border border-neutral-300/70 p-4 shadow-[0_8px_18px_rgba(0,0,0,0.04)] ph-fold-card ${
                   i === 3 ? "bg-[#f9f5f3]" : "bg-white"
                 }`}
               >
-                <div className="text-sm font-semibold">{x.title}</div>
-                <div className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{x.text}</div>
-              </div>
+                <h3 className="text-sm font-semibold">{x.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{x.text}</p>
+              </article>
             ))}
           </div>
         </Section>
@@ -1119,7 +1133,6 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           <OrganisationConnexionContent />
         </section>
 
-        </div>
     </PublicVitrineShell>
   );
 }

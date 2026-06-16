@@ -343,10 +343,10 @@ export function PublicVitrineShell({
           setIsMobileOpen={setMobileNavOpen}
           vitrinePathPrefix={vitrinePathPrefix}
         />
-        <div>
+        <main id="contenu-principal" role="main" className="outline-none">
           {children}
           <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} />
-        </div>
+        </main>
       </div>
     </div>
   );

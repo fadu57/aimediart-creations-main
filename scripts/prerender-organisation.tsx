@@ -1,6 +1,5 @@
 /**
- * Prérendu SSG de /organisation au build — équivalent SSR Next.js pour la vitrine SEO.
- * Génère dist/organisation/index.html avec HTML + données tarifs dans le premier payload.
+ * Prérendu SSG de /organisation — HTML optimisé SEO, Open Graph et JSON-LD.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -13,6 +12,11 @@ import { MemoryRouter } from "react-router-dom";
 
 import i18n from "../src/i18n/config";
 import frHome from "../src/i18n/locales/fr/home.json";
+import {
+  auditPrerenderedHtml,
+  buildOrganisationSeoPayload,
+  injectOrganisationHead,
+} from "../src/lib/organisation/organisationSeo";
 import { fetchPublicHomeData } from "../src/lib/organisation/publicHomeData";
 import PublicHome from "../src/pages/PublicHome";
 import { UiLanguageProvider } from "../src/providers/UiLanguageProvider";
@@ -50,42 +54,34 @@ async function main(): Promise<void> {
     </MemoryRouter>,
   );
 
+  const seo = buildOrganisationSeoPayload(
+    frHome.hero.title_line1,
+    frHome.hero.title_line2,
+  );
+
   const template = readFileSync(templatePath, "utf8");
   const safeJson = JSON.stringify(initialData).replace(/</g, "\\u003c");
   const initialDataScript = `<script type="application/json" id="__ORGANISATION_INITIAL_DATA__">${safeJson}</script>`;
-
-  const seoTitle = `${frHome.hero.title_line1} — ${frHome.hero.title_line2}`;
-  const seoDescription = String(frHome.hero.intro_1).split("\n")[0]?.trim() ?? "AIMEDIArt — médiation d'exposition";
 
   let html = template.replace(
     '<div id="root"></div>',
     `<div id="root">${appHtml}</div>\n    ${initialDataScript}`,
   );
-  html = html.replace(/<title>.*?<\/title>/, `<title>AIMEDIArt — ${escapeHtml(seoTitle)}</title>`);
-  html = html.replace(
-    /<meta name="description" content="[^"]*"\s*\/>/,
-    `<meta name="description" content="${escapeHtml(seoDescription)}" />`,
-  );
-  html = html.replace(
-    /<meta property="og:title" content="[^"]*"\s*\/>/,
-    `<meta property="og:title" content="AIMEDIArt — ${escapeHtml(seoTitle)}" />`,
-  );
-  html = html.replace(
-    /<meta property="og:description" content="[^"]*"\s*\/>/,
-    `<meta property="og:description" content="${escapeHtml(seoDescription)}" />`,
-  );
+
+  html = injectOrganisationHead(html, seo);
+
+  const warnings = auditPrerenderedHtml(html);
+  for (const w of warnings) {
+    console.warn(`[prerender:organisation] audit SEO : ${w}`);
+  }
 
   const outDir = resolve(distDir, "organisation");
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "index.html"), html, "utf8");
-  console.log("[prerender:organisation] dist/organisation/index.html généré.");
-}
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;");
+  console.log(
+    `[prerender:organisation] dist/organisation/index.html généré (description ${seo.description.length} car., canonical ${seo.canonicalUrl}).`,
+  );
 }
 
 main().catch((err: unknown) => {
