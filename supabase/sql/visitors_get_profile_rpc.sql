@@ -44,8 +44,15 @@ BEGIN
     v_row.visitor_client_id := cid;
   END IF;
 
-  IF v_row.id IS NULL OR nullif(trim(v_row.visitor_pseudo), '') IS NULL THEN
+  IF v_row.id IS NULL THEN
     RETURN jsonb_build_object('is_returning', false);
+  END IF;
+
+  IF nullif(trim(v_row.visitor_pseudo), '') IS NULL THEN
+    RETURN jsonb_build_object(
+      'is_returning', false,
+      'persona_defaut', v_row.persona_defaut
+    );
   END IF;
 
   RETURN jsonb_build_object(
@@ -54,7 +61,8 @@ BEGIN
     'avatar_url', v_row.avatar_url,
     'avatar_object_path', v_row.avatar_object_path,
     'selfie_url', v_row.selfie_url,
-    'selfie_object_path', v_row.selfie_object_path
+    'selfie_object_path', v_row.selfie_object_path,
+    'persona_defaut', v_row.persona_defaut
   );
 END;
 $$;

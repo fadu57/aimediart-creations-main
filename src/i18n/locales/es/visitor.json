@@ -31,6 +31,8 @@
   "aria_mediation_next": "Estilo de mediación siguiente",
   "mediation_text_missing": "No hay texto generado para este estilo.",
   "mediation_not_available_in_lang": "La mediación de esta obra aún no está disponible en español.",
+  "default_persona_label": "Mi persona predeterminada",
+  "default_persona_aria": "Establecer esta persona como preferencia predeterminada",
   "emotion_section_title": "La emoción sentida ante esta obra",
   "emotions_empty_error": "No se muestran botones: la tabla emotions no devuelve filas con icone_emotion y name_emotion.",
   "heart_rating_title": "Asigne SU nota en CORAZONES",

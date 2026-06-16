@@ -12,11 +12,17 @@ import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { SettingsMenuDropdown } from "@/components/SettingsMenuDropdown";
+import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { LanguageFlag } from "@/components/LanguageFlag";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
+import { cn } from "@/lib/utils";
 
 /** Effet verre sur les pastilles du menu desktop (aperçu navigateur). */
 const HEADER_NAV_PILL_BLUR = "backdrop-blur-[12px]";
+/** Pastilles menu desktop — compactes. */
+const HEADER_NAV_PILL_CLASS = `rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors sm:text-sm sm:px-2 sm:py-1 ${HEADER_NAV_PILL_BLUR}`;
+/** Pastilles encore plus serrées (header /organisation fusionné). */
+const HEADER_NAV_PILL_COMPACT_CLASS = `rounded-md px-1 py-0.5 text-[11px] font-medium whitespace-nowrap transition-colors ${HEADER_NAV_PILL_BLUR}`;
 /** Ombre portée + inset pour le bouton de déconnexion. */
 const HEADER_LOGOUT_SHADOW =
   "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.15),inset_0px_4px_12px_0px_rgba(0,0,0,0.15)]";
@@ -115,6 +121,8 @@ export default function Header() {
     pathname.startsWith("/summary/") ||
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
+  const isOrganisationVitrinePage =
+    pathname === "/organisation" || pathname.startsWith("/organisation/");
   const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/organisation";
   const { can } = useNavigationMatrix();
@@ -132,6 +140,11 @@ export default function Header() {
   const hasFullHeader = role_id === 4 || role_id === 1 || (typeof role_id === "number" && role_id >= 1 && role_id <= 6);
   const canSeeHomeMenu = can("menu_home");
   const canSeeSettings = role_id === 1 || role_id === 2 || role_id === 3;
+  const showVitrineNavInHeader =
+    Boolean(session) && isOrganisationVitrinePage && !authLoading;
+  const showVitrineNavInHeaderDesktop = showVitrineNavInHeader && isDesktopHeader;
+  const vitrineAnchorPrefix = pathname === "/organisation" ? "" : "/organisation";
+  const navPillClass = showVitrineNavInHeaderDesktop ? HEADER_NAV_PILL_COMPACT_CLASS : HEADER_NAV_PILL_CLASS;
   const userMeta = (user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const jwtDisplayName =
     (typeof userMeta.full_name === "string" ? userMeta.full_name.trim() : "") ||
@@ -231,10 +244,28 @@ export default function Header() {
         className={
           isVisitorPage
             ? "mx-auto flex min-h-[4rem] w-full max-w-[375px] items-center justify-between gap-1.5 px-1.5 sm:gap-2 sm:px-3"
-            : "mx-auto flex min-h-[4.25rem] w-full max-w-[1200px] items-center justify-between gap-2 px-2 py-1 sm:px-4"
+            : cn(
+                "mx-auto flex w-full py-1",
+                showVitrineNavInHeaderDesktop
+                  ? "max-w-[1060px] flex-col px-5 py-2 sm:px-6 min-h-[5.75rem]"
+                  : "max-w-[1200px] items-center justify-between gap-2 px-2 sm:px-4 min-h-[4.25rem]",
+              )
         }
       >
-        <div className="header-left flex min-w-0 flex-1 items-center gap-[15px]">
+        <div
+          className={cn(
+            "flex w-full gap-2",
+            showVitrineNavInHeaderDesktop
+              ? "items-start justify-between px-2 sm:px-3"
+              : "items-center justify-between",
+          )}
+        >
+        <div
+          className={cn(
+            "header-left flex min-w-0 items-center gap-[15px]",
+            !showVitrineNavInHeaderDesktop && "flex-1",
+          )}
+        >
           <Logo compact={isAuthFormPage} role_name={role_name} role_id={role_id} />
           <div className="user-controls flex flex-col items-start gap-1">
             <div className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-1.5">
@@ -279,8 +310,23 @@ export default function Header() {
           </div>
         </div>
         {isDesktopHeader && (
-          <div className="ml-4 hidden shrink-0 flex-col items-end gap-1 xl:flex">
-            <nav className="flex items-center gap-1">
+          <div
+            className={cn(
+              "hidden min-w-0 flex-col gap-0.5 xl:flex",
+              showVitrineNavInHeaderDesktop ? "shrink-0 items-end" : "ml-4 shrink-0 items-end",
+            )}
+          >
+            <nav className="flex flex-nowrap items-center justify-end gap-0.5">
+              <NavLink
+                to="/organisation"
+                className={({ isActive }) =>
+                  `${navPillClass} ${
+                    isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                  }`
+                }
+              >
+                {t("nav_accueil")}
+              </NavLink>
               {hasFullHeader &&
                 HEADER_NAV_ITEMS.map((item) => {
                   if (item.key === "menu_home") return null;
@@ -291,7 +337,7 @@ export default function Header() {
                       key={`desktop-nav-${item.key}`}
                       to={item.to}
                       className={({ isActive }) =>
-                        `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
+                        `${navPillClass} ${
                           isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                         }`
                       }
@@ -304,7 +350,7 @@ export default function Header() {
                 <NavLink
                   to={homePath}
                   className={({ isActive }) =>
-                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
+                    `${navPillClass} ${
                       isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                     }`
                   }
@@ -313,12 +359,12 @@ export default function Header() {
                 </NavLink>
               )}
               {hasFullHeader && canSeeSettings && (
-                <SettingsMenuDropdown triggerClassName={HEADER_NAV_PILL_BLUR} />
+                <SettingsMenuDropdown triggerClassName={navPillClass} />
               )}
               {session && !isAuthFormPage ? (
                 <button
                   type="button"
-                  className={`rounded-md px-2 py-1 text-sm font-medium text-foreground transition-colors hover:bg-muted ${HEADER_NAV_PILL_BLUR} ${HEADER_LOGOUT_SHADOW}`}
+                  className={`${navPillClass} text-foreground hover:bg-muted ${HEADER_LOGOUT_SHADOW}`}
                   onClick={() => {
                     void handleLogout();
                   }}
@@ -329,7 +375,7 @@ export default function Header() {
                 <NavLink
                   to="/login"
                   className={({ isActive }) =>
-                    `rounded-md px-2 py-1 text-sm font-medium transition-colors ${HEADER_NAV_PILL_BLUR} ${
+                    `${navPillClass} ${
                       isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                     }`
                   }
@@ -338,6 +384,17 @@ export default function Header() {
                 </NavLink>
               )}
             </nav>
+            {showVitrineNavInHeaderDesktop ? (
+              <div className="flex justify-end pt-0.5">
+                <div className="rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
+                  <VitrineAnchorNav
+                    vitrinePathPrefix={vitrineAnchorPrefix}
+                    variant="header"
+                    align="end"
+                  />
+                </div>
+              </div>
+            ) : null}
             <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
               {t("greeting")}
               {session ? (
@@ -363,6 +420,15 @@ export default function Header() {
         {!isDesktopHeader && (
           <div className={`fab-container fab-top-right fab-in-header shrink-0 ${isFabOpen ? "active" : ""}`}>
             <div className="fab-links">
+              <NavLink
+                to="/organisation"
+                className="fab-item"
+                title={t("nav_accueil")}
+                onClick={() => setIsFabOpen(false)}
+              >
+                <House className="h-5 w-5 text-[#121212]" aria-hidden />
+                <span className="fab-item-label">{t("nav_accueil")}</span>
+              </NavLink>
               {canSeeHomeMenu && (
                 <NavLink to={homePath} className="fab-item" title={t("nav_home")} onClick={() => setIsFabOpen(false)}>
                   <House className="h-5 w-5 text-[#121212]" aria-hidden />
@@ -402,6 +468,15 @@ export default function Header() {
               {hasFullHeader && canSeeSettings && (
                 <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
               )}
+              {showVitrineNavInHeader ? (
+                <div className="fab-item w-full max-w-[min(100vw-2rem,280px)] rounded-lg border border-neutral-200 bg-[#faf9f7] p-2">
+                  <VitrineAnchorNav
+                    vitrinePathPrefix={vitrineAnchorPrefix}
+                    variant="floating"
+                    onNavigate={() => setIsFabOpen(false)}
+                  />
+                </div>
+              ) : null}
               <div className="fab-item px-2" title={t("language_label")}>
                 <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
                   <LanguageFlag lang={activeLanguage.value} />
@@ -458,6 +533,7 @@ export default function Header() {
             </button>
           </div>
         )}
+        </div>
       </div>
     </header>
   );

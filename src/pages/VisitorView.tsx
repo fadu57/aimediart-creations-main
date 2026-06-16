@@ -8,6 +8,7 @@ import {
   type VisitorProfilePopupData,
 } from "@/components/visitor/VisitorProfilePopup";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, BookOpen, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -42,6 +43,11 @@ import {
   resolveReturningAnonymousVisitor,
 } from "@/lib/registerAnonymousVisitorSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import {
+  getVisitorDefaultPromptStyleId,
+  loadVisitorDefaultPromptStyleFromServer,
+  setVisitorDefaultPromptStyleId,
+} from "@/lib/visitorDefaultPersona";
 import {
   getStoredVisitorExpoVisitId,
   endVisitorExpoVisit,
@@ -227,6 +233,9 @@ const VisitorViewCore = () => {
   /** Message d’erreur renvoyé par Supabase pour la requête `prompt_style` (si échec). */
   const [stylesQueryError, setStylesQueryError] = useState<string | null>(null);
   const [selectedPromptStyleId, setSelectedPromptStyleId] = useState<string>("");
+  const [defaultPromptStyleId, setDefaultPromptStyleId] = useState<string | null>(() =>
+    getVisitorDefaultPromptStyleId(),
+  );
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [heartRating, setHeartRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -690,11 +699,48 @@ const VisitorViewCore = () => {
 
   useEffect(() => {
     if (!aiSlides.length) return;
-    const ids = new Set(aiSlides.map((s) => s.sid));
-    if (!selectedPromptStyleId || !ids.has(selectedPromptStyleId)) {
-      setSelectedPromptStyleId(aiSlides[0].sid);
+    let cancelled = false;
+
+    void (async () => {
+      const storedDefault = await loadVisitorDefaultPromptStyleFromServer();
+      if (cancelled) return;
+
+      const ids = new Set(aiSlides.map((s) => s.sid));
+      const preferred =
+        storedDefault && ids.has(storedDefault) ? storedDefault : aiSlides[0].sid;
+      setSelectedPromptStyleId(preferred);
+      setDefaultPromptStyleId(storedDefault && ids.has(storedDefault) ? storedDefault : null);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [aiSlides, artwork?.artwork_id]);
+
+  useEffect(() => {
+    if (!selectedPromptStyleId || !aiSlides.length) return;
+    const idx = aiSlides.findIndex((s) => s.sid === selectedPromptStyleId);
+    if (idx < 0) return;
+    const swiper = mediationMainSwiperRef.current;
+    if (!swiper || swiper.destroyed) return;
+    if (mediationSwiperLoop) {
+      swiper.slideToLoop(idx, 0);
+    } else {
+      swiper.slideTo(idx, 0);
     }
-  }, [aiSlides, selectedPromptStyleId]);
+  }, [selectedPromptStyleId, aiSlides, artwork?.artwork_id, mediationSwiperLoop]);
+
+  const toggleDefaultPersona = useCallback((promptStyleId: string, checked: boolean) => {
+    if (checked) {
+      setVisitorDefaultPromptStyleId(promptStyleId);
+      setDefaultPromptStyleId(promptStyleId);
+      return;
+    }
+    if (getVisitorDefaultPromptStyleId() === promptStyleId) {
+      setVisitorDefaultPromptStyleId(null);
+      setDefaultPromptStyleId(null);
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1647,6 +1693,19 @@ const VisitorViewCore = () => {
                                 />
                               ) : null}
                             </div>
+                            {!slide.sid.startsWith("code:") ? (
+                              <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs text-[#F0F0F0]/75">
+                                <Checkbox
+                                  checked={defaultPromptStyleId === slide.sid}
+                                  onCheckedChange={(value) =>
+                                    toggleDefaultPersona(slide.sid, value === true)
+                                  }
+                                  aria-label={t("default_persona_aria")}
+                                  className="border-white/40 data-[state=checked]:border-[#E63946] data-[state=checked]:bg-[#E63946] data-[state=checked]:text-white"
+                                />
+                                <span>{t("default_persona_label")}</span>
+                              </label>
+                            ) : null}
                             <VisitorMediationMarkdown
                               text={slide.text}
                               verseMode={slide.canonicalCode === "poetique"}

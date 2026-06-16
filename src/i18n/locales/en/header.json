@@ -3,6 +3,7 @@
   "greeting_agency_suffix": " / {{agency}}",
   "language_label": "Interface language",
   "nav_home": "Your profile",
+  "nav_accueil": "Home",
   "nav_organisation": "Organization",
   "nav_users": "Users",
   "nav_expos": "Exhibitions",

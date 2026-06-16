@@ -7,7 +7,15 @@ type LazyWhenVisibleProps = {
   /** Hauteur minimale réservée pour limiter le CLS avant montage. */
   minHeight?: number | string;
   className?: string;
+  /** Ancre : force le montage si le hash URL correspond (navigation menu vitrine). */
+  anchorId?: string;
+  id?: string;
 };
+
+function hashMatchesAnchor(anchorId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return window.location.hash.replace(/^#/, "") === anchorId;
+}
 
 /**
  * Monte les enfants uniquement quand le conteneur entre (ou approche) le viewport.
@@ -18,9 +26,21 @@ export function LazyWhenVisible({
   rootMargin = "280px 0px",
   minHeight,
   className,
+  anchorId,
+  id,
 }: LazyWhenVisibleProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => (anchorId ? hashMatchesAnchor(anchorId) : false));
+
+  useEffect(() => {
+    if (!anchorId) return;
+    const activateIfHash = () => {
+      if (hashMatchesAnchor(anchorId)) setVisible(true);
+    };
+    activateIfHash();
+    window.addEventListener("hashchange", activateIfHash);
+    return () => window.removeEventListener("hashchange", activateIfHash);
+  }, [anchorId]);
 
   useEffect(() => {
     const el = ref.current;
@@ -47,6 +67,7 @@ export function LazyWhenVisible({
   return (
     <div
       ref={ref}
+      id={id ?? anchorId}
       className={className}
       style={minHeight !== undefined && !visible ? { minHeight } : undefined}
     >

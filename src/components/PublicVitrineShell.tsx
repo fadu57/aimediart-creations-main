@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Heart, Menu, X } from "lucide-react";
 
+import Header from "@/components/Header";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { LanguageFlag } from "@/components/LanguageFlag";
+import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { cn } from "@/lib/utils";
 
@@ -12,8 +15,6 @@ export const BRAND_RED = "hsl(0 65% 48%)";
 export const BRAND_RED_DARK = "hsl(0 62% 38%)";
 /** Rouge marque pour le mot « AIMEDIArt » sur la vitrine */
 export const AIMEDIART_WORD_RED = "text-[#E63946]";
-
-const ANCHOR_IDS = ["accueil", "exposition-vivante", "parcours", "tarifs", "accessibilite", "connectivite"] as const;
 
 function LogoMark({ compact }: { compact?: boolean }) {
   return (
@@ -44,72 +45,36 @@ function FloatingNav({
   isMobileOpen,
   setIsMobileOpen,
   vitrinePathPrefix,
+  hideLogin,
+  stackedBelowBackoffice,
 }: {
   isMobileOpen: boolean;
   setIsMobileOpen: (v: boolean) => void;
   /** "" = ancres sur la page courante ; "/organisation" = ancres vers la vitrine (pages légales) */
   vitrinePathPrefix: "" | "/organisation";
+  hideLogin?: boolean;
+  stackedBelowBackoffice?: boolean;
 }) {
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("home");
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((o) => o.value === language) ?? UI_LANGUAGE_OPTIONS[0];
 
-  const navClassName =
-    "group inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring lg:gap-0.5 lg:rounded lg:px-1 lg:py-0.5 lg:text-[11px] lg:leading-tight xl:px-1.5 xl:text-[12px]";
-
   const NavItems = (
-    <nav aria-label="Navigation de la vitrine" className="flex flex-col gap-1 lg:flex-row lg:items-center lg:gap-0">
-      {ANCHOR_IDS.map((id) => {
-        const label = t(`nav.anchor_${id.replace(/-/g, "_")}`);
-        const dot = (
-          <span
-            className="h-2 w-2 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946] lg:h-1.5 lg:w-1.5"
-            aria-hidden
-          />
-        );
-
-        if (id === "connectivite") {
-          return vitrinePathPrefix ? (
-            <Link
-              key={id}
-              to={`${vitrinePathPrefix}#connectivite`}
-              className={navClassName}
-              onClick={() => setIsMobileOpen(false)}
-            >
-              {dot}
-              {label}
-            </Link>
-          ) : (
-            <a key={id} href="#connectivite" className={navClassName} onClick={() => setIsMobileOpen(false)}>
-              {dot}
-              {label}
-            </a>
-          );
-        }
-
-        return vitrinePathPrefix ? (
-          <Link
-            key={id}
-            to={`${vitrinePathPrefix}#${id}`}
-            className={navClassName}
-            onClick={() => setIsMobileOpen(false)}
-          >
-            {dot}
-            {label}
-          </Link>
-        ) : (
-          <a key={id} href={`#${id}`} className={navClassName} onClick={() => setIsMobileOpen(false)}>
-            {dot}
-            {label}
-          </a>
-        );
-      })}
-    </nav>
+    <VitrineAnchorNav
+      vitrinePathPrefix={vitrinePathPrefix}
+      variant="floating"
+      onNavigate={() => setIsMobileOpen(false)}
+    />
   );
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-neutral-300/70 bg-white/85 backdrop-blur-md">
+      <header
+        className={cn(
+          "fixed inset-x-0 z-40 border-b border-neutral-300/70 bg-white/85 backdrop-blur-md",
+          stackedBelowBackoffice && "top-[4.25rem]",
+        )}
+      >
         <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
             <LogoMark compact />
@@ -133,13 +98,15 @@ function FloatingNav({
             <div className="max-w-full rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
               {NavItems}
             </div>
-            <Link
-              to="/login"
-              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-2.5 py-1.5 text-[11px] font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring lg:px-2 lg:py-1 lg:text-[12px]"
-            >
-              {t("nav.login")}
-              <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
-            </Link>
+            {!hideLogin ? (
+              <Link
+                to="/login"
+                className="inline-flex shrink-0 items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-2.5 py-1.5 text-[11px] font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring lg:px-2 lg:py-1 lg:text-[12px]"
+              >
+                {t("nav.login")}
+                <ChevronRight className="ml-0.5 h-3.5 w-3.5" aria-hidden />
+              </Link>
+            ) : null}
           </div>
           <button
             type="button"
@@ -156,7 +123,10 @@ function FloatingNav({
         <>
           <div className="fixed inset-0 z-50 bg-black/45" aria-hidden onClick={() => setIsMobileOpen(false)} />
           <aside
-            className="fixed left-0 top-0 z-50 h-auto w-[82vw] max-w-[332px] rounded-br-xl border-r border-neutral-300 bg-[rgba(252,251,250,0.60)] p-4 shadow-2xl backdrop-blur-sm"
+            className={cn(
+              "fixed left-0 z-50 h-auto w-[82vw] max-w-[332px] rounded-br-xl border-r border-neutral-300 bg-[rgba(252,251,250,0.60)] p-4 shadow-2xl backdrop-blur-sm",
+              stackedBelowBackoffice ? "top-[4.25rem]" : "top-0",
+            )}
             role="dialog"
             aria-modal="true"
             aria-label="Menu vitrine"
@@ -176,14 +146,16 @@ function FloatingNav({
               <div className="px-2 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">{t("nav.public_vitrine")}</div>
               {NavItems}
               <div className="flex flex-col gap-2 pt-2">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
-                  onClick={() => setIsMobileOpen(false)}
-                >
-                  {t("nav.login")}
-                  <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
-                </Link>
+                {!hideLogin ? (
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                    onClick={() => setIsMobileOpen(false)}
+                  >
+                    {t("nav.login")}
+                    <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
+                  </Link>
+                ) : null}
                 <div className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
                   <LanguageFlag lang={activeLanguage.value} />
                   <select
@@ -278,7 +250,13 @@ function VantaCloudsBackground() {
   );
 }
 
-function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/organisation" }) {
+function PublicVitrineFooter({
+  vitrinePathPrefix,
+  hideLogin,
+}: {
+  vitrinePathPrefix: "" | "/organisation";
+  hideLogin?: boolean;
+}) {
   const { t } = useTranslation("home");
   const contactHref = vitrinePathPrefix ? `${vitrinePathPrefix}#contact` : "#contact";
 
@@ -314,9 +292,11 @@ function PublicVitrineFooter({ vitrinePathPrefix }: { vitrinePathPrefix: "" | "/
             <Link to="/ai-policy" className="text-foreground/80 hover:text-foreground">
               {t("footer.ai_policy")}
             </Link>
-            <Link to="/login" className="text-foreground/80 hover:text-foreground">
-              {t("footer.login")}
-            </Link>
+            {!hideLogin ? (
+              <Link to="/login" className="text-foreground/80 hover:text-foreground">
+                {t("footer.login")}
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
@@ -344,6 +324,10 @@ export function PublicVitrineShell({
   atmosphericBackdrop = false,
 }: PublicVitrineShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { session, loading: authLoading } = useAuthUser();
+  const showBackofficeHeader = Boolean(session) && !authLoading;
+  /** Connecté sur la vitrine : un seul header (backoffice + ancres vitrine). */
+  const mergeVitrineIntoHeader = showBackofficeHeader && vitrinePathPrefix === "";
 
   return (
     <div
@@ -354,14 +338,23 @@ export function PublicVitrineShell({
     >
       <VantaCloudsBackground />
       <div className="relative z-10">
-        <FloatingNav
-          isMobileOpen={mobileNavOpen}
-          setIsMobileOpen={setMobileNavOpen}
-          vitrinePathPrefix={vitrinePathPrefix}
-        />
-        <main id="contenu-principal" role="main" className="outline-none">
+        {showBackofficeHeader ? <Header /> : null}
+        {!mergeVitrineIntoHeader ? (
+          <FloatingNav
+            isMobileOpen={mobileNavOpen}
+            setIsMobileOpen={setMobileNavOpen}
+            vitrinePathPrefix={vitrinePathPrefix}
+            hideLogin={showBackofficeHeader}
+            stackedBelowBackoffice={showBackofficeHeader}
+          />
+        ) : null}
+        <main
+          id="contenu-principal"
+          role="main"
+          className={cn("outline-none", mergeVitrineIntoHeader && "pt-[5.75rem]")}
+        >
           {children}
-          <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} />
+          <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} hideLogin={showBackofficeHeader} />
         </main>
       </div>
     </div>

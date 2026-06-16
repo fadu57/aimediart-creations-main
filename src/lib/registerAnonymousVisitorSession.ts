@@ -13,6 +13,7 @@ import {
   extensionFromFileName,
   uploadVisitorSelfiePhoto,
 } from "@/lib/storagePaths";
+import { applyVisitorPersonaDefautFromProfile } from "@/lib/visitorDefaultPersona";
 
 type EdgeIpResponse = {
   ip_address?: string | null;
@@ -25,6 +26,7 @@ type AnonymousVisitorProfileRpc = {
   avatar_object_path?: string | null;
   selfie_url?: string | null;
   selfie_object_path?: string | null;
+  persona_defaut?: string | null;
 };
 
 export type VisitorAvatarSelfiePayload = {
@@ -72,7 +74,9 @@ export async function resolveReturningAnonymousVisitor(): Promise<VisitorAnonymo
     });
 
     if (!error && data && typeof data === "object") {
-      const rpcProfile = profileFromRpc(data as AnonymousVisitorProfileRpc);
+      const rpcRow = data as AnonymousVisitorProfileRpc;
+      applyVisitorPersonaDefautFromProfile(rpcRow.persona_defaut);
+      const rpcProfile = profileFromRpc(rpcRow);
       if (rpcProfile) {
         setVisitorAnonymousProfile(rpcProfile);
         return rpcProfile;

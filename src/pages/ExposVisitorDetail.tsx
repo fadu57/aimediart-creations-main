@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenStreetMap } from "@/components/OpenStreetMap";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
+import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 
 type FeedbackRow = {
   artwork_id: string | null;
@@ -58,6 +59,34 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+type PersonaStyleRow = PromptStyleLabelFields & { icon?: string | null };
+
+function PersonaDefautField({
+  style,
+  personaId,
+}: {
+  style: PersonaStyleRow | null;
+  personaId: string | null;
+}) {
+  const label = style ? getStyleLabelFromDb(style, "fr") : null;
+  const icon = typeof style?.icon === "string" ? style.icon.trim() : "";
+  return (
+    <div className="py-2 border-b text-sm">
+      <p className="text-xs text-muted-foreground mb-0.5">Persona par défaut</p>
+      {personaId && label ? (
+        <p className="flex items-center gap-1.5 break-all">
+          {icon ? <span aria-hidden>{icon}</span> : null}
+          <span>{label}</span>
+        </p>
+      ) : personaId ? (
+        <p className="break-all text-muted-foreground">{personaId}</p>
+      ) : (
+        <p className="text-muted-foreground">Non définie</p>
+      )}
+    </div>
+  );
+}
+
 function TwoCol({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 gap-x-6">{children}</div>;
 }
@@ -103,25 +132,34 @@ export default function ExposVisitorDetail() {
           "client_timezone, screen_resolution, ip_address, browser_name, " +
           "device_type, country, city, last_seen_at";
 
-        const { data: row, error: err } = await supabase
-          .from("visitors")
-          .select(`${baseSelect}, avatar_url, selfie_url`)
-          .eq("id", id)
-          .maybeSingle();
+        const loadVisitorRow = async (select: string) =>
+          supabase.from("visitors").select(select).eq("id", id).maybeSingle();
 
-        // Si la colonne n'existe pas encore (migration non appliquée), retry sans
         let visitorRow: Record<string, unknown> | null = null;
-        if (err?.code === "42703") {
-          const { data: rowFallback, error: errFallback } = await supabase
-            .from("visitors")
-            .select(baseSelect)
-            .eq("id", id)
+        let res = await loadVisitorRow(`${baseSelect}, avatar_url, selfie_url, persona_defaut`);
+        if (res.error?.code === "42703") {
+          res = await loadVisitorRow(`${baseSelect}, avatar_url, selfie_url`);
+        }
+        if (res.error?.code === "42703") {
+          res = await loadVisitorRow(baseSelect);
+        }
+        if (res.error) {
+          setError(res.error.message);
+          setLoading(false);
+          return;
+        }
+        visitorRow = res.data as Record<string, unknown> | null;
+
+        const personaDefaut =
+          typeof visitorRow?.persona_defaut === "string" ? visitorRow.persona_defaut.trim() : "";
+        let personaStyle: PersonaStyleRow | null = null;
+        if (personaDefaut) {
+          const { data: styleRow } = await supabase
+            .from("prompt_style")
+            .select("id, name_fr, name_en, name_de, name_es, name_it, icon")
+            .eq("id", personaDefaut)
             .maybeSingle();
-          if (errFallback) { setError(errFallback.message); setLoading(false); return; }
-          visitorRow = rowFallback as Record<string, unknown> | null;
-        } else {
-          if (err) { setError(err.message); setLoading(false); return; }
-          visitorRow = row as Record<string, unknown> | null;
+          personaStyle = (styleRow as PersonaStyleRow | null) ?? null;
         }
 
         const { data: lastExpoVisit } = await supabase
@@ -144,6 +182,8 @@ export default function ExposVisitorDetail() {
 
         setData(visitorRow ? {
           ...visitorRow,
+          persona_defaut: personaDefaut || null,
+          persona_style: personaStyle,
           last_seen_at: lastActivity ?? visitorRow.last_seen_at ?? null,
           has_visit_data: Boolean(lastActivity || visitorRow.last_seen_at),
           last_expo_visit_status: lv?.status ?? null,
@@ -343,6 +383,10 @@ export default function ExposVisitorDetail() {
               <TwoCol>
                 <Field label="Pseudo choisi"      value={data.visitor_pseudo as string} />
                 <Field label="Nom visiteur"        value={data.visitor_name as string} />
+                <PersonaDefautField
+                  personaId={(data.persona_defaut as string | null) ?? null}
+                  style={(data.persona_style as PersonaStyleRow | null) ?? null}
+                />
                 <Field label="Dernière activité"   value={formatDate(data.last_seen_at as string)} />
               </TwoCol>
 

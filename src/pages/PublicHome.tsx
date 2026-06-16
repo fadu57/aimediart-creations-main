@@ -1158,8 +1158,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           </div>
         </Section>
 
-        <LazyWhenVisible className="scroll-mt-[68px]" minHeight={320}>
-          <section id="connectivite">
+        <LazyWhenVisible anchorId="connectivite" className="scroll-mt-[5.75rem]" minHeight={320}>
+          <section>
             <Suspense fallback={<div className="mx-auto w-full max-w-[1060px] px-5 py-16 sm:px-6" aria-hidden style={{ minHeight: 320 }} />}>
               <OrganisationConnexionContent />
             </Suspense>
