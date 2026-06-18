@@ -18,10 +18,14 @@ import {
 } from "lucide-react";
 
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
+import { StandbyDashboardBanner } from "@/components/dashboard/StandbyDashboardBanner";
 import {
   formatBirthDisplay,
   mergeProfileValues,
 } from "@/components/dashboard/DashboardProfileEditDialog";
+import { DashboardProfileSelector } from "@/components/dashboard/DashboardProfileSelector";
+import { DashboardPlanActions } from "@/components/dashboard/DashboardPlanActions";
+import { DashboardStandbyButton } from "@/components/dashboard/DashboardStandbyButton";
 import { DashboardTeamMembersTable } from "@/components/dashboard/DashboardTeamMembersTable";
 import {
   AlertDialog,
@@ -39,9 +43,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { useDashboardProfile, type DashboardTeamMember } from "@/hooks/useDashboardProfile";
-import { useProfileAvatar } from "@/hooks/useProfileAvatar";
+import { useDashboardProfile, type DashboardSubscription, type DashboardTeamMember } from "@/hooks/useDashboardProfile";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { useProfileAvatar } from "@/hooks/useProfileAvatar";
+import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { ProfileAvatarImage } from "@/components/ProfileAvatarImage";
 import { resolveProfileAvatarSource } from "@/lib/resolveProfileAvatarSource";
@@ -53,9 +58,38 @@ import {
   resolveEffectiveRoleId,
   roleLevelHint,
 } from "@/lib/roleHierarchy";
+import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
 import { supabase } from "@/lib/supabase";
 import { softDeleteUserProfile } from "@/lib/userSoftDelete";
+import type { StandbyPlanCode } from "@/components/organisation/StandbyPlanModal";
 import Users from "@/pages/Users";
+
+function formatSeniority(startedAt: string | null | undefined): string {
+  if (!startedAt) return "—";
+  const start = new Date(startedAt);
+  if (Number.isNaN(start.getTime())) return "—";
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) months -= 1;
+  if (months < 1) return "< 1 mois";
+  if (months < 12) return `${months} mois`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  if (rem === 0) return `${years} an${years > 1 ? "s" : ""}`;
+  return `${years} an${years > 1 ? "s" : ""} ${rem} mois`;
+}
+
+function formatUsageRatio(used: number, max: number | null | undefined, unlimited: boolean | null | undefined): string {
+  if (unlimited) return `${used} · Illimité`;
+  if (max == null) return String(used);
+  return `${used} / ${max}`;
+}
+
+function resolveStandbyPlanCode(planCode: string | null | undefined): StandbyPlanCode | null {
+  const code = (planCode ?? "").trim().toUpperCase();
+  if (code === "ATELIER" || code === "HORIZON") return code;
+  return null;
+}
 
 function textOrDash(v: string | null | undefined): string {
   return v?.trim() || "—";
@@ -84,12 +118,16 @@ function profileFullName(
 }
 
 function subscriptionBadgeVariant(
-  status: "active" | "expired" | "none" | "unknown" | undefined,
+  status: DashboardSubscription["status"] | undefined,
 ): "default" | "secondary" | "destructive" | "outline" {
   switch (status) {
     case "active":
+    case "standby":
       return "default";
+    case "trial":
+      return "secondary";
     case "expired":
+    case "cancelled":
       return "destructive";
     case "none":
       return "secondary";
@@ -98,24 +136,49 @@ function subscriptionBadgeVariant(
   }
 }
 
-function subscriptionStatusLabel(
-  status: "active" | "expired" | "none" | "unknown" | undefined,
-): string {
+function subscriptionStatusLabel(status: DashboardSubscription["status"] | undefined): string {
   switch (status) {
     case "active":
       return "Actif";
+    case "trial":
+      return "Essai";
+    case "standby":
+      return "Veille";
     case "expired":
       return "Expiré";
+    case "cancelled":
+      return "Résilié";
     case "none":
-      return "Non renseigné";
+      return "Aucun";
     default:
       return "Indisponible";
   }
 }
 
+function standbyStatusLabel(status: string | null | undefined): string {
+  switch ((status ?? "").toLowerCase()) {
+    case "active":
+      return "Veille active";
+    case "inactive":
+      return "Inactive";
+    default:
+      return "—";
+  }
+}
+
+function formatLangRange(min: number | null | undefined, max: number | null | undefined): string {
+  if (min == null && max == null) return "—";
+  if (min != null && max != null && min !== max) return `${min} à ${max}`;
+  const value = min ?? max;
+  return value != null ? String(value) : "—";
+}
+
 const Dashboard = () => {
   const { user, role_id, role_label, role_name, agency_id, expo_id, loading: authLoading } = useAuthUser();
   const { can } = useNavigationMatrix();
+  const { state: standbyState, isStandbyNavRestricted } = useOrganisationStandby();
+  const effectiveAgencyId = agency_id ?? standbyState.agency_id ?? null;
+  const [viewedUserId, setViewedUserId] = useState<string | null>(null);
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [deleteMemberTarget, setDeleteMemberTarget] = useState<DashboardTeamMember | null>(null);
@@ -132,6 +195,9 @@ const Dashboard = () => {
 
   const userId = user?.id ?? null;
   const email = user?.email ?? null;
+  const effectiveRoleId = useMemo(() => resolveEffectiveRoleId(role_id, role_name), [role_id, role_name]);
+  const profileUserId = viewedUserId ?? userId;
+  const isViewingSelf = Boolean(profileUserId && userId && profileUserId === userId);
 
   const {
     profile,
@@ -140,31 +206,55 @@ const Dashboard = () => {
     subscription,
     teamStats,
     teamMembers,
+    profilePickerMembers,
     agencyExpos,
     loading: dataLoading,
     error,
     refresh,
     refreshKey,
-  } = useDashboardProfile(userId, agency_id, expo_id);
+  } = useDashboardProfile(profileUserId, effectiveAgencyId, expo_id, effectiveRoleId, userId);
 
-  const mergedProfile = useMemo(() => mergeProfileValues(profile, user), [profile, user]);
+  const viewedMember = useMemo(
+    () =>
+      profilePickerMembers.find((m) => m.user_id === profileUserId) ??
+      teamMembers.find((m) => m.user_id === profileUserId) ??
+      null,
+    [teamMembers, profilePickerMembers, profileUserId],
+  );
 
-  const resolvedAvatarUrl = useProfileAvatar(userId, user, refreshKey, profile?.avatar_url);
+  const mergedProfile = useMemo(
+    () => mergeProfileValues(profile, isViewingSelf ? user : null),
+    [profile, user, isViewingSelf],
+  );
+
+  const resolvedAvatarUrl = useProfileAvatar(
+    profileUserId,
+    isViewingSelf ? user : null,
+    refreshKey,
+    profile?.avatar_url,
+  );
   const profileAvatarSync = useMemo(
-    () => resolveProfileAvatarSource(profile?.avatar_url, user?.user_metadata),
-    [profile?.avatar_url, user?.user_metadata],
+    () =>
+      isViewingSelf
+        ? resolveProfileAvatarSource(profile?.avatar_url, user?.user_metadata)
+        : profile?.avatar_url ?? null,
+    [profile?.avatar_url, user?.user_metadata, isViewingSelf],
   );
   const avatarSource = resolvedAvatarUrl || profileAvatarSync;
 
   const loading = authLoading || dataLoading;
   const displayName = profileFullName(
-    mergedProfile.firstName || first_name_from_auth(user),
+    mergedProfile.firstName || (isViewingSelf ? first_name_from_auth(user) : ""),
     mergedProfile.lastName,
-    email || "Utilisateur",
+    isViewingSelf ? email || "Utilisateur" : profile?.username || "Membre",
   );
   const isGlobalAdmin = hasFullDataAccess(role_name) || (typeof role_id === "number" && role_id >= 1 && role_id <= 3);
-  const effectiveRoleId = useMemo(() => resolveEffectiveRoleId(role_id, role_name), [role_id, role_name]);
+  const dashboardAgencyId = agency?.id ?? effectiveAgencyId ?? null;
+  const profileAgencyId = agency?.id ?? null;
+  const canSwitchProfiles = isGlobalAdmin;
+  const teamMembersCount = teamMembers.length > 0 ? teamMembers.length : teamStats.members_count;
   const showCreateUser = canCreateUsers(effectiveRoleId) && can("menu_user");
+  const standbyPlanCode = resolveStandbyPlanCode(subscription?.plan_code);
 
   const canEditTeamMember = useMemo(
     () => (member: DashboardTeamMember) => {
@@ -174,19 +264,23 @@ const Dashboard = () => {
     [effectiveRoleId, role_name],
   );
 
-  const role4Count = useMemo(() => teamMembers.filter((m) => m.role_id === 4).length, [teamMembers]);
+  const role4Count = useMemo(
+    () => teamMembers.filter((m) => m.agency_role_id === 4).length,
+    [teamMembers],
+  );
 
   const canDeleteTeamMemberRow = useMemo(
     () => (member: DashboardTeamMember) => {
       if (!canDeleteTeamMember(effectiveRoleId, member.role_id, userId, member.user_id)) return false;
-      if (member.role_id === 4 && role4Count <= 1) return false;
+      if (member.agency_role_id === 4 && role4Count <= 1) return false;
       return true;
     },
     [effectiveRoleId, userId, role4Count],
   );
 
   const canEditMemberExpos = useMemo(
-    () => (member: DashboardTeamMember) => canAssignExpoToMember(effectiveRoleId, member.role_id),
+    () => (member: DashboardTeamMember) =>
+      canAssignExpoToMember(effectiveRoleId, member.agency_role_id ?? member.role_id),
     [effectiveRoleId],
   );
 
@@ -195,11 +289,12 @@ const Dashboard = () => {
     setSavingExpoUserId(member.user_id);
     try {
       const unique = [...new Set(nextExpoIds.map((id) => id.trim()).filter(Boolean))];
+      const storageIds = await resolveExpoStorageIds(unique);
       await supabase.from("expo_user_role").delete().eq("user_id", member.user_id);
-      if (unique.length > 0) {
+      if (storageIds.length > 0) {
         const { error: insertErr } = await supabase
           .from("expo_user_role")
-          .insert(unique.map((expo_id) => ({ user_id: member.user_id, expo_id })));
+          .insert(storageIds.map((expo_id) => ({ user_id: member.user_id, expo_id })));
         if (insertErr) throw insertErr;
       }
       toast.success("Expositions mises à jour.");
@@ -216,7 +311,7 @@ const Dashboard = () => {
       setDeleteLastRole4InOrg(false);
       return;
     }
-    if (deleteMemberTarget.role_id !== 4 || !agency_id?.trim()) {
+    if ((deleteMemberTarget.agency_role_id ?? deleteMemberTarget.role_id) !== 4 || !dashboardAgencyId?.trim()) {
       setDeleteLastRole4InOrg(false);
       return;
     }
@@ -226,7 +321,7 @@ const Dashboard = () => {
         .from("agency_users")
         .select("user_id")
         .eq("role_id", 4)
-        .eq("agency_id", agency_id.trim())
+        .eq("agency_id", dashboardAgencyId.trim())
         .neq("user_id", deleteMemberTarget.user_id)
         .limit(1);
       if (cancelled) return;
@@ -239,12 +334,12 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [deleteMemberTarget, agency_id]);
+  }, [deleteMemberTarget, dashboardAgencyId]);
 
   const confirmDeleteTeamMember = async () => {
     if (!deleteMemberTarget || !canDeleteTeamMemberRow(deleteMemberTarget)) return;
 
-    const targetRoleId = deleteMemberTarget.role_id;
+    const targetRoleId = deleteMemberTarget.agency_role_id ?? deleteMemberTarget.role_id;
     if (effectiveRoleId === 4 && targetRoleId != null && ![4, 5, 6].includes(targetRoleId)) {
       toast.error("Suppression non autorisée pour ce rôle.");
       return;
@@ -284,26 +379,46 @@ const Dashboard = () => {
   }, [subscription?.expires_at, subscription?.started_at]);
 
   const quickLinks = useMemo(() => {
+    const teamUsersHref = dashboardAgencyId
+      ? `/user/utilisateurs?scope=equipe&agency_id=${encodeURIComponent(dashboardAgencyId)}`
+      : teamMembers.length > 0
+        ? "/user/utilisateurs?scope=site"
+        : "/user/utilisateurs";
     const links: Array<{ to: string; label: string; icon: typeof BarChart3; show: boolean }> = [
       { to: "/statistiques", label: "Statistiques", icon: BarChart3, show: can("menu_stats") },
-      { to: "/user/utilisateurs", label: "Équipe", icon: UsersIcon, show: can("menu_user") },
+      { to: teamUsersHref, label: "Équipe", icon: UsersIcon, show: can("menu_user") },
       { to: "/catalogue", label: "Catalogue", icon: ImageIcon, show: can("menu_catalogue") },
       { to: "/agencies", label: "Organisations", icon: Building2, show: can("menu_agence") },
     ];
-    return links.filter((l) => l.show);
-  }, [can]);
+    return links.filter((l) => l.show && !isStandbyNavRestricted);
+  }, [can, isStandbyNavRestricted, dashboardAgencyId]);
 
   return (
     <div className="container py-8 space-y-8">
       {/* En-tête */}
       <div className="flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
-        <div className="min-w-0 shrink-0 md:flex-1">
-          <h2 className="text-3xl font-serif font-bold text-white">
-            {loading ? "Mon espace" : `Bonjour, ${displayName.split(" ")[0] || displayName}`}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Vue d&apos;ensemble de votre compte, abonnement et équipe
-          </p>
+        <div className="min-w-0 shrink-0 md:flex-1 space-y-3">
+          <div>
+            <h2 className="text-3xl font-serif font-bold text-white">
+              {loading ? "Mon espace" : `Bonjour, ${displayName.split(" ")[0] || displayName}`}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Vue d&apos;ensemble de votre compte, abonnement et équipe
+            </p>
+          </div>
+          {canSwitchProfiles && userId ? (
+            <div className="max-w-md">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                Profil affiché
+              </p>
+              <DashboardProfileSelector
+                members={profilePickerMembers}
+                currentUserId={userId}
+                selectedUserId={profileUserId ?? userId}
+                onSelect={(id) => setViewedUserId(id === userId ? null : id)}
+              />
+            </div>
+          ) : null}
         </div>
         <BackofficeStickyAgencyLogoSlot />
       </div>
@@ -314,6 +429,8 @@ const Dashboard = () => {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      <StandbyDashboardBanner />
 
       {loading && (
         <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
@@ -332,9 +449,9 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-gold" />
-                    Mon profil
+                    {isViewingSelf ? "Mon profil" : "Profil membre"}
                   </CardTitle>
-                  {userId && (
+                  {profileUserId && isViewingSelf && (
                     <Button
                       type="button"
                       variant="outline"
@@ -350,7 +467,7 @@ const Dashboard = () => {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="flex items-start gap-4">
-                  {userId ? (
+                  {profileUserId ? (
                     <div className="relative flex h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
                       <ProfileAvatarImage
                         src={avatarSource ?? profile?.avatar_url}
@@ -365,9 +482,26 @@ const Dashboard = () => {
                       <p className="text-sm text-muted-foreground">@{profile.username}</p>
                     )}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="outline">{role_label || role_name || "Rôle inconnu"}</Badge>
-                      {typeof role_id === "number" && (
-                        <Badge variant="secondary">Niveau {role_id}</Badge>
+                      {isViewingSelf ? (
+                        <>
+                          <Badge variant="outline">{role_label || role_name || "Rôle inconnu"}</Badge>
+                          {typeof role_id === "number" && (
+                            <Badge variant="secondary">Niveau {role_id}</Badge>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {viewedMember?.agency_role_label ? (
+                            <Badge variant="outline">{viewedMember.agency_role_label}</Badge>
+                          ) : viewedMember?.role_label ? (
+                            <Badge variant="outline">{viewedMember.role_label}</Badge>
+                          ) : null}
+                          {viewedMember?.agency_role_id != null ? (
+                            <Badge variant="secondary">Niveau {viewedMember.agency_role_id}</Badge>
+                          ) : viewedMember?.role_id != null ? (
+                            <Badge variant="secondary">Niveau {viewedMember.role_id}</Badge>
+                          ) : null}
+                        </>
                       )}
                     </div>
                   </div>
@@ -381,7 +515,7 @@ const Dashboard = () => {
                     label="Mois et année de naissance"
                     value={formatBirthDisplay(mergedProfile.birthMonth, mergedProfile.birthYear)}
                   />
-                  <ProfileField icon={Mail} label="E-mail" value={textOrDash(email)} />
+                  <ProfileField icon={Mail} label="E-mail" value={isViewingSelf ? textOrDash(email) : "—"} />
                   <ProfileField icon={Phone} label="Téléphone" value={textOrDash(mergedProfile.phone)} />
                   <ProfileField
                     icon={MapPin}
@@ -395,7 +529,7 @@ const Dashboard = () => {
                   <ProfileField label="Langue" value={textOrDash(mergedProfile.language?.toUpperCase())} />
                 </dl>
 
-                {(agency || expo) && (
+                {(agency || agencyExpos.length > 0) && (
                   <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Périmètre</p>
                     {agency && (
@@ -404,15 +538,24 @@ const Dashboard = () => {
                         {agency.name_agency || agency.id}
                       </p>
                     )}
-                    {expo && (
+                    {agencyExpos.length > 0 ? (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Expositions</p>
+                        <ul className="space-y-0.5 text-sm text-muted-foreground">
+                          {agencyExpos.map((item) => (
+                            <li key={item.id}>{item.label}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : expo ? (
                       <p className="text-sm text-muted-foreground">
                         Exposition : {expo.expo_name || expo.id}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
-                {isGlobalAdmin && !agency_id && (
+                {isViewingSelf && isGlobalAdmin && !agency_id && !profileAgencyId && (
                   <p className="text-xs text-muted-foreground italic">
                     Compte administrateur global — non rattaché à une organisation.
                   </p>
@@ -434,11 +577,11 @@ const Dashboard = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!agency_id && isGlobalAdmin ? (
+                {!profileAgencyId && isGlobalAdmin && isViewingSelf ? (
                   <p className="text-sm text-muted-foreground py-4">
                     Les administrateurs globaux ne sont pas liés à un abonnement organisation.
                   </p>
-                ) : !agency_id ? (
+                ) : !profileAgencyId ? (
                   <p className="text-sm text-muted-foreground py-4">
                     Aucune organisation associée — l&apos;abonnement sera visible une fois rattaché à une agence.
                   </p>
@@ -446,9 +589,9 @@ const Dashboard = () => {
                   <Alert>
                     <AlertTitle>Abonnement non configuré</AlertTitle>
                     <AlertDescription>
-                      La table <code className="rounded bg-muted px-1">agency_subscriptions</code> n&apos;est pas
-                      encore disponible. Exécutez la migration{" "}
-                      <code className="rounded bg-muted px-1">migration_35_agency_subscriptions.sql</code> sur Supabase.
+                      Les tables de facturation ne sont pas encore disponibles. Exécutez la migration{" "}
+                      <code className="rounded bg-muted px-1">migration_79_pricing_billing_schema.sql</code> sur
+                      Supabase.
                     </AlertDescription>
                   </Alert>
                 ) : subscription?.status === "none" ? (
@@ -458,28 +601,67 @@ const Dashboard = () => {
                       <strong className="text-foreground">{agency?.name_agency || "votre organisation"}</strong>.
                     </p>
                     <Button asChild variant="outline" size="sm">
-                      <Link to="/">Voir les offres</Link>
+                      <Link to="/organisation#tarifs">Voir les offres</Link>
                     </Button>
                   </div>
                 ) : (
                   <>
-                    <div>
-                      <p className="text-2xl font-serif font-bold">
-                        {subscription?.pricing_label || subscription?.pricing_plan || "Plan inconnu"}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {subscription?.billing_cycle === "annual" ? "Facturation annuelle" : "Facturation mensuelle"}
-                        {subscription?.monthly_price_eur != null &&
-                          ` · ${formatEur(subscription.monthly_price_eur)}/mois`}
-                      </p>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-2xl font-serif font-bold">
+                          {subscription?.display_name ||
+                            subscription?.pricing_label ||
+                            subscription?.plan_code ||
+                            "Plan inconnu"}
+                        </p>
+                        {subscription?.plan_code && subscription.plan_code !== subscription?.display_name ? (
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground mt-0.5">
+                            {subscription.plan_code}
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {subscription?.billing_cycle === "annual" ? "Facturation annuelle" : "Facturation mensuelle"}
+                          {subscription?.monthly_price_eur != null &&
+                            ` · ${formatEur(subscription.monthly_price_eur)}/mois`}
+                        </p>
+                        {subscription?.started_at ? (
+                          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+                            <span className="text-muted-foreground">
+                              Début · <span className="text-foreground font-medium">{formatDateFr(subscription.started_at)}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Ancienneté ·{" "}
+                              <span className="text-foreground font-medium">{formatSeniority(subscription.started_at)}</span>
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                      {isGlobalAdmin && profileAgencyId && subscription?.subscription_id ? (
+                        <DashboardPlanActions
+                          organisationId={profileAgencyId}
+                          subscriptionId={subscription.subscription_id}
+                          currentPlanCode={subscription.plan_code}
+                          onChanged={refresh}
+                        />
+                      ) : null}
                     </div>
 
-                    {subscription?.expires_at && (
+                    {(subscription?.next_renewal_at || subscription?.expires_at) && (
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Expire le</span>
-                          <span className="font-medium">{formatDateFr(subscription.expires_at)}</span>
-                        </div>
+                        {subscription.next_renewal_at ? (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Prochaine échéance</span>
+                            <span className="font-medium">{formatDateFr(subscription.next_renewal_at)}</span>
+                          </div>
+                        ) : null}
+                        {subscription.expires_at ? (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {subscription.is_trial ? "Fin d'essai" : "Fin de période"}
+                            </span>
+                            <span className="font-medium">{formatDateFr(subscription.expires_at)}</span>
+                          </div>
+                        ) : null}
                         {subscription.days_remaining != null && (
                           <p
                             className={`text-sm font-semibold ${
@@ -489,8 +671,8 @@ const Dashboard = () => {
                             {subscription.days_remaining > 0
                               ? `${subscription.days_remaining} jour${subscription.days_remaining > 1 ? "s" : ""} restant${subscription.days_remaining > 1 ? "s" : ""}`
                               : subscription.days_remaining === 0
-                                ? "Expire aujourd'hui"
-                                : "Abonnement expiré"}
+                                ? "Échéance aujourd'hui"
+                                : "Période échue"}
                           </p>
                         )}
                         {subscriptionProgress != null && (
@@ -500,22 +682,100 @@ const Dashboard = () => {
                     )}
 
                     <dl className="grid gap-2 text-sm border-t border-border/50 pt-4">
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Œuvres max.</dt>
-                        <dd className="font-medium">
-                          {subscription?.is_unlimited
-                            ? "Illimité"
-                            : subscription?.max_oeuvres ?? "—"}
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Œuvres créées</dt>
+                        <dd className="font-medium text-right">
+                          {formatUsageRatio(
+                            teamStats.artworks_count,
+                            subscription?.max_oeuvres,
+                            subscription?.is_unlimited,
+                          )}
                         </dd>
                       </div>
-                      <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Visiteurs max.</dt>
-                        <dd className="font-medium">
-                          {subscription?.is_unlimited
-                            ? "Illimité"
-                            : subscription?.max_visitors ?? "—"}
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Visiteurs (mois en cours)</dt>
+                        <dd className="font-medium text-right">
+                          {formatUsageRatio(
+                            teamStats.visitors_this_month,
+                            subscription?.max_visitors,
+                            subscription?.is_unlimited,
+                          )}
                         </dd>
                       </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Langues médiation</dt>
+                        <dd className="font-medium text-right">
+                          {formatLangRange(
+                            subscription?.included_mediation_langs_min,
+                            subscription?.included_mediation_langs_max,
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Langues audio</dt>
+                        <dd className="font-medium text-right">
+                          {subscription?.included_audio_langs ?? "—"}
+                        </dd>
+                      </div>
+                      {subscription?.standby_monthly_price_eur != null ? (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-muted-foreground">Tarif veille</dt>
+                          <dd className="font-medium text-right">
+                            {formatEur(subscription.standby_monthly_price_eur)}/mois
+                          </dd>
+                        </div>
+                      ) : null}
+                      {subscription?.source === "organisation" ? (
+                        <>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <dt className="text-muted-foreground">Mode veille</dt>
+                            <dd className="flex flex-wrap items-center justify-end gap-2 font-medium text-right">
+                              <span>{standbyStatusLabel(subscription.standby_status)}</span>
+                              {standbyState.can_request_standby &&
+                              standbyPlanCode &&
+                              subscription?.standby_monthly_price_eur != null ? (
+                                <DashboardStandbyButton
+                                  planCode={standbyPlanCode}
+                                  planDisplayName={
+                                    subscription.display_name ||
+                                    subscription.pricing_label ||
+                                    standbyPlanCode
+                                  }
+                                  monthlyPriceEur={
+                                    subscription.standby_monthly_price_eur ??
+                                    subscription.monthly_price_eur ??
+                                    0
+                                  }
+                                />
+                              ) : null}
+                            </dd>
+                          </div>
+                          {subscription.standby_requested_at ? (
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-muted-foreground">Demande veille</dt>
+                              <dd className="font-medium text-right">
+                                {formatDateFr(subscription.standby_requested_at)}
+                              </dd>
+                            </div>
+                          ) : null}
+                          {subscription.standby_cancel_deadline_at ? (
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-muted-foreground">Annulation possible jusqu&apos;au</dt>
+                              <dd className="font-medium text-right">
+                                {formatDateFr(subscription.standby_cancel_deadline_at)}
+                              </dd>
+                            </div>
+                          ) : null}
+                          {subscription.standby_started_at ? (
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-muted-foreground">Veille effective depuis</dt>
+                              <dd className="font-medium text-right">
+                                {formatDateFr(subscription.standby_started_at)}
+                              </dd>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
                     </dl>
                   </>
                 )}
@@ -527,22 +787,26 @@ const Dashboard = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Membres équipe"
-              value={teamStats.members_count}
+              value={teamMembersCount}
               icon={UsersIcon}
               onClick={() => document.getElementById("dashboard-team-members")?.scrollIntoView({ behavior: "smooth" })}
-              clickable={teamStats.members_count > 0}
+              clickable={teamMembersCount > 0}
             />
             <StatCard label="Expositions" value={teamStats.expos_count} icon={Building2} href="/expos" />
             <StatCard label="Œuvres catalogue" value={teamStats.artworks_count} icon={ImageIcon} href="/catalogue" />
             <StatCard
               label="Rôle actuel"
-              value={role_label || role_name || "—"}
+              value={
+                isViewingSelf
+                  ? role_label || role_name || "—"
+                  : viewedMember?.agency_role_label || viewedMember?.role_label || "—"
+              }
               icon={UserRound}
               isText
             />
           </div>
 
-          {agency_id && (
+          {(dashboardAgencyId || teamMembers.length > 0) && (
             <Card id="dashboard-team-members" className="glass-card scroll-mt-24">
               <CardHeader className="pb-3">
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -584,6 +848,47 @@ const Dashboard = () => {
                   <p className="text-sm text-muted-foreground">
                     Créez des comptes pour votre organisation. {roleLevelHint(role_id)}
                   </p>
+                  {teamMembers.length > 0 ? (
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 max-h-56 overflow-y-auto">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Équipe ({teamMembers.length})
+                      </p>
+                      <ul className="space-y-1">
+                        {teamMembers.map((member) => {
+                          const name = profileFullName(
+                            member.first_name,
+                            member.last_name,
+                            member.username || "Membre",
+                          );
+                          const isSelected = member.user_id === profileUserId;
+                          return (
+                            <li key={member.user_id}>
+                              <button
+                                type="button"
+                                className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50 ${
+                                  isSelected ? "bg-primary/10 font-medium" : ""
+                                }`}
+                                onClick={() => {
+                                  if (canSwitchProfiles && userId) {
+                                    setViewedUserId(member.user_id === userId ? null : member.user_id);
+                                  } else {
+                                    openUserFiche(member.user_id);
+                                  }
+                                }}
+                              >
+                                <span className="truncate">{name}</span>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {member.agency_role_label || member.role_label || "—"}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun membre dans le périmètre actuel.</p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -594,7 +899,15 @@ const Dashboard = () => {
                       Nouvel utilisateur
                     </Button>
                     <Button asChild variant="outline">
-                      <Link to="/user/utilisateurs">Voir toute l&apos;équipe</Link>
+                      <Link
+                        to={
+                          dashboardAgencyId
+                            ? `/user/utilisateurs?scope=equipe&agency_id=${encodeURIComponent(dashboardAgencyId)}`
+                            : "/user/utilisateurs?scope=site"
+                        }
+                      >
+                        Voir toute l&apos;équipe
+                      </Link>
                     </Button>
                   </div>
                 </CardContent>
@@ -648,7 +961,7 @@ const Dashboard = () => {
                   L&apos;utilisateur <strong className="text-foreground">{deleteMemberDisplayName}</strong> sera
                   archivé et pourra être restauré depuis la corbeille utilisateurs.
                 </p>
-                {deleteMemberTarget?.role_id === 4 && (
+                {(deleteMemberTarget?.agency_role_id === 4 || deleteMemberTarget?.role_id === 4) && (
                   <p className="font-semibold text-destructive">
                     Attention : vous supprimez un responsable d&apos;organisation.
                   </p>

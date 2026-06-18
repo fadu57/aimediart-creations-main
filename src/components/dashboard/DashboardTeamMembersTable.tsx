@@ -153,7 +153,7 @@ export function DashboardTeamMembersTable({
             <TableHead>Nom</TableHead>
             <TableHead>Prénom</TableHead>
             <TableHead>Pseudo</TableHead>
-            <TableHead>Rôle</TableHead>
+            <TableHead>Rôle métier</TableHead>
             <TableHead className="hidden md:table-cell min-w-[10rem]">Exposition</TableHead>
             <TableHead className="hidden sm:table-cell">Téléphone</TableHead>
             {showActions && <TableHead className="w-[88px] text-right">Actions</TableHead>}
@@ -162,7 +162,7 @@ export function DashboardTeamMembersTable({
         <TableBody>
           {members.map((member) => {
             const isSelf = currentUserId && member.user_id === currentUserId;
-            const isRole4 = member.role_id === 4;
+            const isRole4 = member.agency_role_id === 4;
             const editable = canEditMember?.(member) ?? false;
             const deletable = canDeleteMember?.(member) ?? false;
             const expoEditable = canEditMemberExpos?.(member) ?? false;
@@ -182,7 +182,7 @@ export function DashboardTeamMembersTable({
                 <TableCell className={cn("font-medium", rowBold)}>{textOrDash(member.last_name)}</TableCell>
                 <TableCell className={rowBold}>{textOrDash(member.first_name)}</TableCell>
                 <TableCell className={rowBold}>{member.username ? `@${member.username}` : "—"}</TableCell>
-                <TableCell className={rowBold}>{textOrDash(member.role_label)}</TableCell>
+                <TableCell className={rowBold}>{textOrDash(member.agency_role_label)}</TableCell>
                 <TableCell
                   className="hidden md:table-cell"
                   onClick={(e) => e.stopPropagation()}

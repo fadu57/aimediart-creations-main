@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { parseGlobalRoleId, resolveMergedAuthRoleId } from "@/lib/authUser";
+import {
+  sortDashboardTeamMembers,
+  resolveTeamScopeFlags,
+  shouldIncludeInTeamScope,
+  fetchDashboardTeamMemberUserIds,
+  fetchSiteTeamMemberUserIds,
+  loadProfileGlobalRole,
+  isGlobalStaffRole,
+} from "@/lib/dashboardTeamScope";
+import { fetchOrganisationStandbyState } from "@/lib/organisationStandby";
+import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
 import { parseNumericRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
 import { readAvatarFromRpcRow } from "@/lib/userAvatar";
 import { filterActiveProfileUserIds } from "@/lib/userSoftDelete";
 
-/** Évite de rappeler Supabase si la table n'existe pas encore (404 / PGRST205). */
-const AGENCY_SUBSCRIPTIONS_CACHE_KEY = "aimediart.agency_subscriptions_unavailable";
+/** Évite de rappeler Supabase si la table legacy n'existe pas encore (404 / PGRST205). */
+const AGENCY_SUBSCRIPTIONS_CACHE_KEY = "aimediart.agency_subscriptions_unavailable.v2";
 
 function readAgencySubscriptionsUnavailable(): boolean {
   try {
@@ -55,24 +67,40 @@ export type DashboardExpo = {
 };
 
 export type DashboardSubscription = {
+  source: "organisation" | "legacy";
+  subscription_id: string | null;
+  plan_code: string | null;
   pricing_plan: string | null;
   pricing_label: string | null;
+  display_name: string | null;
   billing_cycle: "monthly" | "annual" | null;
   started_at: string | null;
   expires_at: string | null;
+  next_renewal_at: string | null;
   is_active: boolean;
+  is_trial: boolean;
   days_remaining: number | null;
   max_oeuvres: number | null;
   max_visitors: number | null;
   is_unlimited: boolean | null;
   monthly_price_eur: number | null;
-  status: "active" | "expired" | "none" | "unknown";
+  standby_monthly_price_eur: number | null;
+  standby_status: string | null;
+  standby_requested_at: string | null;
+  standby_cancel_deadline_at: string | null;
+  standby_started_at: string | null;
+  included_mediation_langs_min: number | null;
+  included_mediation_langs_max: number | null;
+  included_audio_langs: number | null;
+  org_status: string | null;
+  status: "active" | "trial" | "standby" | "expired" | "cancelled" | "none" | "unknown";
 };
 
 export type DashboardTeamStats = {
   members_count: number;
   expos_count: number;
   artworks_count: number;
+  visitors_this_month: number;
 };
 
 export type DashboardTeamMember = {
@@ -82,9 +110,13 @@ export type DashboardTeamMember = {
   username: string | null;
   avatar_url: string | null;
   phone: string | null;
+  /** Rôle fusionné (permissions). */
   role_id: number | null;
   role_label: string | null;
-  /** Identifiants expo (expo_id ou id expos) — plusieurs affectations possibles. */
+  /** Rôle métier agence (agency_users). */
+  agency_role_id: number | null;
+  agency_role_label: string | null;
+  /** Identifiants expo (expos.id) — plusieurs affectations possibles. */
   expo_ids: string[];
 };
 
@@ -101,6 +133,8 @@ export type DashboardData = {
   subscription: DashboardSubscription | null;
   teamStats: DashboardTeamStats;
   teamMembers: DashboardTeamMember[];
+  /** Tous les profils (admins globaux 1–3) ou équipe sinon. */
+  profilePickerMembers: DashboardTeamMember[];
   agencyExpos: DashboardAgencyExpoOption[];
   loading: boolean;
   error: string | null;
@@ -171,37 +205,278 @@ async function fetchPricingForPlan(plan: string | null): Promise<{
 
 function subscriptionPlaceholder(status: DashboardSubscription["status"]): DashboardSubscription {
   return {
+    source: "legacy",
+    subscription_id: null,
+    plan_code: null,
     pricing_plan: null,
     pricing_label: null,
+    display_name: null,
     billing_cycle: null,
     started_at: null,
     expires_at: null,
+    next_renewal_at: null,
     is_active: false,
+    is_trial: false,
     days_remaining: null,
     max_oeuvres: null,
     max_visitors: null,
     is_unlimited: null,
     monthly_price_eur: null,
+    standby_monthly_price_eur: null,
+    standby_status: null,
+    standby_requested_at: null,
+    standby_cancel_deadline_at: null,
+    standby_started_at: null,
+    included_mediation_langs_min: null,
+    included_mediation_langs_max: null,
+    included_audio_langs: null,
+    org_status: null,
     status,
   };
 }
 
-function isAgencySubscriptionsTableMissing(error: { message?: string; code?: string } | null): boolean {
-  if (!error) return false;
-  const code = (error.code ?? "").toUpperCase();
-  const msg = (error.message ?? "").toLowerCase();
-  return (
-    code === "PGRST205" ||
-    code === "42P01" ||
-    msg.includes("could not find") ||
-    msg.includes("does not exist") ||
-    msg.includes("relation") ||
-    msg.includes("schema cache")
+function mapOrganisationSubscriptionStatus(
+  orgStatus: string | null | undefined,
+  standbyStatus: string | null | undefined,
+): DashboardSubscription["status"] {
+  const status = (orgStatus ?? "").toLowerCase();
+  if (status === "trial") return "trial";
+  if (status === "standby" || standbyStatus === "active") return "standby";
+  if (status === "cancelled") return "cancelled";
+  if (status === "expired") return "expired";
+  if (status === "active") return "active";
+  return "unknown";
+}
+
+type PricingJoinRow = {
+  pricing_label?: string | null;
+  display_name?: string | null;
+  plan_code?: string | null;
+  pricing_monthly_ttc_eur?: number | null;
+  pricing_max_oeuvres?: number | null;
+  pricing_max_visitors?: number | null;
+  princing_max_visitors?: number | null;
+  pricing_is_unlimited?: boolean | null;
+  standby_monthly_price_ttc_eur?: number | null;
+  included_mediation_langs_min?: number | null;
+  included_mediation_langs_max?: number | null;
+  included_audio_langs?: number | null;
+};
+
+const PRICING_JOIN_SELECTS = [
+  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
+  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
+] as const;
+
+async function fetchPricingJoinByPlanCode(planCode: string | null): Promise<PricingJoinRow | null> {
+  const code = planCode?.trim();
+  if (!code) return null;
+  for (const select of PRICING_JOIN_SELECTS) {
+    const { data, error } = await supabase.from("pricing").select(select).eq("plan_code", code).limit(1).maybeSingle();
+    if (!error && data) return data as PricingJoinRow;
+  }
+  return null;
+}
+
+async function fetchPricingJoinById(pricingId: string | null): Promise<PricingJoinRow | null> {
+  const id = pricingId?.trim();
+  if (!id) return null;
+  for (const select of PRICING_JOIN_SELECTS) {
+    const { data, error } = await supabase.from("pricing").select(select).eq("pricing_id", id).limit(1).maybeSingle();
+    if (!error && data) return data as PricingJoinRow;
+  }
+  return null;
+}
+
+function buildDashboardSubscriptionFromOrgRow(
+  row: {
+    id?: string;
+    plan_code?: string | null;
+    billing_cycle?: string | null;
+    status?: string | null;
+    standby_status?: string | null;
+    is_trial?: boolean | null;
+    started_at?: string | null;
+    ends_at?: string | null;
+    trial_ends_at?: string | null;
+    next_renewal_at?: string | null;
+    standby_started_at?: string | null;
+    standby_requested_at?: string | null;
+    standby_cancel_deadline_at?: string | null;
+  },
+  pricing: PricingJoinRow | null,
+): DashboardSubscription {
+  const renewalOrEnd = row.next_renewal_at ?? row.ends_at ?? row.trial_ends_at ?? null;
+  const mappedStatus = mapOrganisationSubscriptionStatus(row.status, row.standby_status);
+  const isActive = mappedStatus === "active" || mappedStatus === "trial" || mappedStatus === "standby";
+
+  return {
+    source: "organisation",
+    subscription_id: row.id ?? null,
+    plan_code: row.plan_code ?? pricing?.plan_code ?? null,
+    pricing_plan: pricing?.pricing_label ?? row.plan_code ?? null,
+    pricing_label: pricing?.pricing_label ?? null,
+    display_name: pricing?.display_name ?? pricing?.pricing_label ?? row.plan_code ?? null,
+    billing_cycle:
+      row.billing_cycle === "annual" || row.billing_cycle === "monthly" ? row.billing_cycle : null,
+    started_at: row.started_at ?? null,
+    expires_at: renewalOrEnd,
+    next_renewal_at: row.next_renewal_at ?? null,
+    is_active: isActive,
+    is_trial: row.is_trial === true || mappedStatus === "trial",
+    days_remaining: daysUntil(renewalOrEnd),
+    max_oeuvres: pricing?.pricing_max_oeuvres ?? null,
+    max_visitors: pricing?.pricing_max_visitors ?? pricing?.princing_max_visitors ?? null,
+    is_unlimited: pricing?.pricing_is_unlimited ?? null,
+    monthly_price_eur: pricing?.pricing_monthly_ttc_eur ?? null,
+    standby_monthly_price_eur: pricing?.standby_monthly_price_ttc_eur ?? null,
+    standby_status: row.standby_status ?? null,
+    standby_requested_at: row.standby_requested_at ?? null,
+    standby_cancel_deadline_at: row.standby_cancel_deadline_at ?? null,
+    standby_started_at: row.standby_started_at ?? null,
+    included_mediation_langs_min: pricing?.included_mediation_langs_min ?? null,
+    included_mediation_langs_max: pricing?.included_mediation_langs_max ?? null,
+    included_audio_langs: pricing?.included_audio_langs ?? null,
+    org_status: row.status ?? null,
+    status: mappedStatus === "unknown" ? "active" : mappedStatus,
+  };
+}
+
+async function buildSubscriptionFromStandbyState(agencyId: string): Promise<DashboardSubscription | null> {
+  const state = await fetchOrganisationStandbyState();
+  if (!state.has_subscription || !state.plan_code) return null;
+  if (state.agency_id && state.agency_id !== agencyId) return null;
+
+  const pricing = await fetchPricingJoinByPlanCode(state.plan_code);
+  return buildDashboardSubscriptionFromOrgRow(
+    {
+      plan_code: state.plan_code,
+      billing_cycle: state.billing_cycle,
+      status: state.status,
+      standby_status: state.standby_status,
+      is_trial: state.status === "trial",
+      next_renewal_at: state.next_renewal_at,
+      standby_requested_at: state.standby_requested_at,
+      standby_cancel_deadline_at: state.standby_cancel_deadline_at,
+      standby_started_at: state.standby_effective_at,
+    },
+    pricing,
   );
 }
 
-async function fetchSubscription(agencyId: string | null): Promise<DashboardSubscription | null> {
-  if (!agencyId?.trim()) return null;
+async function resolveAgencyIdFromAgencyUsers(profileUserId: string): Promise<string | null> {
+  const uid = profileUserId.trim();
+  if (!uid) return null;
+  const { data } = await supabase
+    .from("agency_users")
+    .select("agency_id, role_id")
+    .eq("user_id", uid)
+    .order("role_id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const agencyId = (data as { agency_id?: string | null } | null)?.agency_id?.trim();
+  return agencyId || null;
+}
+
+async function resolveExpoIdFromUser(profileUserId: string): Promise<string | null> {
+  const uid = profileUserId.trim();
+  if (!uid) return null;
+  const { data } = await supabase
+    .from("expo_user_role")
+    .select("expo_id")
+    .eq("user_id", uid)
+    .order("assigned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const expoId = (data as { expo_id?: string | null } | null)?.expo_id?.trim();
+  return expoId || null;
+}
+
+async function resolveAgencyIdFromStandbyRpc(): Promise<string | null> {
+  const { data } = await supabase.rpc("get_my_organisation_standby_state");
+  if (data && typeof data === "object" && typeof (data as { agency_id?: unknown }).agency_id === "string") {
+    const resolved = (data as { agency_id: string }).agency_id.trim();
+    return resolved || null;
+  }
+  return null;
+}
+
+async function resolveDashboardAgencyId(
+  profileUserId: string | null,
+  viewerUserId: string | null,
+  viewerAgencyId: string | null,
+): Promise<string | null> {
+  const uid = profileUserId?.trim() || null;
+  const vid = viewerUserId?.trim() || null;
+  const isSelf = Boolean(uid && vid && uid === vid);
+
+  if (uid) {
+    const fromProfile = await resolveAgencyIdFromAgencyUsers(uid);
+    if (fromProfile) return fromProfile;
+  }
+
+  if (!isSelf) return null;
+
+  if (viewerAgencyId?.trim()) return viewerAgencyId.trim();
+  return resolveAgencyIdFromStandbyRpc();
+}
+
+async function fetchOrganisationSubscription(
+  agencyId: string,
+): Promise<{ kind: "data"; subscription: DashboardSubscription } | { kind: "none" } | { kind: "missing_table" }> {
+  const { data, error, status } = await supabase
+    .from("organisation_subscriptions")
+    .select(
+      `id, plan_code, billing_cycle, status, standby_status, is_trial, started_at, ends_at, trial_ends_at,
+       next_renewal_at, standby_started_at, standby_requested_at, standby_cancel_deadline_at, pricing_id`,
+    )
+    .eq("organisation_id", agencyId)
+    .in("status", ["trial", "active", "standby"])
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (status === 404 || isAgencySubscriptionsTableMissing(error)) {
+    return { kind: "missing_table" };
+  }
+
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.warn("[dashboard] organisation_subscriptions:", error.message);
+    }
+    return { kind: "none" };
+  }
+
+  if (!data) return { kind: "none" };
+
+  const row = data as {
+    id?: string;
+    plan_code?: string | null;
+    billing_cycle?: string | null;
+    status?: string | null;
+    standby_status?: string | null;
+    is_trial?: boolean | null;
+    started_at?: string | null;
+    ends_at?: string | null;
+    trial_ends_at?: string | null;
+    next_renewal_at?: string | null;
+    standby_started_at?: string | null;
+    standby_requested_at?: string | null;
+    standby_cancel_deadline_at?: string | null;
+    pricing_id?: string | number | null;
+  };
+
+  const pricing =
+    (await fetchPricingJoinById(row.pricing_id != null ? String(row.pricing_id) : null)) ??
+    (await fetchPricingJoinByPlanCode(row.plan_code ?? null));
+
+  return {
+    kind: "data",
+    subscription: buildDashboardSubscriptionFromOrgRow(row, pricing),
+  };
+}
+
+async function fetchLegacyAgencySubscription(agencyId: string): Promise<DashboardSubscription | null> {
   if (AGENCY_SUBSCRIPTIONS_UNAVAILABLE) return subscriptionPlaceholder("unknown");
 
   const { data, error, status } = await supabase
@@ -241,63 +516,212 @@ async function fetchSubscription(agencyId: string | null): Promise<DashboardSubs
   const pricingDetails = await fetchPricingForPlan(pricingPlan);
   const expiresAt = row.expires_at ?? null;
   const isActive = row.is_active !== false;
-  const daysRemaining = daysUntil(expiresAt);
+  const legacyStatus = subscriptionStatus(isActive, expiresAt);
 
   return {
+    source: "legacy",
+    subscription_id: null,
+    plan_code: null,
     pricing_plan: pricingPlan,
     pricing_label: pricingDetails.pricing_label,
+    display_name: pricingDetails.pricing_label,
     billing_cycle:
-      row.billing_cycle === "annual" || row.billing_cycle === "monthly"
-        ? row.billing_cycle
-        : null,
+      row.billing_cycle === "annual" || row.billing_cycle === "monthly" ? row.billing_cycle : null,
     started_at: row.started_at ?? null,
     expires_at: expiresAt,
+    next_renewal_at: null,
     is_active: isActive,
-    days_remaining: daysRemaining,
+    is_trial: false,
+    days_remaining: daysUntil(expiresAt),
     max_oeuvres: pricingDetails.max_oeuvres,
     max_visitors: pricingDetails.max_visitors,
     is_unlimited: pricingDetails.is_unlimited,
     monthly_price_eur: pricingDetails.monthly_price_eur,
-    status: subscriptionStatus(isActive, expiresAt),
+    standby_monthly_price_eur: null,
+    standby_status: null,
+    standby_requested_at: null,
+    standby_cancel_deadline_at: null,
+    standby_started_at: null,
+    included_mediation_langs_min: null,
+    included_mediation_langs_max: null,
+    included_audio_langs: null,
+    org_status: null,
+    status: legacyStatus === "expired" ? "expired" : legacyStatus === "none" ? "none" : "active",
   };
 }
 
-async function fetchTeamMembers(agencyId: string | null): Promise<{
+function isAgencySubscriptionsTableMissing(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  const code = (error.code ?? "").toUpperCase();
+  const msg = (error.message ?? "").toLowerCase();
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    msg.includes("could not find") ||
+    msg.includes("does not exist") ||
+    msg.includes("relation") ||
+    msg.includes("schema cache")
+  );
+}
+
+async function fetchSubscription(
+  resolvedAgencyId: string | null,
+  allowStandbyFallback = false,
+): Promise<DashboardSubscription | null> {
+  if (!resolvedAgencyId) return null;
+
+  const orgResult = await fetchOrganisationSubscription(resolvedAgencyId);
+  if (orgResult.kind === "data") return orgResult.subscription;
+
+  if (allowStandbyFallback) {
+    const standbySub = await buildSubscriptionFromStandbyState(resolvedAgencyId);
+    if (standbySub) return standbySub;
+  }
+
+  if (orgResult.kind === "missing_table") {
+    const legacy = await fetchLegacyAgencySubscription(resolvedAgencyId);
+    return legacy ?? subscriptionPlaceholder("unknown");
+  }
+
+  return subscriptionPlaceholder("none");
+}
+
+async function fetchSiteTeamMembers(): Promise<{
   members: DashboardTeamMember[];
   agencyExpos: DashboardAgencyExpoOption[];
 }> {
-  if (!agencyId?.trim()) return { members: [], agencyExpos: [] };
-  const aid = agencyId.trim();
+  const [{ data: rpcData, error: rpcErr }, { data: roleRows }] = await Promise.all([
+    supabase.rpc("get_all_users_with_roles"),
+    supabase.from("roles_user").select("role_id, role_name_clair, label, role_name"),
+  ]);
 
-  const [{ data: rpcData, error: rpcErr }, { data: roleRows }, { data: expoRows }, { data: agencyRoleRows }] =
+  const roleLabelById = new Map<number, string>();
+  for (const row of (roleRows as Array<{
+    role_id?: number | null;
+    role_name_clair?: string | null;
+    label?: string | null;
+    role_name?: string | null;
+  }> | null) ?? []) {
+    if (typeof row.role_id !== "number") continue;
+    const raw =
+      row.role_name_clair?.trim() || row.label?.trim() || row.role_name?.trim() || `Rôle ${row.role_id}`;
+    roleLabelById.set(row.role_id, raw);
+  }
+
+  const teamScopeFlags = resolveTeamScopeFlags(null, null, null, new Map());
+  const emptyAgencyRoles = new Map<string, number>();
+
+  type RpcUserRow = {
+    id?: string | null;
+    role_id?: number | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+    user_photo_url?: string | null;
+    phone?: string | null;
+  };
+
+  if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+    let members: DashboardTeamMember[] = (rpcData as RpcUserRow[])
+      .filter((r) => {
+        const uid = typeof r.id === "string" ? r.id.trim() : "";
+        if (!uid) return false;
+        return shouldIncludeInTeamScope(
+          uid,
+          teamScopeFlags,
+          emptyAgencyRoles,
+          parseNumericRoleId(r.role_id),
+        );
+      })
+      .map((r) => {
+        const uid = String(r.id).trim();
+        const mergedRoleId = parseNumericRoleId(r.role_id);
+        return {
+          user_id: uid,
+          first_name: r.first_name ?? null,
+          last_name: r.last_name ?? null,
+          username: r.username ?? null,
+          avatar_url: readAvatarFromRpcRow(r) ?? r.avatar_url ?? null,
+          phone: r.phone ?? null,
+          role_id: mergedRoleId,
+          role_label: mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : null,
+          agency_role_id: null,
+          agency_role_label: null,
+          expo_ids: [] as string[],
+        };
+      });
+
+    members = sortDashboardTeamMembers(members);
+    const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
+    members = members.filter((m) => activeIds.has(m.user_id));
+    return { members, agencyExpos: [] };
+  }
+
+  const memberIdSet = await fetchSiteTeamMemberUserIds();
+  const userIds = [...memberIdSet];
+  if (userIds.length === 0) return { members: [], agencyExpos: [] };
+
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, username, avatar_url, phone, role_id")
+    .in("id", userIds);
+
+  let members: DashboardTeamMember[] = (
+    (profileRows as Array<{
+      id?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+      username?: string | null;
+      avatar_url?: string | null;
+      phone?: string | null;
+      role_id?: unknown;
+    }> | null) ?? []
+  )
+    .filter((row) => typeof row.id === "string" && row.id.trim())
+    .map((row) => {
+      const uid = String(row.id).trim();
+      const mergedRoleId = parseGlobalRoleId(row.role_id);
+      return {
+        user_id: uid,
+        first_name: row.first_name ?? null,
+        last_name: row.last_name ?? null,
+        username: row.username ?? null,
+        avatar_url: row.avatar_url ?? null,
+        phone: row.phone ?? null,
+        role_id: mergedRoleId,
+        role_label: mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : null,
+        agency_role_id: null,
+        agency_role_label: null,
+        expo_ids: [] as string[],
+      };
+    });
+
+  members = sortDashboardTeamMembers(members);
+  const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
+  members = members.filter((m) => activeIds.has(m.user_id));
+  return { members, agencyExpos: [] };
+}
+
+async function fetchTeamMembers(
+  agencyId: string | null,
+  profileUserId: string | null,
+): Promise<{
+  members: DashboardTeamMember[];
+  agencyExpos: DashboardAgencyExpoOption[];
+}> {
+  if (!agencyId?.trim()) return fetchSiteTeamMembers();
+  const aid = agencyId.trim();
+  const pid = profileUserId?.trim() || null;
+
+  const [{ data: rpcData, error: rpcErr }, { data: roleRows }, { data: expoRows }, { data: agencyRoleRows }, profileGlobalRole] =
     await Promise.all([
       supabase.rpc("get_all_users_with_roles"),
       supabase.from("roles_user").select("role_id, role_name_clair, label, role_name"),
       supabase.from("expos").select("id, expo_id, expo_name").eq("agency_id", aid).is("deleted_at", null),
       supabase.from("agency_users").select("user_id, role_id").eq("agency_id", aid),
+      loadProfileGlobalRole(pid),
     ]);
-
-  const agencyExpos: DashboardAgencyExpoOption[] = (
-    (expoRows as Array<{ id?: string | null; expo_id?: string | null; expo_name?: string | null }> | null) ?? []
-  )
-    .filter((row) => typeof row.id === "string" && row.id.trim())
-    .map((row) => {
-      const id = String(row.id).trim();
-      const value = row.expo_id?.trim() || id;
-      return {
-        id,
-        value,
-        label: row.expo_name?.trim() || value,
-      };
-    })
-    .sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
-
-  const normalizeStoredExpoId = (raw: string): string => {
-    const t = raw.trim();
-    if (!t) return "";
-    const match = agencyExpos.find((o) => o.value === t || o.id === t);
-    return match?.value ?? t;
-  };
 
   const agencyRoleByUser = new Map<string, number>();
   for (const row of (agencyRoleRows as Array<{ user_id?: string | null; role_id?: unknown }> | null) ?? []) {
@@ -305,6 +729,31 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     const rid = parseNumericRoleId(row.role_id);
     if (uid && rid != null) agencyRoleByUser.set(uid, rid);
   }
+
+  let effectiveProfileGlobal = profileGlobalRole;
+  if (pid && !isGlobalStaffRole(effectiveProfileGlobal) && Array.isArray(rpcData)) {
+    const profileRpcRow = (rpcData as Array<{ id?: string | null; role_id?: number | null }>).find(
+      (row) => row.id?.trim() === pid,
+    );
+    const merged = parseNumericRoleId(profileRpcRow?.role_id);
+    if (isGlobalStaffRole(merged)) effectiveProfileGlobal = merged;
+  }
+
+  const teamScopeFlags = resolveTeamScopeFlags(aid, pid, effectiveProfileGlobal, agencyRoleByUser);
+
+  const agencyExpos: DashboardAgencyExpoOption[] = (
+    (expoRows as Array<{ id?: string | null; expo_id?: string | null; expo_name?: string | null }> | null) ?? []
+  )
+    .filter((row) => typeof row.id === "string" && row.id.trim())
+    .map((row) => {
+      const id = String(row.id).trim();
+      return {
+        id,
+        value: id,
+        label: row.expo_name?.trim() || row.expo_id?.trim() || id,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "fr", { sensitivity: "base" }));
 
   const roleLabelById = new Map<number, string>();
   for (const row of (roleRows as Array<{
@@ -320,11 +769,87 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     roleLabelById.set(row.role_id, label);
   }
 
+  const buildMember = (
+    uid: string,
+    base: Omit<DashboardTeamMember, "user_id" | "agency_role_id" | "agency_role_label"> & {
+      agency_role_id?: number | null;
+    },
+  ): DashboardTeamMember => {
+    const agencyRoleId = base.agency_role_id ?? agencyRoleByUser.get(uid) ?? null;
+    return {
+      user_id: uid,
+      first_name: base.first_name ?? null,
+      last_name: base.last_name ?? null,
+      username: base.username ?? null,
+      avatar_url: base.avatar_url ?? null,
+      phone: base.phone ?? null,
+      role_id: base.role_id ?? null,
+      role_label: base.role_label ?? null,
+      agency_role_id: agencyRoleId,
+      agency_role_label:
+        agencyRoleId != null ? roleLabelById.get(agencyRoleId) ?? `Rôle ${agencyRoleId}` : null,
+      expo_ids: base.expo_ids ?? [],
+    };
+  };
+
+  const enrichTeamMembersMergedRoles = async (members: DashboardTeamMember[]): Promise<DashboardTeamMember[]> => {
+    if (!members.length) return members;
+    const ids = members.map((m) => m.user_id);
+    const { data: profileRows } = await supabase.from("profiles").select("id, role_id").in("id", ids);
+    const globalByUser = new Map<string, number | null>();
+    for (const row of (profileRows as Array<{ id?: string | null; role_id?: unknown }> | null) ?? []) {
+      const uid = typeof row.id === "string" ? row.id.trim() : "";
+      if (!uid) continue;
+      globalByUser.set(uid, parseGlobalRoleId(row.role_id));
+    }
+    return members.map((member) => {
+      const globalRoleId = globalByUser.get(member.user_id) ?? null;
+      const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, member.agency_role_id);
+      return {
+        ...member,
+        role_id: mergedRoleId,
+        role_label:
+          mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : member.role_label,
+      };
+    });
+  };
+
+  const attachExpoAssignments = async (members: DashboardTeamMember[]): Promise<DashboardTeamMember[]> => {
+    const memberIds = members.map((m) => m.user_id);
+    if (memberIds.length === 0) return members;
+
+    const { data: assignRows } = await supabase
+      .from("expo_user_role")
+      .select("user_id, expo_id")
+      .in("user_id", memberIds);
+
+    const rawByUser = new Map<string, string[]>();
+    for (const row of (assignRows as Array<{ user_id?: string | null; expo_id?: string | null }> | null) ?? []) {
+      const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
+      const eid = typeof row.expo_id === "string" ? row.expo_id.trim() : "";
+      if (!uid || !eid) continue;
+      const list = rawByUser.get(uid) ?? [];
+      if (!list.includes(eid)) list.push(eid);
+      rawByUser.set(uid, list);
+    }
+
+    const updated = await Promise.all(
+      members.map(async (member) => {
+        const raws = rawByUser.get(member.user_id) ?? [];
+        if (!raws.length) return { ...member, expo_ids: [] as string[] };
+        const storageIds = await resolveExpoStorageIds(raws);
+        const ids = storageIds.filter((id) => agencyExpos.some((o) => o.id === id));
+        return { ...member, expo_ids: [...new Set(ids)] };
+      }),
+    );
+
+    return updated;
+  };
+
   type RpcUserRow = {
     id?: string | null;
     role_id?: number | null;
     agency_id?: string | null;
-    expo_id?: string | null;
     first_name?: string | null;
     last_name?: string | null;
     username?: string | null;
@@ -335,51 +860,42 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     phone?: string | null;
   };
 
+  const includeRpcUser = (r: RpcUserRow): boolean => {
+    const uid = typeof r.id === "string" ? r.id.trim() : "";
+    if (!uid) return false;
+    return shouldIncludeInTeamScope(
+      uid,
+      teamScopeFlags,
+      agencyRoleByUser,
+      parseNumericRoleId(r.role_id),
+    );
+  };
+
   if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
     let members: DashboardTeamMember[] = (rpcData as RpcUserRow[])
-      .filter((r) => typeof r.id === "string" && r.id.trim() && r.agency_id?.trim() === aid)
+      .filter(includeRpcUser)
       .map((r) => {
         const uid = String(r.id).trim();
-        const roleId = parseNumericRoleId(r.role_id) ?? agencyRoleByUser.get(uid) ?? null;
-        return {
-          user_id: uid,
+        const mergedRoleId = parseNumericRoleId(r.role_id);
+        return buildMember(uid, {
           first_name: r.first_name ?? null,
           last_name: r.last_name ?? null,
           username: r.username ?? null,
           avatar_url: readAvatarFromRpcRow(r) ?? r.avatar_url ?? null,
           phone: r.phone ?? null,
-          role_id: roleId,
-          role_label: roleId != null ? roleLabelById.get(roleId) ?? `Rôle ${roleId}` : null,
-          expo_ids: [] as string[],
-        };
+          role_id: mergedRoleId,
+          role_label: mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : null,
+          expo_ids: [],
+        });
       });
 
-    const memberIds = members.map((m) => m.user_id);
-    if (memberIds.length > 0) {
-      const { data: assignRows } = await supabase
-        .from("expo_user_role")
-        .select("user_id, expo_id")
-        .in("user_id", memberIds);
-      const expoIdsByUser = new Map<string, string[]>();
-      for (const row of (assignRows as Array<{ user_id?: string | null; expo_id?: string | null }> | null) ?? []) {
-        const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
-        const eid = typeof row.expo_id === "string" ? normalizeStoredExpoId(row.expo_id) : "";
-        if (!uid || !eid) continue;
-        const list = expoIdsByUser.get(uid) ?? [];
-        if (!list.includes(eid)) list.push(eid);
-        expoIdsByUser.set(uid, list);
-      }
-      members = members.map((m) => ({
-        ...m,
-        expo_ids: expoIdsByUser.get(m.user_id) ?? [],
-      }));
-    }
+    const uniqueById = new Map<string, DashboardTeamMember>();
+    for (const member of members) uniqueById.set(member.user_id, member);
+    members = [...uniqueById.values()];
 
-    members.sort((a, b) => {
-      const ln = (a.last_name ?? "").localeCompare(b.last_name ?? "", "fr", { sensitivity: "base" });
-      if (ln !== 0) return ln;
-      return (a.first_name ?? "").localeCompare(b.first_name ?? "", "fr", { sensitivity: "base" });
-    });
+    members = await attachExpoAssignments(members);
+    members = await enrichTeamMembersMergedRoles(members);
+    members = sortDashboardTeamMembers(members);
 
     const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
     members = members.filter((m) => activeIds.has(m.user_id));
@@ -391,26 +907,14 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
     console.warn("[dashboard] RPC get_all_users_with_roles indisponible, repli agency_users :", rpcErr.message);
   }
 
-  // Repli : agency_users visible, profiles souvent bloqués par RLS (noms vides).
-  const { data: agencyRows, error: agencyErr } = await supabase
-    .from("agency_users")
-    .select("user_id, role_id")
-    .eq("agency_id", aid)
-    .order("role_id", { ascending: true });
+  // Repli : agency_users de l'organisation uniquement.
+  const memberIdSet = await fetchDashboardTeamMemberUserIds(aid, pid);
+  const userIds = [...memberIdSet];
 
-  if (agencyErr || !agencyRows?.length) return { members: [], agencyExpos };
-
-  const userIds = [
-    ...new Set(
-      (agencyRows as Array<{ user_id?: string | null }>)
-        .map((r) => (typeof r.user_id === "string" ? r.user_id.trim() : ""))
-        .filter(Boolean),
-    ),
-  ];
   if (userIds.length === 0) return { members: [], agencyExpos };
 
   const [{ data: profileRows }, { data: expoAssignRows }] = await Promise.all([
-    supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone").in("id", userIds),
+    supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone, role_id").in("id", userIds),
     supabase
       .from("expo_user_role")
       .select("user_id, expo_id")
@@ -418,14 +922,32 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
       .order("assigned_at", { ascending: false }),
   ]);
 
-  const expoIdsByUser = new Map<string, string[]>();
+  const rawExpoByUser = new Map<string, string[]>();
   for (const row of (expoAssignRows as Array<{ user_id?: string | null; expo_id?: string | null }> | null) ?? []) {
     const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
-    const eid = typeof row.expo_id === "string" ? normalizeStoredExpoId(row.expo_id) : "";
+    const eid = typeof row.expo_id === "string" ? row.expo_id.trim() : "";
     if (!uid || !eid) continue;
-    const list = expoIdsByUser.get(uid) ?? [];
+    const list = rawExpoByUser.get(uid) ?? [];
     if (!list.includes(eid)) list.push(eid);
-    expoIdsByUser.set(uid, list);
+    rawExpoByUser.set(uid, list);
+  }
+
+  const allRawExpo = [...new Set([...rawExpoByUser.values()].flat())];
+  const resolvedExpo = allRawExpo.length > 0 ? await resolveExpoStorageIds(allRawExpo) : [];
+  const resolvedSet = new Set(resolvedExpo);
+  const expoPkByRaw = new Map<string, string>();
+  for (const raw of allRawExpo) {
+    if (resolvedSet.has(raw)) expoPkByRaw.set(raw, raw);
+  }
+  if (resolvedExpo.length > 0) {
+    const { data: expoLookup } = await supabase.from("expos").select("id, expo_id").in("id", resolvedExpo);
+    for (const row of (expoLookup as Array<{ id?: string | null; expo_id?: string | null }> | null) ?? []) {
+      const pk = row.id?.trim();
+      if (!pk) continue;
+      expoPkByRaw.set(pk, pk);
+      const alt = row.expo_id?.trim();
+      if (alt) expoPkByRaw.set(alt, pk);
+    }
   }
 
   const profileById = new Map<
@@ -436,68 +958,264 @@ async function fetchTeamMembers(agencyId: string | null): Promise<{
       username?: string | null;
       avatar_url?: string | null;
       phone?: string | null;
+      role_id?: number | null;
     }
   >();
-  for (const row of (profileRows as Array<{ id?: string | null; avatar_url?: string | null }> | null) ?? []) {
+  for (const row of (profileRows as Array<{ id?: string | null; role_id?: number | null }> | null) ?? []) {
     const id = typeof row.id === "string" ? row.id.trim() : "";
     if (id) profileById.set(id, row);
   }
 
   const roleByUser = new Map<string, number | null>();
-  for (const row of agencyRows as Array<{ user_id?: string | null; role_id?: number | null }>) {
-    const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
-    if (!uid || roleByUser.has(uid)) continue;
-    roleByUser.set(uid, parseNumericRoleId(row.role_id));
+  for (const [uid, roleId] of agencyRoleByUser) {
+    roleByUser.set(uid, roleId);
   }
 
-  const members: DashboardTeamMember[] = userIds.map((uid) => {
+  let members: DashboardTeamMember[] = userIds.map((uid) => {
     const p = profileById.get(uid);
-    const roleId = roleByUser.get(uid) ?? null;
-    return {
-      user_id: uid,
+    const agencyRoleId = roleByUser.get(uid) ?? null;
+    const globalRoleId = parseNumericRoleId(p?.role_id);
+    const mergedRoleId =
+      globalRoleId != null && agencyRoleId != null
+        ? Math.min(globalRoleId, agencyRoleId)
+        : globalRoleId ?? agencyRoleId;
+    const expoIds = (rawExpoByUser.get(uid) ?? [])
+      .map((raw) => expoPkByRaw.get(raw) ?? raw)
+      .filter((id) => agencyExpos.some((o) => o.id === id));
+
+    return buildMember(uid, {
       first_name: p?.first_name ?? null,
       last_name: p?.last_name ?? null,
       username: p?.username ?? null,
       avatar_url: p?.avatar_url ?? null,
       phone: p?.phone ?? null,
-      role_id: roleId,
-      role_label: roleId != null ? roleLabelById.get(roleId) ?? `Rôle ${roleId}` : null,
-      expo_ids: expoIdsByUser.get(uid) ?? [],
+      role_id: mergedRoleId,
+      role_label: mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : null,
+      agency_role_id: agencyRoleId,
+      expo_ids: [...new Set(expoIds)],
+    });
+  });
+
+  members = await enrichTeamMembersMergedRoles(members);
+  members = sortDashboardTeamMembers(members);
+
+  const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
+  members = members.filter((m) => activeIds.has(m.user_id));
+
+  return { members, agencyExpos };
+}
+
+async function fetchAllUsersForProfilePicker(): Promise<DashboardTeamMember[]> {
+  const [{ data: rpcData, error: rpcErr }, { data: roleRows }, { data: agencyRoleRows }] = await Promise.all([
+    supabase.rpc("get_all_users_with_roles"),
+    supabase.from("roles_user").select("role_id, role_name_clair, label, role_name"),
+    supabase.from("agency_users").select("user_id, agency_id, role_id"),
+  ]);
+
+  const roleLabelById = new Map<number, string>();
+  for (const row of (roleRows as Array<{
+    role_id?: number | null;
+    role_name_clair?: string | null;
+    label?: string | null;
+    role_name?: string | null;
+  }> | null) ?? []) {
+    if (typeof row.role_id !== "number") continue;
+    const raw =
+      row.role_name_clair?.trim() || row.label?.trim() || row.role_name?.trim() || `Rôle ${row.role_id}`;
+    const label = row.role_id === 4 && raw.toLowerCase() === "admin agence" ? "Admin organisation" : raw;
+    roleLabelById.set(row.role_id, label);
+  }
+
+  const agencyRoleByUser = new Map<string, { agency_id: string | null; role_id: number | null }>();
+  for (const row of (agencyRoleRows as Array<{
+    user_id?: string | null;
+    agency_id?: string | null;
+    role_id?: unknown;
+  }> | null) ?? []) {
+    const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
+    if (!uid || agencyRoleByUser.has(uid)) continue;
+    agencyRoleByUser.set(uid, {
+      agency_id: row.agency_id?.trim() || null,
+      role_id: parseNumericRoleId(row.role_id),
+    });
+  }
+
+  if (rpcErr || !Array.isArray(rpcData) || rpcData.length === 0) return [];
+
+  type RpcUserRow = {
+    id?: string | null;
+    role_id?: number | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    username?: string | null;
+    avatar_url?: string | null;
+    user_photo_url?: string | null;
+    phone?: string | null;
+  };
+
+  let members: DashboardTeamMember[] = (rpcData as RpcUserRow[])
+    .filter((r) => typeof r.id === "string" && r.id.trim())
+    .map((r) => {
+      const uid = String(r.id).trim();
+      const agencyRec = agencyRoleByUser.get(uid);
+      const agencyRoleId = agencyRec?.role_id ?? null;
+      const mergedRoleId = parseNumericRoleId(r.role_id);
+      return {
+        user_id: uid,
+        first_name: r.first_name ?? null,
+        last_name: r.last_name ?? null,
+        username: r.username ?? null,
+        avatar_url: readAvatarFromRpcRow(r) ?? r.avatar_url ?? null,
+        phone: r.phone ?? null,
+        role_id: mergedRoleId,
+        role_label: mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : null,
+        agency_role_id: agencyRoleId,
+        agency_role_label:
+          agencyRoleId != null ? roleLabelById.get(agencyRoleId) ?? `Rôle ${agencyRoleId}` : null,
+        expo_ids: [] as string[],
+      };
+    });
+
+  const { data: profileRows } = await supabase.from("profiles").select("id, role_id").in("id", members.map((m) => m.user_id));
+  const globalByUser = new Map<string, number | null>();
+  for (const row of (profileRows as Array<{ id?: string | null; role_id?: unknown }> | null) ?? []) {
+    const uid = typeof row.id === "string" ? row.id.trim() : "";
+    if (uid) globalByUser.set(uid, parseGlobalRoleId(row.role_id));
+  }
+  members = members.map((member) => {
+    const globalRoleId = globalByUser.get(member.user_id) ?? null;
+    const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, member.agency_role_id);
+    return {
+      ...member,
+      role_id: mergedRoleId,
+      role_label:
+        mergedRoleId != null ? roleLabelById.get(mergedRoleId) ?? `Rôle ${mergedRoleId}` : member.role_label,
     };
   });
 
-  members.sort((a, b) => {
-    const ln = (a.last_name ?? "").localeCompare(b.last_name ?? "", "fr", { sensitivity: "base" });
-    if (ln !== 0) return ln;
-    return (a.first_name ?? "").localeCompare(b.first_name ?? "", "fr", { sensitivity: "base" });
-  });
-
+  members = sortDashboardTeamMembers(members);
   const activeIds = await filterActiveProfileUserIds(members.map((m) => m.user_id));
-  const activeMembers = members.filter((m) => activeIds.has(m.user_id));
-
-  return { members: activeMembers, agencyExpos };
+  return members.filter((m) => activeIds.has(m.user_id));
 }
 
-async function fetchTeamStats(agencyId: string | null): Promise<DashboardTeamStats> {
-  const empty: DashboardTeamStats = { members_count: 0, expos_count: 0, artworks_count: 0 };
-  if (!agencyId?.trim()) return empty;
-
+async function countAgencyArtworks(agencyId: string): Promise<number> {
   const aid = agencyId.trim();
 
-  const [membersRes, exposRes, artworksRes] = await Promise.all([
-    supabase.from("agency_users").select("user_id", { count: "exact", head: true }).eq("agency_id", aid),
-    supabase.from("expos").select("id", { count: "exact", head: true }).eq("agency_id", aid).is("deleted_at", null),
-    supabase
+  const { data: expoRows } = await supabase
+    .from("expos")
+    .select("id")
+    .or(`agency_id.eq.${aid},agency_id.is.null`)
+    .is("deleted_at", null);
+  const expoIds = ((expoRows as Array<{ id?: string | null }> | null) ?? [])
+    .map((r) => r.id?.trim())
+    .filter(Boolean) as string[];
+
+  const ids = new Set<string>();
+
+  const collectArtworkIds = (
+    rows: Array<{ artwork_id?: string | null; artwork_agency_id?: string | null }> | null,
+    options?: { requireAgencyMatch?: boolean },
+  ) => {
+    for (const row of rows ?? []) {
+      const id = row.artwork_id?.trim();
+      if (!id) continue;
+      if (options?.requireAgencyMatch) {
+        const rowAgency = row.artwork_agency_id?.trim();
+        if (rowAgency && rowAgency !== aid) continue;
+      }
+      ids.add(id);
+    }
+  };
+
+  const { data: byAgency, error: byAgencyErr } = await supabase
+    .from("artworks")
+    .select("artwork_id")
+    .eq("artwork_agency_id", aid)
+    .is("deleted_at", null);
+
+  if (byAgencyErr) {
+    const { data: fallbackByAgency } = await supabase
       .from("artworks")
-      .select("artwork_id", { count: "exact", head: true })
+      .select("artwork_id")
       .eq("artwork_agency_id", aid)
-      .is("deleted_at", null),
+      .is("artwork_deleted_at", null);
+    collectArtworkIds(fallbackByAgency);
+  } else {
+    collectArtworkIds(byAgency);
+  }
+
+  if (expoIds.length > 0) {
+    const { data: byExpo, error: byExpoErr } = await supabase
+      .from("artworks")
+      .select("artwork_id, artwork_agency_id")
+      .in("artwork_expo_id", expoIds)
+      .is("deleted_at", null);
+
+    if (byExpoErr) {
+      const { data: fallbackByExpo } = await supabase
+        .from("artworks")
+        .select("artwork_id, artwork_agency_id")
+        .in("artwork_expo_id", expoIds)
+        .is("artwork_deleted_at", null);
+      collectArtworkIds(fallbackByExpo, { requireAgencyMatch: true });
+    } else {
+      collectArtworkIds(byExpo, { requireAgencyMatch: true });
+    }
+  }
+
+  if (ids.size === 0) {
+    const { data: allVisible } = await supabase
+      .from("artworks")
+      .select("artwork_id, artwork_agency_id, artwork_expo_id")
+      .is("deleted_at", null);
+    const expoSet = new Set(expoIds);
+    for (const row of (allVisible as Array<{
+      artwork_id?: string | null;
+      artwork_agency_id?: string | null;
+      artwork_expo_id?: string | null;
+    }> | null) ?? []) {
+      const id = row.artwork_id?.trim();
+      if (!id) continue;
+      if (row.artwork_agency_id?.trim() === aid) ids.add(id);
+      else if (row.artwork_expo_id?.trim() && expoSet.has(row.artwork_expo_id.trim())) ids.add(id);
+    }
+  }
+
+  return ids.size;
+}
+
+async function fetchTeamStats(
+  agencyId: string | null,
+  membersCount: number,
+): Promise<DashboardTeamStats> {
+  const base: DashboardTeamStats = {
+    members_count: membersCount,
+    expos_count: 0,
+    artworks_count: 0,
+    visitors_this_month: 0,
+  };
+  if (!agencyId?.trim()) return base;
+
+  const aid = agencyId.trim();
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+
+  const [exposRes, artworksCount, statsRes] = await Promise.all([
+    supabase.from("expos").select("id", { count: "exact", head: true }).eq("agency_id", aid).is("deleted_at", null),
+    countAgencyArtworks(aid),
+    supabase.from("daily_stats").select("visits_count").eq("agency_id", aid).gte("day", monthStart),
   ]);
 
+  let visitorsThisMonth = 0;
+  for (const row of (statsRes.data as Array<{ visits_count?: number | null }> | null) ?? []) {
+    visitorsThisMonth += Number(row.visits_count) || 0;
+  }
+
   return {
-    members_count: membersRes.count ?? 0,
+    members_count: membersCount,
     expos_count: exposRes.count ?? 0,
-    artworks_count: artworksRes.count ?? 0,
+    artworks_count: artworksCount,
+    visitors_this_month: visitorsThisMonth,
   };
 }
 
@@ -505,6 +1223,8 @@ export function useDashboardProfile(
   userId: string | null | undefined,
   agencyId: string | null | undefined,
   expoId: string | null | undefined,
+  viewerRoleId?: number | null,
+  viewerUserId?: string | null,
 ): DashboardData {
   const [profile, setProfile] = useState<DashboardProfile | null>(null);
   const [agency, setAgency] = useState<DashboardAgency | null>(null);
@@ -514,8 +1234,10 @@ export function useDashboardProfile(
     members_count: 0,
     expos_count: 0,
     artworks_count: 0,
+    visitors_this_month: 0,
   });
   const [teamMembers, setTeamMembers] = useState<DashboardTeamMember[]>([]);
+  const [profilePickerMembers, setProfilePickerMembers] = useState<DashboardTeamMember[]>([]);
   const [agencyExpos, setAgencyExpos] = useState<DashboardAgencyExpoOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -524,13 +1246,14 @@ export function useDashboardProfile(
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
-    if (!userId?.trim()) {
+    if (!userId?.trim() && !agencyId?.trim()) {
       setProfile(null);
       setAgency(null);
       setExpo(null);
       setSubscription(null);
-      setTeamStats({ members_count: 0, expos_count: 0, artworks_count: 0 });
+      setTeamStats({ members_count: 0, expos_count: 0, artworks_count: 0, visitors_this_month: 0 });
       setTeamMembers([]);
+      setProfilePickerMembers([]);
       setAgencyExpos([]);
       setLoading(false);
       return;
@@ -542,34 +1265,50 @@ export function useDashboardProfile(
 
     void (async () => {
       try {
-        const uid = userId.trim();
+        const viewerRole = parseNumericRoleId(viewerRoleId);
+        const uid = userId?.trim() || null;
+        const vid = viewerUserId?.trim() || null;
+        const isSelf = Boolean(uid && vid && uid === vid);
 
-        const [profileRes, agencyRes, expoRes, sub, stats, teamData] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select(
-              "id,first_name,last_name,username,avatar_url,phone,zip_code,city,country_code,timezone,language,birth_year,created_at",
-            )
-            .eq("id", uid)
-            .maybeSingle(),
-          agencyId?.trim()
+        const resolvedAgencyId = await resolveDashboardAgencyId(uid, vid, agencyId ?? null);
+        const profileExpoId = uid ? await resolveExpoIdFromUser(uid) : null;
+        const effectiveExpoId = profileExpoId ?? (isSelf ? expoId?.trim() || null : null);
+
+        const teamData = resolvedAgencyId
+          ? await fetchTeamMembers(resolvedAgencyId, uid)
+          : await fetchSiteTeamMembers();
+        const stats = await fetchTeamStats(resolvedAgencyId, teamData.members.length);
+        const pickerMembers =
+          viewerRole != null && viewerRole >= 1 && viewerRole <= 3
+            ? await fetchAllUsersForProfilePicker()
+            : teamData.members;
+
+        const [profileRes, agencyRes, expoRes, sub] = await Promise.all([
+          uid
+            ? supabase
+                .from("profiles")
+                .select(
+                  "id,first_name,last_name,username,avatar_url,phone,zip_code,city,country_code,timezone,language,birth_year,created_at",
+                )
+                .eq("id", uid)
+                .maybeSingle()
+            : Promise.resolve({ data: null, error: null }),
+          resolvedAgencyId
             ? supabase
                 .from("agencies")
                 .select("id,name_agency,logo_agency")
-                .eq("id", agencyId.trim())
+                .eq("id", resolvedAgencyId)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
-          expoId?.trim()
+          effectiveExpoId
             ? supabase
                 .from("expos")
                 .select("id,expo_name")
-                .or(`id.eq.${expoId.trim()},expo_id.eq.${expoId.trim()}`)
+                .or(`id.eq.${effectiveExpoId},expo_id.eq.${effectiveExpoId}`)
                 .limit(1)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
-          fetchSubscription(agencyId ?? null),
-          fetchTeamStats(agencyId ?? null),
-          fetchTeamMembers(agencyId ?? null),
+          fetchSubscription(resolvedAgencyId, isSelf),
         ]);
 
         if (cancelled) return;
@@ -579,7 +1318,7 @@ export function useDashboardProfile(
           setProfile(null);
         } else if (profileRes.data) {
           setProfile(profileRes.data as DashboardProfile);
-        } else {
+        } else if (uid) {
           // Compte auth sans ligne profiles (trigger manquant / migration legacy)
           const { data: authSession } = await supabase.auth.getUser();
           const authUser = authSession.user;
@@ -629,6 +1368,7 @@ export function useDashboardProfile(
         setSubscription(sub);
         setTeamStats(stats);
         setTeamMembers(teamData.members);
+        setProfilePickerMembers(pickerMembers);
         setAgencyExpos(teamData.agencyExpos);
       } catch (e) {
         if (!cancelled) {
@@ -642,7 +1382,20 @@ export function useDashboardProfile(
     return () => {
       cancelled = true;
     };
-  }, [userId, agencyId, expoId, tick]);
+  }, [userId, agencyId, expoId, viewerRoleId, viewerUserId, tick]);
 
-  return { profile, agency, expo, subscription, teamStats, teamMembers, agencyExpos, loading, error, refresh, refreshKey: tick };
+  return {
+    profile,
+    agency,
+    expo,
+    subscription,
+    teamStats,
+    teamMembers,
+    profilePickerMembers,
+    agencyExpos,
+    loading,
+    error,
+    refresh,
+    refreshKey: tick,
+  };
 }

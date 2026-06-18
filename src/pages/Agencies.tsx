@@ -401,6 +401,13 @@ const Agencies = () => {
                   <Button type="button" variant="outline" size="sm" className="w-full justify-center" asChild>
                     <Link to="/catalogue">{t("page.viewCatalogue")}</Link>
                   </Button>
+                  <Button type="button" variant="outline" size="sm" className="w-full justify-center" asChild>
+                    <Link
+                      to={`/user/utilisateurs?scope=equipe&agency_id=${encodeURIComponent(ag.id)}`}
+                    >
+                      {t("page.viewMembers")}
+                    </Link>
+                  </Button>
                 </div>
               </CardContent>
             </Card>

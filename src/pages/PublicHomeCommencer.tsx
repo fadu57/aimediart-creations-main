@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileText, LogIn, Mail, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
+import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
+import { ConnectedExpoQuoteDialog } from "@/components/ConnectedExpoQuoteDialog";
 import { Button } from "@/components/ui/button";
+import { useAuthUser } from "@/hooks/useAuthUser";
 import { cn } from "@/lib/utils";
 import {
   buildLoginHrefFromVisitor,
@@ -14,28 +18,25 @@ import {
 
 const BRAND_WORD = "text-[#E63946]";
 
-/**
- * Capture silencieuse : géoloc (ipapi.co, HTTPS), IP/ville/CP/pays/fuseau, fingerprint (hash),
- * langue `navigator.language` (repli `fr`), détails device (JSONB).
- * Délègue à `@/lib/visitorTracking` pour un seul point de vérité.
- */
 async function getVisitorData(): Promise<VisitorCaptureResult> {
   return fetchVisitorSnapshot();
 }
 
 /**
- * Hub « après les tarifs » : connexion, création de compte (même écran /login), devis sur mesure.
- * Paramètres d’URL : `intent=devis` | `intent=souscrire` (défaut), `plan=nom affiché` (optionnel).
- * Géoloc + fingerprint + langue : chargement silencieux via `getVisitorData()` (ipapi.co HTTPS), stocké dans `geoData`
- * et réinjecté dans les liens `/login?...&city=&zip=&country=&lang=&fp=&tz=` (+ sessionStorage pour IP / device JSONB).
+ * Hub « après les tarifs » : connexion, création de compte, devis Rayonnement.
  */
 export default function PublicHomeCommencer() {
+  const { t } = useTranslation("home");
   const [searchParams] = useSearchParams();
+  const { session, loading: authLoading } = useAuthUser();
   const intent = (searchParams.get("intent") ?? "souscrire").toLowerCase();
   const isDevis = intent === "devis";
+  const isVeille = intent === "veille";
   const plan = searchParams.get("plan")?.trim() ?? "";
+  const isAuthenticated = Boolean(session?.user);
 
   const [geoData, setGeoData] = useState<VisitorCaptureResult | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
 
   useEffect(() => {
     clearLoginTrackerSession();
@@ -65,8 +66,9 @@ export default function PublicHomeCommencer() {
   const loginBase = useMemo(() => {
     const extra: Record<string, string> = {};
     if (plan) extra.plan = plan;
+    if (isVeille) extra.redirect = "/dashboard";
     return buildLoginHrefFromVisitor(extra, geoData);
-  }, [plan, geoData]);
+  }, [plan, geoData, isVeille]);
 
   return (
     <div className="relative min-h-screen bg-white text-[#1f1f1f]">
@@ -76,16 +78,32 @@ export default function PublicHomeCommencer() {
       />
       <div className="relative z-10">
         <header className="border-b border-neutral-200/80 bg-white/90 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-[1060px] items-center justify-between gap-3 px-5 py-4 sm:px-6">
+          <div className="mx-auto grid max-w-[1060px] grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-4 sm:px-6">
             <Link
               to="/organisation#tarifs"
-              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-2 justify-self-start text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
               Retour aux tarifs
             </Link>
-            <Link to="/organisation" className={cn("font-serif text-lg font-semibold tracking-tight", BRAND_WORD)}>
-              AIMEDIArt
+            {isDevis ? (
+              <p
+                className={cn(
+                  "justify-self-center text-center text-xs font-semibold uppercase tracking-wide sm:text-sm",
+                  BRAND_WORD,
+                )}
+              >
+                {t("commencer.rayonnement_header")}
+              </p>
+            ) : (
+              <span className="justify-self-center" aria-hidden />
+            )}
+            <Link
+              to="/organisation"
+              className="inline-flex shrink-0 justify-self-end"
+              aria-label="AIMEDIArt — accueil vitrine"
+            >
+              <AimediartBrandLogoBlock size="sm" />
             </Link>
           </div>
         </header>
@@ -93,12 +111,14 @@ export default function PublicHomeCommencer() {
         <main className="mx-auto max-w-[640px] px-5 py-10 sm:px-6 sm:py-14">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">Étape suivante</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-[2.1rem]">
-            {isDevis ? "Demande sur mesure" : "Accéder à votre espace"}
+            {isDevis ? "Demande sur mesure" : isVeille ? "Passer en plan veille" : "Accéder à votre espace"}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             {isDevis
               ? "L’offre Rayonnement s’adapte à votre événement. Voici comment poursuivre, selon votre situation."
-              : "Pour commander ou activer une offre, vous passez par l’espace sécurisé AIMEDIArt (connexion ou création de compte organisation)."}
+              : isVeille
+                ? "Connectez-vous pour demander le passage en plan veille (Atelier ou Horizon, abonnement mensuel uniquement)."
+                : "Pour commander ou activer une offre, vous passez par l’espace sécurisé AIMEDIArt (connexion ou création de compte organisation)."}
           </p>
 
           {!isDevis && plan ? (
@@ -108,22 +128,25 @@ export default function PublicHomeCommencer() {
           ) : null}
 
           <ul className="mt-8 space-y-4 text-sm leading-relaxed text-foreground/85">
-            <li className="flex gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white">
-                <LogIn className="h-4 w-4 text-[#9d2525]" aria-hidden />
-              </span>
-              <span>
-                <strong className="text-foreground">Déjà un compte ?</strong> Connectez-vous pour poursuivre la configuration,
-                le catalogue ou le suivi d’exposition.
-              </span>
-            </li>
+            {!isAuthenticated && !authLoading ? (
+              <li className="flex gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white">
+                  <LogIn className="h-4 w-4 text-[#9d2525]" aria-hidden />
+                </span>
+                <span>
+                  <strong className="text-foreground">Déjà un compte ?</strong> Connectez-vous pour poursuivre la
+                  configuration, le catalogue ou le suivi d’exposition.
+                </span>
+              </li>
+            ) : null}
             <li className="flex gap-3">
               <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white">
                 <Sparkles className="h-4 w-4 text-[#9d2525]" aria-hidden />
               </span>
               <span>
-                <strong className="text-foreground">Première fois ?</strong> Sur l’écran suivant, utilisez « Créer un compte »
-                avec votre e-mail professionnel ; vous compléterez les informations d’organisation selon votre parcours.
+                <strong className="text-foreground">Première fois ?</strong> Sur l’écran suivant, utilisez « Créer un
+                compte » avec votre e-mail professionnel ; vous compléterez les informations d’organisation selon votre
+                parcours.
               </span>
             </li>
             <li className="flex gap-3">
@@ -131,8 +154,8 @@ export default function PublicHomeCommencer() {
                 <FileText className="h-4 w-4 text-[#9d2525]" aria-hidden />
               </span>
               <span>
-                <strong className="text-foreground">Grand public / visiteur ?</strong> L’inscription visiteur se fait depuis le
-                parcours scan sur place ; cette page sert surtout aux <em>équipes exposition</em>.
+                <strong className="text-foreground">Grand public / visiteur ?</strong> L’inscription visiteur se fait
+                depuis le parcours scan sur place ; cette page sert surtout aux <em>équipes exposition</em>.
               </span>
             </li>
           </ul>
@@ -145,42 +168,49 @@ export default function PublicHomeCommencer() {
                 <li>Un membre de l’équipe vous répond pour caler un échange et une proposition chiffrée.</li>
               </ul>
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
-                <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
-                  <Link to="/organisation#contact">Aller au formulaire contact</Link>
+                <Button
+                  type="button"
+                  className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90"
+                  onClick={() => setQuoteOpen(true)}
+                >
+                  {t("commencer.quote_cta")}
                 </Button>
-                <Button asChild variant="outline" className="rounded-xl border-neutral-300">
-                  <Link to={loginBase}>
-                    <Mail className="mr-2 h-4 w-4" aria-hidden />
-                    J’ai déjà un compte — connexion
-                  </Link>
-                </Button>
+                {!isAuthenticated && !authLoading ? (
+                  <Button asChild variant="outline" className="rounded-xl border-neutral-300">
+                    <Link to={loginBase}>
+                      <Mail className="mr-2 h-4 w-4" aria-hidden />
+                      J’ai déjà un compte — connexion
+                    </Link>
+                  </Button>
+                ) : null}
               </div>
             </div>
           ) : (
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
-                <Link to={loginBase}>
-                  <LogIn className="mr-2 h-4 w-4" aria-hidden />
-                  Connexion ou créer un compte
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-xl border-neutral-300">
-                <Link to="/organisation#contact">Une question avant de s’engager</Link>
-              </Button>
+              {!isAuthenticated && !authLoading ? (
+                <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
+                  <Link to={loginBase}>
+                    <LogIn className="mr-2 h-4 w-4" aria-hidden />
+                    {isVeille ? "Connexion pour activer la veille" : "Connexion ou créer un compte"}
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
+                  <Link to="/dashboard">Accéder à mon espace</Link>
+                </Button>
+              )}
             </div>
           )}
-
-          <section className="mt-12 border-t border-neutral-200 pt-8">
-            <h2 className="font-serif text-lg font-semibold text-foreground">Autres idées de contenu (évolutif)</h2>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>Comparer en un coup d’œil ce qui est inclus dans chaque offre (œuvres, visiteurs, médiation).</li>
-              <li>Lien vers une FAQ « facturation, résiliation, conservation des données ».</li>
-              <li>Témoignage court d’une structure ayant monté son expo avec AIMEDIArt.</li>
-              <li>Bloc « délai de mise en route » (ex. sous 48 h ouvrées après validation du compte).</li>
-            </ul>
-          </section>
         </main>
       </div>
+
+      <ConnectedExpoQuoteDialog
+        open={quoteOpen}
+        onOpenChange={setQuoteOpen}
+        title={t("commencer.quote_form_title")}
+        needDescriptionLabel={t("commencer.need_description")}
+        showFloorPlan={false}
+      />
     </div>
   );
 }

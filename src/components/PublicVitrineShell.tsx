@@ -72,7 +72,7 @@ function FloatingNav({
       <header
         className={cn(
           "fixed inset-x-0 z-40 border-b border-neutral-300/70 bg-white/85 backdrop-blur-md",
-          stackedBelowBackoffice && "top-[4.25rem]",
+          stackedBelowBackoffice ? "top-[4.25rem]" : "top-0",
         )}
       >
         <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
@@ -252,10 +252,8 @@ function VantaCloudsBackground() {
 
 function PublicVitrineFooter({
   vitrinePathPrefix,
-  hideLogin,
 }: {
   vitrinePathPrefix: "" | "/organisation";
-  hideLogin?: boolean;
 }) {
   const { t } = useTranslation("home");
   const contactHref = vitrinePathPrefix ? `${vitrinePathPrefix}#contact` : "#contact";
@@ -292,11 +290,6 @@ function PublicVitrineFooter({
             <Link to="/ai-policy" className="text-foreground/80 hover:text-foreground">
               {t("footer.ai_policy")}
             </Link>
-            {!hideLogin ? (
-              <Link to="/login" className="text-foreground/80 hover:text-foreground">
-                {t("footer.login")}
-              </Link>
-            ) : null}
           </div>
         </div>
       </div>
@@ -351,10 +344,10 @@ export function PublicVitrineShell({
         <main
           id="contenu-principal"
           role="main"
-          className={cn("outline-none", mergeVitrineIntoHeader && "pt-[5.75rem]")}
+          className={cn("outline-none", mergeVitrineIntoHeader && "pt-[5rem]")}
         >
           {children}
-          <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} hideLogin={showBackofficeHeader} />
+          <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} />
         </main>
       </div>
     </div>

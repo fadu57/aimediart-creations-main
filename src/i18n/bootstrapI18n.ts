@@ -8,24 +8,67 @@ import {
   isPublicMarketingPath,
   legalNamespaceForPath,
 } from "./constants";
+import type { SupportedLang } from "./constants";
 import i18n from "./instance";
 import { loadI18nNamespaces } from "./loadNamespaces";
 import { appResources } from "./appResources";
+import { legalResources } from "./legalResources";
 import { vitrineCoreResources } from "./vitrineResources";
 
 let initialized = false;
 let fullNamespacesLoaded = false;
+let legalBundlesRegistered = false;
 const loadedLegalNamespaces = new Set<string>();
 
 function buildInitNs(extra: string[] = []): string[] {
   return [...new Set([...VITRINE_CORE_NAMESPACES, ...extra])];
 }
 
+function isLegalNamespace(ns: string): ns is (typeof VITRINE_LEGAL_NAMESPACES)[number] {
+  return (VITRINE_LEGAL_NAMESPACES as readonly string[]).includes(ns);
+}
+
+function addLegalResourceBundles(namespaces: readonly (typeof VITRINE_LEGAL_NAMESPACES)[number][] = VITRINE_LEGAL_NAMESPACES): void {
+  for (const lng of SUPPORTED_LANGS) {
+    const bundle = legalResources[lng as SupportedLang];
+    for (const ns of namespaces) {
+      if (i18n.hasResourceBundle(lng, ns)) continue;
+      i18n.addResourceBundle(lng, ns, bundle[ns], true, true);
+    }
+  }
+
+  for (const ns of namespaces) {
+    if (SUPPORTED_LANGS.some((lng) => i18n.hasResourceBundle(lng, ns))) {
+      loadedLegalNamespaces.add(ns);
+    }
+  }
+
+  if (namespaces.length === VITRINE_LEGAL_NAMESPACES.length) {
+    legalBundlesRegistered = true;
+  }
+}
+
+function ensureLegalResourceBundles(namespaces: readonly (typeof VITRINE_LEGAL_NAMESPACES)[number][]): void {
+  addLegalResourceBundles(namespaces);
+}
+
+async function loadExtraNamespaces(extraNs: string[]): Promise<void> {
+  if (extraNs.length === 0) return;
+
+  const legalNs = extraNs.filter(isLegalNamespace);
+  const dynamicNs = extraNs.filter((ns) => !isLegalNamespace(ns));
+
+  if (legalNs.length > 0) {
+    ensureLegalResourceBundles(legalNs);
+  }
+  if (dynamicNs.length > 0) {
+    await loadI18nNamespaces(dynamicNs);
+  }
+}
+
 async function ensureInitialized(extraNs: string[] = []): Promise<void> {
   if (initialized) {
-    if (extraNs.length > 0) {
-      await loadI18nNamespaces(extraNs);
-    }
+    await loadExtraNamespaces(extraNs);
     return;
   }
 
@@ -44,9 +87,7 @@ async function ensureInitialized(extraNs: string[] = []): Promise<void> {
     },
   });
 
-  if (extraNs.length > 0) {
-    await loadI18nNamespaces(extraNs);
-  }
+  await loadExtraNamespaces(extraNs);
 
   initialized = true;
 }
@@ -57,7 +98,6 @@ export async function initI18nForPath(pathname: string): Promise<void> {
     const legalNs = legalNamespaceForPath(pathname);
     const extra = legalNs ? [legalNs] : [];
     await ensureInitialized(extra);
-    if (legalNs) loadedLegalNamespaces.add(legalNs);
     return;
   }
 
@@ -65,14 +105,13 @@ export async function initI18nForPath(pathname: string): Promise<void> {
 }
 
 /** Charge les namespaces légaux si navigation client vers /cgv, /privacy, etc. */
-export async function ensureVitrineNamespacesForPath(pathname: string): Promise<void> {
+export function ensureVitrineNamespacesForPath(pathname: string): void {
   if (!isPublicMarketingPath(pathname)) return;
 
   const legalNs = legalNamespaceForPath(pathname);
   if (!legalNs || loadedLegalNamespaces.has(legalNs)) return;
 
-  await loadI18nNamespaces([legalNs]);
-  loadedLegalNamespaces.add(legalNs);
+  ensureLegalResourceBundles([legalNs]);
 }
 
 function addAppResourceBundles(): void {
@@ -93,7 +132,9 @@ export async function ensureFullI18n(): Promise<void> {
   if (fullNamespacesLoaded) return;
 
   addAppResourceBundles();
-  await loadI18nNamespaces([...VITRINE_LEGAL_NAMESPACES]);
+  if (!legalBundlesRegistered) {
+    addLegalResourceBundles();
+  }
   fullNamespacesLoaded = true;
 }
 

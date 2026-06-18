@@ -14,9 +14,9 @@
  * Variables d'environnement requises :
  *   SUPABASE_URL                — automatique dans les Edge Functions
  *   SUPABASE_SERVICE_ROLE_KEY   — automatique dans les Edge Functions
- *   RESEND_API_KEY              — clé API Resend (https://resend.com)
- *   NOTIFY_FROM_EMAIL           — expéditeur ex: "no-reply@votre-domaine.com"
- *                                 (optionnel, défaut : "no-reply@aimediart.app")
+ *   RESEND_API_KEY              — clé API Resend (https://resend.com/api-keys)
+ *   NOTIFY_FROM_EMAIL           — expéditeur ex: "hello@aimediart.com"
+ *                                 (optionnel, défaut : "hello@aimediart.com")
  *
  * Déploiement :
  *   supabase functions deploy notify-before-purge --no-verify-jwt
@@ -36,6 +36,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendResendEmail } from "../_shared/resend.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -180,37 +181,6 @@ async function fetchPendingPurgeItems(
 }
 
 // ---------------------------------------------------------------------------
-// Envoi email via Resend
-// ---------------------------------------------------------------------------
-
-async function sendEmailResend(
-  apiKey: string,
-  from: string,
-  to: string,
-  subject: string,
-  html: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to: [to], subject, html }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return { ok: false, error: err };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erreur réseau Resend." };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Génération du HTML de l'email
 // ---------------------------------------------------------------------------
 
@@ -287,9 +257,9 @@ serve(async (req: Request) => {
   // ── Variables d'environnement ──────────────────────────────────────────
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
   const fromEmail =
-    Deno.env.get("NOTIFY_FROM_EMAIL") || "no-reply@aimediart.app";
+    Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() || "hello@aimediart.com";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, {
@@ -385,7 +355,13 @@ serve(async (req: Request) => {
     const subject = `⚠️ AiMediArt — ${totalItems} fiche${totalItems > 1 ? "s" : ""} proche${totalItems > 1 ? "s" : ""} de la purge définitive`;
     const html = buildEmailHtml(entityReports);
 
-    const result = await sendEmailResend(resendApiKey, fromEmail, toEmail, subject, html);
+    const result = await sendResendEmail({
+      apiKey: resendApiKey,
+      fromEmail,
+      to: toEmail,
+      subject,
+      html,
+    });
     emailResults.push({ to: toEmail, ...result });
 
     if (!result.ok) {

@@ -4,13 +4,14 @@
  * Variables d'env :
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto)
  *   RESEND_API_KEY, ADMIN_EMAIL, APP_URL
- *   NOTIFY_FROM_EMAIL (optionnel, défaut no-reply@aimediart.app)
+ *   NOTIFY_FROM_EMAIL (optionnel, défaut hello@aimediart.com)
  *
  * Déploiement : supabase functions deploy check-ai-limits --no-verify-jwt
  */
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendResendEmail } from "../_shared/resend.ts";
 
 type LimitStatus = "ok" | "warning" | "critical" | "blocked" | "unknown";
 type LimitSource = "auto" | "manual" | "unknown";
@@ -221,36 +222,6 @@ async function wasAlertSentRecently(
   return (data?.length ?? 0) > 0;
 }
 
-async function sendResendEmail(params: {
-  apiKey: string;
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-}): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${params.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: params.from,
-        to: [params.to],
-        subject: params.subject,
-        html: params.html,
-      }),
-    });
-    if (!res.ok) {
-      return { ok: false, error: await res.text() };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Erreur réseau Resend" };
-  }
-}
-
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -264,7 +235,7 @@ serve(async (req: Request) => {
   const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
   const adminEmail = Deno.env.get("ADMIN_EMAIL")?.trim() ?? "";
   const appUrl = (Deno.env.get("APP_URL") ?? "").trim().replace(/\/$/, "");
-  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ?? "no-reply@aimediart.app";
+  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ?? "hello@aimediart.com";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, { ok: false, error: "Variables Supabase manquantes." });
@@ -349,7 +320,7 @@ serve(async (req: Request) => {
 
     const mail = await sendResendEmail({
       apiKey: resendApiKey,
-      from: fromEmail,
+      fromEmail,
       to: adminEmail,
       subject,
       html,

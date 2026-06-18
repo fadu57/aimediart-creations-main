@@ -35,19 +35,21 @@ function SurfaceCardShell({
   backgroundImageAlt,
   backgroundGradient = "left",
   compact = false,
+  quoteCta = false,
 }: {
   children: ReactNode;
   backgroundImage?: string;
   backgroundImageAlt?: string;
   backgroundGradient?: "left" | "right";
   compact?: boolean;
+  quoteCta?: boolean;
 }) {
   return (
     <div className="mx-2 my-3 sm:mx-3 sm:my-4">
       <div
         className={cn(
           "relative overflow-hidden rounded-[2rem] border border-neutral-300/80 bg-[#faf8f5] shadow-[0_12px_28px_rgba(0,0,0,0.06)]",
-          compact ? "p-3 sm:p-3" : "p-5 sm:p-10 lg:p-12",
+          quoteCta ? "px-5 py-[18px] sm:px-6" : compact ? "p-3 sm:p-3" : "p-5 sm:p-10 lg:p-12",
         )}
       >
         {backgroundImage ? (
@@ -78,7 +80,13 @@ function SurfaceCardShell({
               className="pointer-events-none absolute -right-6 top-20 h-40 w-40 rounded-full bg-[rgba(230,57,70,0.07)] blur-2xl"
               aria-hidden
             />
-            <div className="absolute right-0 top-0 h-28 w-28 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]" aria-hidden />
+            <div
+              className={cn(
+                "absolute right-0 top-0 rounded-bl-[80px] bg-[rgba(168,23,29,0.06)]",
+                quoteCta ? "h-[53px] w-[53px]" : "h-28 w-28",
+              )}
+              aria-hidden
+            />
             <div
               className="pointer-events-none absolute -left-8 bottom-10 h-16 w-16 rounded-full border border-[rgba(168,23,29,0.2)]"
               aria-hidden
@@ -206,8 +214,9 @@ export function OrganisationConnexionContent() {
 
         <div id="connexion-visuals" className="hidden" aria-hidden />
 
-        <SurfaceCardShell>
-          <div className="flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
+        <div id="connectivite-challenge" className="scroll-mt-[5rem]">
+          <SurfaceCardShell>
+            <div className="flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:gap-8">
             <div className="order-2 w-full shrink-0 lg:order-1 lg:w-[300px]">
               <figure className="overflow-hidden rounded-2xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
                 <img
@@ -232,6 +241,7 @@ export function OrganisationConnexionContent() {
             </div>
           </div>
         </SurfaceCardShell>
+        </div>
 
         <ConnexionSectionCard
           titlePrefix={t("connexion.sections.solution.title_prefix")}
@@ -330,8 +340,8 @@ export function OrganisationConnexionContent() {
           </div>
         </ConnexionSectionCard>
 
-        <SurfaceCardShell>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4">
+        <SurfaceCardShell quoteCta>
+          <div className="flex h-full flex-wrap flex-col items-center justify-center gap-[54px] text-center sm:flex-row">
             <p className="text-sm leading-relaxed text-foreground">{t("connexion.quote.cta_prefix")}</p>
             <Button
               type="button"

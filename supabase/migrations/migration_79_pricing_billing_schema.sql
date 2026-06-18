@@ -1,5 +1,10 @@
 -- migration_79_pricing_billing_schema.sql
 -- Chantier pricing / billing / overages / upgrades AIMEDIArt
+--
+-- ⚠️ EXÉCUTER LE FICHIER EN ENTIER (du début à COMMIT).
+-- En cas d'erreur, PostgreSQL annule toute la transaction : les tables
+-- (organisation_subscriptions, etc.) n'existent pas si vous reprenez à la section 14.
+--
 -- Tables cibles (noms stricts) : pricing, pricing_options, pricing_overage_rules,
 -- organisation_subscriptions, account_usage_monthly, billing_alerts, invoice_drafts,
 -- invoice_draft_items, upgrade_recommendations, language_option_requests,
@@ -663,18 +668,22 @@ AS $$
   SELECT public.agencies_is_global_admin();
 $$;
 
--- [HYPOTHÈSE H6] role_id 2 = finance interne
+-- [HYPOTHÈSE H6] role_id 2 = finance interne, 3 = développeur (admins globaux dans auth.users)
 CREATE OR REPLACE FUNCTION public.pricing_is_finance_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.users u
-    WHERE u.id = auth.uid() AND u.role_id IN (2, 3)
-  );
+  SELECT COALESCE(
+    NULLIF(trim(auth.jwt() -> 'app_metadata' ->> 'role_id'), '')::integer,
+    (
+      SELECT NULLIF(trim(u.raw_app_meta_data->>'role_id'), '')::integer
+      FROM auth.users u
+      WHERE u.id = auth.uid()
+    )
+  ) IN (2, 3);
 $$;
 
 CREATE OR REPLACE FUNCTION public.pricing_organisation_user_can_read(p_organisation_id uuid)
@@ -718,7 +727,6 @@ AS $$
   SELECT count(*)::integer
   FROM public.artworks a
   WHERE a.artwork_agency_id = p_organisation_id
-    AND a.deleted_at IS NULL
     AND a.artwork_deleted_at IS NULL;
 $$;
 
@@ -1428,12 +1436,12 @@ INSERT INTO public.pricing (
 )
 SELECT v.label, v.plan_code::text, v.plan_code, v.display_name,
        v.monthly, v.max_art, v.max_vis, v.max_art, v.max_vis, v.standby,
-       v.med_min, v.med_max, v.audio, v.trial_days, v.quote_only, v.unlimited, v.sort_ord, true
+       v.med_min, v.med_max, COALESCE(v.audio, 0), v.trial_days, v.quote_only, v.unlimited, v.sort_ord, true
 FROM (VALUES
   ('L''ETINCELLE', 'ETINCELLE'::public.pricing_plan_code, 'Étincelle', 0.00::numeric, 10, 100, NULL::numeric, 1, 1, 0, 30, false, false, 1),
   ('L''ATELIER', 'ATELIER', 'Atelier', 59.00, 100, 1500, 19.00, 1, 2, 1, NULL, false, false, 2),
   ('L''HORIZON', 'HORIZON', 'Horizon', 149.00, 500, 2500, 49.00, 5, 5, 1, NULL, false, false, 3),
-  ('LE RAYONNEMENT', 'RAYONNEMENT', 'Rayonnement', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true, true, 4)
+  ('LE RAYONNEMENT', 'RAYONNEMENT', 'Rayonnement', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, true, true, 4)
 ) AS v(label, plan_code, display_name, monthly, max_art, max_vis, standby, med_min, med_max, audio, trial_days, quote_only, unlimited, sort_ord)
 WHERE NOT EXISTS (
   SELECT 1 FROM public.pricing p WHERE p.plan_code = v.plan_code
@@ -1450,7 +1458,7 @@ UPDATE public.pricing SET
   standby_monthly_price_ttc_eur = v.standby,
   included_mediation_langs_min = v.med_min,
   included_mediation_langs_max = v.med_max,
-  included_audio_langs = v.audio,
+  included_audio_langs = COALESCE(v.audio, 0),
   trial_duration_days = v.trial_days,
   is_quote_only = v.quote_only,
   pricing_is_unlimited = v.unlimited,
@@ -1462,7 +1470,7 @@ FROM (VALUES
   ('ETINCELLE'::public.pricing_plan_code, 'L''ETINCELLE', 'Étincelle', 0.00::numeric, 10, 100, NULL::numeric, 1, 1, 0, 30, false, false, 1),
   ('ATELIER', 'L''ATELIER', 'Atelier', 59.00, 100, 1500, 19.00, 1, 2, 1, NULL, false, false, 2),
   ('HORIZON', 'L''HORIZON', 'Horizon', 149.00, 500, 2500, 49.00, 5, 5, 1, NULL, false, false, 3),
-  ('RAYONNEMENT', 'LE RAYONNEMENT', 'Rayonnement', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, true, true, 4)
+  ('RAYONNEMENT', 'LE RAYONNEMENT', 'Rayonnement', NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, true, true, 4)
 ) AS v(plan_code, label, display_name, monthly, max_art, max_vis, standby, med_min, med_max, audio, trial_days, quote_only, unlimited, sort_ord)
 WHERE public.pricing.plan_code = v.plan_code
    OR upper(public.pricing.pricing_plan) = v.plan_code::text;

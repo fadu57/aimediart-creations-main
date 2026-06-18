@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { fetchOrganisationTeamMemberUserIds, fetchSiteTeamMemberUserIds } from "@/lib/dashboardTeamScope";
 import { supabase } from "@/lib/supabase";
 import Users from "@/pages/Users";
 
@@ -115,6 +116,7 @@ export default function Utilisateurs() {
   const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
   const [agencyOptions, setAgencyOptions] = useState<AgencyOption[]>([]);
   const [expoOptions, setExpoOptions] = useState<ExpoOption[]>([]);
+  const [teamScopeMemberIds, setTeamScopeMemberIds] = useState<Set<string> | null>(null);
   const allowedRoleIds = useMemo(() => getAllowedRoleIds(currentRoleId), [currentRoleId]);
   const visibleRoleIds = useMemo(() => getVisibleRoleIds(currentRoleId), [currentRoleId]);
   const canAccess = can("menu_user");
@@ -134,9 +136,50 @@ export default function Utilisateurs() {
     return map;
   }, [expoOptions]);
 
+  const teamScopeAgencyId = searchParams.get("agency_id")?.trim() || null;
+  const isTeamScope = searchParams.get("scope") === "equipe";
+  const isSiteTeamScope = searchParams.get("scope") === "site";
+
+  useEffect(() => {
+    if (isSiteTeamScope) {
+      let cancelled = false;
+      void (async () => {
+        const ids = await fetchSiteTeamMemberUserIds();
+        if (!cancelled) setTeamScopeMemberIds(ids);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!isTeamScope || !teamScopeAgencyId) {
+      setTeamScopeMemberIds(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const ids = await fetchOrganisationTeamMemberUserIds(teamScopeAgencyId);
+      if (!cancelled) setTeamScopeMemberIds(ids);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isTeamScope, isSiteTeamScope, teamScopeAgencyId]);
+
+  const scopedRows = useMemo(() => {
+    if (isSiteTeamScope) {
+      if (teamScopeMemberIds) return rows.filter((row) => teamScopeMemberIds.has(row.id));
+      return rows;
+    }
+    if (!isTeamScope || !teamScopeAgencyId) return rows;
+    if (teamScopeMemberIds) {
+      return rows.filter((row) => teamScopeMemberIds.has(row.id));
+    }
+    return rows.filter((row) => row.agency_id?.trim() === teamScopeAgencyId);
+  }, [rows, isTeamScope, isSiteTeamScope, teamScopeAgencyId, teamScopeMemberIds]);
+
   const searchSuggestions = useMemo(() => {
     const set = new Set<string>();
-    for (const row of rows) {
+    for (const row of scopedRows) {
       const roleLabel = row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "";
       const agencyLabel = (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
       const expoLabel = (row.expo_id && expoLabelById.get(row.expo_id)) || "";
@@ -146,12 +189,12 @@ export default function Utilisateurs() {
         .forEach((v) => set.add(v));
     }
     return Array.from(set).slice(0, 200);
-  }, [rows, roleLabelById, agencyLabelById, expoLabelById]);
+  }, [scopedRows, roleLabelById, agencyLabelById, expoLabelById]);
 
   const filteredRows = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((row) => {
+    if (!needle) return scopedRows;
+    return scopedRows.filter((row) => {
       const roleLabel = row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "";
       const agencyLabel = (row.agency_id && agencyLabelById.get(row.agency_id)) || "";
       const expoLabel = (row.expo_id && expoLabelById.get(row.expo_id)) || "";
@@ -166,7 +209,7 @@ export default function Utilisateurs() {
         .toLowerCase();
       return haystack.includes(needle);
     });
-  }, [rows, searchTerm, roleLabelById, agencyLabelById, expoLabelById]);
+  }, [scopedRows, searchTerm, roleLabelById, agencyLabelById, expoLabelById]);
 
   const sortedRows = useMemo(() => {
     const pinnedRole1 = filteredRows.filter((r) => Number(r.role_id) === 1);

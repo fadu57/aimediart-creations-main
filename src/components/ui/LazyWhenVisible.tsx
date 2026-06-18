@@ -9,12 +9,15 @@ type LazyWhenVisibleProps = {
   className?: string;
   /** Ancre : force le montage si le hash URL correspond (navigation menu vitrine). */
   anchorId?: string;
+  /** Hash additionnels qui déclenchent le montage (ex. sous-ancre connectivite-challenge). */
+  anchorAliases?: string[];
   id?: string;
 };
 
-function hashMatchesAnchor(anchorId: string): boolean {
+function hashMatchesAnchor(anchorId: string, anchorAliases: string[] = []): boolean {
   if (typeof window === "undefined") return false;
-  return window.location.hash.replace(/^#/, "") === anchorId;
+  const hash = window.location.hash.replace(/^#/, "");
+  return hash === anchorId || anchorAliases.includes(hash);
 }
 
 /**
@@ -27,20 +30,21 @@ export function LazyWhenVisible({
   minHeight,
   className,
   anchorId,
+  anchorAliases = [],
   id,
 }: LazyWhenVisibleProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(() => (anchorId ? hashMatchesAnchor(anchorId) : false));
+  const [visible, setVisible] = useState(() => (anchorId ? hashMatchesAnchor(anchorId, anchorAliases) : false));
 
   useEffect(() => {
     if (!anchorId) return;
     const activateIfHash = () => {
-      if (hashMatchesAnchor(anchorId)) setVisible(true);
+      if (hashMatchesAnchor(anchorId, anchorAliases)) setVisible(true);
     };
     activateIfHash();
     window.addEventListener("hashchange", activateIfHash);
     return () => window.removeEventListener("hashchange", activateIfHash);
-  }, [anchorId]);
+  }, [anchorAliases, anchorId]);
 
   useEffect(() => {
     const el = ref.current;

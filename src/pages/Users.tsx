@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UserRolesField } from "@/components/users/UserRolesField";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources, readMetaString } from "@/lib/birthProfile";
@@ -33,6 +34,20 @@ import { toPublicStorageUrl, resolveAvatarDisplayUrl, readAvatarFromMeta } from 
 import { fetchUserEditDetails } from "@/lib/userEditDetails";
 import { resolveUserAvatarUrl, readAvatarFromRpcRow } from "@/lib/userAvatar";
 import { isRoleAssignableBy, parseNumericRoleId } from "@/lib/roleHierarchy";
+import {
+  parseAgencyRoleId,
+  parseGlobalRoleId,
+  resolveMergedAuthRoleId,
+} from "@/lib/authUser";
+import {
+  buildRoleIdsFromStorage,
+  deriveAgencyRoleIdForStorage,
+  deriveGlobalRoleId,
+  derivePrimaryRoleId,
+  ensureUserRowRoleFields,
+  roleIdsNeedExpos,
+  roleIdsNeedOrganisation,
+} from "@/lib/userRoleAssignment";
 import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +60,7 @@ import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 type UserRow = {
   id: string;
   role_id?: number | null;
+  role_ids?: number[];
   agency_id?: string | null;
   avatar_url?: string | null;
   first_name?: string | null;
@@ -55,6 +71,7 @@ type UserRow = {
   email?: string | null;
   phone?: string | null;
   expo_id?: string | null;
+  expo_ids?: string[];
   last_sign_in_at?: string | null;
 };
 
@@ -128,10 +145,92 @@ function userFullName(row: UserRow): string {
 }
 
 function roleLabelFromUserRow(row: UserRow, roleOptions: RoleOption[]): string {
-  const roleId = Number(row.role_id ?? NaN);
+  const roleId =
+    row.role_ids?.length
+      ? Math.min(...row.role_ids)
+      : Number(row.role_id ?? NaN);
   if (!Number.isFinite(roleId)) return "—";
   const option = roleOptions.find((r) => r.role_id === roleId);
   return option?.label || `Rôle ${roleId}`;
+}
+
+/** Résout des identifiants expo vers expos.id (FK expo_user_role). */
+async function resolveExpoStorageIds(rawIds: string[]): Promise<string[]> {
+  const unique = [...new Set(rawIds.map((id) => id.trim()).filter(Boolean))];
+  if (!unique.length) return [];
+
+  const { data: byId, error: byIdErr } = await supabase
+    .from("expos")
+    .select("id, expo_id")
+    .in("id", unique);
+  if (byIdErr) throw byIdErr;
+
+  const rows = (byId as Array<{ id?: string | null; expo_id?: string | null }> | null) ?? [];
+  const idByAny = new Map<string, string>();
+  for (const row of rows) {
+    const pk = row.id?.trim();
+    if (!pk) continue;
+    idByAny.set(pk, pk);
+    const alt = row.expo_id?.trim();
+    if (alt) idByAny.set(alt, pk);
+  }
+
+  const missing = unique.filter((raw) => !idByAny.has(raw));
+  if (missing.length > 0) {
+    const { data: byExpoId, error: byExpoErr } = await supabase
+      .from("expos")
+      .select("id, expo_id")
+      .in("expo_id", missing);
+    if (byExpoErr) throw byExpoErr;
+    for (const row of (byExpoId as Array<{ id?: string | null; expo_id?: string | null }> | null) ?? []) {
+      const pk = row.id?.trim();
+      const alt = row.expo_id?.trim();
+      if (pk) {
+        idByAny.set(pk, pk);
+        if (alt) idByAny.set(alt, pk);
+      }
+    }
+  }
+
+  return [...new Set(unique.map((raw) => idByAny.get(raw) ?? raw).filter(Boolean))];
+}
+
+async function enrichUserRowsWithMergedRoles(rows: UserRow[]): Promise<UserRow[]> {
+  if (!rows.length) return rows;
+  const ids = rows.map((r) => r.id);
+  const [{ data: profileRows }, { data: agencyRows }] = await Promise.all([
+    supabase.from("profiles").select("id, role_id").in("id", ids),
+    supabase.from("agency_users").select("user_id, role_id, agency_id").in("user_id", ids),
+  ]);
+
+  const globalByUser = new Map<string, number | null>();
+  for (const row of (profileRows as Array<{ id?: string | null; role_id?: unknown }> | null) ?? []) {
+    const uid = typeof row.id === "string" ? row.id.trim() : "";
+    if (uid) globalByUser.set(uid, parseGlobalRoleId(row.role_id));
+  }
+
+  const agencyByUser = new Map<string, { agency_id: string | null; role_id: number | null }>();
+  for (const row of (agencyRows as Array<{ user_id?: string | null; agency_id?: string | null; role_id?: unknown }> | null) ?? []) {
+    const uid = typeof row.user_id === "string" ? row.user_id.trim() : "";
+    if (!uid || agencyByUser.has(uid)) continue;
+    agencyByUser.set(uid, {
+      agency_id: row.agency_id?.trim() || null,
+      role_id: parseAgencyRoleId(row.role_id),
+    });
+  }
+
+  return rows.map((row) => {
+    const globalRoleId = globalByUser.get(row.id) ?? null;
+    const agencyRec = agencyByUser.get(row.id);
+    const agencyRoleId = agencyRec?.role_id ?? parseAgencyRoleId(row.role_id);
+    const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId);
+    return ensureUserRowRoleFields({
+      ...row,
+      role_id: mergedRoleId,
+      agency_id: row.agency_id ?? agencyRec?.agency_id ?? null,
+      role_ids: buildRoleIdsFromStorage(globalRoleId, agencyRoleId),
+    });
+  });
 }
 
 function safeTrim(value: unknown): string {
@@ -296,7 +395,7 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("avatar_url, birth_year, first_name, last_name, username, phone")
+    .select("avatar_url, birth_year, first_name, last_name, username, phone, role_id")
     .eq("id", row.id)
     .maybeSingle();
 
@@ -307,6 +406,7 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     last_name?: string | null;
     username?: string | null;
     phone?: string | null;
+    role_id?: number | null;
   } | null;
 
   if (details) {
@@ -390,6 +490,37 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
   if (resolvedAvatar) {
     enriched.avatar_url = resolvedAvatar;
   }
+
+  const [{ data: agencyRow }, { data: expoAssignRows }] = await Promise.all([
+    supabase
+      .from("agency_users")
+      .select("agency_id, role_id")
+      .eq("user_id", row.id)
+      .order("role_id", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("expo_user_role").select("expo_id").eq("user_id", row.id),
+  ]);
+
+  const agencyRec = agencyRow as { agency_id?: string | null; role_id?: unknown } | null;
+  const expo_ids = [
+    ...new Set(
+      ((expoAssignRows as Array<{ expo_id?: string | null }> | null) ?? [])
+        .map((r) => (typeof r.expo_id === "string" ? r.expo_id.trim() : ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  enriched = ensureUserRowRoleFields({
+    ...enriched,
+    role_ids: buildRoleIdsFromStorage(
+      parseNumericRoleId(p?.role_id),
+      parseNumericRoleId(agencyRec?.role_id),
+    ),
+    agency_id: enriched.agency_id ?? agencyRec?.agency_id ?? null,
+    expo_id: expo_ids[0] ?? enriched.expo_id ?? null,
+    expo_ids,
+  });
 
   return enriched;
 }
@@ -531,7 +662,7 @@ async function fetchUserProfileFallback(
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, username, avatar_url, phone, birth_year")
+      .select("id, first_name, last_name, username, avatar_url, phone, birth_year, role_id")
       .eq("id", targetId)
       .maybeSingle(),
     supabase
@@ -556,6 +687,7 @@ async function fetchUserProfileFallback(
     avatar_url?: string | null;
     phone?: string | null;
     birth_year?: number | null;
+    role_id?: number | null;
   } | null;
   const a = agencyRow as { agency_id?: string | null; role_id?: unknown } | null;
 
@@ -563,12 +695,20 @@ async function fetchUserProfileFallback(
     console.warn("[Users] lecture profiles fallback :", profileErr.message);
   }
 
-  if (!p?.id && !a?.agency_id && !a?.role_id) return null;
+  const profileGlobalRole = parseNumericRoleId(p?.role_id);
+  const agencyRole = parseNumericRoleId(a?.role_id);
+  const expoIdList = (expoRows as Array<{ expo_id?: string | null }> | null) ?? [];
+  const expo_ids = [
+    ...new Set(
+      expoIdList
+        .map((row) => (typeof row.expo_id === "string" ? row.expo_id.trim() : ""))
+        .filter(Boolean),
+    ),
+  ];
 
-  const expoList = (expoRows as Array<{ expo_id?: string | null }> | null) ?? [];
-  const firstExpo = expoList.find((row) => typeof row.expo_id === "string" && row.expo_id.trim())?.expo_id?.trim();
+  if (!p?.id && !a?.agency_id && !a?.role_id && profileGlobalRole == null) return null;
 
-  return {
+  return ensureUserRowRoleFields({
     id: targetId,
     first_name: p?.first_name ?? null,
     last_name: p?.last_name ?? null,
@@ -579,10 +719,11 @@ async function fetchUserProfileFallback(
     birth_month: null,
     birth_year:
       typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
-    role_id: parseNumericRoleId(a?.role_id),
+    role_ids: buildRoleIdsFromStorage(profileGlobalRole, agencyRole),
     agency_id: a?.agency_id ?? connectedAgencyId ?? null,
-    expo_id: firstExpo ?? null,
-  };
+    expo_id: expo_ids[0] ?? null,
+    expo_ids,
+  });
 }
 
 // Lecture d'un utilisateur (auth.users.id = profiles.id) via RPC admin, repli profiles si RLS.
@@ -693,6 +834,7 @@ const Users = ({
         merged = merged.filter((r) => r.agency_id?.trim() === agencyFilter);
       }
 
+      merged = await enrichUserRowsWithMergedRoles(merged);
       setRows(merged);
       setLoading(false);
       return;
@@ -703,7 +845,7 @@ const Users = ({
       { data: agencyData },
       { data: expoData },
     ] = await Promise.all([
-      supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone"),
+      supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone, role_id"),
       supabase
         .from("agency_users")
         .select("user_id, agency_id, role_id")
@@ -755,13 +897,16 @@ const Users = ({
         username?: string | null;
         avatar_url?: string | null;
         phone?: string | null;
+        role_id?: number | null;
       }> | null) ?? []
     )
       .filter((p) => typeof p.id === "string" && p.id.trim())
       .map((p) => {
         const uid = String(p.id);
         const agRec = agencyByUser.get(uid);
-        return {
+        const globalRoleId = parseGlobalRoleId(p.role_id);
+        const agencyRoleId = agRec?.role_id ?? null;
+        return ensureUserRowRoleFields({
           id: uid,
           first_name: p.first_name ?? null,
           last_name: p.last_name ?? null,
@@ -771,10 +916,11 @@ const Users = ({
           email: null,
           birth_month: null,
           birth_year: null,
-          role_id: agRec?.role_id ?? null,
+          role_ids: buildRoleIdsFromStorage(globalRoleId, agencyRoleId),
+          role_id: resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId),
           agency_id: agRec?.agency_id ?? null,
           expo_id: expoByUser.get(uid) ?? null,
-        };
+        });
       });
 
     setRows(
@@ -859,8 +1005,8 @@ const Users = ({
       const base = supabase.from("roles_user").select("*").order("role_id", { ascending: true });
       const { data, error: qErr } =
         typeof currentRoleId === "number" && Number.isFinite(currentRoleId)
-          ? await base.gte("role_id", currentRoleId).lte("role_id", 7)
-          : await base.in("role_id", [4, 5, 6, 7]);
+          ? await base.gte("role_id", currentRoleId).lte("role_id", 6)
+          : await base.in("role_id", [4, 5, 6]);
       if (cancelled) return;
       if (qErr) {
         setRoleOptions(FALLBACK_ROLE_OPTIONS);
@@ -868,7 +1014,7 @@ const Users = ({
       }
       const mapped =
         ((data as Array<{ role_id?: number | null; role_name_clair?: string | null; label?: string | null; role_name?: string | null }> | null) ?? [])
-          .filter((r) => typeof r.role_id === "number")
+          .filter((r) => typeof r.role_id === "number" && r.role_id !== 7)
           .map((r) => ({
             role_id: Number(r.role_id),
             label: extractRoleNameClair(r, Number(r.role_id)),
@@ -923,9 +1069,9 @@ const Users = ({
             .maybeSingle();
           if (!cancelled && !oneErr && oneExpo) {
             const row = oneExpo as { id?: string | null; expo_id?: string | null; expo_name?: string | null };
-            const val = row.expo_id?.trim() || row.id?.trim() || "";
+            const val = row.id?.trim() || row.expo_id?.trim() || "";
             if (val) {
-              setExpoOptions([{ id: row.id?.trim() || val, value: val, expo_name: row.expo_name?.trim() || val }]);
+              setExpoOptions([{ id: val, value: val, expo_name: row.expo_name?.trim() || val }]);
               return;
             }
           }
@@ -948,7 +1094,7 @@ const Users = ({
           .filter((e) => typeof e.id === "string" && e.id.trim())
           .map((e) => ({
             id: String(e.id),
-            value: (e.expo_id?.trim() || e.id?.trim() || ""),
+            value: String(e.id),
             expo_name: e.expo_name?.trim() || String(e.id),
           })) ?? [];
       if (mapped.length === 0 && selectedExpoId) {
@@ -960,9 +1106,9 @@ const Users = ({
           .maybeSingle();
         if (!cancelled && !oneErr && oneExpo) {
           const row = oneExpo as { id?: string | null; expo_id?: string | null; expo_name?: string | null };
-          const val = row.expo_id?.trim() || row.id?.trim() || "";
+          const val = row.id?.trim() || row.expo_id?.trim() || "";
           if (val) {
-            setExpoOptions([{ id: row.id?.trim() || val, value: val, expo_name: row.expo_name?.trim() || val }]);
+            setExpoOptions([{ id: val, value: val, expo_name: row.expo_name?.trim() || val }]);
             return;
           }
         }
@@ -1102,22 +1248,22 @@ const Users = ({
     return byId?.name_agency || aid;
   }, [resolvedAgencyId, agenciesRef]);
 
+  const editingRoleIds = useMemo(
+    () => editing?.role_ids ?? (editing?.role_id != null ? [editing.role_id] : []),
+    [editing?.role_ids, editing?.role_id],
+  );
+
   const canEditAgency = useMemo(() => {
-    const targetRoleId = typeof editing?.role_id === "number" ? editing.role_id : null;
-    const targetIsLevel123 = targetRoleId != null && targetRoleId >= 1 && targetRoleId <= 3;
-    if (saving || targetIsLevel123) return false;
+    if (saving || !roleIdsNeedOrganisation(editingRoleIds)) return false;
     if (currentRoleId === 4) return mode === "create" && !connectedAgencyId;
     return currentRoleId === 1 || currentRoleId === 2 || currentRoleId === 3;
-  }, [editing?.role_id, saving, currentRoleId, mode, connectedAgencyId]);
+  }, [editingRoleIds, saving, currentRoleId, mode, connectedAgencyId]);
 
   const canEditExpo = useMemo(() => {
-    const targetRoleId = typeof editing?.role_id === "number" ? editing.role_id : null;
-    const targetIsLevel123 = targetRoleId != null && targetRoleId >= 1 && targetRoleId <= 3;
-    if (saving || targetIsLevel123) return false;
+    if (saving || !roleIdsNeedExpos(editingRoleIds)) return false;
     if (!callerCanAssignExpo(currentRoleId)) return false;
-    if (!targetRoleUsesExpo(targetRoleId)) return false;
     return Boolean(resolvedAgencyId);
-  }, [editing?.role_id, saving, resolvedAgencyId, currentRoleId]);
+  }, [editingRoleIds, saving, resolvedAgencyId, currentRoleId]);
 
   const canEditEmailField = useMemo(() => {
     if (saving) return false;
@@ -1143,10 +1289,10 @@ const Users = ({
   const openEdit = (row: UserRow) => {
     const rawAgencyId = safeTrim(row.agency_id);
     const resolvedAgencyId = rawAgencyId || connectedAgencyId || "";
-    const baseRow: UserRow = {
+    const baseRow = ensureUserRowRoleFields({
       ...row,
       agency_id: resolvedAgencyId || null,
-    };
+    });
 
     setMode("edit");
     setEditing(baseRow);
@@ -1337,7 +1483,9 @@ const Users = ({
       email: "",
       phone: "",
       expo_id: "",
+      expo_ids: [],
       role_id: null,
+      role_ids: [],
     };
     setEditing(emptyRow);
     setInitialEditing({ ...emptyRow, id: "" });
@@ -1435,15 +1583,24 @@ const Users = ({
         nextPhoto = await uploadUserPhoto(photoFile, editing.id);
       }
 
-      const nextRoleId =
-        typeof editing.role_id === "number" && editing.role_id > 0 ? editing.role_id : null;
-      const isAdminOrganisation = nextRoleId === 4;
-      const isLevel123 = nextRoleId != null && nextRoleId >= 1 && nextRoleId <= 3;
-      const effectiveAgencyId = isLevel123
-        ? null
-        : editing.agency_id?.trim() || connectedAgencyId || null;
-      const effectiveExpoId =
-        isLevel123 || isAdminOrganisation ? null : editing.expo_id?.trim() || null;
+      const roleIds = editing.role_ids?.length
+        ? editing.role_ids
+        : editing.role_id != null
+          ? [editing.role_id]
+          : [];
+      const nextRoleId = derivePrimaryRoleId(roleIds);
+      const globalRoleId = deriveGlobalRoleId(roleIds);
+      const agencyRoleId = deriveAgencyRoleIdForStorage(roleIds);
+      const needsOrganisation = roleIdsNeedOrganisation(roleIds);
+      const needsExpos = roleIdsNeedExpos(roleIds);
+      const effectiveAgencyId = needsOrganisation
+        ? editing.agency_id?.trim() || connectedAgencyId || null
+        : null;
+      const effectiveExpoIds = needsExpos
+        ? await resolveExpoStorageIds(
+            editing.expo_ids ?? (editing.expo_id ? [editing.expo_id] : []),
+          )
+        : [];
 
       const birthYearNum = editing.birth_year?.trim() ? Number.parseInt(editing.birth_year.trim(), 10) : null;
 
@@ -1454,9 +1611,8 @@ const Users = ({
         avatar_url: nextPhoto || null,
         phone: editing.phone?.trim() || null,
         birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
-        // Niveaux 1-3 (admins globaux sans agence) : role_id stocké dans profiles.
-        // Niveaux 4-7 : role_id dans agency_users ; on efface profiles.role_id pour éviter les conflits.
-        role_id: isLevel123 ? nextRoleId : null,
+        // Niveaux 1-3 : role_id global dans profiles ; 4-6 via agency_users.
+        role_id: globalRoleId,
       };
 
       if (mode === "create") {
@@ -1468,7 +1624,17 @@ const Users = ({
           return;
         }
         if (!nextRoleId) {
-          toast.error("Le rôle est requis pour créer l'utilisateur.");
+          toast.error("Au moins un rôle est requis pour créer l'utilisateur.");
+          setSaving(false);
+          return;
+        }
+        if (needsOrganisation && !effectiveAgencyId) {
+          toast.error("Sélectionnez une organisation pour les rôles métier.");
+          setSaving(false);
+          return;
+        }
+        if (needsExpos && effectiveExpoIds.length === 0) {
+          toast.error("Sélectionnez au moins une exposition pour ce rôle.");
           setSaving(false);
           return;
         }
@@ -1502,7 +1668,7 @@ const Users = ({
         // Création Auth via edge function
         const { data: createAuthData, error: createAuthErr } = await supabase.functions.invoke(
           "admin-create-user",
-          { body: { email: effectiveEmail, password: tempPassword, prenom, nom, role_id: nextRoleId } },
+          { body: { email: effectiveEmail, password: tempPassword, prenom, nom, role_id: globalRoleId ?? nextRoleId } },
         );
         if (createAuthErr) throw createAuthErr;
 
@@ -1521,21 +1687,20 @@ const Users = ({
         if (profileErr) throw profileErr;
 
         // Rattachement agence + rôle
-        if (effectiveAgencyId && nextRoleId) {
+        if (effectiveAgencyId && agencyRoleId) {
           const { error: agencyErr } = await supabase
             .from("agency_users")
             .upsert(
-              { user_id: createdUserId, agency_id: effectiveAgencyId, role_id: nextRoleId },
+              { user_id: createdUserId, agency_id: effectiveAgencyId, role_id: agencyRoleId },
               { onConflict: "user_id,agency_id" },
             );
           if (agencyErr) throw agencyErr;
         }
 
-        // Rattachement expo
-        if (effectiveExpoId) {
+        if (effectiveExpoIds.length > 0) {
           const { error: expoErr } = await supabase
             .from("expo_user_role")
-            .insert({ user_id: createdUserId, expo_id: effectiveExpoId });
+            .insert(effectiveExpoIds.map((expo_id) => ({ user_id: createdUserId, expo_id })));
           if (expoErr) throw expoErr;
         }
 
@@ -1543,6 +1708,17 @@ const Users = ({
       } else {
         if (!phoneValid) {
           toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+          setSaving(false);
+          return;
+        }
+
+        if (needsOrganisation && !effectiveAgencyId) {
+          toast.error("Sélectionnez une organisation pour les rôles métier.");
+          setSaving(false);
+          return;
+        }
+        if (needsExpos && effectiveExpoIds.length === 0) {
+          toast.error("Sélectionnez au moins une exposition pour ce rôle.");
           setSaving(false);
           return;
         }
@@ -1577,19 +1753,18 @@ const Users = ({
 
         // Remplace le rattachement agence (delete + insert pour gérer les changements d'agence)
         await supabase.from("agency_users").delete().eq("user_id", editing.id);
-        if (effectiveAgencyId && nextRoleId) {
+        if (effectiveAgencyId && agencyRoleId) {
           const { error: agencyErr } = await supabase
             .from("agency_users")
-            .insert({ user_id: editing.id, agency_id: effectiveAgencyId, role_id: nextRoleId });
+            .insert({ user_id: editing.id, agency_id: effectiveAgencyId, role_id: agencyRoleId });
           if (agencyErr) throw agencyErr;
         }
 
-        // Remplace le rattachement expo
         await supabase.from("expo_user_role").delete().eq("user_id", editing.id);
-        if (effectiveExpoId) {
+        if (effectiveExpoIds.length > 0) {
           const { error: expoErr } = await supabase
             .from("expo_user_role")
-            .insert({ user_id: editing.id, expo_id: effectiveExpoId });
+            .insert(effectiveExpoIds.map((expo_id) => ({ user_id: editing.id, expo_id })));
           if (expoErr) throw expoErr;
         }
 
@@ -1633,10 +1808,10 @@ const Users = ({
       return;
     }
     const nextRoleId =
-      typeof editing.role_id === "number" && editing.role_id > 0
-        ? editing.role_id
-        : Number(editing.role_id ?? NaN);
-    if (!Number.isFinite(nextRoleId)) {
+      deriveGlobalRoleId(editing.role_ids ?? []) ??
+      derivePrimaryRoleId(editing.role_ids ?? []) ??
+      (typeof editing.role_id === "number" && editing.role_id > 0 ? editing.role_id : null);
+    if (nextRoleId == null || !Number.isFinite(nextRoleId)) {
       toast.error("Rôle utilisateur introuvable.");
       return;
     }
@@ -1710,7 +1885,12 @@ const Users = ({
       "expo_id",
       "role_id",
     ];
-    return keys.some((key) => normalize(editing[key]) !== normalize(initialEditing[key]));
+    if (keys.some((key) => normalize(editing[key]) !== normalize(initialEditing[key]))) return true;
+    const sameRoleIds =
+      JSON.stringify(editing.role_ids ?? []) === JSON.stringify(initialEditing.role_ids ?? []);
+    const sameExpoIds =
+      JSON.stringify(editing.expo_ids ?? []) === JSON.stringify(initialEditing.expo_ids ?? []);
+    return !sameRoleIds || !sameExpoIds;
   })();
 
   // =========================================================================
@@ -1935,100 +2115,39 @@ const Users = ({
                   </div>
                 )}
               </div>
-              <div className="space-y-1.5 w-[302px]">
-                <Label htmlFor="user-roles">Rôles</Label>
-                <Select
-                  value={editing.role_id != null ? String(editing.role_id) : ""}
-                  onValueChange={(v) => {
-                    const roleId = roleIdFromValue(v);
-                    setEditing((prev) =>
-                      prev ? applyRoleChangeToUserRow(prev, roleId, connectedAgencyId) : prev,
-                    );
-                  }}
-                  disabled={saving}
-                >
-                  <SelectTrigger id="user-roles">
-                    <SelectValue placeholder="Choisir un rôle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.length === 0 && (
-                      <SelectItem value="__none_role__" disabled>
-                        Aucun rôle disponible
-                      </SelectItem>
-                    )}
-                    {roleOptions.map((role) => (
-                      <SelectItem key={role.role_id} value={String(role.role_id)}>
-                        {role.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="user-agency">Organisation</Label>
-                  <Select
-                    value={editing.agency_id ?? ""}
-                    onValueChange={(v) => {
-                      setField("agency_id", v);
-                      setField("expo_id", "");
-                    }}
-                    disabled={!canEditAgency}
-                  >
-                    <SelectTrigger id="user-agency">
-                      <SelectValue placeholder="Choisir une organisation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agenciesRef.length === 0 && (
-                        <SelectItem value="__none_agency__" disabled>
-                          Aucune organisation disponible
-                        </SelectItem>
-                      )}
-                      {agenciesRef.map((agency) => (
-                        <SelectItem key={agency.id} value={agency.id}>
-                          {agency.name_agency || agency.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="user-expo">Expo</Label>
-                  <Select
-                    value={editing.expo_id ?? ""}
-                    onValueChange={(v) => setField("expo_id", v)}
-                    disabled={!canEditExpo}
-                  >
-                    <SelectTrigger id="user-expo">
-                      <SelectValue
-                        placeholder={
-                          editing.role_id === 4
-                            ? "Non applicable pour ce rôle"
-                            : resolvedAgencyId
-                            ? "Choisir une exposition"
-                            : "Aucune agence connectée"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {expoOptions.length === 0 && (
-                        <SelectItem value="__none_expo__" disabled>
-                          Aucune expo disponible
-                        </SelectItem>
-                      )}
-                      {expoOptions.map((expo) => (
-                        <SelectItem key={expo.id} value={expo.value}>
-                          {expo.expo_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">
-                    Agence utilisée pour filtrer les expos : {resolvedAgencyLabel}
-                  </p>
-                </div>
-              </div>
+              <UserRolesField
+                idPrefix="user"
+                roleOptions={roleOptions}
+                roleIds={editing.role_ids ?? (editing.role_id != null ? [editing.role_id] : [])}
+                onRoleIdsChange={(next) =>
+                  setEditing((prev) =>
+                    prev
+                      ? ensureUserRowRoleFields({
+                          ...prev,
+                          role_ids: next,
+                          role_id: derivePrimaryRoleId(next),
+                        })
+                      : prev,
+                  )
+                }
+                agencyId={editing.agency_id ?? null}
+                onAgencyIdChange={(v) => {
+                  setField("agency_id", v);
+                  setEditing((prev) => (prev ? { ...prev, expo_ids: [], expo_id: null } : prev));
+                }}
+                expoIds={editing.expo_ids ?? (editing.expo_id ? [editing.expo_id] : [])}
+                onExpoIdsChange={(next) =>
+                  setEditing((prev) =>
+                    prev ? { ...prev, expo_ids: next, expo_id: next[0] ?? null } : prev,
+                  )
+                }
+                agencies={agenciesRef}
+                expoOptions={expoOptions}
+                callerRoleId={currentRoleId}
+                canEditAgency={canEditAgency}
+                resolvedAgencyLabel={resolvedAgencyLabel}
+                disabled={saving}
+              />
 
               {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
               {!checkingControl && controlExists && (
@@ -2385,100 +2504,39 @@ const Users = ({
                   </div>
                 )}
               </div>
-              <div className="space-y-1.5 w-[302px]">
-                <Label htmlFor="user-roles-main">Rôles</Label>
-                <Select
-                  value={editing.role_id != null ? String(editing.role_id) : ""}
-                  onValueChange={(v) => {
-                    const roleId = roleIdFromValue(v);
-                    setEditing((prev) =>
-                      prev ? applyRoleChangeToUserRow(prev, roleId, connectedAgencyId) : prev,
-                    );
-                  }}
-                  disabled={saving}
-                >
-                  <SelectTrigger id="user-roles-main">
-                    <SelectValue placeholder="Choisir un rôle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.length === 0 && (
-                      <SelectItem value="__none_role__" disabled>
-                        Aucun rôle disponible
-                      </SelectItem>
-                    )}
-                    {roleOptions.map((role) => (
-                      <SelectItem key={role.role_id} value={String(role.role_id)}>
-                        {role.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="user-agency-main">Organisation</Label>
-                  <Select
-                    value={editing.agency_id ?? ""}
-                    onValueChange={(v) => {
-                      setField("agency_id", v);
-                      setField("expo_id", "");
-                    }}
-                    disabled={!canEditAgency}
-                  >
-                    <SelectTrigger id="user-agency-main">
-                      <SelectValue placeholder="Choisir une organisation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agenciesRef.length === 0 && (
-                        <SelectItem value="__none_agency__" disabled>
-                          Aucune organisation disponible
-                        </SelectItem>
-                      )}
-                      {agenciesRef.map((agency) => (
-                        <SelectItem key={agency.id} value={agency.id}>
-                          {agency.name_agency || agency.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="user-expo-main">Expo</Label>
-                  <Select
-                    value={editing.expo_id ?? ""}
-                    onValueChange={(v) => setField("expo_id", v)}
-                    disabled={!canEditExpo}
-                  >
-                    <SelectTrigger id="user-expo-main">
-                      <SelectValue
-                        placeholder={
-                          editing.role_id === 4
-                            ? "Non applicable pour ce rôle"
-                            : resolvedAgencyId
-                            ? "Choisir une exposition"
-                            : "Aucune agence connectée"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {expoOptions.length === 0 && (
-                        <SelectItem value="__none_expo__" disabled>
-                          Aucune expo disponible
-                        </SelectItem>
-                      )}
-                      {expoOptions.map((expo) => (
-                        <SelectItem key={expo.id} value={expo.value}>
-                          {expo.expo_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">
-                    Agence utilisée pour filtrer les expos : {resolvedAgencyLabel}
-                  </p>
-                </div>
-              </div>
+              <UserRolesField
+                idPrefix="user-main"
+                roleOptions={roleOptions}
+                roleIds={editing.role_ids ?? (editing.role_id != null ? [editing.role_id] : [])}
+                onRoleIdsChange={(next) =>
+                  setEditing((prev) =>
+                    prev
+                      ? ensureUserRowRoleFields({
+                          ...prev,
+                          role_ids: next,
+                          role_id: derivePrimaryRoleId(next),
+                        })
+                      : prev,
+                  )
+                }
+                agencyId={editing.agency_id ?? null}
+                onAgencyIdChange={(v) => {
+                  setField("agency_id", v);
+                  setEditing((prev) => (prev ? { ...prev, expo_ids: [], expo_id: null } : prev));
+                }}
+                expoIds={editing.expo_ids ?? (editing.expo_id ? [editing.expo_id] : [])}
+                onExpoIdsChange={(next) =>
+                  setEditing((prev) =>
+                    prev ? { ...prev, expo_ids: next, expo_id: next[0] ?? null } : prev,
+                  )
+                }
+                agencies={agenciesRef}
+                expoOptions={expoOptions}
+                callerRoleId={currentRoleId}
+                canEditAgency={canEditAgency}
+                resolvedAgencyLabel={resolvedAgencyLabel}
+                disabled={saving}
+              />
 
               {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
               {!checkingControl && controlExists && (

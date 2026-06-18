@@ -3,9 +3,16 @@
  * Équivalent du data fetching d'un Server Component Next.js App Router.
  */
 
+export type PricingOptionRow = {
+  option_code: string;
+  unit_price_ttc_eur: number | null;
+};
+
 export type PricingRow = {
+  pricing_id: number | null;
   pricing_label: string | null;
   pricing_plan: string | null;
+  plan_code: string | null;
   pricing_max_oeuvres: number | null;
   /** Colonne Supabase : princing_max_visitors ou pricing_max_visitors selon migration. */
   princing_max_visitors: number | null;
@@ -14,6 +21,12 @@ export type PricingRow = {
   pricing_annuel: number | null;
   pricing_annual_remis: number | null;
   eco_annuel: number | null;
+  standby_monthly_price_ttc_eur: number | null;
+  included_mediation_langs_min: number | null;
+  included_mediation_langs_max: number | null;
+  included_audio_langs: number | null;
+  trial_duration_days: number | null;
+  pricing_options: PricingOptionRow[];
 };
 
 export type PublicHomeInitialData = {
@@ -21,8 +34,70 @@ export type PublicHomeInitialData = {
   promptIcons: string[];
 };
 
-const PRICING_COLUMNS =
-  "pricing_label,pricing_plan,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel";
+/** Requêtes du plus riche au plus compatible (évite HTTP 400 si migration partielle). */
+const PRICING_SELECT_TIERS = [
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,pricing_options(option_code,unit_price_ttc_eur)",
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days",
+  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
+  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
+] as const;
+
+type PlanEditorialDefaults = {
+  plan_code: string;
+  standby_monthly_price_ttc_eur: number | null;
+  included_mediation_langs_min: number | null;
+  included_mediation_langs_max: number | null;
+  included_audio_langs: number | null;
+  trial_duration_days: number | null;
+  pricing_options: PricingOptionRow[];
+};
+
+const PLAN_EDITORIAL_DEFAULTS: Record<string, PlanEditorialDefaults> = {
+  ETINCELLE: {
+    plan_code: "ETINCELLE",
+    standby_monthly_price_ttc_eur: null,
+    included_mediation_langs_min: 1,
+    included_mediation_langs_max: 1,
+    included_audio_langs: 0,
+    trial_duration_days: 30,
+    pricing_options: [],
+  },
+  ATELIER: {
+    plan_code: "ATELIER",
+    standby_monthly_price_ttc_eur: 19,
+    included_mediation_langs_min: 1,
+    included_mediation_langs_max: 2,
+    included_audio_langs: 1,
+    trial_duration_days: null,
+    pricing_options: [
+      { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: 5 },
+      { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: 5 },
+      { option_code: "STANDBY", unit_price_ttc_eur: 19 },
+    ],
+  },
+  HORIZON: {
+    plan_code: "HORIZON",
+    standby_monthly_price_ttc_eur: 49,
+    included_mediation_langs_min: 5,
+    included_mediation_langs_max: 5,
+    included_audio_langs: 1,
+    trial_duration_days: null,
+    pricing_options: [
+      { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: 15 },
+      { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: 15 },
+      { option_code: "STANDBY", unit_price_ttc_eur: 49 },
+    ],
+  },
+  RAYONNEMENT: {
+    plan_code: "RAYONNEMENT",
+    standby_monthly_price_ttc_eur: null,
+    included_mediation_langs_min: null,
+    included_mediation_langs_max: null,
+    included_audio_langs: null,
+    trial_duration_days: null,
+    pricing_options: [{ option_code: "STANDBY", unit_price_ttc_eur: null }],
+  },
+};
 
 export function toPricingNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -34,11 +109,63 @@ export function toPricingNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizePricingOptions(value: unknown): PricingOptionRow[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const rec = item as Record<string, unknown>;
+      const code = typeof rec.option_code === "string" ? rec.option_code : null;
+      if (!code) return null;
+      return {
+        option_code: code,
+        unit_price_ttc_eur: toPricingNumber(rec.unit_price_ttc_eur),
+      };
+    })
+    .filter((item): item is PricingOptionRow => item !== null);
+}
+
+function inferPlanCode(row: Pick<PricingRow, "plan_code" | "pricing_plan">): string | null {
+  if (row.plan_code?.trim()) {
+    return row.plan_code.trim().toUpperCase();
+  }
+  const plan = (row.pricing_plan ?? "").toUpperCase();
+  if (plan.includes("ETINCELLE") || plan.includes("ÉTINCELLE")) return "ETINCELLE";
+  if (plan.includes("ATELIER")) return "ATELIER";
+  if (plan.includes("HORIZON")) return "HORIZON";
+  if (plan.includes("RAYONNEMENT")) return "RAYONNEMENT";
+  return null;
+}
+
+function enrichPricingRowFromPlanDefaults(row: PricingRow): PricingRow {
+  const code = inferPlanCode(row);
+  const defaults = code ? PLAN_EDITORIAL_DEFAULTS[code] : null;
+  if (!defaults) return row;
+
+  const mergedOptions =
+    row.pricing_options.length > 0 ? row.pricing_options : defaults.pricing_options;
+
+  return {
+    ...row,
+    plan_code: row.plan_code ?? defaults.plan_code,
+    standby_monthly_price_ttc_eur:
+      row.standby_monthly_price_ttc_eur ?? defaults.standby_monthly_price_ttc_eur,
+    included_mediation_langs_min:
+      row.included_mediation_langs_min ?? defaults.included_mediation_langs_min,
+    included_mediation_langs_max:
+      row.included_mediation_langs_max ?? defaults.included_mediation_langs_max,
+    included_audio_langs: row.included_audio_langs ?? defaults.included_audio_langs,
+    trial_duration_days: row.trial_duration_days ?? defaults.trial_duration_days,
+    pricing_options: mergedOptions,
+  };
+}
+
 function normalizePricingRow(row: Record<string, unknown>): PricingRow {
   const ecoFromDb = toPricingNumber(row["éco_annuel"] ?? row.eco_annuel);
   const visitors =
     toPricingNumber(row.princing_max_visitors) ?? toPricingNumber(row.pricing_max_visitors);
-  return {
+  const normalized: PricingRow = {
+    pricing_id: toPricingNumber(row.pricing_id),
     pricing_label:
       typeof row.pricing_label === "string" || row.pricing_label === null
         ? (row.pricing_label as string | null)
@@ -46,6 +173,10 @@ function normalizePricingRow(row: Record<string, unknown>): PricingRow {
     pricing_plan:
       typeof row.pricing_plan === "string" || row.pricing_plan === null
         ? (row.pricing_plan as string | null)
+        : null,
+    plan_code:
+      typeof row.plan_code === "string" || row.plan_code === null
+        ? (row.plan_code as string | null)
         : null,
     pricing_max_oeuvres: toPricingNumber(row.pricing_max_oeuvres),
     princing_max_visitors: visitors,
@@ -55,7 +186,14 @@ function normalizePricingRow(row: Record<string, unknown>): PricingRow {
     pricing_annuel: toPricingNumber(row.pricing_annuel),
     pricing_annual_remis: toPricingNumber(row.pricing_annual_remis),
     eco_annuel: ecoFromDb,
+    standby_monthly_price_ttc_eur: toPricingNumber(row.standby_monthly_price_ttc_eur),
+    included_mediation_langs_min: toPricingNumber(row.included_mediation_langs_min),
+    included_mediation_langs_max: toPricingNumber(row.included_mediation_langs_max),
+    included_audio_langs: toPricingNumber(row.included_audio_langs),
+    trial_duration_days: toPricingNumber(row.trial_duration_days),
+    pricing_options: normalizePricingOptions(row.pricing_options),
   };
+  return enrichPricingRowFromPlanDefaults(normalized);
 }
 
 async function supabaseRestSelect<T>(
@@ -84,13 +222,60 @@ async function supabaseRestSelect<T>(
   return { data, error: null };
 }
 
+async function fetchPricingRows(
+  supabaseUrl: string,
+  anonKey: string,
+): Promise<{ rows: Record<string, unknown>[]; error: string | null }> {
+  let lastError: string | null = null;
+
+  for (const select of PRICING_SELECT_TIERS) {
+    const res = await supabaseRestSelect<Record<string, unknown>>(supabaseUrl, anonKey, "pricing", select);
+    if (!res.error && res.data) {
+      let rows = res.data;
+      if (!select.includes("pricing_options(")) {
+        const optionsRes = await supabaseRestSelect<Record<string, unknown>>(
+          supabaseUrl,
+          anonKey,
+          "pricing_options",
+          "pricing_id,option_code,unit_price_ttc_eur",
+        );
+        if (!optionsRes.error && optionsRes.data?.length) {
+          const optionsByPricingId = new Map<number, PricingOptionRow[]>();
+          for (const opt of optionsRes.data) {
+            const pricingId = toPricingNumber(opt.pricing_id);
+            const code = typeof opt.option_code === "string" ? opt.option_code : null;
+            if (pricingId === null || !code) continue;
+            const bucket = optionsByPricingId.get(pricingId) ?? [];
+            bucket.push({
+              option_code: code,
+              unit_price_ttc_eur: toPricingNumber(opt.unit_price_ttc_eur),
+            });
+            optionsByPricingId.set(pricingId, bucket);
+          }
+          rows = rows.map((row) => {
+            const pricingId = toPricingNumber(row.pricing_id);
+            if (pricingId === null) return row;
+            const embedded = normalizePricingOptions(row.pricing_options);
+            if (embedded.length > 0) return row;
+            return { ...row, pricing_options: optionsByPricingId.get(pricingId) ?? [] };
+          });
+        }
+      }
+      return { rows, error: null };
+    }
+    lastError = res.error;
+  }
+
+  return { rows: [], error: lastError };
+}
+
 /** Fetch Supabase (REST) — utilisable au build et en fallback client. */
 export async function fetchPublicHomeData(
   supabaseUrl: string,
   anonKey: string,
 ): Promise<PublicHomeInitialData> {
   const [pricingRes, promptIconsRes] = await Promise.all([
-    supabaseRestSelect<Record<string, unknown>>(supabaseUrl, anonKey, "pricing", PRICING_COLUMNS),
+    fetchPricingRows(supabaseUrl, anonKey),
     supabaseRestSelect<{ icon?: string | null }>(supabaseUrl, anonKey, "prompt_style", "icon"),
   ]);
 
@@ -98,7 +283,7 @@ export async function fetchPublicHomeData(
     throw new Error(pricingRes.error);
   }
 
-  const rawPricingRows = pricingRes.data ?? [];
+  const rawPricingRows = pricingRes.rows;
   const iconRows = promptIconsRes.data ?? [];
   const cleanedIcons = [...new Set(iconRows.map((r) => (r.icon ?? "").trim()).filter(Boolean))];
 

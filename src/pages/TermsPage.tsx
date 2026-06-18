@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { PublicVitrineShell } from "@/components/PublicVitrineShell";
 import { highlightAimediartCom } from "@/lib/highlightAimediartCom";
+import { LEGAL_ARTICLE_CLASS, LEGAL_SECTION_TITLE_CLASS } from "@/pages/legalPageStyles";
 
 function BulletList({
   prefix,
@@ -38,20 +39,20 @@ const TermsPage = () => {
           <p className="mt-2 text-sm text-neutral-600">{bt("meta.workNotice")}</p>
           <p className="mt-1 text-sm italic text-neutral-500">{bt("meta.languageRef")}</p>
 
-          <article className="prose prose-neutral mt-8 max-w-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none prose-headings:font-semibold prose-headings:text-[#1f1f1f] [&_blockquote]:!text-[12px] [&_li]:!font-normal [&_li]:!text-[12px] [&_li]:leading-relaxed [&_p]:!text-[12px] [&_p]:leading-relaxed sm:mt-10">
+          <article className={LEGAL_ARTICLE_CLASS}>
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.object.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.object.title")}</h2>
               <p className="mt-3">{bt("sections.object.p1")}</p>
               <p className="mt-3">{bt("sections.object.p2")}</p>
             </section>
 
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.accessSecurity.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.accessSecurity.title")}</h2>
               <BulletList prefix="sections.accessSecurity.list" keys={["i1", "i2", "i3", "i4"]} />
             </section>
 
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.acceptableUse.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.acceptableUse.title")}</h2>
               <p className="mt-3">{bt("sections.acceptableUse.respectIntro")}</p>
               <BulletList prefix="sections.acceptableUse.respectList" keys={["i1", "i2", "i3", "i4"]} />
               <p className="mt-3">{bt("sections.acceptableUse.forbiddenIntro")}</p>
@@ -59,17 +60,17 @@ const TermsPage = () => {
             </section>
 
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.contentResponsibility.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.contentResponsibility.title")}</h2>
               <BulletList prefix="sections.contentResponsibility.list" keys={["i1", "i2", "i3", "i4"]} />
             </section>
 
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.personalData.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.personalData.title")}</h2>
               <BulletList prefix="sections.personalData.list" keys={["i1", "i2"]} />
             </section>
 
             <section className="mb-10">
-              <h2 className="!text-[12px] !font-black text-[#1f1f1f]">{bt("sections.suspension.title")}</h2>
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.suspension.title")}</h2>
               <BulletList prefix="sections.suspension.list" keys={["i1", "i2", "i3"]} />
             </section>
           </article>

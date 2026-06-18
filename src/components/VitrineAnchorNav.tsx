@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
+import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
 
 export const VITRINE_ANCHOR_IDS = [
   "accueil",
@@ -20,24 +21,6 @@ type VitrineAnchorNavProps = {
   onNavigate?: () => void;
 };
 
-function scrollToVitrineAnchor(anchorId: string): void {
-  if (typeof window === "undefined") return;
-  window.location.hash = anchorId;
-
-  const tryScroll = (attempt = 0) => {
-    const el = document.getElementById(anchorId);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    if (attempt < 30) {
-      window.setTimeout(() => tryScroll(attempt + 1), 50);
-    }
-  };
-
-  tryScroll();
-}
-
 export function VitrineAnchorNav({
   vitrinePathPrefix,
   variant = "floating",
@@ -49,7 +32,7 @@ export function VitrineAnchorNav({
 
   const itemClassName =
     variant === "header"
-      ? "group inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium leading-tight text-foreground/85 transition-colors hover:bg-neutral-100 lg:text-[12px]"
+      ? "group inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[12px] font-medium leading-tight text-foreground/85 transition-colors hover:bg-neutral-100"
       : "group inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium text-foreground/85 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-ring lg:gap-0.5 lg:rounded lg:px-1 lg:py-0.5 lg:text-[11px] lg:leading-tight xl:px-1.5 xl:text-[12px]";
 
   const navLayoutClassName =

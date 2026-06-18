@@ -125,6 +125,21 @@
 }
 
 @layer components {
+  /** Sonner — toast de remerciement formulaire devis, centré à l'écran */
+  [data-sonner-toast].sonner-quote-success-toast {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   /** PublicHome — zone photo fixe, recadrage central sans déformation */
   .home-hero-image {
     display: block;

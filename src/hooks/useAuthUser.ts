@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
-import { fetchUserRoleFromDb, getRoleIdFromJwt, mergeRoleFromDbAndJwt } from "@/lib/authUser";
+import { fetchUserRoleFromDb, getRoleIdFromJwt, mergeRoleFromDbAndJwt, resolveMergedAuthRoleId } from "@/lib/authUser";
 import { resolveAgencyExpoFromJwt } from "@/lib/userScope";
 
 export type AuthUserWithRole = {
@@ -113,7 +113,7 @@ export function useAuthUser() {
             msg,
           );
         }
-        dbProfile = { role_name: null, role_label: null, role_id: null, first_name: null, agency_id: null, expo_id: null };
+        dbProfile = { role_name: null, role_label: null, role_id: null, global_role_id: null, agency_role_id: null, first_name: null, agency_id: null, expo_id: null };
       }
       if (myGeneration !== applyGenerationRef.current) return;
 
@@ -122,7 +122,14 @@ export function useAuthUser() {
         dbProfile.role_name,
         dbProfile.role_label,
       );
-      const role_id = dbProfile.role_id ?? getRoleIdFromJwt(session.user);
+      const role_id =
+        resolveMergedAuthRoleId(
+          getRoleIdFromJwt(session.user),
+          dbProfile.global_role_id ?? null,
+          dbProfile.agency_role_id ?? null,
+        ) ??
+        dbProfile.role_id ??
+        getRoleIdFromJwt(session.user);
       const meta = session.user.user_metadata as Record<string, unknown> | undefined;
       // Priorite : base de donnees -> metadonnees JWT (signUp avec options.data.first_name)
       const first_name =

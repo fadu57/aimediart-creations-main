@@ -6,7 +6,7 @@ import {
   type PublicHomeInitialData,
 } from "@/lib/organisation/publicHomeData";
 import type { TFunction } from "i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 import {
   ArrowRight,
@@ -23,11 +23,14 @@ import {
 } from "lucide-react";
 
 import { PublicVitrineShell, AIMEDIART_WORD_RED, BRAND_RED, BRAND_RED_DARK } from "@/components/PublicVitrineShell";
+import { AiGenerationInfoTrigger } from "@/components/AiGenerationInfoModal";
 import { LazyWhenVisible } from "@/components/ui/LazyWhenVisible";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StandbyPlanTrigger } from "@/components/organisation/StandbyPlanTrigger";
+import type { StandbyPlanCode } from "@/components/organisation/StandbyPlanModal";
 
 import expositionVivantePhoto from "@/assets/exposition-vivante.png";
 import oreilleAttentivePhoto from "@/assets/oreille-attentive.png";
@@ -36,6 +39,7 @@ import parcoursPhoto from "@/assets/parcours.png";
 import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
+import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
 
 const ForestCanopySketch = lazy(() =>
   import("@/components/ForestCanopySketch").then((m) => ({ default: m.ForestCanopySketch })),
@@ -49,7 +53,7 @@ export type PublicHomeProps = {
   initialData?: PublicHomeInitialData | null;
 };
 
-function highlightAimediartWord(text: string): ReactNode {
+function highlightAimediartWord(text: string, textSpanClassName?: string): ReactNode {
   const parts = text.split(/(AIMEDIArt)/g);
   return parts.map((part, i) =>
     part === "AIMEDIArt" ? (
@@ -57,7 +61,9 @@ function highlightAimediartWord(text: string): ReactNode {
         AIMEDIArt
       </span>
     ) : (
-      <span key={`txt-${i}`}>{part}</span>
+      <span key={`txt-${i}`} className={textSpanClassName}>
+        {part}
+      </span>
     )
   );
 }
@@ -158,7 +164,118 @@ function capacityLabel(row: PricingRow, t: TFunction): string {
     typeof maxVisitors === "number" && maxVisitors > 0
       ? t("tarifs.capacity_visitors", { count: maxVisitors })
       : "Visiteurs sur mesure";
-  return `${oeuvresPart} · ${visitorsPart}`;
+  const base = `${oeuvresPart} · ${visitorsPart}`;
+  if (planCodeFromRow(row).includes("ETINCELLE")) {
+    return `${base}${t("tarifs.capacity_suffix_one_month")}`;
+  }
+  return base;
+}
+
+function planCodeFromRow(row: PricingRow): string {
+  if (row.plan_code?.trim()) return planNameAsciiUpper(row.plan_code);
+  return planNameAsciiUpper(row.pricing_plan);
+}
+
+function optionUnitPrice(row: PricingRow, optionCode: string): number | null {
+  const fromOptions = row.pricing_options.find((o) => o.option_code === optionCode)?.unit_price_ttc_eur;
+  if (typeof fromOptions === "number") return fromOptions;
+  if (optionCode === "STANDBY") return row.standby_monthly_price_ttc_eur;
+  return null;
+}
+
+function formatCompactEur(value: number | null | undefined, locale: string): string {
+  if (typeof value !== "number" || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(
+    value,
+  );
+}
+
+function planStandbyLabel(row: PricingRow, t: TFunction, locale: string): string {
+  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.sur_devis");
+  const price = optionUnitPrice(row, "STANDBY");
+  if (typeof price !== "number" || price <= 0) return t("tarifs.usage_none");
+  return t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
+}
+
+function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): string {
+  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.languages_custom");
+  const min = row.included_mediation_langs_min;
+  const max = row.included_mediation_langs_max ?? min;
+  const extraPrice = optionUnitPrice(row, "EXTRA_MEDIATION_LANG");
+  let included = "";
+  if (min === 1 && max === 1) included = t("tarifs.languages_included_one", { count: 1 });
+  else if (typeof min === "number" && typeof max === "number" && min !== max) {
+    included = t("tarifs.languages_included_range", { min, max });
+  } else if (typeof max === "number" && max > 1) {
+    included = t("tarifs.languages_included_many", { count: max });
+  } else if (typeof min === "number") {
+    included = t("tarifs.languages_included_one", { count: min });
+  } else {
+    return t("tarifs.usage_none");
+  }
+  if (typeof extraPrice !== "number") return included;
+  return `${included} · ${t("tarifs.languages_extra", { price: formatCompactEur(extraPrice, locale) })}`;
+}
+
+function planAudioLabel(row: PricingRow, t: TFunction, locale: string): string {
+  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.languages_custom");
+  const audioLangs = row.included_audio_langs ?? 0;
+  const extraPrice = optionUnitPrice(row, "EXTRA_AUDIO_LANG");
+  if (audioLangs <= 0) return t("tarifs.audio_none");
+  const included =
+    audioLangs === 1 ? t("tarifs.audio_included_one") : t("tarifs.audio_included_many", { count: audioLangs });
+  if (typeof extraPrice !== "number") return included;
+  return `${included} · ${t("tarifs.audio_extra", { price: formatCompactEur(extraPrice, locale) })}`;
+}
+
+function planUsageLabel(row: PricingRow, t: TFunction): string {
+  const code = planCodeFromRow(row);
+  if (code.includes("RAYONNEMENT")) return t("tarifs.usage_custom_event");
+  if (code.includes("ETINCELLE") || row.trial_duration_days === 30) return t("tarifs.usage_limited_one_month");
+  return t("tarifs.usage_no_limit");
+}
+
+function standbyPlanCodeFromDisplay(displayPlan: string): StandbyPlanCode | null {
+  const upper = planNameAsciiUpper(displayPlan);
+  if (upper.includes("ATELIER")) return "ATELIER";
+  if (upper.includes("HORIZON")) return "HORIZON";
+  return null;
+}
+
+function PlanPricingDetails({
+  row,
+  t,
+  locale,
+  isRayonnement,
+  hideStandbyRow = false,
+}: {
+  row: PricingRow;
+  t: TFunction;
+  locale: string;
+  isRayonnement: boolean;
+  hideStandbyRow?: boolean;
+}) {
+  const rows = [
+    ...(!hideStandbyRow ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale) }] : []),
+    ...(!isRayonnement
+      ? [
+          { label: t("tarifs.option_languages"), value: planLanguagesLabel(row, t, locale) },
+          { label: t("tarifs.option_audio"), value: planAudioLabel(row, t, locale) },
+        ]
+      : []),
+    { label: t("tarifs.option_usage"), value: planUsageLabel(row, t) },
+  ];
+
+  return (
+    <div className="mt-2 space-y-1 border-t border-neutral-200 pt-2 text-xs leading-relaxed text-muted-foreground">
+      {rows.map((item) => (
+        <div key={item.label} className="flex flex-wrap gap-x-1">
+          <span className="font-medium text-foreground/80">{item.label} :</span>
+          <span>{item.value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function planEditorialDescription(plan: string, t: TFunction): string {
@@ -197,15 +314,6 @@ function planCardTitleShort(plan: string | null, t: TFunction): string {
   return first.replace(/^L['’]\s*/i, "L’").replace(/^Le\s+/i, "").replace(/^La\s+/i, "").trim() || raw;
 }
 
-/** Résumé court du plan, traduit : fallback pour pricing_label absent ou vide. */
-function planSummary(plan: string | null, t: TFunction): string {
-  const core = planNameAsciiUpper(plan).replace(/^L['’"]?\s*/i, "").replace(/^LE\s+/i, "").trim();
-  if (core.includes("RAYONNEMENT")) return t("tarifs.plan_summary_rayonnement");
-  if (core.includes("HORIZON")) return t("tarifs.plan_summary_horizon");
-  if (core.includes("ATELIER")) return t("tarifs.plan_summary_atelier");
-  if (core.includes("ETINCELLE")) return t("tarifs.plan_summary_etincelle");
-  return "";
-}
 
 /** Enveloppe « surface » (hero / sections) — divs statiques, sans Framer Motion. */
 function SurfaceCardShell({
@@ -374,6 +482,7 @@ function Section({
 
 export default function PublicHome({ initialData: initialDataProp }: PublicHomeProps = {}) {
   const { t, i18n } = useTranslation("home");
+  const location = useLocation();
   const resolvedInitialData = useMemo(
     () => initialDataProp ?? getOrganisationInitialData(),
     [initialDataProp],
@@ -383,6 +492,12 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
   const [pricingRows, setPricingRows] = useState<PricingRow[]>(resolvedInitialData?.pricingRows ?? []);
   const [selectedVariantByPlan, setSelectedVariantByPlan] = useState<Record<string, number>>({});
   const [promptIcons, setPromptIcons] = useState<string[]>(resolvedInitialData?.promptIcons ?? []);
+
+  useEffect(() => {
+    const anchorId = location.hash.replace(/^#/, "").trim();
+    if (!anchorId || location.pathname !== "/organisation") return;
+    scrollToVitrineAnchor(anchorId);
+  }, [location.hash, location.pathname]);
 
   useEffect(() => {
     if (resolvedInitialData) return;
@@ -475,7 +590,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   {" — médiation d'exposition par QR code et intelligence artificielle pour musées, galeries et lieux culturels"}
                 </span>
               </h1>
-              <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[1.12rem]" style={{ whiteSpace: "pre-line" }}>
+              <p className="mt-5 max-w-[92ch] text-[1rem] leading-[1.75] text-foreground/85 max-[389px]:text-[0.95rem] sm:text-[17px]" style={{ whiteSpace: "pre-line" }}>
                 {highlightAimediartWord(t("hero.intro_1"))}
               </p>
               <p className="mt-4 max-w-[88ch] text-[1rem] leading-[1.75] text-foreground/78 sm:text-[1.05rem]" style={{ whiteSpace: "pre-line" }}>
@@ -539,9 +654,12 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   </p>
                 </article>
               </div>
-              <blockquote className="mt-8 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
-                {t("hero.quote")}
-              </blockquote>
+              <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-between sm:gap-5">
+                <blockquote className="min-w-0 flex-1 border-l-2 border-[rgba(168,23,29,0.5)] pl-4 text-sm italic leading-relaxed text-foreground/75 sm:max-w-[52ch]">
+                  {t("hero.quote")}
+                </blockquote>
+                <AiGenerationInfoTrigger className="w-full shrink-0 sm:mt-0 sm:w-[min(100%,459px)]" />
+              </div>
             </SurfaceCardShell>
           </div>
         </section>
@@ -550,11 +668,26 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           surfaceCard
           id="exposition-vivante"
           eyebrow={t("exposition.eyebrow")}
-          title={t("exposition.title")}
+          title={
+            t("exposition.title_line1", { defaultValue: "" }) ? (
+              <>
+                <span className="block">
+                  {t("exposition.title_line1")}
+                  <br />
+                  {t("exposition.title_line2")}
+                </span>
+                <span className="mt-1.5 block text-[0.65rem] font-normal italic leading-snug tracking-[0.6px] text-foreground/65 sm:text-[0.7rem]">
+                  {t("exposition.title_note")}
+                </span>
+              </>
+            ) : (
+              t("exposition.title")
+            )
+          }
         >
-          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
-            <p>{highlightAimediartWord(t("exposition.text_1"))}</p>
-            <p>{t("exposition.text_2")}</p>
+          <div className="w-full space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
+            <p className="w-full">{highlightAimediartWord(t("exposition.text_1"))}</p>
+            <p className="w-full">{t("exposition.text_2")}</p>
           </div>
           <figure className="mt-8 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
@@ -576,7 +709,17 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="oreille-attentive"
           eyebrow={t("oreille.eyebrow")}
           eyebrowClassName="text-left w-[500px]"
-          title={t("oreille.title")}
+          title={
+            t("oreille.title_line1", { defaultValue: "" }) ? (
+              <span className="block">
+                {t("oreille.title_line1")}
+                <br />
+                {t("oreille.title_line2")}
+              </span>
+            ) : (
+              t("oreille.title")
+            )
+          }
         >
           <div className="flex w-full max-w-full flex-col gap-8 lg:w-[900px] lg:flex-row lg:items-start lg:gap-8">
             <div className="w-full min-w-0 flex-1 space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem] lg:min-w-0">
@@ -667,9 +810,9 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           eyebrow={t("live.eyebrow")}
           title={t("live.title")}
         >
-          <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
-            <p>{highlightAimediartWord(t("live.text_1"))}</p>
-            <p>{t("live.text_2")}</p>
+          <div className="w-full space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
+            <p className="w-full">{highlightAimediartWord(t("live.text_1"))}</p>
+            <p className="w-full">{t("live.text_2")}</p>
           </div>
           <div className="relative mt-8 overflow-hidden rounded-2xl border border-emerald-900/25 bg-gradient-to-b from-slate-950 via-emerald-950/90 to-black px-5 py-6 sm:px-8">
             <p className="relative z-10 max-w-[62ch] text-sm leading-relaxed text-emerald-50/95">
@@ -688,8 +831,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
 
         <Section surfaceCard id="sans-friction" eyebrow={t("friction.eyebrow")} title={t("friction.title")}>
           <div className="max-w-[68ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-[1.02rem]">
-            <p>{highlightAimediartWord(t("friction.text_1"))}</p>
-            <p>{t("friction.text_2")}</p>
+            <p className="w-full">{highlightAimediartWord(t("friction.text_1"), "block w-full")}</p>
+            <p className="w-full">{t("friction.text_2")}</p>
           </div>
         </Section>
 
@@ -747,19 +890,6 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           eyebrow={t("parcours.eyebrow")}
           title={t("parcours.title")}
         >
-          <figure className="mb-5 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
-              <OptimizedImage
-                src={parcoursPhoto}
-                alt={t("parcours.image_alt")}
-                className="home-hero-image"
-                loading="lazy"
-                width={1010}
-                height={288}
-              />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
-            </div>
-          </figure>
           <div className="relative grid gap-4 lg:grid-cols-3">
             <div className="pointer-events-none absolute left-[16.66%] right-[16.66%] top-[30px] hidden h-px bg-neutral-300 lg:block" aria-hidden />
             <div className="pointer-events-none absolute left-[33.33%] top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 lg:block" aria-hidden>
@@ -817,6 +947,20 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             ))}
           </div>
 
+          <figure className="mb-5 mt-10 rounded-2xl border border-neutral-300/70 bg-white p-0 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
+            <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
+              <OptimizedImage
+                src={parcoursPhoto}
+                alt={t("parcours.image_alt")}
+                className="home-hero-image"
+                loading="lazy"
+                width={1010}
+                height={288}
+              />
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.14),rgba(0,0,0,0.02)_55%)]" aria-hidden />
+            </div>
+          </figure>
+
           <div className="mt-10 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <article className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.commissaire_eyebrow")}</p>
@@ -872,29 +1016,6 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           backgroundImageAlt={t("tarifs.image_alt")}
           backgroundImageLayout="full-width"
         >
-          <div className="rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <h3 className="text-sm font-semibold">{t("tarifs.monthly_label")}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-foreground/80">
-                  {t("tarifs.monthly_text")}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-                <h3 className="text-sm font-semibold">{t("tarifs.annual_label")}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-foreground/80">
-                  {t("tarifs.annual_text")}
-                </p>
-              </div>
-            </div>
-            <p className="mt-4 text-xs italic text-muted-foreground">
-              {t("tarifs.data_note_1")}
-            </p>
-            <p className="mt-2 text-xs italic text-muted-foreground">
-              {t("tarifs.data_note_2")}
-            </p>
-          </div>
-
           <div className="mt-7">
             {pricingLoading ? (
               <div className="flex items-center justify-center rounded-3xl border border-neutral-300/70 bg-white p-12 shadow-[0_10px_22px_rgba(0,0,0,0.05)]">
@@ -950,11 +1071,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       badgeLabel = testerBadgeCount === 2 ? t("tarifs.badge_sublimer") : t("tarifs.badge_tester");
                     }
                     return (
-                      <article key={planKey} aria-labelledby={`plan-title-${planKey}`}>
+                      <article key={planKey} aria-labelledby={`plan-title-${planKey}`} className="h-full">
                       <Card
                         className={cn(
-                          "rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
-                          !isHighlight && testerBadgeCount === 2 && "h-[303px]",
+                          "flex h-full min-h-[456px] flex-col rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
                           isHighlight && "ring-1 ring-[rgba(168,23,29,0.22)]",
                         )}
                       >
@@ -984,7 +1104,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             {highlightAimediartWord(subtitle)}
                           </p>
                         </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="flex flex-1 flex-col space-y-3">
                           {variants.length > 1 ? (
                             <div className="space-y-2">
                               <label htmlFor={`plan-variant-${planKey}`} className="block text-xs font-medium text-muted-foreground">
@@ -1018,11 +1138,17 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                   )}
                                 >
                                   <div>
-                                    <div className="text-sm font-semibold leading-snug">
-                                      {isRayonnementCard
-                                        ? highlightAimediartWord(planSummary(displayPlan, t))
-                                        : capacityLabel(selectedVariant, t)}
-                                    </div>
+                                    {isRayonnementCard ? (
+                                      <div className="text-sm leading-snug">
+                                        <div className="font-semibold">{t("tarifs.plan_summary_rayonnement_title")}</div>
+                                        <p className="mt-1 font-normal">{t("tarifs.plan_summary_rayonnement_audience")}</p>
+                                        <p className="mt-1 font-normal italic">{t("tarifs.plan_summary_rayonnement_footer")}</p>
+                                      </div>
+                                    ) : (
+                                      <div className="text-sm font-semibold leading-snug">
+                                        {capacityLabel(selectedVariant, t)}
+                                      </div>
+                                    )}
                                   </div>
                                   {!isRayonnementCard && selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
                                     <span className="rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground/80">
@@ -1063,6 +1189,27 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                     ) : null}
                                   </div>
                                 ) : null}
+                                {(() => {
+                                  const standbyCode = standbyPlanCodeFromDisplay(displayPlan);
+                                  const standbyPrice = standbyCode
+                                    ? optionUnitPrice(selectedVariant, "STANDBY")
+                                    : null;
+                                  if (!standbyCode || typeof standbyPrice !== "number") return null;
+                                  return (
+                                    <StandbyPlanTrigger
+                                      planCode={standbyCode}
+                                      planDisplayName={cardTitleShort}
+                                      monthlyPriceEur={standbyPrice}
+                                    />
+                                  );
+                                })()}
+                                <PlanPricingDetails
+                                  row={selectedVariant}
+                                  t={t}
+                                  locale={i18n.language}
+                                  isRayonnement={isRayonnementCard}
+                                  hideStandbyRow={Boolean(standbyPlanCodeFromDisplay(displayPlan))}
+                                />
                               </div>
                             </div>
                           ) : null}
@@ -1072,6 +1219,32 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     );
                   });
                   })()}
+                </div>
+
+                <div className="mt-7 rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+                      <h3 className="text-sm font-semibold">{t("tarifs.monthly_label")}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-foreground/80">
+                        {t("tarifs.monthly_text")}
+                      </p>
+                      <p className="mt-1 text-sm italic leading-relaxed text-foreground/80">
+                        {t("tarifs.monthly_text_veille_note")}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+                      <h3 className="text-sm font-semibold">{t("tarifs.annual_label")}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-foreground/80">
+                        {t("tarifs.annual_text")}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs italic text-muted-foreground">
+                    {t("tarifs.data_note_1")}
+                  </p>
+                  <p className="mt-2 text-xs italic text-muted-foreground">
+                    {t("tarifs.data_note_2")}
+                  </p>
                 </div>
               </>
             )}
@@ -1084,7 +1257,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           eyebrow={t("access.eyebrow")}
           title={t("access.title")}
         >
-          <p className="max-w-[68ch] text-sm leading-relaxed text-foreground/80">
+          <p className="w-full text-sm leading-relaxed text-foreground/80">
             {t("access.intro")}
           </p>
 
@@ -1136,7 +1309,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             </div>
           </figure>
           <div className="rounded-[2rem] border border-neutral-300/70 bg-[#faf9f7] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-8">
-            <p className="max-w-[70ch] text-sm leading-relaxed text-foreground/80">
+            <p className="w-full text-sm leading-relaxed text-foreground/80">
               {t("contact.text_1")}
               <span className="mt-2 block">
                 {highlightAimediartWord(t("contact.text_2"))}
@@ -1158,7 +1331,12 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           </div>
         </Section>
 
-        <LazyWhenVisible anchorId="connectivite" className="scroll-mt-[5.75rem]" minHeight={320}>
+        <LazyWhenVisible
+          anchorId="connectivite"
+          anchorAliases={["connectivite-challenge"]}
+          className="scroll-mt-[5rem]"
+          minHeight={320}
+        >
           <section>
             <Suspense fallback={<div className="mx-auto w-full max-w-[1060px] px-5 py-16 sm:px-6" aria-hidden style={{ minHeight: 320 }} />}>
               <OrganisationConnexionContent />

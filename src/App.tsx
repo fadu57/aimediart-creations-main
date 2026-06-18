@@ -14,7 +14,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Header from "./components/Header";
+import { StandbyModeNavGuard } from "./components/StandbyModeNavGuard";
 import { BackofficeNavGuard } from "./components/BackofficeNavGuard";
+import { OrganisationStandbyProvider } from "./providers/OrganisationStandbyProvider";
 import { OeuvrePageAccessGuard } from "./components/OeuvrePageAccessGuard";
 import { ArtworkEntryGate } from "./components/visitor/ArtworkEntryGate";
 import { RequireBackoffice } from "./components/RequireBackoffice";
@@ -75,9 +77,9 @@ function NormalizeMultipleSlashPathname() {
 function I18nRouteLoader() {
   const { pathname } = useLocation();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isPublicMarketingPath(pathname)) {
-      void ensureVitrineNamespacesForPath(pathname);
+      ensureVitrineNamespacesForPath(pathname);
       return;
     }
     void ensureFullI18n();
@@ -151,7 +153,7 @@ function VisitorShell() {
 function AdminShell() {
   return (
     <div className="mx-auto w-full max-w-[1200px] text-[#F0F0F0]">
-      <BackofficeNavGuard />
+      <StandbyModeNavGuard />
     </div>
   );
 }
@@ -336,12 +338,14 @@ const App = () => {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <UiLanguageProvider>
             <NavigationMatrixProvider>
+              <OrganisationStandbyProvider>
               <NormalizeMultipleSlashPathname />
               <I18nRouteLoader />
               <VisitorErrorLogCapture />
               <OrganizerErrorLogCapture />
               <AppRoutes />
               <CookieConsentBanner />
+              </OrganisationStandbyProvider>
             </NavigationMatrixProvider>
           </UiLanguageProvider>
         </BrowserRouter>

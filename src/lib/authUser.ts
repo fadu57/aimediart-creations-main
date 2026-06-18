@@ -132,6 +132,52 @@ export function getRoleIdFromJwt(user: User | null): number | null {
   return null;
 }
 
+function parseAuthRoleId(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const n = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Rôle global SaaS (1–3) : JWT app_metadata ou profiles.role_id. */
+export function parseGlobalRoleId(raw: unknown): number | null {
+  const n = parseAuthRoleId(raw);
+  if (n == null || n < 1 || n > 3) return null;
+  return n;
+}
+
+/** Rôle métier agence/expo (4–7) : agency_users.role_id. */
+export function parseAgencyRoleId(raw: unknown): number | null {
+  const n = parseAuthRoleId(raw);
+  if (n == null || n < 4 || n > 7) return null;
+  return n;
+}
+
+/**
+ * Rôle effectif : privilège le plus élevé = role_id le plus bas.
+ * 1. global JWT / profiles (1–3)
+ * 2. agency_users (4–7)
+ * Les deux peuvent coexister (ex. propriétaire + admin organisation).
+ */
+export function resolveMergedAuthRoleId(
+  jwtRoleId: number | null,
+  profileGlobalRoleId: number | null,
+  agencyRoleId: number | null,
+): number | null {
+  const jwtGlobal = parseGlobalRoleId(jwtRoleId);
+  const profileGlobal = parseGlobalRoleId(profileGlobalRoleId);
+  const global =
+    jwtGlobal != null && profileGlobal != null
+      ? Math.min(jwtGlobal, profileGlobal)
+      : jwtGlobal ?? profileGlobal;
+  const agency = parseAgencyRoleId(agencyRoleId);
+
+  if (global != null && agency != null) return Math.min(global, agency);
+  return global ?? agency ?? jwtRoleId ?? profileGlobalRoleId ?? agencyRoleId ?? null;
+}
+
 /**
  * Role affiche pour l'app : priorite a la base (agency_users), sinon metadonnees JWT
  * (fallback si profiles/RLS inaccessible).
@@ -152,6 +198,8 @@ export function mergeRoleFromDbAndJwt(
 
 type UserProfileRow = {
   role_id?: number | string | null;
+  global_role_id?: number | null;
+  agency_role_id?: number | null;
   agency_id?: string | null;
   expo_id?: string | null;
   first_name?: string | null;
@@ -159,7 +207,9 @@ type UserProfileRow = {
 
 function parseRoleId(row: UserProfileRow | null): number | null {
   if (!row) return null;
-  // role_id vient de agency_users.role_id -> roles_user.role_id (source de verite)
+  if (row.global_role_id != null || row.agency_role_id != null) {
+    return resolveMergedAuthRoleId(null, row.global_role_id ?? null, row.agency_role_id ?? null);
+  }
   const raw = row.role_id ?? null;
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string") {
@@ -204,17 +254,9 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
         .limit(1)
         .maybeSingle();
 
-      // Fallback pour les admins globaux (niveaux 1-3) qui n'ont pas de ligne dans agency_users :
-      // leur role_id est dans public.profiles.role_id (colonne à ajouter via migration).
       const profileRoleId = (profileData as { role_id?: number | string | null } | null)?.role_id ?? null;
-      let globalRoleId: number | null = null;
-      if (!agencyData && profileRoleId != null) {
-        if (typeof profileRoleId === "number" && Number.isFinite(profileRoleId)) globalRoleId = profileRoleId;
-        else if (typeof profileRoleId === "string") {
-          const n = Number((profileRoleId as string).trim());
-          if (Number.isFinite(n)) globalRoleId = n;
-        }
-      }
+      const globalRoleId = parseGlobalRoleId(profileRoleId);
+      const agencyRoleId = parseAgencyRoleId(agencyData?.role_id);
 
       // Rattachement expo : prend le plus recent
       const { data: expoData } = await supabase
@@ -227,7 +269,9 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
 
       return {
         first_name: profileData?.first_name ?? null,
-        role_id: agencyData?.role_id ?? globalRoleId,
+        global_role_id: globalRoleId,
+        agency_role_id: agencyRoleId,
+        role_id: resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId),
         agency_id: agencyData?.agency_id ?? null,
         expo_id: expoData?.expo_id ?? null,
       };
@@ -274,13 +318,24 @@ export async function fetchUserRoleFromDb(
   role_name: string | null;
   role_label: string | null;
   role_id: number | null;
+  global_role_id: number | null;
+  agency_role_id: number | null;
   first_name: string | null;
   agency_id: string | null;
   expo_id: string | null;
 }> {
   const profile = await fetchProfileFromUsers(authUserId);
   if (!profile) {
-    return { role_name: null, role_label: null, role_id: null, first_name: null, agency_id: null, expo_id: null };
+    return {
+      role_name: null,
+      role_label: null,
+      role_id: null,
+      global_role_id: null,
+      agency_role_id: null,
+      first_name: null,
+      agency_id: null,
+      expo_id: null,
+    };
   }
 
   const role_id = parseRoleId(profile);
@@ -307,6 +362,8 @@ export async function fetchUserRoleFromDb(
   const first_name = typeof profile.first_name === "string" ? profile.first_name.trim() || null : null;
   const agency_id = typeof profile.agency_id === "string" ? profile.agency_id.trim() || null : null;
   const expo_id = typeof profile.expo_id === "string" ? profile.expo_id.trim() || null : null;
+  const global_role_id = profile.global_role_id ?? parseGlobalRoleId(profile.role_id);
+  const agency_role_id = profile.agency_role_id ?? parseAgencyRoleId(profile.role_id);
 
-  return { role_name, role_label, role_id, first_name, agency_id, expo_id };
+  return { role_name, role_label, role_id, global_role_id, agency_role_id, first_name, agency_id, expo_id };
 }

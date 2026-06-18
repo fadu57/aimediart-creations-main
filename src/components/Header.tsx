@@ -8,6 +8,7 @@ import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { endOrganizerErrorSession, logClientError } from "@/lib/clientErrorLogging";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
 import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
@@ -21,8 +22,8 @@ import { cn } from "@/lib/utils";
 const HEADER_NAV_PILL_BLUR = "backdrop-blur-[12px]";
 /** Pastilles menu desktop — compactes. */
 const HEADER_NAV_PILL_CLASS = `rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors sm:text-sm sm:px-2 sm:py-1 ${HEADER_NAV_PILL_BLUR}`;
-/** Pastilles encore plus serrées (header /organisation fusionné). */
-const HEADER_NAV_PILL_COMPACT_CLASS = `rounded-md px-1 py-0.5 text-[11px] font-medium whitespace-nowrap transition-colors ${HEADER_NAV_PILL_BLUR}`;
+/** Pastilles header /organisation fusionné — taille intermédiaire. */
+const HEADER_NAV_PILL_COMPACT_CLASS = `rounded-md px-1.5 py-0.5 text-[12px] font-medium whitespace-nowrap transition-colors ${HEADER_NAV_PILL_BLUR}`;
 /** Ombre portée + inset pour le bouton de déconnexion. */
 const HEADER_LOGOUT_SHADOW =
   "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.15),inset_0px_4px_12px_0px_rgba(0,0,0,0.15)]";
@@ -126,6 +127,7 @@ export default function Header() {
   const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/organisation";
   const { can } = useNavigationMatrix();
+  const { isStandbyNavRestricted } = useOrganisationStandby();
   const { language, setLanguage } = useUiLanguage();
   const { t } = useTranslation("header");
   const activeLanguage = UI_LANGUAGE_OPTIONS.find((option) => option.value === language) ?? UI_LANGUAGE_OPTIONS[0];
@@ -140,11 +142,33 @@ export default function Header() {
   const hasFullHeader = role_id === 4 || role_id === 1 || (typeof role_id === "number" && role_id >= 1 && role_id <= 6);
   const canSeeHomeMenu = can("menu_home");
   const canSeeSettings = role_id === 1 || role_id === 2 || role_id === 3;
+  const standbyNavOnly = isStandbyNavRestricted;
   const showVitrineNavInHeader =
     Boolean(session) && isOrganisationVitrinePage && !authLoading;
   const showVitrineNavInHeaderDesktop = showVitrineNavInHeader && isDesktopHeader;
   const vitrineAnchorPrefix = pathname === "/organisation" ? "" : "/organisation";
   const navPillClass = showVitrineNavInHeaderDesktop ? HEADER_NAV_PILL_COMPACT_CLASS : HEADER_NAV_PILL_CLASS;
+  const languageInNavRow = showVitrineNavInHeaderDesktop && isDesktopHeader;
+
+  const languageSelector = (
+    <div className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border bg-white px-1.5">
+      <LanguageFlag lang={activeLanguage.value} />
+      <select
+        id={languageInNavRow ? "languageSelectorDesktopNav" : "languageSelector"}
+        value={language}
+        onChange={(e) => setLanguage(e.target.value as UiLanguage)}
+        className="h-7 w-[64px] bg-transparent text-[10px] font-semibold outline-none"
+        aria-label={t("language_label")}
+        title={t("language_label")}
+      >
+        {UI_LANGUAGE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
   const userMeta = (user?.user_metadata as Record<string, unknown> | undefined) ?? {};
   const jwtDisplayName =
     (typeof userMeta.full_name === "string" ? userMeta.full_name.trim() : "") ||
@@ -247,7 +271,7 @@ export default function Header() {
             : cn(
                 "mx-auto flex w-full py-1",
                 showVitrineNavInHeaderDesktop
-                  ? "max-w-[1060px] flex-col px-5 py-2 sm:px-6 min-h-[5.75rem]"
+                  ? "max-w-[1060px] flex-col px-5 py-1 sm:px-6 min-h-[5rem]"
                   : "max-w-[1200px] items-center justify-between gap-2 px-2 sm:px-4 min-h-[4.25rem]",
               )
         }
@@ -256,7 +280,7 @@ export default function Header() {
           className={cn(
             "flex w-full gap-2",
             showVitrineNavInHeaderDesktop
-              ? "items-start justify-between px-2 sm:px-3"
+              ? "items-center justify-between px-2 sm:px-3"
               : "items-center justify-between",
           )}
         >
@@ -267,25 +291,10 @@ export default function Header() {
           )}
         >
           <Logo compact={isAuthFormPage} role_name={role_name} role_id={role_id} />
-          <div className="user-controls flex flex-col items-start gap-1">
-            <div className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-1.5">
-              <LanguageFlag lang={activeLanguage.value} />
-              <select
-                id="languageSelector"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as UiLanguage)}
-                className="h-7 w-[64px] bg-transparent text-[10px] font-semibold outline-none"
-                aria-label={t("language_label")}
-                title={t("language_label")}
-              >
-                {UI_LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {!isDesktopHeader && (
+          {!languageInNavRow ? (
+            <div className="user-controls flex flex-col items-start gap-1">
+              {languageSelector}
+              {!isDesktopHeader && (
               <span className="hidden min-[400px]:inline whitespace-nowrap text-[11px] text-gray-700">
                 {t("greeting")}
                 {session ? (
@@ -307,16 +316,18 @@ export default function Header() {
                 )}
               </span>
             )}
-          </div>
+            </div>
+          ) : null}
         </div>
         {isDesktopHeader && (
           <div
             className={cn(
-              "hidden min-w-0 flex-col gap-0.5 xl:flex",
-              showVitrineNavInHeaderDesktop ? "shrink-0 items-end" : "ml-4 shrink-0 items-end",
+              "hidden min-w-0 flex-col xl:flex",
+              showVitrineNavInHeaderDesktop ? "shrink-0 items-end gap-0" : "ml-4 shrink-0 items-end gap-0.5",
             )}
           >
-            <nav className="flex flex-nowrap items-center justify-end gap-0.5">
+            <nav className="flex flex-nowrap items-center justify-end gap-1">
+              {languageInNavRow ? languageSelector : null}
               <NavLink
                 to="/organisation"
                 className={({ isActive }) =>
@@ -327,7 +338,8 @@ export default function Header() {
               >
                 {t("nav_accueil")}
               </NavLink>
-              {hasFullHeader &&
+              {!standbyNavOnly &&
+                hasFullHeader &&
                 HEADER_NAV_ITEMS.map((item) => {
                   if (item.key === "menu_home") return null;
                   if (hideOrganisationNav && item.key === "menu_agence") return null;
@@ -347,18 +359,25 @@ export default function Header() {
                   );
                 })}
               {canSeeHomeMenu && (
-                <NavLink
-                  to={homePath}
-                  className={({ isActive }) =>
-                    `${navPillClass} ${
-                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                    }`
-                  }
-                >
-                  {t("nav_home")}
-                </NavLink>
+                <div className="inline-flex items-center gap-1.5">
+                  <NavLink
+                    to={homePath}
+                    className={({ isActive }) =>
+                      `${navPillClass} ${
+                        isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                      }`
+                    }
+                  >
+                    {t("nav_home")}
+                  </NavLink>
+                  {standbyNavOnly ? (
+                    <span className="rounded-full border border-amber-400/90 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                      {t("standby_mode_badge")}
+                    </span>
+                  ) : null}
+                </div>
               )}
-              {hasFullHeader && canSeeSettings && (
+              {!standbyNavOnly && hasFullHeader && canSeeSettings && (
                 <SettingsMenuDropdown triggerClassName={navPillClass} />
               )}
               {session && !isAuthFormPage ? (
@@ -385,7 +404,7 @@ export default function Header() {
               )}
             </nav>
             {showVitrineNavInHeaderDesktop ? (
-              <div className="flex justify-end pt-0.5">
+              <div className="flex items-center justify-end gap-3">
                 <div className="rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
                   <VitrineAnchorNav
                     vitrinePathPrefix={vitrineAnchorPrefix}
@@ -393,28 +412,54 @@ export default function Header() {
                     align="end"
                   />
                 </div>
+                {session ? (
+                  <Link
+                    to={homePath}
+                    className="whitespace-nowrap text-[11px] text-gray-700 transition-colors hover:text-foreground"
+                  >
+                    {t("greeting")}{" "}
+                    {authLoading ? (
+                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
+                    ) : (
+                      <span id="display_user_prenom" className="font-semibold">
+                        {displayUserPrenom}
+                        {showGreetingAgency && agencyDisplayName
+                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                          : null}
+                      </span>
+                    )}
+                  </Link>
+                ) : (
+                  <span className="whitespace-nowrap text-[11px] text-gray-700">
+                    {t("greeting")}
+                  </span>
+                )}
               </div>
-            ) : null}
-            <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
-              {t("greeting")}
-              {session ? (
-                <>
-                  {" "}
-                  {authLoading ? (
-                    <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
-                  ) : (
-                    <span id="display_user_prenom" className="font-semibold">
-                      {displayUserPrenom}
-                      {showGreetingAgency && agencyDisplayName
-                        ? t("greeting_agency_suffix", { agency: agencyDisplayName })
-                        : null}
-                    </span>
-                  )}
-                </>
-              ) : (
-                ""
-              )}
-            </span>
+            ) : (
+              <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
+                {t("greeting")}
+                {session ? (
+                  <>
+                    {" "}
+                    {authLoading ? (
+                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
+                    ) : (
+                      <Link
+                        to={homePath}
+                        className="font-semibold transition-colors hover:text-foreground"
+                      >
+                        {displayUserPrenom}
+                        {showGreetingAgency && agencyDisplayName
+                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                          : null}
+                      </Link>
+                    )}
+                  </>
+                ) : (
+                  ""
+                )}
+              </span>
+            )}
           </div>
         )}
         {!isDesktopHeader && (
@@ -432,10 +477,14 @@ export default function Header() {
               {canSeeHomeMenu && (
                 <NavLink to={homePath} className="fab-item" title={t("nav_home")} onClick={() => setIsFabOpen(false)}>
                   <House className="h-5 w-5 text-[#121212]" aria-hidden />
-                  <span className="fab-item-label">{t("nav_home")}</span>
+                  <span className="fab-item-label">
+                    {t("nav_home")}
+                    {standbyNavOnly ? ` · ${t("standby_mode_badge")}` : ""}
+                  </span>
                 </NavLink>
               )}
-              {hasFullHeader &&
+              {!standbyNavOnly &&
+                hasFullHeader &&
                 HEADER_NAV_ITEMS.map((item) => {
                   if (item.key === "menu_home") return null;
                   if (hideOrganisationNav && item.key === "menu_agence") return null;
@@ -465,7 +514,7 @@ export default function Header() {
                     </NavLink>
                   );
                 })}
-              {hasFullHeader && canSeeSettings && (
+              {!standbyNavOnly && hasFullHeader && canSeeSettings && (
                 <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
               )}
               {showVitrineNavInHeader ? (

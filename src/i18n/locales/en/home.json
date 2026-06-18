@@ -11,7 +11,7 @@
     "anchor_parcours": "Journey",
     "anchor_tarifs": "Pricing",
     "anchor_accessibilite": "Accessibility",
-    "anchor_connectivite": "Connectivity"
+    "anchor_connectivite": "No network?"
   },
   "hero": {
     "eyebrow": "Invisible feedback · Living exhibition",
@@ -24,6 +24,27 @@
     "feature_qr_text": "A web app: scan, converse, feel.",
     "feature_lang_label": "Adaptive language",
     "feature_lang_text": "Expert, Poet, Child, FALC… the tone follows the visitor.",
+    "ai_generation": {
+      "button": "AI generates… humans stay in control",
+      "title": "How AI generates your texts",
+      "intro": "To generate texts with AI, you need to provide context, clear and explicit instructions, and goals to achieve… otherwise the AI will invent, say anything, or \"hallucinate\".",
+      "workflow_title": "Workflow: expertise honed over several years",
+      "workflow_steps": [
+        "Prompt to generate the artist's bio (the more well-known the artist, the more precise it is)",
+        "Generated bio",
+        "Prompt to analyze the artwork photo against 5 criteria",
+        "Generated artwork description",
+        "Prompt to generate the 8 mediation texts",
+        "8 generated mediation texts"
+      ],
+      "dependency_1": "The 8 mediation texts can only be effectively generated <qs>if</qs> the artwork description has been generated first.",
+      "dependency_2": "The artwork description can only be effectively generated <qs>if</qs> the artist's bio has been generated first.",
+      "editable_title": "You stay in control",
+      "editable_body": "Regardless, ALL AI-generated texts are fully editable. And if you really don't like the generated text, you can write your own from scratch.",
+      "persona_warning": "Note: the different generated personas may be difficult to adapt. Edit and write with care…",
+      "closing": "<i>AI can generate </i><r>anything</r><r> if you ask it </r><i>anything!</i>",
+      "close": "Got it"
+    },
     "feature_hearts_label": "Hearts & emotions",
     "feature_hearts_text": "Narrative 'likes' that feed the exhibition in real time.",
     "image_alt": "Visitors observing artworks in a gallery",
@@ -41,6 +62,8 @@
   "oreille": {
     "eyebrow": "Invisible feedback",
     "title": "The attentive ear, the natural continuation of dialogue",
+    "title_line1": "The attentive ear,",
+    "title_line2": "the natural continuation of dialogue",
     "image_alt": "Illustration — mediation and listening within the exhibition",
     "text_1": "The 'survey' is no longer a blunt interruption between rooms. AIMEDIArt reads immediate reactions, the intonations of free-form text, the heartbeats given to a work: without any imposed questionnaire, the system understands, for example, that a technique surprised, moved, or clarified something for the visitor.",
     "text_2": "For the venue and its partners, it's a report that speaks of effectiveness and engagement — the exhibition's 'pulse' in real time. For the artist and curator, it's a living dashboard: adjusting a light, refining a label, responding from the studio when the room murmurs its incomprehension or wonder."
@@ -116,6 +139,7 @@
     "image_alt": "Visitor looking at a large landscape mountain print in a gallery",
     "monthly_label": "Monthly payment",
     "monthly_text": "Flexibility. Cancellable at the end of the event.",
+    "monthly_text_veille_note": "Before cancelling, consider the STANDBY plan…",
     "annual_label": "Annual payment",
     "annual_text": "Price advantage. The most peaceful for keeping your catalogue and artwork files.",
     "data_note_1": "On cancellation, access remains active until the end of the paid period. After that, data is permanently deleted.",
@@ -145,6 +169,26 @@
     "capacity_unlimited": "∞ artworks · ∞ visitors",
     "capacity_oeuvres": "{{count}} artworks max",
     "capacity_visitors": "{{count}} visitors max",
+    "capacity_suffix_one_month": " - 1 month max",
+    "option_standby": "Standby plan",
+    "option_languages": "Languages",
+    "option_audio": "Audio guide",
+    "option_usage": "Usage",
+    "usage_none": "—",
+    "usage_limited_one_month": "Limited to 1 month",
+    "usage_no_limit": "No usage limit",
+    "usage_custom_event": "1 major event / network",
+    "languages_included_one": "{{count}} included",
+    "languages_included_range": "{{min}} to {{max}} included",
+    "languages_included_many": "{{count}} included",
+    "languages_extra": "+{{price}}/extra language",
+    "languages_extra_none": "—",
+    "languages_custom": "Tailored",
+    "audio_none": "No",
+    "audio_included_one": "1 language included",
+    "audio_included_many": "{{count}} languages included",
+    "audio_extra": "+{{price}}/extra language",
+    "standby_price": "{{price}}/month",
     "per_month": "€/month",
     "per_year": "€/year",
     "plan_name_etincelle": "Spark",
@@ -154,7 +198,106 @@
     "plan_summary_etincelle": "Exhibition powered by a focused selection of works",
     "plan_summary_atelier": "Fixed catalogue, enriched mediation throughout the exhibition",
     "plan_summary_horizon": "Multiple projects, evolving catalogue, ambitious structure",
-    "plan_summary_rayonnement": "Major tailor-made event — unlimited capacity and support"
+    "plan_summary_rayonnement": "Major tailor-made event — unlimited capacity and support",
+    "plan_summary_rayonnement_title": "Major tailor-made event",
+    "plan_summary_rayonnement_audience": "Festivals, biennials, fairs, international trade shows, major art museums, cultural exhibition networks",
+    "plan_summary_rayonnement_footer": "Capacity and support tailored to your needs"
+  },
+  "standby_modal": {
+    "trigger_label": "STANDBY PLAN",
+    "trigger_label_line1": "The \"STANDBY\" Plan",
+    "trigger_label_line2": "What is it?",
+    "close": "Close",
+    "title": "Put your exhibition on standby",
+    "badge": "Continuity — {{plan}} plan",
+    "subtitle": "Standby is not a shutdown: it is a smart pause between active periods that keeps your data and makes reactivation simple.",
+    "essentials_title": "Key points",
+    "essentials_items": [
+      "The standby plan is billed monthly.",
+      "Switching to standby takes effect at your next billing date.",
+      "Your data and back office remain accessible.",
+      "You can reactivate your active plan whenever you wish."
+    ],
+    "purpose_title": "What is the standby plan for?",
+    "purpose_text": "When the exhibition is no longer open to the public, standby keeps your organisation space alive at a reduced cost while preserving catalogue, artwork records and history.",
+    "when_title": "When to use it?",
+    "when_items": [
+      "Between two exhibitions in the same season",
+      "During temporary closure or refurbishment",
+      "Between tours or residencies",
+      "While preparing the next show without public access yet",
+      "To keep catalogue and settings without a full active subscription"
+    ],
+    "eligibility_title": "Eligibility",
+    "eligibility_intro": "Standby is available for monthly Studio and Horizon subscriptions only.",
+    "eligibility_items": [
+      "Available only for Studio and Horizon on monthly billing",
+      "Not available on Spark",
+      "Not available on annual subscriptions",
+      "The “1½ months free” discount applies to active annual subscriptions only"
+    ],
+    "commercial_logic_title": "Monthly vs annual: two complementary approaches",
+    "commercial_monthly_label": "Monthly subscription",
+    "commercial_monthly_text": "Flexibility aligned with your exhibition schedule, with standby between active periods.",
+    "commercial_annual_label": "Annual subscription",
+    "commercial_annual_text": "Commitment over the year, with the “1½ months free” pricing advantage.",
+    "commercial_no_cumul": "You cannot combine standby flexibility with the annual pricing advantage: choose monthly flexibility or annual savings.",
+    "accessible_title": "What stays available",
+    "accessible_items": [
+      "Your back office and organisation account",
+      "Your artwork catalogue and records",
+      "Your data, statistics and mediation history",
+      "Administrative continuity of your space",
+      "Simple reactivation when you are ready"
+    ],
+    "changes_title": "What changes during standby",
+    "changes_items": [
+      "The exhibition is no longer publicly active for visitors",
+      "Visitor journey (QR, in-room mediation) is suspended",
+      "Features tied to a live exhibition are not deployed",
+      "You switch to a lighter standby monthly rate"
+    ],
+    "compare_title": "Active plan vs Standby plan",
+    "compare_active": "Active plan",
+    "compare_standby": "Standby plan",
+    "compare_rows": [
+      {
+        "label": "Open to the public",
+        "active": "Yes — mediation and visitor journey active",
+        "standby": "No — exhibition on pause"
+      },
+      {
+        "label": "Data & catalogue",
+        "active": "Kept and enriched",
+        "standby": "Fully preserved"
+      },
+      {
+        "label": "Back office",
+        "active": "Full",
+        "standby": "Accessible"
+      },
+      {
+        "label": "Monthly rate",
+        "active": "Active plan pricing",
+        "standby": "Reduced standby rate"
+      },
+      {
+        "label": "Reactivation",
+        "active": "—",
+        "standby": "Simple, no heavy reconfiguration"
+      }
+    ],
+    "pricing_title": "Standby pricing",
+    "pricing_current": "{{plan}}: {{price}}/month on standby",
+    "pricing_note": "Standby applies to your current monthly plan (Studio or Horizon). It is not a main subscription — it ensures continuity between active periods.",
+    "pricing_atelier": "Studio — standby: €19/month",
+    "pricing_horizon": "Horizon — standby: €49/month",
+    "pricing_etincelle": "Spark — no standby plan (limited trial)",
+    "pricing_rayonnement": "Radiance — tailored per contract",
+    "reactivation_title": "Reactivation",
+    "reactivation_text": "When your next exhibition is ready, switch back to an active plan from your organisation space. Your artworks, settings and history are already there.",
+    "cta_primary": "Switch to standby",
+    "cta_secondary": "Keep my active plan"
   },
   "access": {
     "intro": "Scan near the artwork, no app to install: the web-app opens, offers reading profiles (child, expert, poet, plain language…) or follows the phone’s language, then brings the visitor back to feedback without ever breaking their flow.",
@@ -263,20 +406,24 @@
       "zip_code": "Postcode",
       "city": "City",
       "contact_phone": "Contact phone",
+      "preferred_contact_time": "What is the best time to contact you? (date, time, …)",
       "need_description": "Description of my needs (room type, floor area, …)",
       "floor_plan": "I'm sending you a plan of my room or exhibition venue",
       "floor_plan_accept": "Accepted files: .pdf, .png, .jpg",
       "cancel": "Cancel",
       "submit": "Send",
-      "success_title": "Request sent",
-      "success_body": "Thank you! Your quote request has been submitted. Our team will contact you shortly.",
+      "success_title": "Quote request",
+      "success_body": "Got it, thank you very much! Your message has reached us safely. We'll get back to you shortly to follow up, and we'll do our best to contact you during any time slots you may have shared with us.",
       "success_ok": "OK",
       "error_required": "Please fill in all required fields.",
       "error_email": "Invalid email address.",
+      "error_phone": "Invalid phone number for the selected country.",
       "error_auth": "Session expired. Please sign in again.",
       "error_table": "Unable to save: apply migration_78 on Supabase.",
       "error_submit": "Unable to send: {{message}}",
-      "warn_floor_plan": "Request saved, but the floor plan could not be uploaded."
+      "warn_floor_plan": "Request saved, but the floor plan could not be uploaded.",
+      "warn_email": "Request saved, but emails could not be sent. Check Resend (RESEND_API_KEY, aimediart.com domain verified).",
+      "warn_email_detail": "Request saved, but emails could not be sent: {{detail}}"
     }
   }
 }

@@ -30,5 +30,14 @@
   "settings_submenu_trash_expos": "Expos",
   "settings_submenu_trash_visitors": "Visiteurs",
   "logout": "Déconnexion",
-  "login": "Connexion"
+  "login": "Connexion",
+  "standby_mode_badge": "Mode veille activé",
+  "standby_mode_active_title": "Plan veille demandé",
+  "standby_mode_active_desc": "Votre espace est en mode veille : seuls Accueil et votre profil restent accessibles. Vos données et votre back-office sont conservés.",
+  "standby_mode_effective_at": "Prise d'effet prévue à la prochaine échéance : {{date}}.",
+  "standby_cancel_cta": "Annuler la demande de veille",
+  "standby_cancel_loading": "Annulation…",
+  "standby_cancel_success": "Demande de plan veille annulée.",
+  "standby_cancel_error": "Impossible d'annuler la demande de veille.",
+  "standby_cancel_closed": "Le délai de rétractation de 24 h est écoulé ou la nouvelle échéance a démarré."
 }

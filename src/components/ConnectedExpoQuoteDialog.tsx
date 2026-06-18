@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,20 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 
 async function submitConnectedExpoQuote(
   values: ConnectedExpoQuoteFormValues,
   floorPlanFile: File | null,
-): Promise<{ warn_floor_plan?: boolean }> {
+): Promise<{ warn_floor_plan?: boolean; warn_email?: boolean; email_errors?: string[] }> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
   if (!supabaseUrl || !anonKey) {
@@ -43,6 +35,9 @@ async function submitConnectedExpoQuote(
   if (values.address.trim()) formData.append("address", values.address.trim());
   if (values.zip_code.trim()) formData.append("zip_code", values.zip_code.trim());
   if (values.city.trim()) formData.append("city", values.city.trim());
+  if (values.preferred_contact_time.trim()) {
+    formData.append("preferred_contact_time", values.preferred_contact_time.trim());
+  }
   if (floorPlanFile) formData.append("floor_plan", floorPlanFile);
 
   const res = await fetch(`${supabaseUrl}/functions/v1/connected-expo-quote`, {
@@ -57,11 +52,17 @@ async function submitConnectedExpoQuote(
   const payload = (await res.json().catch(() => ({}))) as {
     error?: string;
     warn_floor_plan?: boolean;
+    warn_email?: boolean;
+    email_errors?: string[];
   };
   if (!res.ok) {
     throw new Error(payload.error ?? `HTTP ${res.status}`);
   }
-  return { warn_floor_plan: payload.warn_floor_plan };
+  return {
+    warn_floor_plan: payload.warn_floor_plan,
+    warn_email: payload.warn_email,
+    email_errors: payload.email_errors,
+  };
 }
 
 export type ConnectedExpoQuoteFormValues = {
@@ -72,6 +73,7 @@ export type ConnectedExpoQuoteFormValues = {
   zip_code: string;
   city: string;
   contact_phone: string;
+  preferred_contact_time: string;
   need_description: string;
 };
 
@@ -79,6 +81,12 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultOrgName?: string;
+  /** Titre du dialogue (défaut : Pack connexion). */
+  title?: string;
+  /** Afficher le champ plan de salle (défaut : true). */
+  showFloorPlan?: boolean;
+  /** Libellé du champ description (défaut : Pack connexion). */
+  needDescriptionLabel?: string;
 };
 
 const EMPTY: ConnectedExpoQuoteFormValues = {
@@ -89,8 +97,19 @@ const EMPTY: ConnectedExpoQuoteFormValues = {
   zip_code: "",
   city: "",
   contact_phone: "",
+  preferred_contact_time: "",
   need_description: "",
 };
+
+const DIALOG_CLASS =
+  "box-border flex h-[min(800px,90vh)] w-[calc(100vw-2rem)] !max-w-[700px] max-w-[700px] flex-col gap-4 overflow-x-hidden overflow-y-hidden p-4 sm:p-6";
+const FORM_CLASS =
+  "flex min-h-0 w-full min-w-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto [&_input]:box-border [&_input]:min-w-0 [&_input]:max-w-full [&_input]:w-full [&_input]:focus-visible:outline-none [&_input]:focus-visible:ring-2 [&_input]:focus-visible:ring-inset [&_input]:focus-visible:ring-ring [&_input]:focus-visible:ring-offset-0 [&_textarea]:box-border [&_textarea]:min-w-0 [&_textarea]:max-w-full [&_textarea]:w-full [&_textarea]:focus-visible:outline-none [&_textarea]:focus-visible:ring-2 [&_textarea]:focus-visible:ring-inset [&_textarea]:focus-visible:ring-ring [&_textarea]:focus-visible:ring-offset-0";
+const FIELD_CLASS = "flex w-full min-w-0 flex-col gap-1.5";
+const INPUT_CLASS =
+  "pl-6 pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-0";
+const TEXTAREA_CLASS =
+  "h-[200px] resize-y pl-6 pr-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-0";
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -104,12 +123,17 @@ export function ConnectedExpoQuoteDialog({
   open,
   onOpenChange,
   defaultOrgName = "",
+  title,
+  showFloorPlan = true,
+  needDescriptionLabel,
 }: Props) {
   const { t } = useTranslation("home");
+  const dialogTitle = title?.trim() || t("connexion.form.title");
+  const needLabel = needDescriptionLabel?.trim() || t("connexion.form.need_description");
   const [values, setValues] = useState<ConnectedExpoQuoteFormValues>(EMPTY);
   const [floorPlanFile, setFloorPlanFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [successOpen, setSuccessOpen] = useState(false);
+  const [phoneValid, setPhoneValid] = useState(true);
 
   useEffect(() => {
     if (!open) return;
@@ -129,6 +153,7 @@ export function ConnectedExpoQuoteDialog({
       org_name: defaultOrgName.trim(),
     });
     setFloorPlanFile(null);
+    setPhoneValid(true);
   }, [defaultOrgName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -147,6 +172,10 @@ export function ConnectedExpoQuoteDialog({
       toast.error(t("connexion.form.error_email"));
       return;
     }
+    if (!phoneValid) {
+      toast.error(t("connexion.form.error_phone"));
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -154,13 +183,41 @@ export function ConnectedExpoQuoteDialog({
       if (result.warn_floor_plan) {
         toast.warning(t("connexion.form.warn_floor_plan"));
       }
+      if (result.warn_email) {
+        const detail = result.email_errors?.filter(Boolean).join(" — ");
+        toast.warning(
+          detail
+            ? t("connexion.form.warn_email_detail", { detail })
+            : t("connexion.form.warn_email"),
+        );
+      }
 
       onOpenChange(false);
       resetForm();
-      setSuccessOpen(true);
+      toast.custom(
+        () => (
+          <div
+            role="status"
+            aria-live="polite"
+            className="w-[700px] max-w-[calc(100vw-2rem)] rounded-xl border-2 border-[hsl(var(--gold))] bg-white px-6 py-5 shadow-[0_8px_32px_hsl(var(--gold)/0.28)]"
+          >
+            <p className="text-lg font-semibold leading-snug text-neutral-950">
+              {t("connexion.form.success_title")}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-800">
+              {t("connexion.form.success_body")}
+            </p>
+          </div>
+        ),
+        {
+          duration: 10_000,
+          unstyled: true,
+          className: "sonner-quote-success-toast",
+        },
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (/connected_expo_quote_requests/i.test(msg)) {
+      if (/relation ["']?connected_expo_quote_requests["']? does not exist/i.test(msg)) {
         toast.error(t("connexion.form.error_table"));
       } else {
         toast.error(t("connexion.form.error_submit", { message: msg }));
@@ -173,37 +230,39 @@ export function ConnectedExpoQuoteDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{t("connexion.form.title")}</DialogTitle>
+        <DialogContent className={DIALOG_CLASS}>
+          <DialogHeader className="shrink-0">
+            <DialogTitle>{dialogTitle}</DialogTitle>
             <p className="text-xs font-normal italic text-[#E63946]">{t("connexion.form.required_hint")}</p>
           </DialogHeader>
-          <form className="flex flex-col gap-4" onSubmit={(e) => void handleSubmit(e)}>
-            <div className="flex flex-col gap-1.5">
+          <form className={FORM_CLASS} onSubmit={(e) => void handleSubmit(e)}>
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-org">
                 {t("connexion.form.org_name")}
                 <RequiredAsterisk />
               </Label>
               <Input
                 id="ceq-org"
+                className={INPUT_CLASS}
                 value={values.org_name}
                 onChange={(e) => setField("org_name", e.target.value)}
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-contact">
                 {t("connexion.form.contact_name")}
                 <RequiredAsterisk />
               </Label>
               <Input
                 id="ceq-contact"
+                className={INPUT_CLASS}
                 value={values.contact_name}
                 onChange={(e) => setField("contact_name", e.target.value)}
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-email">
                 {t("connexion.form.contact_email")}
                 <RequiredAsterisk />
@@ -211,74 +270,92 @@ export function ConnectedExpoQuoteDialog({
               <Input
                 id="ceq-email"
                 type="email"
+                className={INPUT_CLASS}
                 value={values.contact_email}
                 onChange={(e) => setField("contact_email", e.target.value)}
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-address">{t("connexion.form.address")}</Label>
               <Input
                 id="ceq-address"
+                className={INPUT_CLASS}
                 value={values.address}
                 onChange={(e) => setField("address", e.target.value)}
               />
             </div>
-            <div className="flex flex-wrap gap-3">
-              <div className="flex min-w-[120px] flex-1 flex-col gap-1.5">
+            <div className="grid w-full min-w-0 max-w-full grid-cols-1 gap-3 sm:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+              <div className={FIELD_CLASS}>
                 <Label htmlFor="ceq-zip">{t("connexion.form.zip_code")}</Label>
                 <Input
                   id="ceq-zip"
+                  className={INPUT_CLASS}
                   value={values.zip_code}
                   onChange={(e) => setField("zip_code", e.target.value)}
                 />
               </div>
-              <div className="flex min-w-[160px] flex-[2] flex-col gap-1.5">
+              <div className={FIELD_CLASS}>
                 <Label htmlFor="ceq-city">{t("connexion.form.city")}</Label>
                 <Input
                   id="ceq-city"
+                  className={INPUT_CLASS}
                   value={values.city}
                   onChange={(e) => setField("city", e.target.value)}
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-phone">
                 {t("connexion.form.contact_phone")}
                 <RequiredAsterisk />
               </Label>
-              <Input
+              <SmartPhoneInput
                 id="ceq-phone"
-                type="tel"
                 value={values.contact_phone}
-                onChange={(e) => setField("contact_phone", e.target.value)}
-                required
+                onChange={(value) => setField("contact_phone", value)}
+                onValidityChange={setPhoneValid}
+                disabled={submitting}
+                className="w-full [&_button]:h-10 [&_input]:h-10 [&_input]:text-sm"
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className={FIELD_CLASS}>
+              <Label htmlFor="ceq-contact-time">{t("connexion.form.preferred_contact_time")}</Label>
+              <Input
+                id="ceq-contact-time"
+                className={INPUT_CLASS}
+                value={values.preferred_contact_time}
+                onChange={(e) => setField("preferred_contact_time", e.target.value)}
+              />
+            </div>
+            <div className={FIELD_CLASS}>
               <Label htmlFor="ceq-need">
-                {t("connexion.form.need_description")}
+                {needLabel}
                 <RequiredAsterisk />
               </Label>
               <Textarea
                 id="ceq-need"
-                rows={4}
+                rows={showFloorPlan ? 4 : 6}
+                className={TEXTAREA_CLASS}
                 value={values.need_description}
                 onChange={(e) => setField("need_description", e.target.value)}
                 required
               />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="ceq-plan">{t("connexion.form.floor_plan")}</Label>
-              <p className="text-xs text-muted-foreground">{t("connexion.form.floor_plan_accept")}</p>
-              <Input
-                id="ceq-plan"
-                type="file"
-                accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
-                onChange={(e) => setFloorPlanFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            <DialogFooter className="gap-2 sm:gap-0">
+            {showFloorPlan ? (
+              <div className={FIELD_CLASS}>
+                <Label htmlFor="ceq-plan">{t("connexion.form.floor_plan")}</Label>
+                <p className="text-xs text-muted-foreground">{t("connexion.form.floor_plan_accept")}</p>
+                <Input
+                  id="ceq-plan"
+                  type="file"
+                  className="pl-3 pr-3"
+                  accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                  onChange={(e) => setFloorPlanFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            ) : null}
+            <DialogFooter className="mt-auto w-full min-w-0 shrink-0 gap-2 sm:gap-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
                 {t("connexion.form.cancel")}
               </Button>
@@ -290,18 +367,6 @@ export function ConnectedExpoQuoteDialog({
           </form>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("connexion.form.success_title")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("connexion.form.success_body")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction>{t("connexion.form.success_ok")}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

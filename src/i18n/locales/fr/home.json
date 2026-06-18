@@ -11,7 +11,7 @@
     "anchor_parcours": "Parcours",
     "anchor_tarifs": "Tarifs",
     "anchor_accessibilite": "Accessibilité",
-    "anchor_connectivite": "Connectivité"
+    "anchor_connectivite": "Pas de réseau ?"
   },
   "hero": {
     "eyebrow": "Feedback invisible · Exposition vivante",
@@ -24,6 +24,27 @@
     "feature_qr_text": "Une web-app : scanner, dialoguer, ressentir.",
     "feature_lang_label": "Langage adapté",
     "feature_lang_text": "Expert, Poète, Enfant, FALC… le ton suit le visiteur.",
+    "ai_generation": {
+      "button": "L'IA génère ... l'humain contrôle",
+      "title": "Comment l'IA génère vos textes",
+      "intro": "Pour générer des textes par une IA, il faut donner du contexte, des consignes claires et explicites, des objectifs à atteindre… sinon l'IA va inventer, dire n'importe quoi, « halluciner ».",
+      "workflow_title": "Workflow : un savoir-faire de plusieurs années mis en œuvre",
+      "workflow_steps": [
+        "Prompt pour générer la bio de l'artiste (plus l'artiste est connu, plus c'est précis)",
+        "Bio générée",
+        "Prompt pour analyser la photo de l'œuvre selon 5 critères",
+        "Description de l'œuvre générée",
+        "Prompt pour générer les 8 textes de médiation",
+        "8 textes de médiation générés"
+      ],
+      "dependency_1": "Les 8 textes de médiation ne pourront être efficacement générés <qs>que si</qs> préalablement la description de l'œuvre a été générée.",
+      "dependency_2": "La description de l'œuvre ne pourra être efficacement générée <qs>que si</qs> préalablement la bio de l'artiste a été générée.",
+      "editable_title": "Vous gardez la main",
+      "editable_body": "TOUS les textes générés par l'IA sont totalement MODIFIABLES\nSi le texte généré ne plaît vraiment pas, il est possible de rédiger votre propre texte.",
+      "persona_warning": "Attention : les différentes personas générées seront peut-être difficiles à adapter. Il faut modifier, rédiger avec prudence…",
+      "closing": "<i>L'IA peut générer </i><r>n'importe quoi</r><r> si on lui demande </r><i>n'importe quoi !</i>",
+      "close": "J'ai compris"
+    },
     "feature_hearts_label": "Cœurs & émotions",
     "feature_hearts_text": "Des « likes » narratifs qui nourrissent l'expo en direct.",
     "image_alt": "Visiteurs observant des œuvres dans une galerie",
@@ -34,6 +55,9 @@
   "exposition": {
     "eyebrow": "Une exposition qui vibre",
     "title": "Le feedback devient une respiration collective",
+    "title_line1": "Le feedback * devient",
+    "title_line2": "une respiration collective",
+    "title_note": "* Les réactions des visiteurs",
     "image_alt": "Visiteurs au sein d'une installation d'exposition, bannières et espace immersif",
     "text_1": "AIMEDIArt est une écoute scénographique : ce que la plupart des expositions devinent à peine — le vrai ressenti — devient une matière visible et partagée. Le visiteur ne « remplit » rien : il poursuit la conversation commencée devant l'œuvre.",
     "text_2": "Un écran qui n'affiche pas des statistiques froides ; il révèle le pouls de la salle. Même dans un silence feutré, on voit l'activité émotionnelle bouillonner : cela rassure, invite à s'attarder, et replace chaque regard au centre du récit."
@@ -41,6 +65,8 @@
   "oreille": {
     "eyebrow": "Feedback invisible",
     "title": "L'oreille attentive, la suite naturelle du dialogue",
+    "title_line1": "L'oreille attentive,",
+    "title_line2": "la suite naturelle du dialogue",
     "image_alt": "Illustration — médiation et écoute au sein de l'exposition",
     "text_1": "Le « sondage » n'est plus une irruption brutale entre deux salles. AIMEDIArt lit les réactions immédiates, les intonations du texte libre, les battements de cœurs donnés à une œuvre : sans questionnaire imposé, le système comprend par exemple qu'une technique a surpris, ému ou clarifié quelque chose pour le visiteur.",
     "text_2": "Pour le lieu et les partenaires, c'est un rapport qui parle d'efficacité et d'engagement — le « pouls » de l'expo en direct. Pour l'artiste et le curateur, c'est un tableau de bord vivant : ajuster une lumière, préciser un cartel, répondre depuis l'atelier quand la salle murmure son incompréhension ou son émerveillement."
@@ -116,6 +142,7 @@
     "image_alt": "Visiteur observant un grand tirage paysage montagne dans une galerie",
     "monthly_label": "Paiement mensuel",
     "monthly_text": "Souplesse. Résiliable à la fin de l'événement.",
+    "monthly_text_veille_note": "Avant de résilier, voyez quand même le plan VEILLE…",
     "annual_label": "Paiement annuel",
     "annual_text": "Avantage tarifaire. Le plus serein pour conserver catalogue et fiches d'œuvres.",
     "data_note_1": "En cas de résiliation, l'accès reste actif jusqu'à la fin de la période payée. À son terme, les données sont supprimées définitivement.",
@@ -145,6 +172,26 @@
     "capacity_unlimited": "∞ œuvres · ∞ visiteurs",
     "capacity_oeuvres": "{{count}} œuvres maxi",
     "capacity_visitors": "{{count}} visiteurs maxi",
+    "capacity_suffix_one_month": " - 1 mois maxi",
+    "option_standby": "Plan veille",
+    "option_languages": "Langues",
+    "option_audio": "Audio-guide",
+    "option_usage": "Usage",
+    "usage_none": "—",
+    "usage_limited_one_month": "Limité à 1 mois",
+    "usage_no_limit": "Pas de limite d'utilisation",
+    "usage_custom_event": "1 gros événement / réseau",
+    "languages_included_one": "{{count}} incluse",
+    "languages_included_range": "{{min}} à {{max}} incluses",
+    "languages_included_many": "{{count}} incluses",
+    "languages_extra": "+{{price}}/langue suppl.",
+    "languages_extra_none": "—",
+    "languages_custom": "Sur mesure",
+    "audio_none": "Non",
+    "audio_included_one": "1 langue incluse",
+    "audio_included_many": "{{count}} langues incluses",
+    "audio_extra": "+{{price}}/langue suppl.",
+    "standby_price": "{{price}}/mois",
     "per_month": "€/mois",
     "per_year": "€/an",
     "plan_name_etincelle": "Étincelle",
@@ -154,7 +201,112 @@
     "plan_summary_etincelle": "Exposition portée par une sélection resserrée d’œuvres",
     "plan_summary_atelier": "Catalogue fixe, médiation enrichie tout au long de l’expo",
     "plan_summary_horizon": "Projets multiples, catalogue évolutif, structure ambitieuse",
-    "plan_summary_rayonnement": "Grand événement sur mesure — capacité et accompagnement illimités"
+    "plan_summary_rayonnement": "Grand événement sur mesure — capacité et accompagnement illimités",
+    "plan_summary_rayonnement_title": "Grand événement sur mesure",
+    "plan_summary_rayonnement_audience": "Festivals, biennales, salons, foires internationales, grands musées d’art, réseaux culturels d’exposition",
+    "plan_summary_rayonnement_footer": "Capacité et accompagnement adapté"
+  },
+  "standby_modal": {
+    "trigger_label": "Plan VEILLE",
+    "trigger_label_line1": "Le Plan \"VEILLE\"",
+    "trigger_label_line2": "Qu'est-ce que c'est ?",
+    "close": "Fermer",
+    "title": "Mettre votre exposition en veille",
+    "badge": "Continuité — formule {{plan}}",
+    "subtitle": "Le plan veille n’est pas une fermeture : c’est un mode de pause intelligente entre deux temps forts, qui préserve vos données et simplifie la reprise.",
+    "essentials_title": "À retenir",
+    "essentials_items": [
+      "Le plan veille est facturé mensuellement.",
+      "Le passage en veille prend effet à votre prochaine échéance.",
+      "Vos données et votre back-office restent accessibles.",
+      "Vous pouvez réactiver votre plan actif quand vous le souhaitez."
+    ],
+    "purpose_title": "À quoi sert le plan veille ?",
+    "purpose_text": "Quand l’exposition n’est plus ouverte au public — entre deux vernissages, pendant un montage, une pause estivale ou une période creuse — le plan veille maintient votre espace organisationnel en vie à coût réduit. Vous gardez la main sur votre catalogue, vos fiches œuvres et votre historique, sans payer un abonnement actif complet.",
+    "when_title": "Dans quels cas l’utiliser ?",
+    "when_items": [
+      "Entre deux expositions dans la même saison",
+      "Pendant une fermeture temporaire ou des travaux",
+      "Lors d’une pause entre deux tournées ou résidences",
+      "Quand vous préparez la prochaine exposition sans diffuser encore au public",
+      "Pour conserver sereinement catalogue et paramétrage sans engagement actif"
+    ],
+    "eligibility_title": "Conditions d’éligibilité",
+    "eligibility_intro": "Le plan veille est réservé aux abonnements mensuels Atelier et Horizon.",
+    "eligibility_items": [
+      "Disponible uniquement sur les formules Atelier et Horizon en paiement mensuel",
+      "Non disponible sur Étincelle",
+      "Non disponible sur les abonnements annuels",
+      "La remise « 1 mois et demi offert » est réservée aux abonnements annuels actifs"
+    ],
+    "commercial_logic_title": "Mensuel ou annuel : deux logiques complémentaires",
+    "commercial_monthly_label": "Abonnement mensuel",
+    "commercial_monthly_text": "Flexibilité au rythme de l’exposition, avec la possibilité de passer en plan veille entre deux temps forts.",
+    "commercial_annual_label": "Abonnement annuel",
+    "commercial_annual_text": "Engagement sur la durée, avec l’avantage tarifaire « 1 mois et demi offert » sur l’année.",
+    "commercial_no_cumul": "On ne peut pas cumuler la flexibilité du plan veille et l’avantage tarifaire de l’abonnement annuel : vous choisissez la souplesse du mensuel, ou l’économie de l’annuel.",
+    "accessible_title": "Ce qui reste accessible",
+    "accessible_items": [
+      "Votre back-office et votre compte organisation",
+      "Votre catalogue d’œuvres et les fiches associées",
+      "Vos données, statistiques et historique de médiation",
+      "La continuité administrative de votre espace",
+      "Une réactivation simple quand vous êtes prêts"
+    ],
+    "changes_title": "Ce qui change pendant la veille",
+    "changes_items": [
+      "L’exposition n’est plus active publiquement pour les visiteurs",
+      "Le parcours visiteur (QR, médiation en salle) est suspendu",
+      "Les fonctionnalités liées à une expo en cours ne sont plus déployées",
+      "Vous basculez sur un tarif veille, plus léger qu’un plan actif"
+    ],
+    "compare_title": "Plan actif vs Plan veille",
+    "compare_active": "Plan actif",
+    "compare_standby": "Plan veille",
+    "compare_rows": [
+      {
+        "label": "Exposition ouverte au public",
+        "active": "Oui — médiation et parcours visiteur actifs",
+        "standby": "Non — exposition en pause"
+      },
+      {
+        "label": "Données & catalogue",
+        "active": "Conservés et enrichis",
+        "standby": "Conservés intégralement"
+      },
+      {
+        "label": "Back-office",
+        "active": "Complet",
+        "standby": "Accessible"
+      },
+      {
+        "label": "Tarif mensuel",
+        "active": "Tarif du plan actif",
+        "standby": "Tarif veille allégé"
+      },
+      {
+        "label": "Réactivation",
+        "active": "—",
+        "standby": "Simple, sans reconfiguration lourde"
+      }
+    ],
+    "pricing_title": "Tarifs veille",
+    "pricing_current": "{{plan}} : {{price}}/mois en veille",
+    "pricing_note": "Le plan veille s’applique à la formule mensuelle que vous avez déjà choisie (Atelier ou Horizon). Il ne remplace pas un abonnement principal : il assure la continuité entre deux périodes actives.",
+    "pricing_atelier": "Atelier — plan veille : 19 €/mois",
+    "pricing_horizon": "Horizon — plan veille : 49 €/mois",
+    "pricing_etincelle": "Étincelle — pas de plan veille (offre d’essai limitée, sans option veille)",
+    "pricing_rayonnement": "Rayonnement — sur mesure selon contrat",
+    "reactivation_title": "Réactivation",
+    "reactivation_text": "Quand votre prochaine exposition est prête, vous repassez en plan actif en quelques clics depuis votre espace organisation. Vos œuvres, paramètres et historique sont déjà là : vous retrouvez immédiatement un environnement opérationnel, sans repartir de zéro.",
+    "cta_primary": "Passer en veille",
+    "cta_secondary": "Conserver mon plan actif",
+    "request_loading": "Demande en cours…",
+    "request_success": "Votre demande de plan veille est enregistrée. Vous pouvez l'annuler pendant 24 h depuis votre profil.",
+    "request_error": "Impossible d'enregistrer la demande de plan veille.",
+    "error_role": "Le plan veille est réservé aux utilisateurs de niveau inférieur à 6.",
+    "error_not_eligible": "Votre abonnement actuel ne permet pas de passer en plan veille (mensuel Atelier ou Horizon requis).",
+    "error_already_pending": "Une demande de plan veille est déjà active."
   },
   "access": {
     "intro": "Scan près de l’œuvre, aucune application à installer : la web-app s’ouvre, propose des profils de lecture (enfant, expert, poète, langage simplifié…) ou suit la langue du téléphone, puis ramène le visiteur vers le feedback sans jamais casser la déambulation.",
@@ -263,20 +415,30 @@
       "zip_code": "Code postal",
       "city": "Ville",
       "contact_phone": "Tél. de contact",
+      "preferred_contact_time": "Quel est le meilleur moment pour vous contacter ? (date, heure, ...)",
       "need_description": "Description de mon besoin (type de salle, surfaces, …)",
       "floor_plan": "Je vous envoie un plan de ma salle ou de mon lieu d'exposition",
       "floor_plan_accept": "Fichiers acceptés : .pdf, .png, .jpg",
       "cancel": "Annuler",
       "submit": "Envoyer",
-      "success_title": "Demande envoyée",
-      "success_body": "Merci ! Votre demande de devis a bien été transmise. Notre équipe vous recontactera rapidement.",
+      "success_title": "Demande de devis",
+      "success_body": "C'est noté, merci beaucoup ! Votre message est bien arrivé jusqu'à nous. Nous reviendrons vers vous rapidement pour faire le point, en faisant tout notre possible pour vous contacter sur les plages horaires que vous nous avez éventuellement transmises.",
       "success_ok": "OK",
       "error_required": "Veuillez remplir tous les champs obligatoires.",
       "error_email": "Adresse e-mail invalide.",
+      "error_phone": "Numéro de téléphone invalide pour le pays sélectionné.",
       "error_auth": "Session expirée. Reconnectez-vous.",
-      "error_table": "Enregistrement impossible : appliquez migration_78 sur Supabase.",
+      "error_table": "Enregistrement impossible : table connected_expo_quote_requests absente (appliquez les migrations Supabase).",
       "error_submit": "Envoi impossible : {{message}}",
-      "warn_floor_plan": "Demande enregistrée, mais le plan n'a pas pu être téléversé."
+      "warn_floor_plan": "Demande enregistrée, mais le plan n'a pas pu être téléversé.",
+      "warn_email": "Demande enregistrée, mais l'envoi des e-mails a échoué. Vérifiez Resend (RESEND_API_KEY, domaine aimediart.com vérifié).",
+      "warn_email_detail": "Demande enregistrée, mais l'envoi des e-mails a échoué : {{detail}}"
     }
+  },
+  "commencer": {
+    "rayonnement_header": "Offre sur mesure RAYONNEMENT",
+    "quote_form_title": "Demande de devis - Rayonnement",
+    "quote_cta": "Aller au formulaire contact",
+    "need_description": "Description de mon besoin (type d'événement, nombre d'œuvres exposées, nombre attendu de visiteurs, …)"
   }
 }
