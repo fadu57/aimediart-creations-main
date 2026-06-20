@@ -195,12 +195,16 @@ function VantaCloudsBackground() {
 
     const initVanta = async () => {
       try {
-        const THREE = await import("three");
-        (window as unknown as { THREE?: unknown }).THREE = THREE;
+        const threeModule = await import("three");
+        const THREE =
+          (threeModule as { default?: typeof threeModule }).default ?? threeModule;
         const vantaModule = await import("vanta/dist/vanta.clouds.min");
-        const CLOUDS = (vantaModule.default ?? vantaModule) as (options: Record<string, unknown>) => { destroy: () => void };
+        const CLOUDS = (vantaModule.default ?? vantaModule) as (options: Record<string, unknown>) => {
+          destroy: () => void;
+        };
         if (!mounted || !container) return;
         effect = CLOUDS({
+          THREE,
           el: container,
           mouseControls: true,
           touchControls: true,

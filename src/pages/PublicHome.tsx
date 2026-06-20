@@ -571,6 +571,14 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
     const anchorId = location.hash.replace(/^#/, "").trim();
     if (!anchorId || location.pathname !== "/organisation") return;
     scrollToVitrineAnchor(anchorId);
+    // Après ancre (#accessibilite…), forcer le chargement des img lazy dans la section cible
+    requestAnimationFrame(() => {
+      const section = document.getElementById(anchorId);
+      section?.querySelectorAll<HTMLImageElement>('img[loading="lazy"]').forEach((img) => {
+        img.loading = "eager";
+        img.decode?.().catch(() => undefined);
+      });
+    });
   }, [location.hash, location.pathname]);
 
   useEffect(() => {

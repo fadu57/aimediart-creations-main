@@ -12,6 +12,9 @@ type OptimizedImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "loading" |
 function deriveWebpSrc(src: string): string | undefined {
   if (!src.startsWith("/")) return undefined;
   if (/\.webp$/i.test(src)) return undefined;
+  if (!/\.(png|jpe?g)$/i.test(src)) return undefined;
+  // Assets Vite hashés (/assets/foo-Xy12AbCd.png) : pas de .webp au même chemin
+  if (/\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(png|jpe?g)$/i.test(src)) return undefined;
   return src.replace(/\.(png|jpe?g)$/i, ".webp");
 }
 
