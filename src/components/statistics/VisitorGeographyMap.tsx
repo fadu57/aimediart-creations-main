@@ -10,6 +10,8 @@ const MARKER_COLORS = {
   profile: "#dc2626",
 } as const;
 
+const FRANCE_CENTER: [number, number] = [46.603354, 1.888334];
+
 function createParticipantIcon(kind: VisitorGeoTableRow["participantKind"]) {
   const color = MARKER_COLORS[kind];
   return L.divIcon({
@@ -21,44 +23,85 @@ function createParticipantIcon(kind: VisitorGeoTableRow["participantKind"]) {
   });
 }
 
+function isValidCoord(lat: number, lon: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+}
+
 function FitMapToMarkers({ markers }: { markers: Array<{ lat: number; lon: number }> }) {
   const map = useMap();
-  const pointsKey = markers.map((m) => `${m.lat},${m.lon}`).join("|");
+  const pointsKey = markers.map((m) => `${m.lat.toFixed(5)},${m.lon.toFixed(5)}`).join("|");
 
   useEffect(() => {
     if (markers.length === 0) return;
 
     let cancelled = false;
-    let timer: number | undefined;
+    const timers: number[] = [];
+
+    const mapIsAlive = () => {
+      try {
+        const container = map.getContainer();
+        return Boolean(container && container.isConnected);
+      } catch {
+        return false;
+      }
+    };
 
     const applyFit = () => {
-      if (cancelled) return;
-      map.invalidateSize();
+      if (cancelled || markers.length === 0 || !mapIsAlive()) return;
 
-      if (markers.length === 1) {
-        map.setView([markers[0]!.lat, markers[0]!.lon], 11, { animate: false });
-        return;
+      try {
+        map.invalidateSize(true);
+        const latLngs = markers
+          .filter((m) => isValidCoord(m.lat, m.lon))
+          .map((m) => L.latLng(m.lat, m.lon));
+        if (latLngs.length === 0) return;
+
+        if (latLngs.length === 1) {
+          map.setView(latLngs[0]!, 11, { animate: false });
+          return;
+        }
+
+        let bounds = L.latLngBounds(latLngs);
+        if (!bounds.isValid()) {
+          const center = latLngs[0]!;
+          bounds = L.latLngBounds(center, center);
+        }
+
+        const northEast = bounds.getNorthEast();
+        const southWest = bounds.getSouthWest();
+        const latSpan = Math.abs(northEast.lat - southWest.lat);
+        const lonSpan = Math.abs(northEast.lng - southWest.lng);
+        if (latSpan < 0.02 || lonSpan < 0.02) {
+          const padLat = Math.max(latSpan, 0.02);
+          const padLon = Math.max(lonSpan, 0.02);
+          const center = bounds.getCenter();
+          bounds = L.latLngBounds(
+            L.latLng(center.lat - padLat, center.lng - padLon),
+            L.latLng(center.lat + padLat, center.lng + padLon),
+          );
+        }
+
+        map.fitBounds(bounds, { padding: [52, 52], maxZoom: 13, animate: false });
+      } catch {
+        // Carte démontée entre-temps (changement de filtre)
       }
-
-      const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lon] as [number, number]));
-      if (!bounds.isValid()) return;
-      map.fitBounds(bounds, { padding: [52, 52], animate: false });
     };
 
     const scheduleFit = () => {
       applyFit();
-      window.requestAnimationFrame(applyFit);
-      timer = window.setTimeout(applyFit, 300);
+      for (const delay of [80, 250, 600]) {
+        timers.push(window.setTimeout(applyFit, delay));
+      }
     };
 
-    if (map.getContainer()) {
-      scheduleFit();
-    }
-    map.whenReady(scheduleFit);
+    scheduleFit();
+    map.whenReady(() => {
+      if (!cancelled) scheduleFit();
+    });
 
     return () => {
       cancelled = true;
-      if (timer) window.clearTimeout(timer);
+      for (const timer of timers) window.clearTimeout(timer);
     };
   }, [map, pointsKey, markers]);
 
@@ -67,10 +110,11 @@ function FitMapToMarkers({ markers }: { markers: Array<{ lat: number; lon: numbe
 
 type Props = {
   rows: VisitorGeoTableRow[];
+  scopeKey: string;
   height?: number;
 };
 
-export function VisitorGeographyMap({ rows, height = 420 }: Props) {
+export function VisitorGeographyMap({ rows, scopeKey, height = 420 }: Props) {
   const icons = useMemo(
     () => ({
       visitor: createParticipantIcon("visitor"),
@@ -88,10 +132,11 @@ export function VisitorGeographyMap({ rows, height = 420 }: Props) {
           lat: row.latitude as number,
           lon: row.longitude as number,
           label: row.label,
-          place: [row.city, row.country].filter(Boolean).join(", ") || "—",
+          place: [row.zipCode, row.city, row.country].filter(Boolean).join(", ") || "—",
           kind: row.participantKind,
           offset: ((index % 5) - 2) * 0.0008,
-        })),
+        }))
+        .filter((m) => isValidCoord(m.lat, m.lon)),
     [rows],
   );
 
@@ -102,13 +147,16 @@ export function VisitorGeographyMap({ rows, height = 420 }: Props) {
 
   const defaultCenter = useMemo<[number, number]>(() => {
     if (markers.length > 0) return [markers[0]!.lat, markers[0]!.lon];
-    return [46.603354, 1.888334];
+    return FRANCE_CENTER;
   }, [markers]);
+
+  if (markers.length === 0) return null;
 
   return (
     <MapContainer
+      key={scopeKey}
       center={defaultCenter}
-      zoom={5}
+      zoom={6}
       style={{ height, width: "100%", borderRadius: "0.5rem" }}
       scrollWheelZoom
       zoomControl

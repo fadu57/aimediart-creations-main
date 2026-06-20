@@ -53,7 +53,7 @@ type VisitorRecord = {
 };
 
 const PROFILE_SELECT =
-  "id, first_name, last_name, username, avatar_url, city, country_code, zip_code";
+  "id, first_name, last_name, username, avatar_url, city, country_code, zip_code, ip_address";
 
 type GeographyRpcRow = {
   visitor_key?: string | null;
@@ -143,6 +143,242 @@ async function loadParticipantsViaRpc(params: {
 }
 
 const geoCache = new Map<string, GeoPoint | null>();
+const QUERY_GEO_LS_KEY = "aimediart:statistics-geo-query:v4";
+const PARTICIPANT_GEO_LS_KEY = "aimediart:statistics-geo-participant:v4";
+const GEO_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+function migrateGeographyCacheVersion(): void {
+  for (const legacyKey of [
+    "aimediart:statistics-geo-query:v1",
+    "aimediart:statistics-geo-participant:v1",
+    "aimediart:statistics-geo-query:v2",
+    "aimediart:statistics-geo-participant:v2",
+    "aimediart:statistics-geo-query:v3",
+    "aimediart:statistics-geo-participant:v3",
+  ]) {
+    try {
+      localStorage.removeItem(legacyKey);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+type ParticipantGeoStored = {
+  latitude: number;
+  longitude: number;
+  city?: string | null;
+  country?: string | null;
+  region?: string | null;
+  source: VisitorGeoTableRow["source"];
+  at: number;
+};
+
+function readJsonRecord<T>(key: string): Record<string, T> {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, T>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeJsonRecord<T>(key: string, record: Record<string, T>): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(record));
+  } catch {
+    // quota ou mode privé
+  }
+}
+
+function hydrateQueryCacheFromStorage(): void {
+  const entries = readJsonRecord<GeoPoint | null>(QUERY_GEO_LS_KEY);
+  for (const [cacheKey, point] of Object.entries(entries)) {
+    if (point && Number.isFinite(point.lat) && Number.isFinite(point.lon)) {
+      geoCache.set(cacheKey, point);
+    }
+  }
+}
+
+function persistQueryCacheEntry(cacheKey: string, point: GeoPoint | null): void {
+  if (!point) {
+    geoCache.delete(cacheKey);
+    return;
+  }
+  geoCache.set(cacheKey, point);
+  const entries = readJsonRecord<GeoPoint>(QUERY_GEO_LS_KEY);
+  entries[cacheKey] = point;
+  writeJsonRecord(QUERY_GEO_LS_KEY, entries);
+}
+
+function getParticipantGeo(visitorKey: string): ParticipantGeoStored | null {
+  const entries = readJsonRecord<ParticipantGeoStored>(PARTICIPANT_GEO_LS_KEY);
+  const stored = entries[visitorKey];
+  if (!stored) return null;
+  if (Date.now() - stored.at > GEO_CACHE_MAX_AGE_MS) return null;
+  if (!Number.isFinite(stored.latitude) || !Number.isFinite(stored.longitude)) return null;
+  return stored;
+}
+
+function setParticipantGeo(row: VisitorGeoTableRow): void {
+  if (row.latitude == null || row.longitude == null) return;
+  const entries = readJsonRecord<ParticipantGeoStored>(PARTICIPANT_GEO_LS_KEY);
+  entries[row.visitorKey] = {
+    latitude: row.latitude,
+    longitude: row.longitude,
+    city: row.city,
+    country: row.country,
+    region: row.region,
+    source: row.source,
+    at: Date.now(),
+  };
+  writeJsonRecord(PARTICIPANT_GEO_LS_KEY, entries);
+}
+
+migrateGeographyCacheVersion();
+hydrateQueryCacheFromStorage();
+
+export function canGeocodeRow(row: VisitorGeoTableRow): boolean {
+  return Boolean(row.zipCode || row.city || (row.ipAddress && !isPrivateIp(row.ipAddress)));
+}
+
+/** Vrai si chaque participant géolocalisable possède des coordonnées. */
+export function isGeographyRunComplete(rows: VisitorGeoTableRow[]): boolean {
+  return !rows.some(
+    (row) => canGeocodeRow(row) && (row.latitude == null || row.longitude == null),
+  );
+}
+
+export function clearPersistedGeographyCache(): void {
+  try {
+    localStorage.removeItem(QUERY_GEO_LS_KEY);
+    localStorage.removeItem(PARTICIPANT_GEO_LS_KEY);
+  } catch {
+    // ignore
+  }
+  geoCache.clear();
+}
+
+function rowInitialSource(row: Pick<VisitorGeoTableRow, "zipCode" | "city" | "ipAddress">): VisitorGeoTableRow["source"] {
+  if (row.zipCode || row.city) return "place";
+  if (row.ipAddress && !isPrivateIp(row.ipAddress)) return "ip";
+  return "ip_pending";
+}
+
+/** Complète ville/CP/IP depuis public.profiles (source de vérité organisateurs). */
+export async function hydrateProfilePlaceData(rows: VisitorGeoTableRow[]): Promise<VisitorGeoTableRow[]> {
+  const profileIds = [
+    ...new Set(rows.filter((row) => isUuidLike(row.visitorKey)).map((row) => row.visitorKey)),
+  ];
+  if (profileIds.length === 0) return rows;
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, city, zip_code, country_code, ip_address")
+    .in("id", profileIds);
+
+  if (!data?.length) return rows;
+
+  const byId = new Map<
+    string,
+    { city: string | null; zipCode: string | null; country: string | null; ipAddress: string | null }
+  >();
+  for (const profile of data as Array<{
+    id?: string;
+    city?: string | null;
+    zip_code?: string | null;
+    country_code?: string | null;
+    ip_address?: string | null;
+  }>) {
+    const id = asTrimmed(profile.id);
+    if (!id) continue;
+    byId.set(id, {
+      city: asTrimmed(profile.city) || null,
+      zipCode: asTrimmed(profile.zip_code) || null,
+      country: asTrimmed(profile.country_code) || null,
+      ipAddress: asTrimmed(profile.ip_address) || null,
+    });
+  }
+
+  return rows.map((row) => {
+    const profile = byId.get(row.visitorKey);
+    if (!profile) return row;
+    const merged = {
+      ...row,
+      city: row.city || profile.city,
+      zipCode: row.zipCode || profile.zipCode,
+      country: row.country || profile.country || "FR",
+      ipAddress: row.ipAddress || profile.ipAddress,
+    };
+    return {
+      ...merged,
+      source: rowInitialSource(merged),
+    };
+  });
+}
+
+/** Efface les coordonnées calculées pour relancer un passage complet. */
+export function stripGeocodingFromRows(rows: VisitorGeoTableRow[]): VisitorGeoTableRow[] {
+  return rows.map((row) => ({
+    ...row,
+    latitude: null,
+    longitude: null,
+    region: null,
+    source: rowInitialSource(row),
+  }));
+}
+
+/** Prépare un passage de géocodage (complet si incomplet ou forcé). */
+export function prepareGeocodingPass(
+  baseRows: VisitorGeoTableRow[],
+  opts: { force?: boolean } = {},
+): { rows: VisitorGeoTableRow[]; runGeocoder: boolean; bypassQueryCache: boolean; force: boolean } {
+  if (opts.force) {
+    clearPersistedGeographyCache();
+    return {
+      rows: stripGeocodingFromRows(baseRows),
+      runGeocoder: true,
+      bypassQueryCache: true,
+      force: true,
+    };
+  }
+
+  const withCache = applyPersistedGeocoding(baseRows);
+  const pendingCount = withCache.filter(
+    (row) => canGeocodeRow(row) && (row.latitude == null || row.longitude == null),
+  ).length;
+
+  if (pendingCount === 0) {
+    return { rows: withCache, runGeocoder: false, bypassQueryCache: false, force: false };
+  }
+
+  return {
+    rows: withCache,
+    runGeocoder: true,
+    bypassQueryCache: false,
+    force: false,
+  };
+}
+/** Réapplique les coordonnées déjà géolocalisées (localStorage). */
+export function applyPersistedGeocoding(rows: VisitorGeoTableRow[]): VisitorGeoTableRow[] {
+  return rows.map((row) => {
+    if (row.latitude != null && row.longitude != null) return row;
+    const stored = getParticipantGeo(row.visitorKey);
+    if (!stored) return row;
+    return {
+      ...row,
+      latitude: stored.latitude,
+      longitude: stored.longitude,
+      city: row.city || stored.city || null,
+      country: row.country || stored.country || null,
+      region: row.region || stored.region || null,
+      source: stored.source,
+    };
+  });
+}
+
 const VISITOR_SELECT =
   "id, visitor_client_id, auth_user_id, ip_address, country, city, visitor_pseudo, visitor_name, avatar_url, selfie_url";
 
@@ -168,19 +404,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function geocodeIp(ip: string): Promise<GeoPoint | null> {
+async function geocodeIp(ip: string, bypassCache = false): Promise<GeoPoint | null> {
   const key = `ip:${ip}`;
-  if (geoCache.has(key)) return geoCache.get(key) ?? null;
+  if (bypassCache) geoCache.delete(key);
+  else if (geoCache.has(key)) return geoCache.get(key) ?? null;
 
   if (isPrivateIp(ip)) {
-    geoCache.set(key, null);
+    persistQueryCacheEntry(key, null);
     return null;
   }
 
   try {
     const res = await fetch(`https://get.geojs.io/v1/ip/geo/${encodeURIComponent(ip)}.json`);
     if (!res.ok) {
-      geoCache.set(key, null);
+      persistQueryCacheEntry(key, null);
       return null;
     }
     const geo = (await res.json()) as {
@@ -193,7 +430,7 @@ async function geocodeIp(ip: string): Promise<GeoPoint | null> {
     const lat = Number.parseFloat(String(geo.latitude ?? ""));
     const lon = Number.parseFloat(String(geo.longitude ?? ""));
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      geoCache.set(key, null);
+      persistQueryCacheEntry(key, null);
       return null;
     }
     const point: GeoPoint = {
@@ -203,10 +440,107 @@ async function geocodeIp(ip: string): Promise<GeoPoint | null> {
       country: geo.country ?? null,
       region: geo.region ?? null,
     };
-    geoCache.set(key, point);
+    persistQueryCacheEntry(key, point);
     return point;
   } catch {
-    geoCache.set(key, null);
+    persistQueryCacheEntry(key, null);
+    return null;
+  }
+}
+
+function resolveCountryCode(country?: string | null): string {
+  const value = asTrimmed(country).toUpperCase();
+  if (/^[A-Z]{2}$/.test(value)) return value.toLowerCase();
+  if (value === "FRANCE") return "fr";
+  if (value === "DEUTSCHLAND" || value === "GERMANY") return "de";
+  if (value === "ESPAGNE" || value === "SPAIN") return "es";
+  if (value === "ITALIE" || value === "ITALY") return "it";
+  return "fr";
+}
+
+function resolveCountryLabel(country?: string | null): string {
+  const value = asTrimmed(country).toUpperCase();
+  if (value === "FR") return "France";
+  if (value === "DE") return "Deutschland";
+  if (value === "ES") return "España";
+  if (value === "IT") return "Italia";
+  if (value.length === 2) return value;
+  return asTrimmed(country) || "France";
+}
+
+async function geocodeFrenchAddress(
+  zip: string,
+  city: string,
+  bypassCache: boolean,
+): Promise<GeoPoint | null> {
+  const q = [zip, city].filter(Boolean).join(" ").trim();
+  if (!q) return null;
+  const cacheKey = `ban:${q.toLowerCase()}`;
+  if (bypassCache) geoCache.delete(cacheKey);
+  else if (geoCache.has(cacheKey)) return geoCache.get(cacheKey) ?? null;
+
+  try {
+    const url = new URL("https://api-adresse.data.gouv.fr/search/");
+    url.searchParams.set("q", q);
+    url.searchParams.set("limit", "1");
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const payload = (await res.json()) as {
+      features?: Array<{
+        geometry?: { coordinates?: [number, number] };
+        properties?: { city?: string; context?: string };
+      }>;
+    };
+    const feature = payload.features?.[0];
+    const coords = feature?.geometry?.coordinates;
+    if (!coords || coords.length < 2) return null;
+    const [lon, lat] = coords;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const point: GeoPoint = {
+      lat,
+      lon,
+      city: feature.properties?.city || city || null,
+      country: "France",
+      region: feature.properties?.context?.split(",").pop()?.trim() || null,
+    };
+    persistQueryCacheEntry(cacheKey, point);
+    return point;
+  } catch {
+    return null;
+  }
+}
+
+async function nominatimSearch(
+  params: Record<string, string>,
+  bypassCache: boolean,
+): Promise<GeoPoint | null> {
+  const cacheKey = `nominatim:${Object.entries(params).sort().map(([k, v]) => `${k}=${v}`).join("&")}`;
+  if (bypassCache) geoCache.delete(cacheKey);
+  else if (geoCache.has(cacheKey)) return geoCache.get(cacheKey) ?? null;
+
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, value);
+    }
+    const res = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json",
+        "Accept-Language": "fr",
+        "User-Agent": "AIMEDIart/1.0 (statistics geography; hello@aimediart.com)",
+      },
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ lat?: string; lon?: string; display_name?: string }>;
+    const hit = rows[0];
+    if (!hit?.lat || !hit.lon) return null;
+    const lat = Number.parseFloat(hit.lat);
+    const lon = Number.parseFloat(hit.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const point: GeoPoint = { lat, lon };
+    persistQueryCacheEntry(cacheKey, point);
+    return point;
+  } catch {
     return null;
   }
 }
@@ -215,47 +549,49 @@ async function geocodePlace(
   city: string,
   country?: string | null,
   zipCode?: string | null,
+  bypassCache = false,
 ): Promise<GeoPoint | null> {
-  const query = [zipCode?.trim(), city.trim(), country?.trim()].filter(Boolean).join(", ");
+  const zip = asTrimmed(zipCode);
+  const cityName = asTrimmed(city);
+  const countryCode = resolveCountryCode(country);
+  const countryLabel = resolveCountryLabel(country);
+
+  if (countryCode === "fr" && (zip || cityName)) {
+    const fromBan = await geocodeFrenchAddress(zip, cityName, bypassCache);
+    if (fromBan) return fromBan;
+  }
+
+  if (zip) {
+    const postalParams: Record<string, string> = {
+      format: "json",
+      limit: "1",
+      postalcode: zip,
+      countrycodes: countryCode,
+    };
+    if (cityName) postalParams.city = cityName;
+    const fromPostal = await nominatimSearch(postalParams, bypassCache);
+    if (fromPostal) {
+      return { ...fromPostal, city: cityName || null, country: countryLabel };
+    }
+  }
+
+  const query = [zip, cityName, countryLabel].filter(Boolean).join(", ");
   if (!query) return null;
   const key = `place:${query.toLowerCase()}`;
-  if (geoCache.has(key)) return geoCache.get(key) ?? null;
+  if (bypassCache) geoCache.delete(key);
+  else if (geoCache.has(key)) return geoCache.get(key) ?? null;
 
-  try {
-    const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("q", query);
-    url.searchParams.set("format", "json");
-    url.searchParams.set("limit", "1");
-    const res = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json",
-        "Accept-Language": "fr",
-        "User-Agent": "AIMEDIart/1.0 (statistics geography; hello@aimediart.com)",
-      },
-    });
-    if (!res.ok) {
-      geoCache.set(key, null);
-      return null;
-    }
-    const rows = (await res.json()) as Array<{ lat?: string; lon?: string }>;
-    const hit = rows[0];
-    if (!hit?.lat || !hit.lon) {
-      geoCache.set(key, null);
-      return null;
-    }
-    const lat = Number.parseFloat(hit.lat);
-    const lon = Number.parseFloat(hit.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      geoCache.set(key, null);
-      return null;
-    }
-    const point: GeoPoint = { lat, lon, city: city.trim(), country: country?.trim() || null };
-    geoCache.set(key, point);
+  const fromQuery = await nominatimSearch(
+    { format: "json", limit: "1", q: query },
+    bypassCache,
+  );
+  if (fromQuery) {
+    const point: GeoPoint = { ...fromQuery, city: cityName || null, country: countryLabel };
+    persistQueryCacheEntry(key, point);
     return point;
-  } catch {
-    geoCache.set(key, null);
-    return null;
   }
+
+  return null;
 }
 
 function filterFeedbackRows<T extends { artwork_id?: string | number | null }>(
@@ -454,7 +790,15 @@ async function enrichProfilesWithVisitorData(profiles: VisitorRecord[]): Promise
       ...profile,
       ...linked,
       auth_user_id: authId,
-      id: asTrimmed(linked.id) || authId,
+      id: authId,
+      visitor_db_id: asTrimmed(linked.id) || null,
+      first_name: asTrimmed(profile.first_name) || asTrimmed(linked.first_name) || null,
+      last_name: asTrimmed(profile.last_name) || asTrimmed(linked.last_name) || null,
+      username: asTrimmed(profile.username) || asTrimmed(linked.username) || null,
+      city: asTrimmed(profile.city) || asTrimmed(linked.city) || null,
+      zip_code: asTrimmed(profile.zip_code) || asTrimmed(linked.zip_code) || null,
+      country: asTrimmed(profile.country) || asTrimmed(linked.country) || null,
+      country_code: asTrimmed(profile.country_code) || asTrimmed(linked.country_code) || null,
       ip_address: linkedIp || profileIp || null,
       avatar_url: asTrimmed(linked.avatar_url) || asTrimmed(profile.avatar_url) || null,
       selfie_url: asTrimmed(linked.selfie_url) || asTrimmed(profile.selfie_url) || null,
@@ -672,6 +1016,13 @@ function resolveInitialSource(record: VisitorRecord): VisitorGeoTableRow["source
 }
 
 function resolveParticipantKind(record: VisitorRecord): VisitorGeoTableRow["participantKind"] {
+  if (asTrimmed(record.auth_user_id)) {
+    const namedProfile =
+      asTrimmed(record.first_name) ||
+      asTrimmed(record.last_name) ||
+      asTrimmed(record.username);
+    if (namedProfile) return "profile";
+  }
   if (asTrimmed(record.visitor_db_id) || asTrimmed(record.visitor_pseudo) || asTrimmed(record.visitor_name)) {
     return "visitor";
   }
@@ -700,27 +1051,51 @@ function recordToRow(record: VisitorRecord, fallbackKey?: string): VisitorGeoTab
   };
 }
 
+function placeCacheKey(city: string, country: string | null | undefined, zipCode: string | null | undefined): string | null {
+  const query = [asTrimmed(zipCode), asTrimmed(city), resolveCountryLabel(country)].filter(Boolean).join(", ");
+  return query ? `place:${query.toLowerCase()}` : null;
+}
+
+function rowToGeocodeInput(row: VisitorGeoTableRow): VisitorRecord {
+  return {
+    ip_address: row.ipAddress,
+    city: row.city,
+    zip_code: row.zipCode,
+    country: row.country,
+    country_code: row.country,
+  };
+}
+
 async function resolveCoords(
   record: VisitorRecord,
-): Promise<{ point: GeoPoint | null; source: VisitorGeoTableRow["source"] }> {
+  bypassQueryCache = false,
+): Promise<{ point: GeoPoint | null; source: VisitorGeoTableRow["source"]; throttleMs: number }> {
   const ip = asTrimmed(record.ip_address);
   const city = asTrimmed(record.city);
   const zipCode = asTrimmed(record.zip_code);
-  const country = asTrimmed(record.country) || asTrimmed(record.country_code);
+  const countryHint = asTrimmed(record.country_code) || asTrimmed(record.country);
+  const hasPlace = Boolean(zipCode || city);
 
-  if (zipCode || city) {
-    const fromPlace = await geocodePlace(city, country || "France", zipCode);
-    if (fromPlace) return { point: fromPlace, source: "place" };
-    return { point: null, source: "place" };
+  if (hasPlace) {
+    const cacheKey = placeCacheKey(city, countryHint || "FR", zipCode);
+    const cached = !bypassQueryCache && cacheKey ? geoCache.has(cacheKey) : false;
+    const fromPlace = await geocodePlace(city, countryHint || "FR", zipCode, bypassQueryCache);
+    if (fromPlace) {
+      const usedBan = resolveCountryCode(countryHint || "FR") === "fr";
+      return { point: fromPlace, source: "place", throttleMs: cached ? 0 : usedBan ? 80 : 1100 };
+    }
   }
 
   if (ip && !isPrivateIp(ip)) {
-    const fromIp = await geocodeIp(ip);
-    if (fromIp) return { point: fromIp, source: "ip" };
-    return { point: null, source: "ip_pending" };
+    const cached = !bypassQueryCache && geoCache.has(`ip:${ip}`);
+    const fromIp = await geocodeIp(ip, bypassQueryCache);
+    if (fromIp) return { point: fromIp, source: "ip", throttleMs: cached ? 0 : 150 };
+    if (hasPlace) return { point: null, source: "place", throttleMs: cached ? 0 : 150 };
+    return { point: null, source: "ip_pending", throttleMs: cached ? 0 : 150 };
   }
 
-  return { point: null, source: "ip_pending" };
+  if (hasPlace) return { point: null, source: "place", throttleMs: 0 };
+  return { point: null, source: "ip_pending", throttleMs: 0 };
 }
 
 export async function fetchVisitorGeographyForStatistics(params: {
@@ -740,27 +1115,50 @@ export async function fetchVisitorGeographyForStatistics(params: {
     .filter((row): row is VisitorGeoTableRow => row != null);
 
   rows.sort((a, b) => a.label.localeCompare(b.label, "fr"));
-  return { rows, error: null };
+  const hydrated = await hydrateProfilePlaceData(rows);
+  return { rows: hydrated, error: null };
 }
 
-/** Géocode chaque ligne : ville/pays en priorité, puis IP publique. */
+type GeocodeRowsOptions = {
+  bypassQueryCache?: boolean;
+  force?: boolean;
+};
+
+/** Géocode chaque ligne : ville/pays en priorité, puis IP publique. Résultats persistés en localStorage. */
 export async function geocodeVisitorGeoRows(
   rows: VisitorGeoTableRow[],
   onProgress?: (done: number, total: number) => void,
+  onRowsUpdate?: (rows: VisitorGeoTableRow[]) => void,
+  options?: GeocodeRowsOptions,
 ): Promise<VisitorGeoTableRow[]> {
-  const enriched: VisitorGeoTableRow[] = [];
+  const bypassQueryCache = options?.bypassQueryCache ?? false;
+  const force = options?.force ?? false;
+  const enriched: VisitorGeoTableRow[] = rows.map((row) => ({ ...row }));
 
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
-    const { point, source } = await resolveCoords({
-      ip_address: row.ipAddress,
-      city: row.city,
-      zip_code: row.zipCode,
-      country: row.country,
-      country_code: row.country,
-    });
-    onProgress?.(index + 1, rows.length);
-    enriched.push({
+  for (let index = 0; index < enriched.length; index += 1) {
+    const row = enriched[index]!;
+    const needsGeocode =
+      force || row.latitude == null || row.longitude == null;
+    const canTry = canGeocodeRow(row);
+
+    if (!needsGeocode) {
+      onProgress?.(index + 1, enriched.length);
+      onRowsUpdate?.([...enriched]);
+      continue;
+    }
+
+    if (!canTry) {
+      onProgress?.(index + 1, enriched.length);
+      onRowsUpdate?.([...enriched]);
+      continue;
+    }
+
+    const { point, source, throttleMs } = await resolveCoords(
+      rowToGeocodeInput(row),
+      bypassQueryCache,
+    );
+
+    const updated: VisitorGeoTableRow = {
       ...row,
       city: row.city || (point?.city ?? null),
       country: row.country || (point?.country ?? null),
@@ -768,8 +1166,16 @@ export async function geocodeVisitorGeoRows(
       latitude: point?.lat ?? null,
       longitude: point?.lon ?? null,
       source,
-    });
-    if (index < rows.length - 1) await sleep(300);
+    };
+    enriched[index] = updated;
+    if (point) setParticipantGeo(updated);
+
+    onProgress?.(index + 1, enriched.length);
+    onRowsUpdate?.([...enriched]);
+
+    if (index < enriched.length - 1 && throttleMs > 0) {
+      await sleep(throttleMs);
+    }
   }
 
   return enriched;

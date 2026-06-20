@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Heart, Menu, X } from "lucide-react";
 
@@ -257,32 +257,56 @@ function VantaCloudsBackground() {
 function PublicVitrineFooter() {
   const { t } = useTranslation("home");
 
+  const footerLinkClass =
+    "group inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[12px] font-medium leading-tight text-foreground/85 transition-colors hover:bg-neutral-100";
+
+  const footerLinks = [
+    { to: "/cgv", label: t("footer.cgv") },
+    { to: "/cookies", label: t("footer.cookies") },
+    { to: "/privacy", label: t("footer.privacy") },
+    { to: "/terms", label: t("footer.terms") },
+    { to: "/ai-policy", label: t("footer.ai_policy") },
+  ] as const;
+
   return (
-    <footer className="border-t border-neutral-300/70 bg-white/80 py-10">
+    <footer className="border-t border-neutral-300/70 bg-white/80 py-3.5">
       <div className="mx-auto w-full max-w-[1060px] px-5 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-[7px] sm:flex-row sm:items-center sm:justify-between">
           <div>
             <LogoMark compact />
           </div>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <a href={AIMEDIART_CONTACT_MAILTO} className="text-foreground/80 hover:text-foreground">
-              {t("footer.contact")}
-            </a>
-            <Link to="/cgv" className="text-foreground/80 hover:text-foreground">
-              {t("footer.cgv")}
-            </Link>
-            <Link to="/cookies" className="text-foreground/80 hover:text-foreground">
-              {t("footer.cookies")}
-            </Link>
-            <Link to="/privacy" className="text-foreground/80 hover:text-foreground">
-              {t("footer.privacy")}
-            </Link>
-            <Link to="/terms" className="text-foreground/80 hover:text-foreground">
-              {t("footer.terms")}
-            </Link>
-            <Link to="/ai-policy" className="text-foreground/80 hover:text-foreground">
-              {t("footer.ai_policy")}
-            </Link>
+          <div className="rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
+            <nav className="flex flex-wrap items-center gap-0.5" aria-label={t("footer.nav_aria")}>
+              <a href={AIMEDIART_CONTACT_MAILTO} className={footerLinkClass}>
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-300 transition-colors group-hover:bg-[#E63946]"
+                  aria-hidden
+                />
+                {t("footer.contact")}
+              </a>
+              {footerLinks.map(({ to, label }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    cn(footerLinkClass, isActive && "bg-neutral-100")
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full transition-colors",
+                          isActive ? "bg-[#E63946]" : "bg-neutral-300 group-hover:bg-[#E63946]",
+                        )}
+                        aria-hidden
+                      />
+                      {label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
           </div>
         </div>
       </div>
@@ -323,7 +347,7 @@ export function PublicVitrineShell({
   return (
     <div
       className={cn(
-        "relative min-h-screen text-[#1f1f1f]",
+        "relative min-h-screen font-sans text-[#1f1f1f]",
         atmosphericBackdrop ? "bg-transparent" : "bg-white",
       )}
     >

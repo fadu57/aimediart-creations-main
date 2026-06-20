@@ -30,7 +30,7 @@ import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmo
 import { formatBarVisitLabel, sumChartVisits } from "@/lib/statisticsCharts";
 import { StatisticsReportView, type StatisticsArtistCoverLetter, type StatisticsReportViewProps } from "@/components/statistics/StatisticsReportView";
 import { VisitorGeographySection } from "@/components/statistics/VisitorGeographySection";
-import { fetchVisitorGeographyForStatistics, geocodeVisitorGeoRows, type VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
+import { fetchVisitorGeographyForStatistics, geocodeVisitorGeoRows, hydrateProfilePlaceData, prepareGeocodingPass, type VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
@@ -251,6 +251,13 @@ const Statistics = () => {
   const [visitorGeoGeocoding, setVisitorGeoGeocoding] = useState(false);
   const [visitorGeoProgress, setVisitorGeoProgress] = useState<{ done: number; total: number } | null>(null);
   const [visitorGeoError, setVisitorGeoError] = useState<string | null>(null);
+  const visitorGeoBaseRowsRef = useRef<VisitorGeoTableRow[]>([]);
+  const visitorGeoScopeRef = useRef<{
+    targetAgencyId: string | null;
+    targetExpoId: string | null;
+    expoDateRange: { start: Date; end: Date } | null;
+  }>({ targetAgencyId: null, targetExpoId: null, expoDateRange: null });
+  const geoRunRef = useRef(0);
   const [activeArtworksCount, setActiveArtworksCount] = useState(0);
   const [topSortKey, setTopSortKey] = useState<TopSortKey>("visits");
   const [topSortDirection, setTopSortDirection] = useState<TopSortDirection>("desc");
@@ -771,6 +778,18 @@ const Statistics = () => {
       to: toFrDateLabel(expoDateRange.end),
     };
   }, [expoDateRange]);
+
+  const visitorGeoMapScopeKey = useMemo(() => {
+    const targetAgencyId =
+      effectiveAgencyFilter ??
+      (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+    const targetExpoId =
+      drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
+    const rangeKey = expoDateRange
+      ? `${expoDateRange.start.toISOString()}_${expoDateRange.end.toISOString()}`
+      : "all";
+    return [targetAgencyId ?? "all", targetExpoId ?? "all", rangeKey].join("|");
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, expoDateRange]);
 
   useEffect(() => {
     setManualPreviewDateFrom("");
@@ -1317,20 +1336,90 @@ const Statistics = () => {
     };
   }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId, expoDateRange]);
 
+  const runVisitorGeocoding = useCallback(async (
+    baseRows: VisitorGeoTableRow[],
+    opts: { force?: boolean } = {},
+    externalRunId?: number,
+  ) => {
+    const runId = externalRunId ?? ++geoRunRef.current;
+    const hydratedRows = await hydrateProfilePlaceData(baseRows);
+    const { rows: toProcess, runGeocoder, bypassQueryCache, force } = prepareGeocodingPass(hydratedRows, opts);
+
+    if (runId !== geoRunRef.current) return;
+
+    if (runGeocoder) {
+      setVisitorGeoRows(toProcess);
+      setVisitorGeoGeocoding(true);
+      setVisitorGeoProgress(null);
+    } else {
+      setVisitorGeoRows(toProcess);
+      setVisitorGeoGeocoding(false);
+      setVisitorGeoProgress(null);
+      return;
+    }
+
+    try {
+      const enriched = await geocodeVisitorGeoRows(
+        toProcess,
+        (done, total) => {
+          if (runId === geoRunRef.current) setVisitorGeoProgress({ done, total });
+        },
+        (updatedRows) => {
+          if (runId === geoRunRef.current) setVisitorGeoRows(updatedRows);
+        },
+        { bypassQueryCache, force },
+      );
+      if (runId === geoRunRef.current) setVisitorGeoRows(enriched);
+    } finally {
+      if (runId === geoRunRef.current) {
+        setVisitorGeoGeocoding(false);
+        setVisitorGeoProgress(null);
+      }
+    }
+  }, []);
+
+  const handleRefreshVisitorGeocoding = useCallback(async () => {
+    if (visitorGeoGeocoding || visitorGeoLoading) return;
+
+    setVisitorGeoError(null);
+
+    try {
+      const { rows, error } = await fetchVisitorGeographyForStatistics(visitorGeoScopeRef.current);
+      if (error) {
+        setVisitorGeoError(error);
+        return;
+      }
+
+      visitorGeoBaseRowsRef.current = rows;
+      if (rows.length === 0) {
+        setVisitorGeoRows([]);
+        return;
+      }
+
+      await runVisitorGeocoding(rows, { force: true });
+    } catch (err) {
+      setVisitorGeoError(
+        err instanceof Error ? err.message : "Impossible de recalculer la géolocalisation.",
+      );
+    }
+  }, [runVisitorGeocoding, visitorGeoGeocoding, visitorGeoLoading]);
+
   useEffect(() => {
     let cancelled = false;
+    const runId = ++geoRunRef.current;
+
     void (async () => {
       setVisitorGeoLoading(true);
-      setVisitorGeoGeocoding(false);
       setVisitorGeoError(null);
       setVisitorGeoProgress(null);
-      setVisitorGeoRows([]);
 
       const targetAgencyId =
         effectiveAgencyFilter ??
         (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
+
+      visitorGeoScopeRef.current = { targetAgencyId, targetExpoId, expoDateRange };
 
       try {
         const { rows, error } = await fetchVisitorGeographyForStatistics({
@@ -1339,34 +1428,29 @@ const Statistics = () => {
           expoDateRange,
         });
 
-        if (cancelled) return;
+        if (cancelled || runId !== geoRunRef.current) return;
         if (error) {
+          visitorGeoBaseRowsRef.current = [];
           setVisitorGeoRows([]);
           setVisitorGeoError(error);
           return;
         }
 
-        setVisitorGeoRows(rows);
-        setVisitorGeoLoading(false);
+        visitorGeoBaseRowsRef.current = rows;
 
-        if (rows.length === 0) return;
+        if (rows.length === 0) {
+          setVisitorGeoRows([]);
+          return;
+        }
 
-        setVisitorGeoGeocoding(true);
-        const enriched = await geocodeVisitorGeoRows(rows, (done, total) => {
-          if (!cancelled) setVisitorGeoProgress({ done, total });
-        });
-        if (cancelled) return;
-        setVisitorGeoRows(enriched);
+        await runVisitorGeocoding(rows, {}, runId);
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || runId !== geoRunRef.current) return;
+        visitorGeoBaseRowsRef.current = [];
         setVisitorGeoRows([]);
         setVisitorGeoError(err instanceof Error ? err.message : "Impossible de charger la géographie des visiteurs.");
       } finally {
-        if (!cancelled) {
-          setVisitorGeoLoading(false);
-          setVisitorGeoGeocoding(false);
-          setVisitorGeoProgress(null);
-        }
+        if (!cancelled && runId === geoRunRef.current) setVisitorGeoLoading(false);
       }
     })();
     return () => {
@@ -1379,6 +1463,7 @@ const Statistics = () => {
     scope.agencyId,
     scope.expoId,
     expoDateRange,
+    runVisitorGeocoding,
   ]);
 
   const emotionCatalog = useMemo(() => emotionCatalogFromDb, [emotionCatalogFromDb]);
@@ -2433,6 +2518,8 @@ const Statistics = () => {
         geocoding={visitorGeoGeocoding}
         progress={visitorGeoProgress}
         error={visitorGeoError}
+        mapScopeKey={visitorGeoMapScopeKey}
+        onRefreshGeocoding={handleRefreshVisitorGeocoding}
       />
 
       <Dialog open={printPreviewOpen} onOpenChange={handlePrintPreviewOpenChange}>
