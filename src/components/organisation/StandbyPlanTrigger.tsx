@@ -48,13 +48,15 @@ export function StandbyPlanTrigger({
         </span>
       </button>
 
-      <StandbyPlanModal
-        open={open}
-        onOpenChange={setOpen}
-        planCode={planCode}
-        planDisplayName={planDisplayName}
-        monthlyPriceEur={monthlyPriceEur}
-      />
+      {open ? (
+        <StandbyPlanModal
+          open={open}
+          onOpenChange={setOpen}
+          planCode={planCode}
+          planDisplayName={planDisplayName}
+          monthlyPriceEur={monthlyPriceEur}
+        />
+      ) : null}
     </>
   );
 }
