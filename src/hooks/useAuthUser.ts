@@ -3,6 +3,7 @@ import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import { fetchUserRoleFromDb, getRoleIdFromJwt, getRoleNameFromJwt, mergeRoleFromDbAndJwt, mapRoleNameFromRoleId, normalizeRoleName, resolveSessionRoleId } from "@/lib/authUser";
+import { persistUserIpOnLogin } from "@/lib/persistUserIpOnLogin";
 import { resolveAgencyExpoFromJwt } from "@/lib/userScope";
 
 export type AuthUserWithRole = {
@@ -194,8 +195,11 @@ export function useAuthUser() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
+      if (session?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        void persistUserIpOnLogin(session.user.id);
+      }
       void applySession(session);
     });
 

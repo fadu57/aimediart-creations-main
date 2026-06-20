@@ -10,7 +10,7 @@
   padding: 0;
   background: #fff;
   color: #111827;
-  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 .statistics-pdf-document * {
@@ -18,7 +18,7 @@
 }
 
 .statistics-pdf-document .statistics-pdf-sans {
-  font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Pages logiques du rapport (structure demandée) */
@@ -90,7 +90,7 @@
 }
 
 .statistics-pdf-kpi-value {
-  font-family: ui-serif, Georgia, serif;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-size: 1.1rem;
   font-weight: 700;
   margin-top: 0.25rem;

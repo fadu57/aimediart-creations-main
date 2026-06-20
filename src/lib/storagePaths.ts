@@ -109,8 +109,16 @@ export async function uploadExpoLogo(expoId: string, file: File | Blob, fileName
 export function normalizeStoragePublicUrl(url: string | null | undefined): string {
   const raw = (url ?? "").trim();
   if (!raw) return "";
-  if (raw.includes("/object/public/")) return raw;
-  return raw
+
+  let normalized = raw
     .replace("/storage/v1/object/authenticated/", "/storage/v1/object/public/")
     .replace("/storage/v1/object/images/", "/storage/v1/object/public/images/");
+
+  // Migration URL incorrecte : …/photos/visitors/selfies/{fichier} → …/photos/visitors/{fichier}
+  normalized = normalized.replace(/\/photos\/visitors\/selfies\//gi, "/photos/visitors/");
+
+  // Legacy bucket selfies : …/selfies/selfies/{fichier} → …/photos/visitors/{fichier}
+  normalized = normalized.replace(/\/selfies\/selfies\//gi, "/photos/visitors/");
+
+  return normalized;
 }

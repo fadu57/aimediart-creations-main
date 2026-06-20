@@ -4,6 +4,10 @@ import { Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { getOrCreateVisitorUuid, getVisitorLocaleMetadata } from "@/lib/visitorIdentity";
+import {
+  ensureVisitorSessionBeforeFeedback,
+  resolveFeedbackVisitorId,
+} from "@/lib/registerAnonymousVisitorSession";
 import { getCurrentExpoId, setCurrentExpoId } from "@/lib/expoContext";
 import aimediartLogoUrl from "@/assets/aimediart-logo.png";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
@@ -394,33 +398,6 @@ const Oeuvre = () => {
     }
   };
 
-  const ensureAnonymousVisitor = async () => {
-    const possibleNameColumns = ["name", "visitor_name", "name_visitor", "full_name"];
-
-    for (const column of possibleNameColumns) {
-      const { data, error } = await supabase
-        .from("visitors")
-        .select("id")
-        .eq(column, "Anonymous")
-        .limit(1)
-        .maybeSingle();
-
-      if (!error && data?.id) {
-        return String(data.id);
-      }
-    }
-
-    for (const column of possibleNameColumns) {
-      const payload = { [column]: "Anonymous" };
-      const { data, error } = await supabase.from("visitors").insert(payload).select("id").maybeSingle();
-      if (!error && data?.id) {
-        return String(data.id);
-      }
-    }
-
-    throw new Error("Impossible de créer ou retrouver le visiteur Anonymous dans `visitors`.");
-  };
-
   const handleValidate = async () => {
     if (!emotionSelectionnee || note < 1) return;
 
@@ -433,8 +410,11 @@ const Oeuvre = () => {
         throw new Error("expo_id ou agency_id manquant pour enregistrer le feedback.");
       }
 
-      if (!session) {
-        await ensureAnonymousVisitor();
+      const authUserId = session?.user?.id?.trim() || null;
+      await ensureVisitorSessionBeforeFeedback(authUserId);
+      const visitorId = resolveFeedbackVisitorId(authUserId);
+      if (!visitorId) {
+        throw new Error("Identifiant visiteur indisponible.");
       }
 
       const { error } = await supabase.from("visitor_feedback").insert({
@@ -443,6 +423,7 @@ const Oeuvre = () => {
         heart_rating: note,
         expo_id: expoId,
         agency_id: agencyId,
+        visitor_id: visitorId,
       });
 
       if (error) {

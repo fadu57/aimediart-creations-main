@@ -122,6 +122,7 @@ export interface Database {
           timezone: string | null;
           language: string | null;
           birth_year: number | null;
+          ip_address: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -138,6 +139,7 @@ export interface Database {
           timezone?: string | null;
           language?: string | null;
           birth_year?: number | null;
+          ip_address?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -154,6 +156,7 @@ export interface Database {
           timezone?: string | null;
           language?: string | null;
           birth_year?: number | null;
+          ip_address?: string | null;
           updated_at?: string | null;
         };
         Relationships: [{ foreignKeyName: "profiles_id_fkey"; columns: ["id"]; referencedRelation: "users"; referencedColumns: ["id"] }];
@@ -630,6 +633,40 @@ export interface Database {
           p_auth_user_id: string;
         };
         Returns: boolean;
+      };
+      sync_auth_user_ip_on_login: {
+        Args: {
+          p_ip_address: string;
+          p_visitor_client_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      get_statistics_geography_visitors: {
+        Args: {
+          p_agency_id?: string | null;
+          p_expo_id?: string | null;
+          p_date_from?: string | null;
+          p_date_to?: string | null;
+          p_artwork_ids?: string[] | null;
+        };
+        Returns: Array<{
+          visitor_key: string | null;
+          visitor_pseudo: string | null;
+          visitor_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
+          username: string | null;
+          avatar_url: string | null;
+          selfie_url: string | null;
+          city: string | null;
+          zip_code: string | null;
+          country: string | null;
+          country_code: string | null;
+          ip_address: string | null;
+          auth_user_id: string | null;
+          visitor_client_id: string | null;
+          visitor_db_id: string | null;
+        }>;
       };
       /** SECURITY DEFINER — `visitor_client_id` = UUID navigateur persisté localement. */
       confirm_visitor_pseudo_from_client: {

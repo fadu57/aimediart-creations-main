@@ -14,6 +14,7 @@ import {
   uploadVisitorSelfiePhoto,
 } from "@/lib/storagePaths";
 import { applyVisitorPersonaDefautFromProfile } from "@/lib/visitorDefaultPersona";
+import { persistUserIpOnLogin } from "@/lib/persistUserIpOnLogin";
 
 type EdgeIpResponse = {
   ip_address?: string | null;
@@ -97,6 +98,44 @@ export type AnonymousVisitorSession = {
   /** PK `public.visitors.id` retournée par la RPC (null si non disponible). */
   visitorDbId: string | null;
 };
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** Identifiant stocké dans `visitor_feedback.visitor_id`. */
+export function resolveFeedbackVisitorId(authUserId?: string | null): string {
+  const fingerprintId = getOrCreateVisitorUuid().trim();
+  const rawVisitorId = authUserId?.trim() || fingerprintId;
+  if (rawVisitorId && isUuidLike(rawVisitorId)) return rawVisitorId;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "";
+}
+
+/**
+ * Assure une ligne `visitors` (avec IP) avant tout feedback.
+ * Anonyme : `register_anonymous_visitor` via UUID navigateur.
+ * Connecté : met à jour le visiteur + lie `auth_user_id` pour retrouver l'IP ensuite.
+ */
+export async function ensureVisitorSessionBeforeFeedback(authUserId?: string | null): Promise<void> {
+  await registerAnonymousVisitorSession();
+
+  const authId = authUserId?.trim() || null;
+  const visitorUuid = getOrCreateVisitorUuid().trim();
+  if (!authId || !visitorUuid) return;
+
+  await persistUserIpOnLogin(authId, { visitorClientId: visitorUuid, force: true });
+
+  const { error } = await supabase.rpc("link_visitor_to_auth_user", {
+    p_visitor_client_id: visitorUuid,
+    p_auth_user_id: authId,
+  });
+  if (error) {
+    throw new Error(error.message);
+  }
+}
 
 /** Enregistre ou met à jour la ligne `visitors` pour l’UUID navigateur courant. */
 export async function registerAnonymousVisitorSession(): Promise<AnonymousVisitorSession> {

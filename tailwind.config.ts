@@ -18,6 +18,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -94,6 +98,18 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "mediation-indeterminate": "mediation-indeterminate 2.2s ease-in-out infinite",
+      },
+      typography: {
+        DEFAULT: {
+          css: {
+            fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+            h1: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+            h2: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+            h3: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+            h4: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+            strong: { fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+          },
+        },
       },
     },
   },

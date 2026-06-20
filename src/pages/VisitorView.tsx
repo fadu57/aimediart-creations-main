@@ -39,7 +39,9 @@ import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { fetchExpoRowForVisitor, readExpoScanSequenceNavigation } from "@/lib/visitorExpoFetch";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
 import {
+  ensureVisitorSessionBeforeFeedback,
   localizeVisitorAnonymousProfile,
+  resolveFeedbackVisitorId,
   resolveReturningAnonymousVisitor,
 } from "@/lib/registerAnonymousVisitorSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
@@ -1020,14 +1022,15 @@ const VisitorViewCore = () => {
     const resolvedExpoIdRaw = expoId || artwork?.artwork_expo_id?.trim() || "";
     const resolvedArtworkId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
     const emotionId = selectedEmotion?.trim() || "";
-    const fingerprintId = getOrCreateVisitorUuid().trim();
-    const rawVisitorId = session?.user?.id?.trim() || fingerprintId;
-    const visitorId =
-      rawVisitorId && isUuidLike(rawVisitorId)
-        ? rawVisitorId
-        : (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : "");
+    const authUserId = session?.user?.id?.trim() || null;
+
+    try {
+      await ensureVisitorSessionBeforeFeedback(authUserId);
+    } catch (err) {
+      console.warn("[VisitorView] ensureVisitorSessionBeforeFeedback :", err);
+    }
+
+    const visitorId = resolveFeedbackVisitorId(authUserId);
 
     if (!resolvedArtworkId || !emotionId || !heartRating || !visitorId) {
       // Donnée critique absente : on n'envoie rien.

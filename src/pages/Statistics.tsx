@@ -29,6 +29,8 @@ import {
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
 import { formatBarVisitLabel, sumChartVisits } from "@/lib/statisticsCharts";
 import { StatisticsReportView, type StatisticsArtistCoverLetter, type StatisticsReportViewProps } from "@/components/statistics/StatisticsReportView";
+import { VisitorGeographySection } from "@/components/statistics/VisitorGeographySection";
+import { fetchVisitorGeographyForStatistics, geocodeVisitorGeoRows, type VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { getArtworksForDataScope } from "@/lib/userScope";
@@ -244,6 +246,11 @@ const Statistics = () => {
   const [crossError, setCrossError] = useState<string | null>(null);
   const [topArtworks, setTopArtworks] = useState<TopArtworkRow[]>([]);
   const [topArtworksError, setTopArtworksError] = useState<string | null>(null);
+  const [visitorGeoRows, setVisitorGeoRows] = useState<VisitorGeoTableRow[]>([]);
+  const [visitorGeoLoading, setVisitorGeoLoading] = useState(false);
+  const [visitorGeoGeocoding, setVisitorGeoGeocoding] = useState(false);
+  const [visitorGeoProgress, setVisitorGeoProgress] = useState<{ done: number; total: number } | null>(null);
+  const [visitorGeoError, setVisitorGeoError] = useState<string | null>(null);
   const [activeArtworksCount, setActiveArtworksCount] = useState(0);
   const [topSortKey, setTopSortKey] = useState<TopSortKey>("visits");
   const [topSortDirection, setTopSortDirection] = useState<TopSortDirection>("desc");
@@ -1310,6 +1317,70 @@ const Statistics = () => {
     };
   }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, selectedArtistId, expoDateRange]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setVisitorGeoLoading(true);
+      setVisitorGeoGeocoding(false);
+      setVisitorGeoError(null);
+      setVisitorGeoProgress(null);
+      setVisitorGeoRows([]);
+
+      const targetAgencyId =
+        effectiveAgencyFilter ??
+        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+      const targetExpoId =
+        drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
+
+      try {
+        const { rows, error } = await fetchVisitorGeographyForStatistics({
+          targetAgencyId,
+          targetExpoId,
+          expoDateRange,
+        });
+
+        if (cancelled) return;
+        if (error) {
+          setVisitorGeoRows([]);
+          setVisitorGeoError(error);
+          return;
+        }
+
+        setVisitorGeoRows(rows);
+        setVisitorGeoLoading(false);
+
+        if (rows.length === 0) return;
+
+        setVisitorGeoGeocoding(true);
+        const enriched = await geocodeVisitorGeoRows(rows, (done, total) => {
+          if (!cancelled) setVisitorGeoProgress({ done, total });
+        });
+        if (cancelled) return;
+        setVisitorGeoRows(enriched);
+      } catch (err) {
+        if (cancelled) return;
+        setVisitorGeoRows([]);
+        setVisitorGeoError(err instanceof Error ? err.message : "Impossible de charger la géographie des visiteurs.");
+      } finally {
+        if (!cancelled) {
+          setVisitorGeoLoading(false);
+          setVisitorGeoGeocoding(false);
+          setVisitorGeoProgress(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    effectiveAgencyFilter,
+    drillExpoId,
+    scope.mode,
+    scope.agencyId,
+    scope.expoId,
+    expoDateRange,
+  ]);
+
   const emotionCatalog = useMemo(() => emotionCatalogFromDb, [emotionCatalogFromDb]);
 
   const emotionSeries = useMemo(() => {
@@ -2226,25 +2297,25 @@ const Statistics = () => {
           ) : crossRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("cross.empty")}</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("cross.colArtwork")}</th>
+                  <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("cross.colArtwork")}</th>
                   {crossEmotionColumns.map((emotion) => (
-                    <th key={emotion.id} className="text-center py-3 px-2 font-medium text-muted-foreground">
+                    <th key={emotion.id} className="text-center py-1 px-1 font-medium text-muted-foreground">
                       <button
                         type="button"
-                        className="inline-flex items-center justify-center gap-1 hover:text-foreground"
+                        className="inline-flex items-center justify-center gap-0.5 hover:text-foreground"
                         onClick={() => toggleCrossSort(emotion.id)}
                       >
-                        <span aria-hidden="true">
+                        <span className="text-sm leading-none" aria-hidden="true">
                           {emotion.name.toLowerCase().includes("troublé") ? "😵‍💫" : (emotion.icon || "")}
                         </span>
-                        <span>{t(`emotions.names.${normalizeEmotionKey(emotion.name)}`, { defaultValue: emotion.name })}</span>
+                        <span className="max-w-[4.5rem] truncate">{t(`emotions.names.${normalizeEmotionKey(emotion.name)}`, { defaultValue: emotion.name })}</span>
                         {crossSortEmotionId === emotion.id && crossSortDirection === "asc" ? (
-                          <ArrowUp className="h-3.5 w-3.5" />
+                          <ArrowUp className="h-3 w-3 shrink-0" />
                         ) : (
-                          <ArrowDown className="h-3.5 w-3.5" />
+                          <ArrowDown className="h-3 w-3 shrink-0" />
                         )}
                       </button>
                     </th>
@@ -2254,9 +2325,9 @@ const Statistics = () => {
               <tbody>
                 {sortedCrossRows.map((row) => (
                   <tr key={row.artworkId} className="border-b border-border/50">
-                    <td className="py-3 px-2 font-semibold">{row.name}</td>
+                    <td className="py-1 px-1.5 font-medium">{row.name}</td>
                     {crossEmotionColumns.map((emotion) => (
-                      <td key={`${row.artworkId}-${emotion.id}`} className="text-center py-3">
+                      <td key={`${row.artworkId}-${emotion.id}`} className="px-1 py-1 text-center tabular-nums">
                         {(row.counts[emotion.id] ?? 0) > 0 ? (row.counts[emotion.id] ?? 0) : "-"}
                       </td>
                     ))}
@@ -2280,36 +2351,36 @@ const Statistics = () => {
           ) : topArtworks.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("top.empty")}</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("top.colRank")}</th>
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">{t("top.colArtwork")}</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">
+                  <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("top.colRank")}</th>
+                  <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("top.colArtwork")}</th>
+                  <th className="text-right py-1 px-1.5 font-medium text-muted-foreground">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      className="inline-flex items-center gap-0.5 hover:text-foreground"
                       onClick={() => toggleTopSort("visits")}
                     >
                       <span>{t("top.colVisits")}</span>
                       {topSortKey === "visits" && topSortDirection === "asc" ? (
-                        <ArrowUp className="h-3.5 w-3.5" />
+                        <ArrowUp className="h-3 w-3" />
                       ) : (
-                        <ArrowDown className="h-3.5 w-3.5" />
+                        <ArrowDown className="h-3 w-3" />
                       )}
                     </button>
                   </th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">
+                  <th className="text-right py-1 px-1.5 font-medium text-muted-foreground">
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      className="inline-flex items-center gap-0.5 hover:text-foreground"
                       onClick={() => toggleTopSort("avgHearts")}
                     >
                       <span>{t("top.colAvgHearts")}</span>
                       {topSortKey === "avgHearts" && topSortDirection === "asc" ? (
-                        <ArrowUp className="h-3.5 w-3.5" />
+                        <ArrowUp className="h-3 w-3" />
                       ) : (
-                        <ArrowDown className="h-3.5 w-3.5" />
+                        <ArrowDown className="h-3 w-3" />
                       )}
                     </button>
                   </th>
@@ -2318,32 +2389,32 @@ const Statistics = () => {
               <tbody>
                 {sortedTopArtworks.map((row, index) => (
                   <tr key={row.artworkId} className="border-b border-border/50">
-                    <td className="py-3 px-2">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 font-semibold">
+                    <td className="py-1 px-1.5">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold">
                         {index + 1}
                       </div>
                     </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative overflow-hidden h-12 w-12 shrink-0 rounded-lg">
+                    <td className="py-1 px-1.5">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="relative h-[50px] w-[50px] shrink-0 overflow-hidden rounded-md">
                           {row.imageUrl ? (
                             <ImageWithSkeleton
                               src={row.imageUrl}
                               alt={row.title}
-                              className="h-12 w-12 rounded-lg object-cover shrink-0"
+                              className="h-[50px] w-[50px] shrink-0 rounded-md object-cover"
                             />
                           ) : (
-                            <div className="h-12 w-12 rounded-lg bg-muted" />
+                            <div className="h-[50px] w-[50px] rounded-md bg-muted" />
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold truncate">{row.title}</div>
-                          <div className="text-xs text-muted-foreground truncate">{row.artist}</div>
+                        <div className="min-w-0 truncate">
+                          <span className="font-medium">{row.title}</span>
+                          <span className="text-muted-foreground"> · {row.artist}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-right">{formatFrNumber(row.visits)} visite(s)</td>
-                    <td className="py-3 px-2 text-right">
+                    <td className="px-1.5 py-1 text-right tabular-nums">{formatFrNumber(row.visits)} visite(s)</td>
+                    <td className="px-1.5 py-1 text-right tabular-nums">
                       {row.avgHearts == null
                         ? "—"
                         : formatFrNumber(row.avgHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
@@ -2355,6 +2426,14 @@ const Statistics = () => {
           )}
         </CardContent>
       </Card>
+
+      <VisitorGeographySection
+        rows={visitorGeoRows}
+        loading={visitorGeoLoading}
+        geocoding={visitorGeoGeocoding}
+        progress={visitorGeoProgress}
+        error={visitorGeoError}
+      />
 
       <Dialog open={printPreviewOpen} onOpenChange={handlePrintPreviewOpenChange}>
         <DialogContent

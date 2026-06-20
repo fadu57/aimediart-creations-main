@@ -136,5 +136,28 @@
   },
   "common": {
     "chartNoData": "Datos insuficientes para un gráfico."
+  },
+  "geography": {
+    "title": "Origen geográfico de los visitantes y los organizadores",
+    "disclaimer": "El origen geográfico es aproximado: se deduce de la dirección IP pública del visitante o, en su defecto, de la ciudad y el país registrados. Las IP pueden corresponder a un operador móvil, una VPN o un proxy, y no siempre reflejan el lugar real de la visita. La precisión suele ser a nivel de ciudad o región, no de una dirección exacta.",
+    "loading": "Geolocalizando visitantes…",
+    "loadingProgress": "Geolocalización ({{done}}/{{total}})…",
+    "empty": "Ningún visitante en este ámbito.",
+    "mapEmpty": "Ninguna posición cartografiable para este ámbito.",
+    "mapHint": "{{mapped}} visitante(s) en el mapa de {{total}} en total.",
+    "legendVisitor": "Visitante (tabla visitors)",
+    "legendOrganizer": "Organizador (tabla profiles)",
+    "colVisitor": "Visitante",
+    "colPseudo": "Apodo",
+    "colCity": "Ciudad",
+    "colCountry": "País",
+    "colRegion": "Región",
+    "colSource": "Fuente",
+    "sources": {
+      "ip": "Dirección IP",
+      "place": "Ciudad / país",
+      "ip_pending": "dir. IP pendiente",
+      "unavailable": "No disponible"
+    }
   }
 }
