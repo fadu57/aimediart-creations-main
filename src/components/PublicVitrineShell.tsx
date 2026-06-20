@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import * as THREE from "three";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, Heart, Menu, X } from "lucide-react";
@@ -195,9 +196,7 @@ function VantaCloudsBackground() {
 
     const initVanta = async () => {
       try {
-        const threeModule = await import("three");
-        const THREE =
-          (threeModule as { default?: typeof threeModule }).default ?? threeModule;
+        (window as Window & { THREE?: typeof THREE }).THREE = THREE;
         const vantaModule = await import("vanta/dist/vanta.clouds.min");
         const CLOUDS = (vantaModule.default ?? vantaModule) as (options: Record<string, unknown>) => {
           destroy: () => void;

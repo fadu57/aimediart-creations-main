@@ -33,12 +33,19 @@ import { StandbyPlanTrigger } from "@/components/organisation/StandbyPlanTrigger
 import type { StandbyPlanCode } from "@/components/organisation/StandbyPlanModal";
 
 import expositionVivantePhoto from "@/assets/exposition-vivante.png";
+import expositionVivanteWebp from "@/assets/exposition-vivante.webp";
 import oreilleAttentivePhoto from "@/assets/oreille-attentive.png";
+import oreilleAttentiveWebp from "@/assets/oreille-attentive.webp";
 import outputCreatifPhoto from "@/assets/output-creatif.png";
+import outputCreatifWebp from "@/assets/output-creatif.webp";
 import parcoursPhoto from "@/assets/parcours.png";
+import parcoursWebp from "@/assets/parcours.webp";
 import tarifsPhoto from "@/assets/tarifs.png";
+import tarifsWebp from "@/assets/tarifs.webp";
 import accessibilitePhoto from "@/assets/accessibilite.png";
+import accessibiliteWebp from "@/assets/accessibilite.webp";
 import contactPhoto from "@/assets/contact.png";
+import contactWebp from "@/assets/contact.webp";
 import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
 import { AIMEDIART_CONTACT_MAILTO } from "@/lib/aimediartContact";
 
@@ -394,6 +401,7 @@ function SurfaceCardShell({
   decorations,
   children,
   backgroundImage,
+  backgroundWebp,
   backgroundImageAlt,
   backgroundGradient = "left",
   backgroundImageLayout = "side-fade",
@@ -401,6 +409,7 @@ function SurfaceCardShell({
   decorations?: ReactNode;
   children: ReactNode;
   backgroundImage?: string;
+  backgroundWebp?: string;
   backgroundImageAlt?: string;
   backgroundGradient?: "left" | "right";
   /** side-fade : photo sur le côté (connexion) ; full-width : photo entière sur toute la largeur */
@@ -432,9 +441,10 @@ function SurfaceCardShell({
               >
                 <OptimizedImage
                   src={backgroundImage}
+                  webpSrc={backgroundWebp}
                   alt=""
                   className="block h-auto w-full object-contain object-top"
-                  loading="lazy"
+                  loading="eager"
                   aria-hidden
                 />
               </div>
@@ -447,12 +457,13 @@ function SurfaceCardShell({
             <>
               <OptimizedImage
                 src={backgroundImage}
+                webpSrc={backgroundWebp}
                 alt={backgroundImageAlt ?? ""}
                 className={cn(
                   "pointer-events-none absolute inset-0 h-full w-full object-cover",
                   backgroundGradient === "right" ? "object-left" : "object-right",
                 )}
-                loading="lazy"
+                loading="eager"
                 aria-hidden={!backgroundImageAlt}
               />
               <div
@@ -483,6 +494,7 @@ function Section({
   children,
   surfaceCard = false,
   backgroundImage,
+  backgroundWebp,
   backgroundImageAlt,
   backgroundGradient = "left",
   backgroundImageLayout = "side-fade",
@@ -496,6 +508,7 @@ function Section({
   /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
   surfaceCard?: boolean;
   backgroundImage?: string;
+  backgroundWebp?: string;
   backgroundImageAlt?: string;
   backgroundGradient?: "left" | "right";
   backgroundImageLayout?: "side-fade" | "full-width";
@@ -525,6 +538,7 @@ function Section({
         {surfaceCard ? (
           <SurfaceCardShell
             backgroundImage={backgroundImage}
+            backgroundWebp={backgroundWebp}
             backgroundImageAlt={backgroundImageAlt}
             backgroundGradient={backgroundGradient}
             backgroundImageLayout={backgroundImageLayout}
@@ -786,9 +800,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <OptimizedImage
                 src={expositionVivantePhoto}
+                webpSrc={expositionVivanteWebp}
                 alt={t("exposition.image_alt")}
                 className="home-hero-image"
-                loading="lazy"
+                loading="eager"
                 width={1010}
                 height={288}
               />
@@ -823,9 +838,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               <figure className="ml-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-neutral-300/70 bg-white shadow-[0_10px_20px_rgba(0,0,0,0.04)]">
                 <OptimizedImage
                   src={oreilleAttentivePhoto}
+                  webpSrc={oreilleAttentiveWebp}
                   alt={t("oreille.image_alt")}
                   className="aspect-[4/3] w-full max-w-[300px] overflow-visible object-cover object-center object-bottom sm:aspect-[5/4] lg:aspect-auto lg:h-[350px] lg:min-h-[350px] lg:w-[300px]"
-                  loading="lazy"
+                  loading="eager"
                   width={300}
                   height={350}
                 />
@@ -886,9 +902,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <OptimizedImage
                 src={outputCreatifPhoto}
+                webpSrc={outputCreatifWebp}
                 alt={t("output.image_alt")}
                 className="home-hero-image"
-                loading="lazy"
+                loading="eager"
                 width={1010}
                 height={288}
               />
@@ -1044,9 +1061,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <OptimizedImage
                 src={parcoursPhoto}
+                webpSrc={parcoursWebp}
                 alt={t("parcours.image_alt")}
                 className="home-hero-image"
-                loading="lazy"
+                loading="eager"
                 width={1010}
                 height={288}
               />
@@ -1106,6 +1124,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="tarifs"
           title={t("tarifs.title")}
           backgroundImage={tarifsPhoto}
+          backgroundWebp={tarifsWebp}
           backgroundImageAlt={t("tarifs.image_alt")}
           backgroundImageLayout="full-width"
         >
@@ -1401,9 +1420,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <OptimizedImage
                 src={accessibilitePhoto}
+                webpSrc={accessibiliteWebp}
                 alt={t("access.image_alt")}
                 className="home-hero-image"
-                loading="lazy"
+                loading="eager"
                 width={1010}
                 height={288}
               />
@@ -1435,9 +1455,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             <div className="relative mx-auto w-full max-w-[1010px] overflow-hidden rounded-2xl">
               <OptimizedImage
                 src={contactPhoto}
+                webpSrc={contactWebp}
                 alt={t("contact.image_alt")}
                 className="home-hero-image"
-                loading="lazy"
+                loading="eager"
                 width={1010}
                 height={288}
               />

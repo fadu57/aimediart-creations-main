@@ -130,10 +130,15 @@ export function escapeHtmlAttribute(value: string): string {
 export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload): string {
   const jsonLd = JSON.stringify(buildOrganisationJsonLd(seo)).replace(/</g, "\\u003c");
   const lcpWebpUrl = `${seo.siteOrigin}${ORGANISATION_LCP_WEBP_PATH}`;
+  const preloadLcp = !seo.pageUrl.includes("#") || /#accueil(?:$|[?&])/.test(seo.pageUrl);
   const performanceHints = `
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-    <link rel="preload" as="image" type="image/webp" href="${escapeHtmlAttribute(lcpWebpUrl)}" fetchpriority="high" />`;
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />${
+      preloadLcp
+        ? `
+    <link rel="preload" as="image" type="image/webp" href="${escapeHtmlAttribute(lcpWebpUrl)}" fetchpriority="high" />`
+        : ""
+    }`;
   const headBlock = `
     <title>${escapeHtmlAttribute(seo.title)}</title>
     <meta name="description" content="${escapeHtmlAttribute(seo.description)}" />

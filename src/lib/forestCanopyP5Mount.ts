@@ -261,14 +261,16 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
 
     /** DPR natif (1 sur écran standard, 2 sur Retina / beaucoup de 4K) — pas de forçage artificiel. */
     const applyPixelDensity = () => {
-      const raw =
-        typeof pAny.displayDensity === "function"
-          ? pAny.displayDensity()
-          : typeof window !== "undefined"
-            ? window.devicePixelRatio || 1
-            : 1;
+      let raw = 1;
+      if (typeof pAny.displayDensity === "function") {
+        raw = pAny.displayDensity();
+      } else if (typeof window !== "undefined") {
+        raw = window.devicePixelRatio || 1;
+      }
       const d = Math.max(1, Math.round(Number(raw) || 1));
-      pAny.pixelDensity?.(d);
+      if (typeof pAny.pixelDensity === "function") {
+        pAny.pixelDensity(d);
+      }
     };
 
     /** Pas de scaling CSS sur le canvas : seul le flag agrandissement sans flou navigateur (TV). */
@@ -320,7 +322,9 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
 
     p.setup = () => {
       try {
-        pAny.setAttributes?.("alpha", false);
+        if (typeof pAny.setAttributes === "function") {
+          pAny.setAttributes("alpha", false);
+        }
       } catch {
         /* 2D / versions sans setAttributes */
       }

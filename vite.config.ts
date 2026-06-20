@@ -47,6 +47,10 @@ export default defineConfig(({ mode }) => {
   build: {
     // p5 / three-vanta / bootstrap : chunks lourds volontairement lazy-loadés
     chunkSizeWarningLimit: 1200,
+    // p5 analyse sketch.toString() au runtime : conserver les noms évite les erreurs Acorn en prod
+    esbuild: {
+      keepNames: true,
+    },
     rollupOptions: {
       output: {
         // Découpage minimal : uniquement libs lourdes et isolées (évite les cycles charts/i18n).
