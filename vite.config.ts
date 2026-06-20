@@ -45,6 +45,8 @@ export default defineConfig(({ mode }) => {
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
   build: {
+    // p5 / three-vanta / bootstrap : chunks lourds volontairement lazy-loadés
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         // Découpage minimal : uniquement libs lourdes et isolées (évite les cycles charts/i18n).
