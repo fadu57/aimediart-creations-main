@@ -99,14 +99,30 @@ function planNameAsciiUpper(plan: string | null): string {
     .replace(/\p{M}/gu, "");
 }
 
-/** Zénith / Zenith : non affiché sur la vitrine tarifs ; filtré avant le groupement. */
+/** Zénith / Zenith : carte pleine largeur sous la grille 2×2. */
 function isZenithPlanName(plan: string | null): boolean {
   return planNameAsciiUpper(plan).includes("ZENITH");
 }
 
-/** Offre Rayonnement : libellés et mise en page spécifiques sur la carte tarifs. */
+/** Offre Rayonnement : réseaux d'expositions, sur devis. */
 function isRayonnementPlanName(plan: string | null): boolean {
   return planNameAsciiUpper(plan).includes("RAYONNEMENT");
+}
+
+function isQuoteOnlyPlanName(plan: string | null): boolean {
+  return isZenithPlanName(plan);
+}
+
+function isCustomLanguagesPlanCode(code: string): boolean {
+  return code.includes("ZENITH");
+}
+
+/** Sur devis uniquement si Zénith ou ligne sans prix mensuel explicitement marquée devis. */
+function isQuoteOnlyRow(row: PricingRow): boolean {
+  const code = planCodeFromRow(row);
+  if (code.includes("ZENITH")) return true;
+  if (typeof row.pricing_monthly_ttc_eur === "number") return false;
+  return row.is_quote_only === true;
 }
 
 const PLAN_ORDER: Record<string, number> = {
@@ -144,18 +160,26 @@ function variantOptionCode(plan: string | null, optionIndexZeroBased: number): s
 }
 
 /** Colonne « Annuel TTC » : masquée si offre gratuite ou montants annuels nuls / absents. */
-function shouldShowAnnualPricingColumn(row: PricingRow, isRayonnement: boolean): boolean {
-  if (isRayonnement) return false;
+function shouldShowAnnualPricingColumn(row: PricingRow, isQuoteOnly: boolean): boolean {
+  if (isQuoteOnly) return false;
   if (row.pricing_monthly_ttc_eur === 0) return false;
   const ar = row.pricing_annual_remis ?? 0;
   const af = row.pricing_annuel ?? 0;
   return !(ar === 0 && af === 0);
 }
 
+function planCodeFromRow(row: PricingRow): string {
+  if (row.plan_code?.trim()) return planNameAsciiUpper(row.plan_code);
+  return planNameAsciiUpper(row.pricing_plan);
+}
+
 function capacityLabel(row: PricingRow, t: TFunction): string {
-  if (row.pricing_is_unlimited) return t("tarifs.capacity_unlimited");
   const maxOeuvres = row.pricing_max_oeuvres;
   const maxVisitors = row.princing_max_visitors;
+  const hasConcreteLimits =
+    (typeof maxOeuvres === "number" && maxOeuvres > 0) ||
+    (typeof maxVisitors === "number" && maxVisitors > 0);
+  if (row.pricing_is_unlimited && !hasConcreteLimits) return t("tarifs.capacity_unlimited");
   const oeuvresPart =
     typeof maxOeuvres === "number" && maxOeuvres > 0
       ? t("tarifs.capacity_oeuvres", { count: maxOeuvres })
@@ -171,9 +195,33 @@ function capacityLabel(row: PricingRow, t: TFunction): string {
   return base;
 }
 
-function planCodeFromRow(row: PricingRow): string {
-  if (row.plan_code?.trim()) return planNameAsciiUpper(row.plan_code);
-  return planNameAsciiUpper(row.pricing_plan);
+function CapacityBlockSummary({ row, t }: { row: PricingRow; t: TFunction }) {
+  const maxOeuvres = row.pricing_max_oeuvres;
+  const maxVisitors = row.princing_max_visitors;
+  const hasConcreteLimits =
+    (typeof maxOeuvres === "number" && maxOeuvres > 0) ||
+    (typeof maxVisitors === "number" && maxVisitors > 0);
+
+  if (row.pricing_is_unlimited && !hasConcreteLimits) {
+    return <div className="text-sm font-semibold leading-snug">{t("tarifs.capacity_unlimited")}</div>;
+  }
+
+  return (
+    <div className="text-sm font-semibold leading-snug">
+      {typeof maxOeuvres === "number" && maxOeuvres > 0 ? (
+        <div>{t("tarifs.capacity_oeuvres_block", { count: maxOeuvres })}</div>
+      ) : null}
+      {typeof maxVisitors === "number" && maxVisitors > 0 ? (
+        <div>{t("tarifs.capacity_visitors_block", { count: maxVisitors })}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function shouldHideStandbyDetailRow(row: PricingRow, hideStandbyRow: boolean): boolean {
+  if (hideStandbyRow) return true;
+  const code = planCodeFromRow(row);
+  return code.includes("ETINCELLE") || code.includes("RAYONNEMENT") || code.includes("ZENITH");
 }
 
 function optionUnitPrice(row: PricingRow, optionCode: string): number | null {
@@ -191,14 +239,14 @@ function formatCompactEur(value: number | null | undefined, locale: string): str
 }
 
 function planStandbyLabel(row: PricingRow, t: TFunction, locale: string): string {
-  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.sur_devis");
+  if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.sur_devis");
   const price = optionUnitPrice(row, "STANDBY");
   if (typeof price !== "number" || price <= 0) return t("tarifs.usage_none");
   return t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
 }
 
 function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): string {
-  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.languages_custom");
+  if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
   const min = row.included_mediation_langs_min;
   const max = row.included_mediation_langs_max ?? min;
   const extraPrice = optionUnitPrice(row, "EXTRA_MEDIATION_LANG");
@@ -213,24 +261,31 @@ function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): stri
   } else {
     return t("tarifs.usage_none");
   }
+  if (planCodeFromRow(row).includes("RAYONNEMENT")) {
+    return `${included} ${t("tarifs.languages_extra_on_quote")}`;
+  }
   if (typeof extraPrice !== "number") return included;
   return `${included} · ${t("tarifs.languages_extra", { price: formatCompactEur(extraPrice, locale) })}`;
 }
 
 function planAudioLabel(row: PricingRow, t: TFunction, locale: string): string {
-  if (planCodeFromRow(row).includes("RAYONNEMENT")) return t("tarifs.languages_custom");
+  if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
   const audioLangs = row.included_audio_langs ?? 0;
   const extraPrice = optionUnitPrice(row, "EXTRA_AUDIO_LANG");
   if (audioLangs <= 0) return t("tarifs.audio_none");
   const included =
     audioLangs === 1 ? t("tarifs.audio_included_one") : t("tarifs.audio_included_many", { count: audioLangs });
+  if (planCodeFromRow(row).includes("RAYONNEMENT")) {
+    return `${included} ${t("tarifs.languages_extra_on_quote")}`;
+  }
   if (typeof extraPrice !== "number") return included;
   return `${included} · ${t("tarifs.audio_extra", { price: formatCompactEur(extraPrice, locale) })}`;
 }
 
 function planUsageLabel(row: PricingRow, t: TFunction): string {
   const code = planCodeFromRow(row);
-  if (code.includes("RAYONNEMENT")) return t("tarifs.usage_custom_event");
+  if (code.includes("ZENITH")) return t("tarifs.usage_custom_event");
+  if (code.includes("RAYONNEMENT")) return t("tarifs.usage_network");
   if (code.includes("ETINCELLE") || row.trial_duration_days === 30) return t("tarifs.usage_limited_one_month");
   return t("tarifs.usage_no_limit");
 }
@@ -246,24 +301,27 @@ function PlanPricingDetails({
   row,
   t,
   locale,
-  isRayonnement,
+  isQuoteOnly,
   hideStandbyRow = false,
 }: {
   row: PricingRow;
   t: TFunction;
   locale: string;
-  isRayonnement: boolean;
+  isQuoteOnly: boolean;
   hideStandbyRow?: boolean;
 }) {
+  const hideStandby = shouldHideStandbyDetailRow(row, hideStandbyRow);
+  const usageValue = planUsageLabel(row, t);
+  const showUsageRow = usageValue !== t("tarifs.usage_no_limit");
   const rows = [
-    ...(!hideStandbyRow ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale) }] : []),
-    ...(!isRayonnement
+    ...(!hideStandby ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale) }] : []),
+    ...(!isQuoteOnly
       ? [
           { label: t("tarifs.option_languages"), value: planLanguagesLabel(row, t, locale) },
           { label: t("tarifs.option_audio"), value: planAudioLabel(row, t, locale) },
         ]
       : []),
-    { label: t("tarifs.option_usage"), value: planUsageLabel(row, t) },
+    ...(showUsageRow ? [{ label: t("tarifs.option_usage"), value: usageValue }] : []),
   ];
 
   return (
@@ -292,7 +350,21 @@ function planEditorialDescription(plan: string, t: TFunction): string {
   if (upper.includes("RAYONNEMENT")) {
     return t("tarifs.plan_desc_rayonnement");
   }
+  if (upper.includes("ZENITH") || upper.includes("ZÉNITH")) {
+    return t("tarifs.plan_desc_zenith");
+  }
   return "Offre AIMEDIArt.";
+}
+
+function QuotePlanSummary({ kind, t }: { kind: "rayonnement" | "zenith"; t: TFunction }) {
+  const prefix = kind === "rayonnement" ? "plan_summary_rayonnement" : "plan_summary_zenith";
+  return (
+    <div className="text-sm leading-snug">
+      <div className="font-semibold">{t(`tarifs.${prefix}_title`)}</div>
+      <p className="mt-1 font-normal">{t(`tarifs.${prefix}_audience`)}</p>
+      <p className="mt-1 font-normal italic">{t(`tarifs.${prefix}_footer`)}</p>
+    </div>
+  );
 }
 
 /** Titre court en tête de carte : seul le nom du palier, traduit via i18n. */
@@ -303,6 +375,7 @@ function planCardTitleShort(plan: string | null, t: TFunction): string {
     .replace(/^LE\s+/i, "")
     .trim();
 
+  if (core.includes("ZENITH")) return t("tarifs.plan_name_zenith");
   if (core.includes("RAYONNEMENT")) return t("tarifs.plan_name_rayonnement");
   if (core.includes("HORIZON")) return t("tarifs.plan_name_horizon");
   if (core.includes("ATELIER")) return t("tarifs.plan_name_atelier");
@@ -534,9 +607,20 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
     };
   }, [resolvedInitialData]);
 
+  const zenithPlan = useMemo(
+    () =>
+      pricingRows.find(
+        (r) => isZenithPlanName(r.plan_code) || isZenithPlanName(r.pricing_plan),
+      ) ?? null,
+    [pricingRows],
+  );
+
   const groupedPlans = useMemo(() => {
     const rows = [...pricingRows].filter(
-      (r) => (r.pricing_plan ?? "").trim().length > 0 && !isZenithPlanName(r.pricing_plan),
+      (r) =>
+        (r.pricing_plan ?? "").trim().length > 0 &&
+        !isZenithPlanName(r.pricing_plan) &&
+        !isZenithPlanName(r.plan_code),
     );
     rows.sort((a, b) => {
       const p = planSortKey(a.pricing_plan) - planSortKey(b.pricing_plan);
@@ -1055,7 +1139,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     const selectedIndex = Math.min(Math.max(selectedIndexRaw, 0), Math.max(variants.length - 1, 0));
                     const selectedVariant = variants[selectedIndex];
                     const isRayonnementCard = isRayonnementPlanName(displayPlan);
-                    const showAnnualColumn = shouldShowAnnualPricingColumn(selectedVariant, isRayonnementCard);
+                    const isQuoteOnlyCard = selectedVariant
+                      ? isQuoteOnlyRow(selectedVariant)
+                      : isQuoteOnlyPlanName(displayPlan);
+                    const showAnnualColumn = shouldShowAnnualPricingColumn(selectedVariant, isQuoteOnlyCard);
                     const subtitle =
                       rawLabel && !repeatsPlanName
                         ? rawLabel
@@ -1085,8 +1172,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             </span>
                             <Link
                               to={
-                                isRayonnementCard
-                                  ? "/organisation/commencer?intent=devis"
+                                isQuoteOnlyCard
+                                  ? `/organisation/commencer?intent=devis&plan=${encodeURIComponent(displayPlan)}`
                                   : `/organisation/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
                               }
                             >
@@ -1095,7 +1182,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                 className="h-8 rounded-lg px-3 text-xs font-semibold"
                                 style={{ backgroundColor: "#9D2525", color: "white" }}
                               >
-                                {isRayonnementCard ? t("tarifs.cta_devis") : t("tarifs.cta_commander")}
+                                {isQuoteOnlyCard ? t("tarifs.cta_devis") : t("tarifs.cta_commander")}
                               </Button>
                             </Link>
                           </div>
@@ -1132,31 +1219,18 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             <div className="rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
                               <div className="flex flex-col gap-3">
                                 <div
-                                  className={cn(
-                                    "flex items-center justify-between gap-3",
-                                    isRayonnementCard && "lg:justify-start",
-                                  )}
+                                  className="flex items-center justify-between gap-3"
                                 >
                                   <div>
-                                    {isRayonnementCard ? (
-                                      <div className="text-sm leading-snug">
-                                        <div className="font-semibold">{t("tarifs.plan_summary_rayonnement_title")}</div>
-                                        <p className="mt-1 font-normal">{t("tarifs.plan_summary_rayonnement_audience")}</p>
-                                        <p className="mt-1 font-normal italic">{t("tarifs.plan_summary_rayonnement_footer")}</p>
-                                      </div>
-                                    ) : (
-                                      <div className="text-sm font-semibold leading-snug">
-                                        {capacityLabel(selectedVariant, t)}
-                                      </div>
-                                    )}
+                                    <CapacityBlockSummary row={selectedVariant} t={t} />
                                   </div>
-                                  {!isRayonnementCard && selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
+                                  {!isQuoteOnlyCard && selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
                                     <span className="rounded-full border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-medium text-foreground/80">
                                       {t("tarifs.option_prefix", { code: variantOptionCode(displayPlan, selectedIndex) })}
                                     </span>
                                   ) : null}
                                 </div>
-                                {!isRayonnementCard ? (
+                                {!isQuoteOnlyCard ? (
                                   <div
                                     className={cn(
                                       "grid gap-2",
@@ -1166,21 +1240,30 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                     )}
                                   >
                                     <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
-                                      <div className="text-[11px] font-medium text-muted-foreground">{t("tarifs.col_monthly")}</div>
-                                      <div className="mt-0.5 text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                      {selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
+                                        <div className="text-[11px] font-medium text-muted-foreground">
+                                          {t("tarifs.col_monthly")}
+                                        </div>
+                                      ) : null}
+                                      <div
+                                        className={cn(
+                                          "mt-0.5 text-[15px] font-semibold leading-none tracking-tight whitespace-nowrap",
+                                          selectedVariant.pricing_monthly_ttc_eur === 0 && "italic text-[#9d2525]",
+                                        )}
+                                      >
                                         {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur, t, i18n.language)}
                                       </div>
                                     </div>
                                     {showAnnualColumn ? (
                                       <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center">
                                         <div className="text-[11px] font-medium text-muted-foreground">{t("tarifs.col_annual")}</div>
-                                        <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-                                          <span className="text-[22px] font-semibold leading-none tracking-tight xl:text-[24px]">
+                                        <div className="mt-0.5 flex flex-nowrap items-center justify-center gap-x-1.5 whitespace-nowrap">
+                                          <span className="text-[15px] font-semibold leading-none tracking-tight">
                                             {formatEur(selectedVariant.pricing_annual_remis, i18n.language)}
                                           </span>
                                           {typeof selectedVariant.pricing_annuel === "number" &&
                                           !Number.isNaN(selectedVariant.pricing_annuel) ? (
-                                            <span className="text-[20px] font-bold italic leading-none text-[#9d2525] line-through">
+                                            <span className="text-[15px] font-bold italic leading-none text-[#9d2525] line-through">
                                               {formatEur(selectedVariant.pricing_annuel, i18n.language)}
                                             </span>
                                           ) : null}
@@ -1207,7 +1290,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                   row={selectedVariant}
                                   t={t}
                                   locale={i18n.language}
-                                  isRayonnement={isRayonnementCard}
+                                  isQuoteOnly={isQuoteOnlyCard}
                                   hideStandbyRow={Boolean(standbyPlanCodeFromDisplay(displayPlan))}
                                 />
                               </div>
@@ -1220,6 +1303,50 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   });
                   })()}
                 </div>
+
+                {zenithPlan ? (
+                  <article aria-labelledby="plan-title-zenith" className="mt-4">
+                    <Card className="flex min-h-[280px] flex-col overflow-hidden rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card ring-1 ring-[rgba(168,23,29,0.22)] lg:min-h-[220px] lg:flex-row">
+                      <CardHeader className="flex-1 pb-3 lg:pb-6 lg:pr-8">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <span className="rounded-full border border-neutral-300 bg-neutral-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {t("tarifs.badge_zenith")}
+                          </span>
+                          <Link to="/organisation/commencer?intent=devis&plan=ZENITH">
+                            <Button
+                              size="sm"
+                              className="h-8 rounded-lg px-3 text-xs font-semibold"
+                              style={{ backgroundColor: "#9D2525", color: "white" }}
+                            >
+                              {t("tarifs.cta_devis")}
+                            </Button>
+                          </Link>
+                        </div>
+                        <CardTitle
+                          id="plan-title-zenith"
+                          className="font-serif text-[1.75rem] leading-tight text-[#9d2525] lg:text-[2rem]"
+                        >
+                          {planCardTitleShort(zenithPlan.pricing_plan, t)}
+                        </CardTitle>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {highlightAimediartWord(t("tarifs.plan_desc_zenith"))}
+                        </p>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 flex-col justify-center border-t border-neutral-200/80 pt-4 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-6">
+                        <div className="rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4 lg:p-5">
+                          <QuotePlanSummary kind="zenith" t={t} />
+                          <PlanPricingDetails
+                            row={zenithPlan}
+                            t={t}
+                            locale={i18n.language}
+                            isQuoteOnly
+                            hideStandbyRow
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </article>
+                ) : null}
 
                 <div className="mt-7 rounded-3xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] sm:p-6">
                   <div className="grid gap-3 sm:grid-cols-2">

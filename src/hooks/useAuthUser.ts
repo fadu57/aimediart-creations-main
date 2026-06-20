@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
-import { fetchUserRoleFromDb, getRoleIdFromJwt, mergeRoleFromDbAndJwt, resolveMergedAuthRoleId } from "@/lib/authUser";
+import { fetchUserRoleFromDb, getRoleIdFromJwt, getRoleNameFromJwt, mergeRoleFromDbAndJwt, mapRoleNameFromRoleId, normalizeRoleName, resolveSessionRoleId } from "@/lib/authUser";
 import { resolveAgencyExpoFromJwt } from "@/lib/userScope";
 
 export type AuthUserWithRole = {
@@ -117,19 +117,15 @@ export function useAuthUser() {
       }
       if (myGeneration !== applyGenerationRef.current) return;
 
-      const { role_name, role_label } = mergeRoleFromDbAndJwt(
+      const { role_name: dbRoleName, role_label: dbRoleLabel } = mergeRoleFromDbAndJwt(
         session.user,
         dbProfile.role_name,
         dbProfile.role_label,
       );
-      const role_id =
-        resolveMergedAuthRoleId(
-          getRoleIdFromJwt(session.user),
-          dbProfile.global_role_id ?? null,
-          dbProfile.agency_role_id ?? null,
-        ) ??
-        dbProfile.role_id ??
-        getRoleIdFromJwt(session.user);
+      const role_id = resolveSessionRoleId(session.user, dbProfile);
+      const role_name =
+        normalizeRoleName(mapRoleNameFromRoleId(role_id)) ?? dbRoleName ?? normalizeRoleName(getRoleNameFromJwt(session.user));
+      const role_label = dbRoleLabel;
       const meta = session.user.user_metadata as Record<string, unknown> | undefined;
       // Priorite : base de donnees -> metadonnees JWT (signUp avec options.data.first_name)
       const first_name =

@@ -26,6 +26,7 @@ export type PricingRow = {
   included_mediation_langs_max: number | null;
   included_audio_langs: number | null;
   trial_duration_days: number | null;
+  is_quote_only: boolean | null;
   pricing_options: PricingOptionRow[];
 };
 
@@ -36,8 +37,8 @@ export type PublicHomeInitialData = {
 
 /** Requêtes du plus riche au plus compatible (évite HTTP 400 si migration partielle). */
 const PRICING_SELECT_TIERS = [
-  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,pricing_options(option_code,unit_price_ttc_eur)",
-  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days",
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only,pricing_options(option_code,unit_price_ttc_eur)",
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only",
   "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
   "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
 ] as const;
@@ -82,20 +83,28 @@ const PLAN_EDITORIAL_DEFAULTS: Record<string, PlanEditorialDefaults> = {
     included_mediation_langs_max: 5,
     included_audio_langs: 1,
     trial_duration_days: null,
-    pricing_options: [
-      { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: 15 },
-      { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: 15 },
-      { option_code: "STANDBY", unit_price_ttc_eur: 49 },
-    ],
+    pricing_options: [],
   },
   RAYONNEMENT: {
     plan_code: "RAYONNEMENT",
+    standby_monthly_price_ttc_eur: null,
+    included_mediation_langs_min: 1,
+    included_mediation_langs_max: 5,
+    included_audio_langs: 1,
+    trial_duration_days: null,
+    pricing_options: [
+      { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: null },
+      { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: null },
+    ],
+  },
+  ZENITH: {
+    plan_code: "ZENITH",
     standby_monthly_price_ttc_eur: null,
     included_mediation_langs_min: null,
     included_mediation_langs_max: null,
     included_audio_langs: null,
     trial_duration_days: null,
-    pricing_options: [{ option_code: "STANDBY", unit_price_ttc_eur: null }],
+    pricing_options: [],
   },
 };
 
@@ -134,6 +143,7 @@ function inferPlanCode(row: Pick<PricingRow, "plan_code" | "pricing_plan">): str
   if (plan.includes("ATELIER")) return "ATELIER";
   if (plan.includes("HORIZON")) return "HORIZON";
   if (plan.includes("RAYONNEMENT")) return "RAYONNEMENT";
+  if (plan.includes("ZENITH") || plan.includes("ZÉNITH")) return "ZENITH";
   return null;
 }
 
@@ -142,21 +152,10 @@ function enrichPricingRowFromPlanDefaults(row: PricingRow): PricingRow {
   const defaults = code ? PLAN_EDITORIAL_DEFAULTS[code] : null;
   if (!defaults) return row;
 
-  const mergedOptions =
-    row.pricing_options.length > 0 ? row.pricing_options : defaults.pricing_options;
-
   return {
     ...row,
     plan_code: row.plan_code ?? defaults.plan_code,
-    standby_monthly_price_ttc_eur:
-      row.standby_monthly_price_ttc_eur ?? defaults.standby_monthly_price_ttc_eur,
-    included_mediation_langs_min:
-      row.included_mediation_langs_min ?? defaults.included_mediation_langs_min,
-    included_mediation_langs_max:
-      row.included_mediation_langs_max ?? defaults.included_mediation_langs_max,
-    included_audio_langs: row.included_audio_langs ?? defaults.included_audio_langs,
     trial_duration_days: row.trial_duration_days ?? defaults.trial_duration_days,
-    pricing_options: mergedOptions,
   };
 }
 
@@ -191,6 +190,7 @@ function normalizePricingRow(row: Record<string, unknown>): PricingRow {
     included_mediation_langs_max: toPricingNumber(row.included_mediation_langs_max),
     included_audio_langs: toPricingNumber(row.included_audio_langs),
     trial_duration_days: toPricingNumber(row.trial_duration_days),
+    is_quote_only: row.is_quote_only === true ? true : row.is_quote_only === false ? false : null,
     pricing_options: normalizePricingOptions(row.pricing_options),
   };
   return enrichPricingRowFromPlanDefaults(normalized);

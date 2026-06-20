@@ -1,5 +1,5 @@
 import { parseGlobalRoleId } from "@/lib/authUser";
-import { parseNumericRoleId } from "@/lib/roleHierarchy";
+import { pickLowestRoleId, parseNumericRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
 
 export type DashboardTeamScopeRow = {
@@ -124,8 +124,15 @@ export async function loadGlobalRoleMap(userIds?: string[]): Promise<Map<string,
 export async function loadProfileGlobalRole(profileUserId: string | null | undefined): Promise<number | null> {
   const pid = profileUserId?.trim();
   if (!pid) return null;
-  const { data } = await supabase.from("profiles").select("role_id").eq("id", pid).maybeSingle();
-  return parseGlobalRoleId((data as { role_id?: unknown } | null)?.role_id);
+
+  const { data, error } = await supabase.rpc("get_all_users_with_roles");
+  if (!error && Array.isArray(data)) {
+    const row = (data as Array<{ id?: string | null; role_id?: unknown }>).find((r) => r.id === pid);
+    const merged = parseNumericRoleId(row?.role_id);
+    if (isGlobalStaffRole(merged)) return merged;
+  }
+
+  return null;
 }
 
 /** Liste org seule (lien depuis page Organisations, sans profil consulté). */

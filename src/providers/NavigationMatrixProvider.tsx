@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { parseGlobalRoleId, getRoleIdFromJwt, resolveMergedAuthRoleId } from "@/lib/authUser";
+import { pickLowestRoleId, parseNumericRoleId } from "@/lib/roleHierarchy";
 import {
   defaultNavAccessForRole,
   mergeNavAccessFromMatriceSecurite,
@@ -34,12 +36,10 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
 
     setLoading(true);
     try {
-      // Priorite 1 : role_id deja resolu par useAuthUser (agency_users + fallback JWT)
-      let roleId = typeof authRoleId === "number" ? authRoleId : NaN;
+      const jwtRoleId = getRoleIdFromJwt(session?.user ?? null);
+      let roleId = pickLowestRoleId(authRoleId, parseGlobalRoleId(jwtRoleId), jwtRoleId);
 
-      // Priorite 2 : si toujours inconnu, nouvelle tentative sur agency_users
-      // (cas ou useAuthUser n'a pas encore charge le role au moment du montage)
-      if (!Number.isFinite(roleId)) {
+      if (roleId == null) {
         const { data: agencyRow } = await supabase
           .from("agency_users")
           .select("role_id")
@@ -47,10 +47,15 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
           .order("role_id", { ascending: true })
           .limit(1)
           .maybeSingle();
-        roleId = Number(agencyRow?.role_id ?? NaN);
+        const agencyRoleId = parseNumericRoleId(agencyRow?.role_id);
+        roleId = pickLowestRoleId(
+          resolveMergedAuthRoleId(jwtRoleId, parseGlobalRoleId(jwtRoleId), agencyRoleId),
+          agencyRoleId,
+          jwtRoleId,
+        );
       }
 
-      if (!Number.isFinite(roleId)) {
+      if (roleId == null) {
         setAccess(defaultNavAccessForRole(null));
         return;
       }

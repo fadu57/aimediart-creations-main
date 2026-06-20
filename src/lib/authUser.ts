@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 
+import { pickLowestRoleId, parseNumericRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
 
 // Circuit breaker: si la table `public.profiles` est protegee (403/permission denied),
@@ -141,7 +142,7 @@ function parseAuthRoleId(raw: unknown): number | null {
   return null;
 }
 
-/** Rôle global SaaS (1–3) : JWT app_metadata ou profiles.role_id. */
+/** Rôle global SaaS (1–3) : JWT app_metadata uniquement côté client. */
 export function parseGlobalRoleId(raw: unknown): number | null {
   const n = parseAuthRoleId(raw);
   if (n == null || n < 1 || n > 3) return null;
@@ -219,6 +220,13 @@ function parseRoleId(row: UserProfileRow | null): number | null {
   return null;
 }
 
+async function fetchMergedRoleIdFromRpc(authUserId: string): Promise<number | null> {
+  const { data, error } = await supabase.rpc("get_all_users_with_roles");
+  if (error || !Array.isArray(data)) return null;
+  const row = (data as Array<{ id?: string | null; role_id?: unknown }>).find((r) => r.id === authUserId);
+  return parseNumericRoleId(row?.role_id);
+}
+
 async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow | null> {
   if (USERS_TABLE_FORBIDDEN) return null;
   const inflight = USERS_PROFILE_INFLIGHT.get(authUserId);
@@ -229,7 +237,7 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
       // role_id dans profiles = admins globaux (1-3) qui n'ont pas de ligne dans agency_users
       const { data: profileData, error: profileErr } = await supabase
         .from("profiles")
-        .select("first_name, role_id")
+        .select("first_name")
         .eq("id", authUserId)
         .maybeSingle();
 
@@ -254,9 +262,12 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
         .limit(1)
         .maybeSingle();
 
-      const profileRoleId = (profileData as { role_id?: number | string | null } | null)?.role_id ?? null;
-      const globalRoleId = parseGlobalRoleId(profileRoleId);
       const agencyRoleId = parseAgencyRoleId(agencyData?.role_id);
+      const rpcMergedRoleId = await fetchMergedRoleIdFromRpc(authUserId);
+      const mergedRoleId = pickLowestRoleId(
+        rpcMergedRoleId,
+        resolveMergedAuthRoleId(null, null, agencyRoleId),
+      );
 
       // Rattachement expo : prend le plus recent
       const { data: expoData } = await supabase
@@ -269,9 +280,9 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
 
       return {
         first_name: profileData?.first_name ?? null,
-        global_role_id: globalRoleId,
+        global_role_id: rpcMergedRoleId != null ? parseGlobalRoleId(rpcMergedRoleId) : null,
         agency_role_id: agencyRoleId,
-        role_id: resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId),
+        role_id: mergedRoleId,
         agency_id: agencyData?.agency_id ?? null,
         expo_id: expoData?.expo_id ?? null,
       };
@@ -290,7 +301,7 @@ async function fetchProfileFromUsers(authUserId: string): Promise<UserProfileRow
   }
 }
 
-function mapRoleNameFromRoleId(roleId: number | null): string | null {
+export function mapRoleNameFromRoleId(roleId: number | null): string | null {
   switch (roleId) {
     case 1:
       return ROLE_ADMIN_GENERAL;
@@ -362,8 +373,25 @@ export async function fetchUserRoleFromDb(
   const first_name = typeof profile.first_name === "string" ? profile.first_name.trim() || null : null;
   const agency_id = typeof profile.agency_id === "string" ? profile.agency_id.trim() || null : null;
   const expo_id = typeof profile.expo_id === "string" ? profile.expo_id.trim() || null : null;
-  const global_role_id = profile.global_role_id ?? parseGlobalRoleId(profile.role_id);
-  const agency_role_id = profile.agency_role_id ?? parseAgencyRoleId(profile.role_id);
+  const global_role_id = profile.global_role_id ?? parseGlobalRoleId(role_id);
+  const agency_role_id = profile.agency_role_id ?? parseAgencyRoleId(role_id);
 
   return { role_name, role_label, role_id, global_role_id, agency_role_id, first_name, agency_id, expo_id };
+}
+
+/** Rôle effectif connecté : MIN(JWT global, RPC fusionné, agency_users). */
+export function resolveSessionRoleId(
+  user: User | null,
+  dbProfile: {
+    role_id: number | null;
+    global_role_id: number | null;
+    agency_role_id: number | null;
+  },
+): number | null {
+  const jwtRoleId = getRoleIdFromJwt(user);
+  return pickLowestRoleId(
+    resolveMergedAuthRoleId(jwtRoleId, parseGlobalRoleId(jwtRoleId), dbProfile.agency_role_id ?? null),
+    dbProfile.role_id,
+    jwtRoleId,
+  );
 }

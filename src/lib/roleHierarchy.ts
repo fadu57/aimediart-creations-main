@@ -24,6 +24,12 @@ export function parseNumericRoleId(raw: unknown): number | null {
   return null;
 }
 
+/** Privilège le plus élevé = role_id le plus bas (1 avant 4). */
+export function pickLowestRoleId(...candidates: (number | null | undefined)[]): number | null {
+  const nums = candidates.map((c) => parseNumericRoleId(c)).filter((n): n is number => n != null);
+  return nums.length ? Math.min(...nums) : null;
+}
+
 /** role_id DB/JWT, sinon déduction depuis role_name (ex. admin_agency → 4). */
 export function resolveEffectiveRoleId(
   roleId: number | null | undefined,

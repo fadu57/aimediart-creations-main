@@ -12,7 +12,7 @@ import {
 } from "@/lib/dashboardTeamScope";
 import { fetchOrganisationStandbyState } from "@/lib/organisationStandby";
 import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
-import { parseNumericRoleId } from "@/lib/roleHierarchy";
+import { parseNumericRoleId, pickLowestRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
 import { readAvatarFromRpcRow } from "@/lib/userAvatar";
 import { filterActiveProfileUserIds } from "@/lib/userSoftDelete";
@@ -794,17 +794,8 @@ async function fetchTeamMembers(
 
   const enrichTeamMembersMergedRoles = async (members: DashboardTeamMember[]): Promise<DashboardTeamMember[]> => {
     if (!members.length) return members;
-    const ids = members.map((m) => m.user_id);
-    const { data: profileRows } = await supabase.from("profiles").select("id, role_id").in("id", ids);
-    const globalByUser = new Map<string, number | null>();
-    for (const row of (profileRows as Array<{ id?: string | null; role_id?: unknown }> | null) ?? []) {
-      const uid = typeof row.id === "string" ? row.id.trim() : "";
-      if (!uid) continue;
-      globalByUser.set(uid, parseGlobalRoleId(row.role_id));
-    }
     return members.map((member) => {
-      const globalRoleId = globalByUser.get(member.user_id) ?? null;
-      const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, member.agency_role_id);
+      const mergedRoleId = pickLowestRoleId(member.role_id, member.agency_role_id);
       return {
         ...member,
         role_id: mergedRoleId,
@@ -1084,7 +1075,10 @@ async function fetchAllUsersForProfilePicker(): Promise<DashboardTeamMember[]> {
   }
   members = members.map((member) => {
     const globalRoleId = globalByUser.get(member.user_id) ?? null;
-    const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, member.agency_role_id);
+    const mergedRoleId = pickLowestRoleId(
+      member.role_id,
+      resolveMergedAuthRoleId(null, globalRoleId, member.agency_role_id),
+    );
     return {
       ...member,
       role_id: mergedRoleId,
