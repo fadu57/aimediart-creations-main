@@ -118,6 +118,9 @@ export interface Database {
           phone: string | null;
           zip_code: string | null;
           city: string | null;
+          adresse_postale: string | null;
+          compl_adresse: string | null;
+          country: string | null;
           country_code: string | null;
           timezone: string | null;
           language: string | null;
@@ -135,6 +138,9 @@ export interface Database {
           phone?: string | null;
           zip_code?: string | null;
           city?: string | null;
+          adresse_postale?: string | null;
+          compl_adresse?: string | null;
+          country?: string | null;
           country_code?: string | null;
           timezone?: string | null;
           language?: string | null;
@@ -152,6 +158,9 @@ export interface Database {
           phone?: string | null;
           zip_code?: string | null;
           city?: string | null;
+          adresse_postale?: string | null;
+          compl_adresse?: string | null;
+          country?: string | null;
           country_code?: string | null;
           timezone?: string | null;
           language?: string | null;

@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 
-import type { VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
+import { formatVisitorGeoMapPopupLines, type VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
 
 const MARKER_COLORS = {
   visitor: "#2563eb",
@@ -131,8 +131,7 @@ export function VisitorGeographyMap({ rows, scopeKey, height = 420 }: Props) {
           id: `${row.participantKind}:${row.visitorKey}`,
           lat: row.latitude as number,
           lon: row.longitude as number,
-          label: row.label,
-          place: [row.zipCode, row.city, row.country].filter(Boolean).join(", ") || "—",
+          popupLines: formatVisitorGeoMapPopupLines(row),
           kind: row.participantKind,
           offset: ((index % 5) - 2) * 0.0008,
         }))
@@ -173,9 +172,12 @@ export function VisitorGeographyMap({ rows, scopeKey, height = 420 }: Props) {
           icon={icons[marker.kind]}
         >
           <Popup>
-            <div className="text-sm">
-              <p className="font-semibold">{marker.label}</p>
-              <p className="text-muted-foreground">{marker.place}</p>
+            <div className="text-sm leading-snug">
+              {marker.popupLines.map((line, index) => (
+                <p key={`${marker.id}-${index}`} className={index === 0 ? "font-semibold" : "text-muted-foreground"}>
+                  {line}
+                </p>
+              ))}
             </div>
           </Popup>
         </Marker>

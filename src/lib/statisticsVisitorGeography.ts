@@ -4,7 +4,10 @@ import { normalizeStoragePublicUrl } from "@/lib/storagePaths";
 export type VisitorGeoTableRow = {
   visitorKey: string;
   label: string;
+  firstName: string | null;
+  lastName: string | null;
   pseudo: string | null;
+  adressePostale: string | null;
   avatarUrl: string | null;
   selfieUrl: string | null;
   city: string | null;
@@ -18,6 +21,39 @@ export type VisitorGeoTableRow = {
   /** Bleu = table visitors ; rouge = table profiles (organisateurs). */
   participantKind: "visitor" | "profile";
 };
+
+/** Lignes du popup carte : nom, pseudo, adresse, CP + ville. */
+export function formatVisitorGeoMapPopupLines(row: VisitorGeoTableRow): string[] {
+  const lines: string[] = [];
+  const fullName = [row.firstName, row.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const pseudo = row.pseudo?.trim() || null;
+
+  if (fullName) {
+    lines.push(fullName);
+    if (pseudo) lines.push(pseudo);
+  } else if (pseudo) {
+    lines.push(pseudo);
+  }
+
+  const address = row.adressePostale?.trim();
+  if (address) lines.push(address);
+
+  const zipCity = [row.zipCode, row.city]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(", ");
+  if (zipCity) lines.push(zipCity);
+
+  if (lines.length === 0 && row.label.trim()) {
+    lines.push(row.label.trim());
+  }
+
+  return lines;
+}
 
 type GeoPoint = {
   lat: number;
@@ -44,6 +80,7 @@ type VisitorRecord = {
   first_name?: string | null;
   last_name?: string | null;
   username?: string | null;
+  adresse_postale?: string | null;
   country_code?: string | null;
   avatar_url?: string | null;
   selfie_url?: string | null;
@@ -53,7 +90,7 @@ type VisitorRecord = {
 };
 
 const PROFILE_SELECT =
-  "id, first_name, last_name, username, avatar_url, city, country_code, zip_code, ip_address";
+  "id, first_name, last_name, username, avatar_url, adresse_postale, city, country_code, zip_code, ip_address";
 
 type GeographyRpcRow = {
   visitor_key?: string | null;
@@ -62,6 +99,7 @@ type GeographyRpcRow = {
   first_name?: string | null;
   last_name?: string | null;
   username?: string | null;
+  adresse_postale?: string | null;
   avatar_url?: string | null;
   selfie_url?: string | null;
   city?: string | null;
@@ -93,6 +131,7 @@ function rpcRowToRecord(row: GeographyRpcRow): VisitorRecord {
     first_name: asTrimmed(row.first_name) || null,
     last_name: asTrimmed(row.last_name) || null,
     username: asTrimmed(row.username) || null,
+    adresse_postale: asTrimmed(row.adresse_postale) || null,
     avatar_url: asTrimmed(row.avatar_url) || null,
     selfie_url: asTrimmed(row.selfie_url) || null,
     city: asTrimmed(row.city) || null,
@@ -267,7 +306,7 @@ function rowInitialSource(row: Pick<VisitorGeoTableRow, "zipCode" | "city" | "ip
   return "ip_pending";
 }
 
-/** Complète ville/CP/IP depuis public.profiles (source de vérité organisateurs). */
+/** Complète identité et adresse depuis public.profiles (source de vérité organisateurs). */
 export async function hydrateProfilePlaceData(rows: VisitorGeoTableRow[]): Promise<VisitorGeoTableRow[]> {
   const profileIds = [
     ...new Set(rows.filter((row) => isUuidLike(row.visitorKey)).map((row) => row.visitorKey)),
@@ -276,17 +315,30 @@ export async function hydrateProfilePlaceData(rows: VisitorGeoTableRow[]): Promi
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, city, zip_code, country_code, ip_address")
+    .select("id, first_name, last_name, username, adresse_postale, city, zip_code, country_code, ip_address")
     .in("id", profileIds);
 
   if (!data?.length) return rows;
 
   const byId = new Map<
     string,
-    { city: string | null; zipCode: string | null; country: string | null; ipAddress: string | null }
+    {
+      firstName: string | null;
+      lastName: string | null;
+      pseudo: string | null;
+      adressePostale: string | null;
+      city: string | null;
+      zipCode: string | null;
+      country: string | null;
+      ipAddress: string | null;
+    }
   >();
   for (const profile of data as Array<{
     id?: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    username?: string | null;
+    adresse_postale?: string | null;
     city?: string | null;
     zip_code?: string | null;
     country_code?: string | null;
@@ -295,6 +347,10 @@ export async function hydrateProfilePlaceData(rows: VisitorGeoTableRow[]): Promi
     const id = asTrimmed(profile.id);
     if (!id) continue;
     byId.set(id, {
+      firstName: asTrimmed(profile.first_name) || null,
+      lastName: asTrimmed(profile.last_name) || null,
+      pseudo: asTrimmed(profile.username) || null,
+      adressePostale: asTrimmed(profile.adresse_postale) || null,
       city: asTrimmed(profile.city) || null,
       zipCode: asTrimmed(profile.zip_code) || null,
       country: asTrimmed(profile.country_code) || null,
@@ -307,6 +363,10 @@ export async function hydrateProfilePlaceData(rows: VisitorGeoTableRow[]): Promi
     if (!profile) return row;
     const merged = {
       ...row,
+      firstName: row.firstName || profile.firstName,
+      lastName: row.lastName || profile.lastName,
+      pseudo: row.pseudo || profile.pseudo,
+      adressePostale: row.adressePostale || profile.adressePostale,
       city: row.city || profile.city,
       zipCode: row.zipCode || profile.zipCode,
       country: row.country || profile.country || "FR",
@@ -733,6 +793,7 @@ function mergeVisitorRecords(base: VisitorRecord | undefined, next: VisitorRecor
     first_name: asTrimmed(next.first_name) || asTrimmed(base.first_name) || null,
     last_name: asTrimmed(next.last_name) || asTrimmed(base.last_name) || null,
     username: asTrimmed(next.username) || asTrimmed(base.username) || null,
+    adresse_postale: asTrimmed(next.adresse_postale) || asTrimmed(base.adresse_postale) || null,
     city: asTrimmed(next.city) || asTrimmed(base.city) || null,
     zip_code: asTrimmed(next.zip_code) || asTrimmed(base.zip_code) || null,
     visitor_db_id: asTrimmed(next.visitor_db_id) || asTrimmed(base.visitor_db_id) || null,
@@ -795,6 +856,7 @@ async function enrichProfilesWithVisitorData(profiles: VisitorRecord[]): Promise
       first_name: asTrimmed(profile.first_name) || asTrimmed(linked.first_name) || null,
       last_name: asTrimmed(profile.last_name) || asTrimmed(linked.last_name) || null,
       username: asTrimmed(profile.username) || asTrimmed(linked.username) || null,
+      adresse_postale: asTrimmed(profile.adresse_postale) || asTrimmed(linked.adresse_postale) || null,
       city: asTrimmed(profile.city) || asTrimmed(linked.city) || null,
       zip_code: asTrimmed(profile.zip_code) || asTrimmed(linked.zip_code) || null,
       country: asTrimmed(profile.country) || asTrimmed(linked.country) || null,
@@ -1036,7 +1098,10 @@ function recordToRow(record: VisitorRecord, fallbackKey?: string): VisitorGeoTab
   return {
     visitorKey,
     label: resolveLabel(visitorKey, record),
+    firstName: asTrimmed(record.first_name) || null,
+    lastName: asTrimmed(record.last_name) || null,
     pseudo: resolvePseudo(record),
+    adressePostale: asTrimmed(record.adresse_postale) || null,
     avatarUrl: resolveTableAvatarUrl(record),
     selfieUrl: resolveSelfieUrl(record),
     city: asTrimmed(record.city) || null,

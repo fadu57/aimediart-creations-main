@@ -24,6 +24,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserRolesField } from "@/components/users/UserRolesField";
+import {
+  UserProfileAddressFields,
+  resolveProfileCountryLabel,
+} from "@/components/users/UserProfileAddressFields";
+import { getCountryOption } from "@/lib/countries";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { BIRTH_YEARS, birthMonthOptions, readBirthMonthFromMeta, readBirthYearFromSources, readMetaString } from "@/lib/birthProfile";
@@ -70,6 +75,12 @@ type UserRow = {
   birth_year?: string | null;
   email?: string | null;
   phone?: string | null;
+  adresse_postale?: string | null;
+  compl_adresse?: string | null;
+  country?: string | null;
+  city?: string | null;
+  zip_code?: string | null;
+  country_code?: string | null;
   expo_id?: string | null;
   expo_ids?: string[];
   last_sign_in_at?: string | null;
@@ -347,6 +358,12 @@ function fillMissingProfileFields(target: UserRow, source: Partial<UserRow>): Us
     "username",
     "avatar_url",
     "phone",
+    "adresse_postale",
+    "compl_adresse",
+    "country",
+    "city",
+    "zip_code",
+    "country_code",
     "email",
     "birth_year",
     "birth_month",
@@ -395,7 +412,9 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("avatar_url, birth_year, first_name, last_name, username, phone, role_id")
+    .select(
+      "avatar_url, birth_year, first_name, last_name, username, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, role_id",
+    )
     .eq("id", row.id)
     .maybeSingle();
 
@@ -406,6 +425,12 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     last_name?: string | null;
     username?: string | null;
     phone?: string | null;
+    adresse_postale?: string | null;
+    compl_adresse?: string | null;
+    country?: string | null;
+    city?: string | null;
+    zip_code?: string | null;
+    country_code?: string | null;
     role_id?: number | null;
   } | null;
 
@@ -431,6 +456,12 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     username: p?.username ?? null,
     avatar_url: p?.avatar_url ?? null,
     phone: p?.phone ?? null,
+    adresse_postale: p?.adresse_postale ?? null,
+    compl_adresse: p?.compl_adresse ?? null,
+    country: resolveProfileCountryLabel(p?.country, p?.country_code),
+    city: p?.city ?? null,
+    zip_code: p?.zip_code ?? null,
+    country_code: p?.country_code ?? null,
     birth_year:
       typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
   });
@@ -443,6 +474,9 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
       last_name: readMetaString(meta, "last_name", "lastname", "nom") || null,
       username: readMetaString(meta, "username") || null,
       phone: readMetaString(meta, "phone") || null,
+      city: readMetaString(meta, "city") || null,
+      zip_code: readMetaString(meta, "zip_code") || null,
+      country_code: readMetaString(meta, "country_code") || null,
     });
     const metaAvatar = readAvatarFromMeta(meta);
     if (metaAvatar) enriched.avatar_url = enriched.avatar_url?.trim() || metaAvatar;
@@ -640,6 +674,15 @@ function mapRpcRowToUserRow(row: RpcUserWithRolesRow): UserRow | null {
     username: row.username ?? null,
     avatar_url: readAvatarFromRpcRow(row) ?? row.avatar_url ?? null,
     phone: row.phone ?? null,
+    adresse_postale: typeof row.adresse_postale === "string" ? row.adresse_postale : null,
+    compl_adresse: typeof row.compl_adresse === "string" ? row.compl_adresse : null,
+    country:
+      typeof row.country === "string"
+        ? row.country
+        : resolveProfileCountryLabel(null, typeof row.country_code === "string" ? row.country_code : null),
+    city: typeof row.city === "string" ? row.city : null,
+    zip_code: typeof row.zip_code === "string" ? row.zip_code : null,
+    country_code: typeof row.country_code === "string" ? row.country_code : null,
     email: typeof row.email === "string" ? row.email.trim() || null : null,
     birth_month:
       row.birth_month != null ? readBirthMonthFromMeta({ birth_month: row.birth_month }) || null : null,
@@ -662,7 +705,9 @@ async function fetchUserProfileFallback(
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, username, avatar_url, phone, birth_year, role_id")
+      .select(
+        "id, first_name, last_name, username, avatar_url, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, birth_year, role_id",
+      )
       .eq("id", targetId)
       .maybeSingle(),
     supabase
@@ -686,6 +731,12 @@ async function fetchUserProfileFallback(
     username?: string | null;
     avatar_url?: string | null;
     phone?: string | null;
+    adresse_postale?: string | null;
+    compl_adresse?: string | null;
+    country?: string | null;
+    city?: string | null;
+    zip_code?: string | null;
+    country_code?: string | null;
     birth_year?: number | null;
     role_id?: number | null;
   } | null;
@@ -715,6 +766,12 @@ async function fetchUserProfileFallback(
     username: p?.username ?? null,
     avatar_url: p?.avatar_url ?? null,
     phone: p?.phone ?? null,
+    adresse_postale: p?.adresse_postale ?? null,
+    compl_adresse: p?.compl_adresse ?? null,
+    country: resolveProfileCountryLabel(p?.country, p?.country_code),
+    city: p?.city ?? null,
+    zip_code: p?.zip_code ?? null,
+    country_code: p?.country_code ?? null,
     email: null,
     birth_month: null,
     birth_year:
@@ -1482,6 +1539,12 @@ const Users = ({
       birth_year: "",
       email: "",
       phone: "",
+      adresse_postale: "",
+      compl_adresse: "",
+      country: "France",
+      city: "",
+      zip_code: "",
+      country_code: "FR",
       expo_id: "",
       expo_ids: [],
       role_id: null,
@@ -1532,6 +1595,10 @@ const Users = ({
 
   const setField = (key: keyof UserRow, value: string) => {
     setEditing((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const patchUserFields = (patch: Partial<UserRow>) => {
+    setEditing((prev) => (prev ? { ...prev, ...patch } : prev));
   };
 
   // Vérification d'unicité du pseudo (username) dans profiles.
@@ -1610,6 +1677,15 @@ const Users = ({
         username: editing.username?.trim() || null,
         avatar_url: nextPhoto || null,
         phone: editing.phone?.trim() || null,
+        adresse_postale: editing.adresse_postale?.trim() || null,
+        compl_adresse: editing.compl_adresse?.trim() || null,
+        country: editing.country?.trim() || null,
+        city: editing.city?.trim() || null,
+        zip_code: editing.zip_code?.trim() || null,
+        country_code:
+          getCountryOption(editing.country)?.iso?.toUpperCase() ||
+          editing.country_code?.trim().toUpperCase() ||
+          "FR",
         birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
         // Niveaux 1-3 : role_id global dans profiles ; 4-6 via agency_users.
         role_id: globalRoleId,
@@ -1882,6 +1958,12 @@ const Users = ({
       "birth_year",
       "email",
       "phone",
+      "adresse_postale",
+      "compl_adresse",
+      "country",
+      "city",
+      "zip_code",
+      "country_code",
       "expo_id",
       "role_id",
     ];
@@ -2076,6 +2158,13 @@ const Users = ({
                   </div>
                 </div>
               </div>
+
+              <UserProfileAddressFields
+                idPrefix="user"
+                values={editing}
+                onChange={patchUserFields}
+                disabled={saving}
+              />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -2465,6 +2554,13 @@ const Users = ({
                   </div>
                 </div>
               </div>
+
+              <UserProfileAddressFields
+                idPrefix="user-main"
+                values={editing}
+                onChange={patchUserFields}
+                disabled={saving}
+              />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
