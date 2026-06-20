@@ -19,9 +19,17 @@ async function mountApp(): Promise<void> {
 
   const app = <App />;
 
-  if (rootEl.hasChildNodes()) {
+  // /organisation : HTML pré-rendu (PublicHome seul) ≠ arbre client (<App />…) → pas d'hydratation.
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const isOrganisationPrerender =
+    path === "/organisation" && Boolean(document.getElementById("__ORGANISATION_INITIAL_DATA__"));
+
+  if (rootEl.hasChildNodes() && !isOrganisationPrerender) {
     hydrateRoot(rootEl, app);
   } else {
+    if (isOrganisationPrerender) {
+      rootEl.replaceChildren();
+    }
     createRoot(rootEl).render(app);
   }
 }

@@ -1,16 +1,11 @@
 /**
- * Prérendu SSG de /organisation — HTML optimisé SEO, Open Graph et JSON-LD.
+ * Prérendu SSG de /organisation — SEO head + données initiales (pas de HTML React dans #root).
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import React from "react";
 import { config } from "dotenv";
-import { renderToString } from "react-dom/server";
-import { I18nextProvider } from "react-i18next";
-import { MemoryRouter } from "react-router-dom";
 
-import i18n from "../src/i18n/config";
 import { initI18nForPath } from "../src/i18n/bootstrapI18n";
 import frHome from "../src/i18n/locales/fr/home.json";
 import {
@@ -19,8 +14,6 @@ import {
   injectOrganisationHead,
 } from "../src/lib/organisation/organisationSeo";
 import { fetchPublicHomeData } from "../src/lib/organisation/publicHomeData";
-import PublicHome from "../src/pages/PublicHome";
-import { UiLanguageProvider } from "../src/providers/UiLanguageProvider";
 
 config();
 
@@ -43,18 +36,7 @@ async function main(): Promise<void> {
   }
 
   await initI18nForPath("/organisation");
-  await i18n.changeLanguage("fr");
   const initialData = await fetchPublicHomeData(supabaseUrl, anonKey);
-
-  const appHtml = renderToString(
-    <MemoryRouter initialEntries={["/organisation"]}>
-      <I18nextProvider i18n={i18n}>
-        <UiLanguageProvider>
-          <PublicHome initialData={initialData} />
-        </UiLanguageProvider>
-      </I18nextProvider>
-    </MemoryRouter>,
-  );
 
   const seo = buildOrganisationSeoPayload(
     frHome.hero.title_line1,
@@ -67,12 +49,12 @@ async function main(): Promise<void> {
 
   let html = template.replace(
     '<div id="root"></div>',
-    `<div id="root">${appHtml}</div>\n    ${initialDataScript}`,
+    `<div id="root"></div>\n    ${initialDataScript}`,
   );
 
   html = injectOrganisationHead(html, seo);
 
-  const warnings = auditPrerenderedHtml(html);
+  const warnings = auditPrerenderedHtml(html, { requireBodySemantics: false });
   for (const w of warnings) {
     console.warn(`[prerender:organisation] audit SEO : ${w}`);
   }

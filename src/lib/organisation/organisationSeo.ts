@@ -172,13 +172,19 @@ export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload
 }
 
 /** Contrôles qualité post-prérendu (logs build). */
-export function auditPrerenderedHtml(html: string): string[] {
+export function auditPrerenderedHtml(
+  html: string,
+  options?: { requireBodySemantics?: boolean },
+): string[] {
   const warnings: string[] = [];
-  const h1Count = (html.match(/<h1\b/gi) ?? []).length;
-  if (h1Count !== 1) warnings.push(`Attendu 1 <h1>, trouvé ${h1Count}.`);
-  if (!/<main\b/i.test(html)) warnings.push("Balise <main> absente.");
-  if (!/<footer\b/i.test(html)) warnings.push("Balise <footer> absente.");
-  if (!/<header\b/i.test(html)) warnings.push("Balise <header> absente.");
+  const requireBody = options?.requireBodySemantics !== false;
+  if (requireBody) {
+    const h1Count = (html.match(/<h1\b/gi) ?? []).length;
+    if (h1Count !== 1) warnings.push(`Attendu 1 <h1>, trouvé ${h1Count}.`);
+    if (!/<main\b/i.test(html)) warnings.push("Balise <main> absente.");
+    if (!/<footer\b/i.test(html)) warnings.push("Balise <footer> absente.");
+    if (!/<header\b/i.test(html)) warnings.push("Balise <header> absente.");
+  }
   const descMatch = html.match(/<meta name="description" content="([^"]*)"/i);
   if (descMatch) {
     const len = descMatch[1].length;

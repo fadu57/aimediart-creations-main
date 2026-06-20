@@ -34,7 +34,7 @@ export function LazyWhenVisible({
   id,
 }: LazyWhenVisibleProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(() => (anchorId ? hashMatchesAnchor(anchorId, anchorAliases) : false));
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (!anchorId) return;
