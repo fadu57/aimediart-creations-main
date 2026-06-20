@@ -3,6 +3,8 @@
  * Partagé entre le script de prérendu (Node) et l'app (référence des constantes).
  */
 
+import { AIMEDIART_CONTACT_EMAIL } from "@/lib/aimediartContact";
+
 export const ORGANISATION_PATH = "/organisation";
 
 /** Description optimisée Google + LLM (cible 140–160 caractères). */
@@ -84,7 +86,7 @@ export function buildOrganisationJsonLd(seo: OrganisationSeoPayload): Record<str
         name: "AIMEDIArt",
         url: seo.siteOrigin,
         logo: `${seo.siteOrigin}/favicon.svg`,
-        email: "contact@aimediart.com",
+        email: AIMEDIART_CONTACT_EMAIL,
         description: seo.description,
       },
       {

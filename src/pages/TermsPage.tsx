@@ -32,7 +32,7 @@ const TermsPage = () => {
 
   return (
     <PublicVitrineShell vitrinePathPrefix="/organisation" atmosphericBackdrop>
-      <main className="mx-auto w-full max-w-[1060px] bg-[var(--tw-ring-offset-color)] px-5 pb-10 pt-24 sm:px-6">
+      <main className="mx-auto w-full max-w-[1060px] bg-[var(--tw-ring-offset-color)] px-5 pb-10 sm:px-6">
         <div className="rounded-2xl border border-[rgba(0,166,255,0.35)] bg-white px-5 py-8 shadow-[0_16px_48px_rgba(30,64,175,0.09)] backdrop-blur-xl sm:px-8 sm:py-10">
           <h1 className="font-serif text-3xl font-bold tracking-tight text-[#1f1f1f]">{bt("meta.title")}</h1>
           <p className="mt-2 text-sm text-neutral-600">{bt("meta.version")}</p>

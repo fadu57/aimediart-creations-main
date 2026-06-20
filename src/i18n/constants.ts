@@ -57,6 +57,13 @@ export function legalNamespaceForPath(pathname: string): (typeof VITRINE_LEGAL_N
   return LEGAL_PATH_TO_NAMESPACE[path] ?? null;
 }
 
+/** Vitrine /organisation et pages légales publiques (CGV, cookies, etc.). */
+export function isOrganisationVitrineAreaPath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/organisation" || path.startsWith("/organisation/")) return true;
+  return path in LEGAL_PATH_TO_NAMESPACE;
+}
+
 export function getInitialLanguage(): SupportedLang {
   if (typeof window === "undefined") return "fr";
   const stored = window.localStorage.getItem("ui_language");

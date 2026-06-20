@@ -9,6 +9,7 @@ import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { LanguageFlag } from "@/components/LanguageFlag";
 import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
+import { AIMEDIART_CONTACT_MAILTO } from "@/lib/aimediartContact";
 import { cn } from "@/lib/utils";
 
 export const BRAND_RED = "hsl(0 65% 48%)";
@@ -250,13 +251,8 @@ function VantaCloudsBackground() {
   );
 }
 
-function PublicVitrineFooter({
-  vitrinePathPrefix,
-}: {
-  vitrinePathPrefix: "" | "/organisation";
-}) {
+function PublicVitrineFooter() {
   const { t } = useTranslation("home");
-  const contactHref = vitrinePathPrefix ? `${vitrinePathPrefix}#contact` : "#contact";
 
   return (
     <footer className="border-t border-neutral-300/70 bg-white/80 py-10">
@@ -266,15 +262,9 @@ function PublicVitrineFooter({
             <LogoMark compact />
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
-            {vitrinePathPrefix ? (
-              <Link to={contactHref} className="text-foreground/80 hover:text-foreground">
-                {t("footer.contact")}
-              </Link>
-            ) : (
-              <a href={contactHref} className="text-foreground/80 hover:text-foreground">
-                {t("footer.contact")}
-              </a>
-            )}
+            <a href={AIMEDIART_CONTACT_MAILTO} className="text-foreground/80 hover:text-foreground">
+              {t("footer.contact")}
+            </a>
             <Link to="/cgv" className="text-foreground/80 hover:text-foreground">
               {t("footer.cgv")}
             </Link>
@@ -319,8 +309,13 @@ export function PublicVitrineShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { session, loading: authLoading } = useAuthUser();
   const showBackofficeHeader = Boolean(session) && !authLoading;
-  /** Connecté sur la vitrine : un seul header (backoffice + ancres vitrine). */
-  const mergeVitrineIntoHeader = showBackofficeHeader && vitrinePathPrefix === "";
+  /** Connecté : un seul header (backoffice avec ancres vitrine), pas de FloatingNav en doublon. */
+  const mergeVitrineIntoHeader = showBackofficeHeader;
+  const mainTopPaddingClass = mergeVitrineIntoHeader
+    ? "pt-[5rem]"
+    : vitrinePathPrefix === "/organisation"
+      ? "pt-[74px]"
+      : undefined;
 
   return (
     <div
@@ -344,10 +339,10 @@ export function PublicVitrineShell({
         <main
           id="contenu-principal"
           role="main"
-          className={cn("outline-none", mergeVitrineIntoHeader && "pt-[5rem]")}
+          className={cn("outline-none", mainTopPaddingClass)}
         >
           {children}
-          <PublicVitrineFooter vitrinePathPrefix={vitrinePathPrefix} />
+          <PublicVitrineFooter />
         </main>
       </div>
     </div>

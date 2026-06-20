@@ -126,6 +126,6 @@ La version en vigueur est celle publiée sur cette page à la date de votre visi
 
 Pour toute question sur la présente politique cookies, vous pouvez nous contacter à l’adresse suivante :
 
-**contact@aimediart.com** (à adapter),
+**hello@aimediart.com**,
 
 ou via le formulaire de contact prévu sur Aimediart.com.

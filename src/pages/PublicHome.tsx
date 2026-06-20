@@ -40,6 +40,7 @@ import tarifsPhoto from "@/assets/tarifs.png";
 import accessibilitePhoto from "@/assets/accessibilite.png";
 import contactPhoto from "@/assets/contact.png";
 import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
+import { AIMEDIART_CONTACT_MAILTO } from "@/lib/aimediartContact";
 
 const ForestCanopySketch = lazy(() =>
   import("@/components/ForestCanopySketch").then((m) => ({ default: m.ForestCanopySketch })),
@@ -1443,7 +1444,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               </span>
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <a href="mailto:contact@aimediart.com" className="w-full sm:w-auto">
+              <a href={AIMEDIART_CONTACT_MAILTO} className="w-full sm:w-auto">
                 <Button className="h-11 w-full rounded-xl px-5 text-sm max-[389px]:h-10 max-[389px]:text-[13px] sm:w-auto" style={{ backgroundColor: BRAND_RED_DARK, color: "white" }}>
                   {t("contact.cta_contact")}
                   <ArrowRight className="ml-2 h-4 w-4" aria-hidden />

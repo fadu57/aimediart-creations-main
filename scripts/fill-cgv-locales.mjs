@@ -28,7 +28,7 @@ const fr = {
     },
     sellerIdentity: {
       title: "Article 1 — Identité de l’Éditeur",
-      p1: "L’Éditeur du Service AIMEDIArt est la personne morale ou la personne physique identifiée dans les mentions légales publiées sur le site aimediart.com, dont le siège social ou le domicile professionnel y figure, joignable à l’adresse électronique contact@aimediart.com.",
+      p1: "L’Éditeur du Service AIMEDIArt est la personne morale ou la personne physique identifiée dans les mentions légales publiées sur le site aimediart.com, dont le siège social ou le domicile professionnel y figure, joignable à l’adresse électronique hello@aimediart.com.",
       p2: "Toute information complémentaire (numéro d’immatriculation, TVA intracommunautaire, directeur de publication) est portée à la connaissance du Client sur lesdites mentions légales, qui font partie intégrante de la documentation contractuelle.",
     },
     definitions: {
@@ -153,7 +153,7 @@ const fr = {
     },
     disputes: {
       title: "Article 21 — Réclamations — Médiation",
-      p1: "Le Client adresse ses réclamations à contact@aimediart.com avec les pièces utiles. L’Éditeur accuse réception et tente de trouver une solution amiable dans un délai raisonnable.",
+      p1: "Le Client adresse ses réclamations à hello@aimediart.com avec les pièces utiles. L’Éditeur accuse réception et tente de trouver une solution amiable dans un délai raisonnable.",
       p2: "Conformément aux dispositions du Code de la consommation applicables aux consommateurs, les informations relatives au médiateur de la consommation ou à tout dispositif de règlement extrajudiciaire des litiges sont communiquées sur le site lorsqu’elles sont obligatoires. Pour les professionnels, les parties peuvent convenir d’une procédure spécifique par avenant écrit.",
     },
     applicableLaw: {
@@ -177,7 +177,7 @@ const enSections = {
   },
   sellerIdentity: {
     title: "Article 1 — Publisher identity",
-    p1: "The Publisher of the AIMEDIArt Service is the legal entity or sole trader identified in the legal notices published on aimediart.com, reachable at contact@aimediart.com.",
+    p1: "The Publisher of the AIMEDIArt Service is the legal entity or sole trader identified in the legal notices published on aimediart.com, reachable at hello@aimediart.com.",
     p2: "Further information (registration number, VAT ID, publication director) is provided in those legal notices, which form part of the contractual documentation.",
   },
   definitions: {
@@ -302,7 +302,7 @@ const enSections = {
   },
   disputes: {
     title: "Article 21 — Claims — Mediation",
-    p1: "Claims go to contact@aimediart.com with supporting documents. The Publisher acknowledges receipt and seeks an amicable solution within a reasonable time.",
+    p1: "Claims go to hello@aimediart.com with supporting documents. The Publisher acknowledges receipt and seeks an amicable solution within a reasonable time.",
     p2: "Consumer mediation information required by law is provided on the site where applicable. B2B parties may agree otherwise in writing.",
   },
   applicableLaw: {

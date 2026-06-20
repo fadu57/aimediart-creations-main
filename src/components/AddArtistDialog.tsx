@@ -9,6 +9,7 @@ import { CalendarIcon, ChevronDown, ImageIcon, Loader2, X } from "lucide-react";
 import { z } from "zod";
 
 import { supabase } from "@/lib/supabase";
+import { AIMEDIART_CONTACT_EMAIL } from "@/lib/aimediartContact";
 import type { Database } from "@/types/supabase";
 import { artistsMatchForDuplicate, computeArtistControl } from "@/lib/artistControl";
 import {
@@ -1276,7 +1277,7 @@ export function AddArtistDialog({
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                   {editingArtistId && (
                     <a
-                      href={`mailto:contact@aimediart.com?subject=${encodeURIComponent(t("btn_report_error_email_subject"))}&body=${encodeURIComponent(`Artiste : ${artistTitleName || "inconnu"}\nArtist ID : ${editingArtistId}\n\nDécrivez l'information erronée :`)}`}
+                      href={`mailto:${AIMEDIART_CONTACT_EMAIL}?subject=${encodeURIComponent(t("btn_report_error_email_subject"))}&body=${encodeURIComponent(`Artiste : ${artistTitleName || "inconnu"}\nArtist ID : ${editingArtistId}\n\nDécrivez l'information erronée :`)}`}
                       className="inline-flex h-9 w-[150px] items-center justify-center gap-1.5 rounded-md border border-white/60 bg-[#FDFDFC] px-3 text-[11px] font-black text-[#D99726]/80 text-center hover:border-white hover:text-white transition-colors"
                       title={t("btn_report_error_title")}
                     >

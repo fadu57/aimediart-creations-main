@@ -15,6 +15,7 @@ import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { SettingsMenuDropdown } from "@/components/SettingsMenuDropdown";
 import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { LanguageFlag } from "@/components/LanguageFlag";
+import { isOrganisationVitrineAreaPath } from "@/i18n/constants";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { cn } from "@/lib/utils";
 
@@ -122,8 +123,7 @@ export default function Header() {
     pathname.startsWith("/summary/") ||
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
-  const isOrganisationVitrinePage =
-    pathname === "/organisation" || pathname.startsWith("/organisation/");
+  const isOrganisationVitrinePage = isOrganisationVitrineAreaPath(pathname);
   const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
   const homePath = session ? "/dashboard" : "/organisation";
   const { can } = useNavigationMatrix();
