@@ -880,7 +880,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   src={oreilleAttentivePhoto}
                   webpSrc={oreilleAttentiveWebp}
                   alt={t("oreille.image_alt")}
-                  className="aspect-[4/3] w-full max-w-[300px] overflow-visible object-cover object-center object-bottom sm:aspect-[5/4] lg:aspect-auto lg:h-[350px] lg:min-h-[350px] lg:w-[300px]"
+                  className="aspect-[4/3] w-full max-w-[300px] object-cover object-center object-bottom sm:aspect-[5/4] lg:aspect-auto lg:h-[350px] lg:min-h-[350px] lg:w-[300px]"
                   loading="eager"
                   width={300}
                   height={350}

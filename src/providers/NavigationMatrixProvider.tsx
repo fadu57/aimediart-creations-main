@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
@@ -25,12 +25,17 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
     defaultNavAccessForRole(null),
   );
   const [loading, setLoading] = useState(true);
+  const loadGenerationRef = useRef(0);
 
   const load = useCallback(async () => {
     // Attendre que useAuthUser ait fini de charger
     if (authLoading) return;
 
+    const generation = ++loadGenerationRef.current;
+    const isStale = () => generation !== loadGenerationRef.current;
+
     if (!sessionUserId) {
+      if (isStale()) return;
       setAccess(defaultNavAccessForRole(null));
       setLoading(false);
       return;
@@ -39,9 +44,11 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
     setLoading(true);
     try {
       const jwtRoleId = getRoleIdFromJwt(session?.user ?? null);
-      let roleId = pickLowestRoleId(effectiveRoleId, parseGlobalRoleId(jwtRoleId), jwtRoleId);
+      const jwtGlobalRoleId = parseGlobalRoleId(jwtRoleId);
+      let roleId = pickLowestRoleId(effectiveRoleId, jwtGlobalRoleId, jwtRoleId);
 
-      if (roleId == null) {
+      // Admins globaux (1–3) : le JWT suffit — pas de requête agency_users inutile.
+      if (roleId == null && jwtGlobalRoleId == null) {
         const { data: agencyRow } = await supabase
           .from("agency_users")
           .select("role_id")
@@ -49,13 +56,17 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
           .order("role_id", { ascending: true })
           .limit(1)
           .maybeSingle();
+        if (isStale()) return;
+
         const agencyRoleId = parseNumericRoleId(agencyRow?.role_id);
         roleId = pickLowestRoleId(
-          resolveMergedAuthRoleId(jwtRoleId, parseGlobalRoleId(jwtRoleId), agencyRoleId),
+          resolveMergedAuthRoleId(jwtRoleId, jwtGlobalRoleId, agencyRoleId),
           agencyRoleId,
           jwtRoleId,
         );
       }
+
+      if (isStale()) return;
 
       if (roleId == null) {
         setAccess(defaultNavAccessForRole(null));
@@ -74,6 +85,8 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
         .eq("role_id", roleId)
         .in("ressource", [...NAV_MATRIX_CIBLES]);
 
+      if (isStale()) return;
+
       if (error) {
         if (import.meta.env.DEV) console.warn("[NavigationMatrix]", error.message);
         setAccess(defaultNavAccessForRole(roleId));
@@ -86,7 +99,7 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
         );
       }
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [sessionUserId, effectiveRoleId, authLoading, session?.user]);
 
