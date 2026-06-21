@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
 import { isVisitorRole } from "@/lib/authUser";
 import { Loader2 } from "lucide-react";
 
@@ -16,7 +16,7 @@ const OEUVRE_PATH = "/scan-work1";
  *   (role null = admin sans ligne agency_users ou JWT non enrichi ; on fait confiance a la session)
  */
 export function RequireBackoffice() {
-  const { session, loading, role_name, role_id, expo_id } = useAuthUser();
+  const { session, loading, role_name, role_id, expo_id } = useEffectiveAuth();
   const location = useLocation();
 
   const isExplicitVisitor = isVisitorRole(role_name, role_id);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
-import { fetchUserRoleFromDb, getRoleIdFromJwt, getRoleNameFromJwt, mergeRoleFromDbAndJwt, mapRoleNameFromRoleId, normalizeRoleName, resolveSessionRoleId } from "@/lib/authUser";
+import { fetchUserRoleFromDb, getRoleIdFromJwt, getRoleNameFromJwt, mergeRoleFromDbAndJwt, mapRoleNameFromRoleId, normalizeRoleName, parseGlobalRoleId, resolveSessionRoleId } from "@/lib/authUser";
 import { persistUserIpOnLogin } from "@/lib/persistUserIpOnLogin";
 import { resolveAgencyExpoFromJwt } from "@/lib/userScope";
 
@@ -11,8 +11,12 @@ export type AuthUserWithRole = {
   user: User | null;
   role_name: string | null;
   role_label: string | null;
-  /** Niveau reel issu de agency_users.role_id. */
+  /** Niveau effectif fusionné (privilège le plus élevé). */
   role_id: number | null;
+  /** Rôle global SaaS (1–3), si présent. */
+  global_role_id: number | null;
+  /** Rôle métier agence/expo (4–7), si présent. */
+  agency_role_id: number | null;
   /** Prenom depuis public.profiles.first_name. */
   first_name: string | null;
   /** Perimetre metier : agence (obligatoire pour filtrer les ecrans). */
@@ -28,6 +32,8 @@ const empty: AuthUserWithRole = {
   role_name: null,
   role_label: null,
   role_id: null,
+  global_role_id: null,
+  agency_role_id: null,
   first_name: null,
   agency_id: null,
   expo_id: null,
@@ -82,6 +88,8 @@ export function useAuthUser() {
         role_name: null,
         role_label: null,
         role_id: null,
+        global_role_id: null,
+        agency_role_id: null,
         first_name: null,
         agency_id: null,
         expo_id: null,
@@ -118,6 +126,10 @@ export function useAuthUser() {
       }
       if (myGeneration !== applyGenerationRef.current) return;
 
+      const jwtRoleId = getRoleIdFromJwt(session.user);
+      const global_role_id = dbProfile.global_role_id ?? parseGlobalRoleId(jwtRoleId);
+      const agency_role_id = dbProfile.agency_role_id ?? null;
+
       const { role_name: dbRoleName, role_label: dbRoleLabel } = mergeRoleFromDbAndJwt(
         session.user,
         dbProfile.role_name,
@@ -151,6 +163,8 @@ export function useAuthUser() {
         role_name,
         role_label,
         role_id,
+        global_role_id,
+        agency_role_id,
         first_name,
         agency_id,
         expo_id,
@@ -160,7 +174,14 @@ export function useAuthUser() {
       if (myGeneration !== applyGenerationRef.current) return;
       // Bypass robuste: si la lecture DB (profiles) echoue (403/RLS), on continue avec le role JWT.
       const { role_name, role_label } = mergeRoleFromDbAndJwt(session.user, null, null);
-      const role_id = getRoleIdFromJwt(session.user);
+      const jwtRoleId = getRoleIdFromJwt(session.user);
+      const role_id = resolveSessionRoleId(session.user, {
+        role_id: null,
+        global_role_id: parseGlobalRoleId(jwtRoleId),
+        agency_role_id: null,
+      });
+      const global_role_id = parseGlobalRoleId(jwtRoleId);
+      const agency_role_id = null;
       const meta = session.user.user_metadata as Record<string, unknown> | undefined;
       const first_name =
         typeof meta?.first_name === "string" ? meta.first_name.trim() || null : null;
@@ -182,6 +203,8 @@ export function useAuthUser() {
         role_name,
         role_label,
         role_id,
+        global_role_id,
+        agency_role_id,
         first_name,
         agency_id: jwtScope.agency_id,
         expo_id: jwtScope.expo_id,

@@ -113,7 +113,7 @@ function ConnexionSectionHeading({
   return (
     <h2
       className={cn(
-        "flex w-full flex-col font-serif text-[30px] font-semibold leading-tight tracking-tight text-foreground",
+        "flex w-full flex-col text-[30px] font-semibold leading-tight tracking-tight text-foreground",
         compact && "gap-0.5",
       )}
     >
@@ -183,7 +183,7 @@ function ConnexionSectionCard({
               compact={compact}
             />
           ) : (
-            <h2 className="w-full font-serif text-[30px] font-semibold leading-tight tracking-tight text-foreground">
+            <h2 className="w-full text-[30px] font-semibold leading-tight tracking-tight text-foreground">
               {title}
             </h2>
           )}
@@ -205,7 +205,7 @@ export function OrganisationConnexionContent() {
         <SurfaceCardShell compact>
           <div className="flex items-start gap-3">
             <Wifi className="mt-1.5 h-8 w-8 shrink-0 text-[#E63946]" aria-hidden />
-            <h2 className="max-w-[46ch] font-serif text-[30px] font-semibold leading-tight tracking-tight text-[#E63946]">
+            <h2 className="max-w-[46ch] text-[30px] font-semibold leading-tight tracking-tight text-[#E63946]">
               <span className="block">{t("connexion.title_line1")}</span>
               <span className="mt-1 block font-normal italic">{t("connexion.title_line2")}</span>
             </h2>
@@ -228,7 +228,7 @@ export function OrganisationConnexionContent() {
               </figure>
             </div>
             <div className="order-1 min-w-0 flex-1 lg:order-2">
-              <h2 className="max-w-[558px] font-serif text-[30px] font-semibold leading-tight tracking-tight text-foreground">
+              <h2 className="max-w-[558px] text-[30px] font-semibold leading-tight tracking-tight text-foreground">
                 {t("connexion.sections.challenge.title")}
               </h2>
               <p className="mt-6 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">

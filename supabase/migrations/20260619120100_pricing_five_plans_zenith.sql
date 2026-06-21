@@ -33,7 +33,7 @@ SELECT
   NULL,
   NULL,
   NULL,
-  NULL,
+  0,
   NULL,
   true,
   true,

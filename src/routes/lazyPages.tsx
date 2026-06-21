@@ -48,6 +48,7 @@ export const NotFound = lazy(() => import("@/pages/NotFound"));
 export const WorkScanner = lazy(() => import("@/pages/WorkScanner"));
 export const PublicHome = lazy(() => import("@/pages/PublicHome"));
 export const PublicHomeCommencer = lazy(() => import("@/pages/PublicHomeCommencer"));
+export const OrganisationEngagement = lazy(() => import("@/pages/OrganisationEngagement"));
 export const OrganisationConnexion = lazy(() => import("@/pages/OrganisationConnexion"));
 export const CgvPage = lazy(() => import("@/pages/CgvPage"));
 export const CookiesPage = lazy(() => import("@/pages/CookiesPage"));

@@ -3,6 +3,7 @@ import { BarChart3, Building2, GalleryVerticalEnd, House, Loader2, LogIn, LogOut
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
 import { normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
@@ -124,7 +125,7 @@ export default function Header() {
     isArtworkViewerPage;
   const isAuthFormPage = pathname === "/login" || isVisitorPage;
   const isOrganisationVitrinePage = isOrganisationVitrineAreaPath(pathname);
-  const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useAuthUser();
+  const { session, first_name, user, role_name, role_id, agency_id, loading: authLoading } = useEffectiveAuth();
   const homePath = session ? "/dashboard" : "/organisation";
   const { can } = useNavigationMatrix();
   const { isStandbyNavRestricted } = useOrganisationStandby();
@@ -136,8 +137,8 @@ export default function Header() {
   const [isDesktopHeader, setIsDesktopHeader] = useState(
     typeof window !== "undefined" ? window.innerWidth > 1173 : true,
   );
-  /** Rôles métier agence/expo/visiteur : pas d’entrée « Organisation » (/agencies) dans le header. */
-  const hideOrganisationNav = typeof role_id === "number" && role_id > 3;
+  /** Équipe expo (6) et visiteur : pas d’entrée « Organisation » ; admin agence (4) et commissaire (5) y accèdent. */
+  const hideOrganisationNav = typeof role_id === "number" && role_id > 5;
   const showGreetingAgency = typeof role_id === "number" && role_id > 3;
   const hasFullHeader = role_id === 4 || role_id === 1 || (typeof role_id === "number" && role_id >= 1 && role_id <= 6);
   const canSeeHomeMenu = can("menu_home");

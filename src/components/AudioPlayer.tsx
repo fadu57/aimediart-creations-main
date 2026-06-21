@@ -62,6 +62,12 @@ type AudioPlayerProps = {
   /** Bouton pour rouvrir le dialogue lorsque des voix existent déjà. */
   onManageVoicesClick?: () => void;
 
+  /** Désactive la génération (ex. plan Étincelle). */
+  generateDisabled?: boolean;
+
+  /** Message affiché à droite du bouton lorsque generateDisabled est true. */
+  generateDisabledHint?: string;
+
 };
 
 
@@ -225,6 +231,10 @@ export function AudioPlayer({
   onGenerateClick,
 
   onManageVoicesClick,
+
+  generateDisabled = false,
+
+  generateDisabledHint,
 
 }: AudioPlayerProps) {
 
@@ -515,9 +525,10 @@ export function AudioPlayer({
 
             className={cn("h-8 gap-1.5 text-xs", btnClass)}
 
-            disabled={generating || !text_id || !prompt_style_id}
+            disabled={generating || !text_id || !prompt_style_id || generateDisabled}
 
             onClick={() => {
+              if (generateDisabled) return;
               if (onGenerateClick) onGenerateClick();
               else handleGenerate();
             }}
@@ -537,6 +548,10 @@ export function AudioPlayer({
             {hasFailed ? t("audio_player.retry") : t("audio_player.generate")}
 
           </Button>
+
+          {generateDisabled && generateDisabledHint ? (
+            <p className="text-[11px] font-medium text-destructive">{generateDisabledHint}</p>
+          ) : null}
 
         </div>
 

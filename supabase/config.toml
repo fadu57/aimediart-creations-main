@@ -89,3 +89,8 @@ entrypoint = "./functions/sync-google-billing/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/supabase-db-monitoring/index.ts"
+
+[functions.generate-sponsoring-convention]
+verify_jwt = true
+entrypoint = "./functions/generate-sponsoring-convention/index.ts"
+static_files = [ "./functions/generate-sponsoring-convention/template.docx" ]

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
 import { parseGlobalRoleId, getRoleIdFromJwt, resolveMergedAuthRoleId } from "@/lib/authUser";
 import { pickLowestRoleId, parseNumericRoleId } from "@/lib/roleHierarchy";
 import {
@@ -16,7 +17,8 @@ import { NavigationMatrixContext, type NavigationMatrixContextValue } from "@/pr
 export function NavigationMatrixProvider({ children }: { children: ReactNode }) {
   // On utilise directement role_id resolu par useAuthUser (inclut deja le fallback JWT)
   // pour eviter une double requete qui peut echouer si la table users n'existe plus.
-  const { session, role_id: authRoleId, loading: authLoading } = useAuthUser();
+  const { session, loading: authLoading } = useAuthUser();
+  const { role_id: effectiveRoleId } = useEffectiveAuth();
   const sessionUserId = session?.user?.id ?? null;
 
   const [access, setAccess] = useState<NavigationMatrixContextValue["access"]>(() =>
@@ -37,7 +39,7 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
     setLoading(true);
     try {
       const jwtRoleId = getRoleIdFromJwt(session?.user ?? null);
-      let roleId = pickLowestRoleId(authRoleId, parseGlobalRoleId(jwtRoleId), jwtRoleId);
+      let roleId = pickLowestRoleId(effectiveRoleId, parseGlobalRoleId(jwtRoleId), jwtRoleId);
 
       if (roleId == null) {
         const { data: agencyRow } = await supabase
@@ -86,7 +88,7 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
     } finally {
       setLoading(false);
     }
-  }, [sessionUserId, authRoleId, authLoading]);
+  }, [sessionUserId, effectiveRoleId, authLoading, session?.user]);
 
   useEffect(() => {
     void load();

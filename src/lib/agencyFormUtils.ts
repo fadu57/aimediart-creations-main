@@ -1,4 +1,27 @@
-/** Utilitaires formulaire agence — aligner les libellés si la table évolue. */
+import { isAgencyIdentityFormKey } from "@/lib/agencyIdentity";
+
+/** Colonnes commerciales — éditées via bloc dédié (admins globaux). */
+export const COMMERCIAL_AGENCY_KEYS = [
+  "commercial_kind",
+  "commercial_plan_code",
+  "discount_percent",
+  "discount_amount_eur",
+  "commercial_notes",
+] as const;
+
+export function isCommercialAgencyFormKey(key: string): boolean {
+  return (COMMERCIAL_AGENCY_KEYS as readonly string[]).includes(key);
+}
+
+export function defaultCommercialAgencyValues(): Record<string, string> {
+  return {
+    commercial_kind: "standard",
+    commercial_plan_code: "",
+    discount_percent: "0",
+    discount_amount_eur: "0.00",
+    commercial_notes: "",
+  };
+}
 
 const READONLY_KEYS_INSERT = new Set(["created_at", "updated_at"]);
 
@@ -25,6 +48,17 @@ export function fieldLabel(key: string): string {
     website: "Site web",
     description: "Description",
     logo_agency: "Logo de l’agence",
+    commercial_kind: "Profil commercial",
+    commercial_plan_code: "Abonnement concerné",
+    discount_percent: "Remise (%)",
+    discount_amount_eur: "Remise (€ TTC mensuelle)",
+    commercial_notes: "Notes commerciales / sponsoring",
+    structure_category: "Famille de structure",
+    structure_type: "Forme juridique",
+    siret: "Numéro SIRET",
+    legal_rep_firstname: "Prénom du responsable légal",
+    legal_rep_lastname: "Nom du responsable légal",
+    legal_rep_role: "Qualité du responsable légal",
   };
   return map[key] ?? key.replace(/_/g, " ");
 }
@@ -34,9 +68,14 @@ export function isAgencyLogoField(key: string): boolean {
   return key === "logo_agency";
 }
 
-/** Ne pas afficher dans le formulaire (UUID généré à la création). */
+/** Ne pas afficher dans le formulaire (UUID généré à la création ou bloc dédié). */
 export function isHiddenAgencyFormKey(key: string): boolean {
-  return key === "id";
+  return (
+    key === "id" ||
+    isCommercialAgencyFormKey(key) ||
+    isAgencyIdentityFormKey(key) ||
+    key === "sponsor_valid_until"
+  );
 }
 
 /** Ordre d’affichage : id, nom métier, puis le reste, timestamps en fin. */
@@ -58,6 +97,14 @@ export function valueToInputString(v: unknown): string {
 export function parseInputForKey(key: string, raw: string): unknown {
   const t = raw.trim();
   if (t === "") return null;
+  if (key === "siret") {
+    const digits = t.replace(/\D/g, "").slice(0, 14);
+    return digits.length === 14 ? digits : digits.length === 0 ? null : digits;
+  }
+  if (key === "discount_percent" || key === "discount_amount_eur") {
+    const n = Number(t.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
   if (key.endsWith("_at")) return t;
   if ((key.includes("json") || key.includes("metadata") || key.includes("data")) && (t.startsWith("{") || t.startsWith("["))) {
     try {

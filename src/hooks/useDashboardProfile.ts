@@ -11,6 +11,8 @@ import {
   isGlobalStaffRole,
 } from "@/lib/dashboardTeamScope";
 import { fetchOrganisationStandbyState } from "@/lib/organisationStandby";
+import { isEtincellePlanCode } from "@/lib/organisation/planLimits";
+import { countAgencyArtworks } from "@/lib/organisation/countAgencyArtworks";
 import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
 import { parseNumericRoleId, pickLowestRoleId } from "@/lib/roleHierarchy";
 import { supabase } from "@/lib/supabase";
@@ -59,6 +61,19 @@ export type DashboardAgency = {
   id: string;
   name_agency: string | null;
   logo_agency: string | null;
+  discount_percent?: number | null;
+  discount_amount_eur?: number | null;
+  commercial_kind?: string | null;
+  commercial_plan_code?: string | null;
+  commercial_notes?: string | null;
+  sponsor_valid_until?: string | null;
+  adresse_agency?: string | null;
+  zip_agency?: string | null;
+  city_agency?: string | null;
+  siret?: string | null;
+  legal_rep_firstname?: string | null;
+  legal_rep_lastname?: string | null;
+  legal_rep_role?: string | null;
 };
 
 export type DashboardExpo = {
@@ -94,6 +109,12 @@ export type DashboardSubscription = {
   included_audio_langs: number | null;
   org_status: string | null;
   status: "active" | "trial" | "standby" | "expired" | "cancelled" | "none" | "unknown";
+  list_price_eur: number | null;
+  discount_percent: number | null;
+  discount_amount_eur: number | null;
+  net_price_eur: number | null;
+  commercial_kind: string | null;
+  sponsor_valid_until: string | null;
 };
 
 export type DashboardTeamStats = {
@@ -141,12 +162,39 @@ export type DashboardData = {
   refresh: () => void;
 };
 
+function addDaysToIso(iso: string, days: number): string | null {
+  const start = new Date(iso);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start.getTime());
+  end.setDate(end.getDate() + days);
+  return end.toISOString();
+}
+
 function daysUntil(isoDate: string | null): number | null {
   if (!isoDate) return null;
   const end = new Date(isoDate);
   if (Number.isNaN(end.getTime())) return null;
   const diff = end.getTime() - Date.now();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function resolveSubscriptionEndDate(
+  row: {
+    started_at?: string | null;
+    ends_at?: string | null;
+    trial_ends_at?: string | null;
+    next_renewal_at?: string | null;
+  },
+  planCode: string | null,
+  trialDurationDays: number | null,
+): string | null {
+  if (isEtincellePlanCode(planCode)) {
+    const fromDb = row.trial_ends_at ?? row.ends_at ?? null;
+    if (fromDb) return fromDb;
+    if (row.started_at) return addDaysToIso(row.started_at, trialDurationDays ?? 30);
+    return null;
+  }
+  return row.next_renewal_at ?? row.ends_at ?? row.trial_ends_at ?? null;
 }
 
 function subscriptionStatus(
@@ -232,6 +280,12 @@ function subscriptionPlaceholder(status: DashboardSubscription["status"]): Dashb
     included_audio_langs: null,
     org_status: null,
     status,
+    list_price_eur: null,
+    discount_percent: null,
+    discount_amount_eur: null,
+    net_price_eur: null,
+    commercial_kind: null,
+    sponsor_valid_until: null,
   };
 }
 
@@ -261,11 +315,12 @@ type PricingJoinRow = {
   included_mediation_langs_min?: number | null;
   included_mediation_langs_max?: number | null;
   included_audio_langs?: number | null;
+  trial_duration_days?: number | null;
 };
 
 const PRICING_JOIN_SELECTS = [
-  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
-  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
+  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs, trial_duration_days",
+  "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs, trial_duration_days",
 ] as const;
 
 async function fetchPricingJoinByPlanCode(planCode: string | null): Promise<PricingJoinRow | null> {
@@ -303,17 +358,25 @@ function buildDashboardSubscriptionFromOrgRow(
     standby_started_at?: string | null;
     standby_requested_at?: string | null;
     standby_cancel_deadline_at?: string | null;
+    list_price_eur?: number | null;
+    discount_percent?: number | null;
+    discount_amount_eur?: number | null;
+    net_price_eur?: number | null;
+    commercial_kind?: string | null;
+    sponsor_valid_until?: string | null;
   },
   pricing: PricingJoinRow | null,
 ): DashboardSubscription {
-  const renewalOrEnd = row.next_renewal_at ?? row.ends_at ?? row.trial_ends_at ?? null;
+  const planCode = row.plan_code ?? pricing?.plan_code ?? null;
+  const isEtincelle = isEtincellePlanCode(planCode);
+  const renewalOrEnd = resolveSubscriptionEndDate(row, planCode, pricing?.trial_duration_days ?? null);
   const mappedStatus = mapOrganisationSubscriptionStatus(row.status, row.standby_status);
   const isActive = mappedStatus === "active" || mappedStatus === "trial" || mappedStatus === "standby";
 
   return {
     source: "organisation",
     subscription_id: row.id ?? null,
-    plan_code: row.plan_code ?? pricing?.plan_code ?? null,
+    plan_code: planCode,
     pricing_plan: pricing?.pricing_label ?? row.plan_code ?? null,
     pricing_label: pricing?.pricing_label ?? null,
     display_name: pricing?.display_name ?? pricing?.pricing_label ?? row.plan_code ?? null,
@@ -321,9 +384,9 @@ function buildDashboardSubscriptionFromOrgRow(
       row.billing_cycle === "annual" || row.billing_cycle === "monthly" ? row.billing_cycle : null,
     started_at: row.started_at ?? null,
     expires_at: renewalOrEnd,
-    next_renewal_at: row.next_renewal_at ?? null,
+    next_renewal_at: isEtincelle ? null : row.next_renewal_at ?? null,
     is_active: isActive,
-    is_trial: row.is_trial === true || mappedStatus === "trial",
+    is_trial: row.is_trial === true || mappedStatus === "trial" || isEtincelle,
     days_remaining: daysUntil(renewalOrEnd),
     max_oeuvres: pricing?.pricing_max_oeuvres ?? null,
     max_visitors: pricing?.pricing_max_visitors ?? pricing?.princing_max_visitors ?? null,
@@ -339,6 +402,12 @@ function buildDashboardSubscriptionFromOrgRow(
     included_audio_langs: pricing?.included_audio_langs ?? null,
     org_status: row.status ?? null,
     status: mappedStatus === "unknown" ? "active" : mappedStatus,
+    list_price_eur: row.list_price_eur ?? null,
+    discount_percent: row.discount_percent ?? null,
+    discount_amount_eur: row.discount_amount_eur ?? null,
+    net_price_eur: row.net_price_eur ?? null,
+    commercial_kind: row.commercial_kind ?? null,
+    sponsor_valid_until: row.sponsor_valid_until ?? null,
   };
 }
 
@@ -428,7 +497,8 @@ async function fetchOrganisationSubscription(
     .from("organisation_subscriptions")
     .select(
       `id, plan_code, billing_cycle, status, standby_status, is_trial, started_at, ends_at, trial_ends_at,
-       next_renewal_at, standby_started_at, standby_requested_at, standby_cancel_deadline_at, pricing_id`,
+       next_renewal_at, standby_started_at, standby_requested_at, standby_cancel_deadline_at, pricing_id,
+       list_price_eur, discount_percent, discount_amount_eur, net_price_eur, commercial_kind, sponsor_valid_until`,
     )
     .eq("organisation_id", agencyId)
     .in("status", ["trial", "active", "standby"])
@@ -514,14 +584,18 @@ async function fetchLegacyAgencySubscription(agencyId: string): Promise<Dashboar
 
   const pricingPlan = row.pricing_plan ?? null;
   const pricingDetails = await fetchPricingForPlan(pricingPlan);
-  const expiresAt = row.expires_at ?? null;
+  const isEtincelle = isEtincellePlanCode(pricingPlan);
+  let expiresAt = row.expires_at ?? null;
+  if (isEtincelle && !expiresAt && row.started_at) {
+    expiresAt = addDaysToIso(row.started_at, 30);
+  }
   const isActive = row.is_active !== false;
   const legacyStatus = subscriptionStatus(isActive, expiresAt);
 
   return {
     source: "legacy",
     subscription_id: null,
-    plan_code: null,
+    plan_code: isEtincelle ? "ETINCELLE" : null,
     pricing_plan: pricingPlan,
     pricing_label: pricingDetails.pricing_label,
     display_name: pricingDetails.pricing_label,
@@ -531,7 +605,7 @@ async function fetchLegacyAgencySubscription(agencyId: string): Promise<Dashboar
     expires_at: expiresAt,
     next_renewal_at: null,
     is_active: isActive,
-    is_trial: false,
+    is_trial: isEtincelle,
     days_remaining: daysUntil(expiresAt),
     max_oeuvres: pricingDetails.max_oeuvres,
     max_visitors: pricingDetails.max_visitors,
@@ -546,7 +620,20 @@ async function fetchLegacyAgencySubscription(agencyId: string): Promise<Dashboar
     included_mediation_langs_max: null,
     included_audio_langs: null,
     org_status: null,
-    status: legacyStatus === "expired" ? "expired" : legacyStatus === "none" ? "none" : "active",
+    status:
+      isEtincelle && legacyStatus !== "expired"
+        ? "trial"
+        : legacyStatus === "expired"
+          ? "expired"
+          : legacyStatus === "none"
+            ? "none"
+            : "active",
+    list_price_eur: pricingDetails.monthly_price_eur,
+    discount_percent: 0,
+    discount_amount_eur: 0,
+    net_price_eur: pricingDetails.monthly_price_eur,
+    commercial_kind: "standard",
+    sponsor_valid_until: null,
   };
 }
 
@@ -1092,92 +1179,6 @@ async function fetchAllUsersForProfilePicker(): Promise<DashboardTeamMember[]> {
   return members.filter((m) => activeIds.has(m.user_id));
 }
 
-async function countAgencyArtworks(agencyId: string): Promise<number> {
-  const aid = agencyId.trim();
-
-  const { data: expoRows } = await supabase
-    .from("expos")
-    .select("id")
-    .or(`agency_id.eq.${aid},agency_id.is.null`)
-    .is("deleted_at", null);
-  const expoIds = ((expoRows as Array<{ id?: string | null }> | null) ?? [])
-    .map((r) => r.id?.trim())
-    .filter(Boolean) as string[];
-
-  const ids = new Set<string>();
-
-  const collectArtworkIds = (
-    rows: Array<{ artwork_id?: string | null; artwork_agency_id?: string | null }> | null,
-    options?: { requireAgencyMatch?: boolean },
-  ) => {
-    for (const row of rows ?? []) {
-      const id = row.artwork_id?.trim();
-      if (!id) continue;
-      if (options?.requireAgencyMatch) {
-        const rowAgency = row.artwork_agency_id?.trim();
-        if (rowAgency && rowAgency !== aid) continue;
-      }
-      ids.add(id);
-    }
-  };
-
-  const { data: byAgency, error: byAgencyErr } = await supabase
-    .from("artworks")
-    .select("artwork_id")
-    .eq("artwork_agency_id", aid)
-    .is("deleted_at", null);
-
-  if (byAgencyErr) {
-    const { data: fallbackByAgency } = await supabase
-      .from("artworks")
-      .select("artwork_id")
-      .eq("artwork_agency_id", aid)
-      .is("artwork_deleted_at", null);
-    collectArtworkIds(fallbackByAgency);
-  } else {
-    collectArtworkIds(byAgency);
-  }
-
-  if (expoIds.length > 0) {
-    const { data: byExpo, error: byExpoErr } = await supabase
-      .from("artworks")
-      .select("artwork_id, artwork_agency_id")
-      .in("artwork_expo_id", expoIds)
-      .is("deleted_at", null);
-
-    if (byExpoErr) {
-      const { data: fallbackByExpo } = await supabase
-        .from("artworks")
-        .select("artwork_id, artwork_agency_id")
-        .in("artwork_expo_id", expoIds)
-        .is("artwork_deleted_at", null);
-      collectArtworkIds(fallbackByExpo, { requireAgencyMatch: true });
-    } else {
-      collectArtworkIds(byExpo, { requireAgencyMatch: true });
-    }
-  }
-
-  if (ids.size === 0) {
-    const { data: allVisible } = await supabase
-      .from("artworks")
-      .select("artwork_id, artwork_agency_id, artwork_expo_id")
-      .is("deleted_at", null);
-    const expoSet = new Set(expoIds);
-    for (const row of (allVisible as Array<{
-      artwork_id?: string | null;
-      artwork_agency_id?: string | null;
-      artwork_expo_id?: string | null;
-    }> | null) ?? []) {
-      const id = row.artwork_id?.trim();
-      if (!id) continue;
-      if (row.artwork_agency_id?.trim() === aid) ids.add(id);
-      else if (row.artwork_expo_id?.trim() && expoSet.has(row.artwork_expo_id.trim())) ids.add(id);
-    }
-  }
-
-  return ids.size;
-}
-
 async function fetchTeamStats(
   agencyId: string | null,
   membersCount: number,
@@ -1290,7 +1291,9 @@ export function useDashboardProfile(
           resolvedAgencyId
             ? supabase
                 .from("agencies")
-                .select("id,name_agency,logo_agency")
+                .select(
+                  "id,name_agency,logo_agency,discount_percent,discount_amount_eur,commercial_kind,commercial_plan_code,commercial_notes,sponsor_valid_until,adresse_agency,zip_agency,city_agency,siret,legal_rep_firstname,legal_rep_lastname,legal_rep_role",
+                )
                 .eq("id", resolvedAgencyId)
                 .maybeSingle()
             : Promise.resolve({ data: null, error: null }),
@@ -1346,8 +1349,7 @@ export function useDashboardProfile(
         }
 
         if (agencyRes.data) {
-          const a = agencyRes.data as DashboardAgency;
-          setAgency({ id: a.id, name_agency: a.name_agency ?? null, logo_agency: a.logo_agency ?? null });
+          setAgency(agencyRes.data as DashboardAgency);
         } else {
           setAgency(null);
         }

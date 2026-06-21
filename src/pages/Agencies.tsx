@@ -25,6 +25,7 @@ type AgencyRow = {
   id: string;
   name_agency?: string | null;
   logo_agency?: string | null;
+  commercial_notes?: string | null;
   deleted_at?: string | null;
 };
 
@@ -191,7 +192,7 @@ const Agencies = () => {
     };
     const base = supabase
       .from("agencies")
-      .select("id, name_agency, logo_agency")
+      .select("id, name_agency, logo_agency, commercial_notes")
       .is("deleted_at", null)
       .order("name_agency", { ascending: true, nullsFirst: false });
     const { data, error: qErr } = await applyScope(base);
@@ -261,6 +262,9 @@ const Agencies = () => {
     (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
   const canOpenAgencyTrash =
     (typeof role_id === "number" && role_id >= 1 && role_id <= 4) || hasFullDataAccess(role_name);
+
+  const canEditCommercialTerms =
+    (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
 
   const canEditAgency = (agId: string) => {
     if ((typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name)) return true;
@@ -391,6 +395,9 @@ const Agencies = () => {
                   </div>
                   <div className="flex-1 min-w-0 pointer-events-none">
                     <h3 className="font-serif font-bold text-lg">{ag.name_agency?.trim() || t("page.noName")}</h3>
+                    {ag.commercial_notes?.trim() ? (
+                      <p className="mt-1 text-sm italic text-[#E63946]">{ag.commercial_notes.trim()}</p>
+                    ) : null}
                     <AgencyExpoList expos={exposByAgencyId[ag.id] ?? []} />
                   </div>
                 </div>
@@ -421,6 +428,7 @@ const Agencies = () => {
         mode={formMode}
         agencyId={formMode === "edit" ? editingAgencyId : null}
         fieldKeys={agencyFieldKeys}
+        canEditCommercialTerms={canEditCommercialTerms}
         onSuccess={() => void load()}
       />
     </div>

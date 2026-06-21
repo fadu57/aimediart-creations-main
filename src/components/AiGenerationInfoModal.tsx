@@ -122,7 +122,7 @@ export function AiGenerationInfoModal({ open, onOpenChange }: AiGenerationInfoMo
         {/* Texte sur fond opaque — ne recouvre pas la photo à droite */}
         <div className="relative z-10 flex h-full min-h-0 flex-col bg-[#faf8f5] sm:w-[650px] sm:max-w-[650px]">
         <DialogHeader className="shrink-0 space-y-2 border-b border-neutral-200/90 bg-[#faf8f5] px-5 py-4 sm:px-6">
-          <DialogTitle className="pr-8 text-left font-serif text-xl text-[#1f1f1f]">
+          <DialogTitle className="pr-8 text-left text-xl text-[#1f1f1f]">
             {t(`${ns}.title`)}
           </DialogTitle>
           <DialogDescription className="-mx-5 w-[calc(100%+2.5rem)] px-5 text-left text-sm leading-relaxed text-[#333] sm:-mx-6 sm:w-[calc(100%+3rem)] sm:px-6">

@@ -525,7 +525,7 @@ function Section({
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="mt-2 max-w-[23ch] font-serif text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
+      <h2 className="mt-2 max-w-[23ch] text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
         {title}
       </h2>
       <div className="mt-9">{children}</div>
@@ -689,7 +689,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               </p>
               <h1
                 id="hero-title"
-                className="mt-4 max-w-[18ch] font-serif text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]"
+                className="mt-4 max-w-[18ch] text-[2.05rem] font-semibold leading-[1.08] tracking-tight text-foreground max-[389px]:text-[1.85rem] sm:max-w-[22ch] sm:text-5xl lg:text-[3.35rem]"
               >
                 <span className="block">{t("hero.title_line1")}</span>
                 <span className="block">{t("hero.title_line2")}</span>
@@ -864,7 +864,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <div className="mb-3 flex h-24 items-end justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-400/25 via-fuchsia-400/20 to-transparent ph-animate-float">
                   <Cloud className="h-14 w-14 text-indigo-500/90" strokeWidth={1.25} aria-hidden />
                 </div>
-                <CardTitle className="font-serif text-lg">{t("output.card_nuage_title")}</CardTitle>
+                <CardTitle className="text-lg">{t("output.card_nuage_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
                 <p>{t("output.card_nuage_text")}</p>
@@ -877,7 +877,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-rose-300/25 to-amber-100/40 ph-animate-float-delayed">
                   <Wind className="h-12 w-12 text-rose-600/85" strokeWidth={1.25} aria-hidden />
                 </div>
-                <CardTitle className="font-serif text-lg">{t("output.card_murmures_title")}</CardTitle>
+                <CardTitle className="text-lg">{t("output.card_murmures_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
                 <p>{highlightAimediartWord(t("output.card_murmures_text"))}</p>
@@ -890,7 +890,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 <div className="mb-3 flex h-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-400/30 to-emerald-300/15">
                   <ThermometerSun className="h-12 w-12 text-sky-600/90 ph-animate-shimmer" strokeWidth={1.25} aria-hidden />
                 </div>
-                <CardTitle className="font-serif text-lg">{t("output.card_thermometre_title")}</CardTitle>
+                <CardTitle className="text-lg">{t("output.card_thermometre_title")}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm leading-relaxed text-foreground/80">
                 <p>{t("output.card_thermometre_text")}</p>
@@ -1044,7 +1044,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       <x.icon className="h-4 w-4 text-foreground/70" aria-hidden />
                     </div>
                   </div>
-                  <CardTitle id={`${x.id}-title`} className="font-serif text-xl">{x.title}</CardTitle>
+                  <CardTitle id={`${x.id}-title`} className="text-xl">{x.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm leading-relaxed text-foreground/80">
                   <p style={{ whiteSpace: "pre-line" }}>{x.text}</p>
@@ -1075,7 +1075,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           <div className="mt-10 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <article className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.commissaire_eyebrow")}</p>
-              <h3 className="mt-2 font-serif text-2xl font-semibold tracking-tight">{t("parcours.commissaire_title")}</h3>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight">{t("parcours.commissaire_title")}</h3>
               <p className="mt-3 text-sm leading-relaxed text-foreground/80">{t("parcours.commissaire_text")}</p>
               <div className="mt-5 grid gap-2 sm:grid-cols-2">
                 {[
@@ -1085,7 +1085,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   { id: "kpi_retours", kpi: "+31%", label: t("parcours.kpi_retours_label") },
                 ].map((item) => (
                   <div key={item.id} className="rounded-2xl border border-neutral-200 bg-white p-3">
-                    <p className="font-serif text-xl leading-none text-foreground">{item.kpi}</p>
+                    <p className="text-xl leading-none text-foreground">{item.kpi}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
                   </div>
                 ))}
@@ -1214,7 +1214,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                               </Button>
                             </Link>
                           </div>
-                          <CardTitle id={`plan-title-${planKey}`} className="font-serif text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
+                          <CardTitle id={`plan-title-${planKey}`} className="text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
                           <p className="text-sm leading-relaxed text-muted-foreground">
                             {highlightAimediartWord(subtitle)}
                           </p>
@@ -1275,8 +1275,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                       ) : null}
                                       <div
                                         className={cn(
-                                          "mt-0.5 text-[15px] font-semibold leading-none tracking-tight whitespace-nowrap",
-                                          selectedVariant.pricing_monthly_ttc_eur === 0 && "italic text-[#9d2525]",
+                                          "mt-0.5 text-[15px] font-semibold leading-none tracking-tight",
+                                          selectedVariant.pricing_monthly_ttc_eur === 0
+                                            ? "italic text-[#9d2525] text-[18px] leading-snug whitespace-normal"
+                                            : "whitespace-nowrap",
                                         )}
                                       >
                                         {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur, t, i18n.language)}
@@ -1352,7 +1354,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                         </div>
                         <CardTitle
                           id="plan-title-zenith"
-                          className="font-serif text-[1.75rem] leading-tight text-[#9d2525] lg:text-[2rem]"
+                          className="text-[1.75rem] leading-tight text-[#9d2525] lg:text-[2rem]"
                         >
                           {planCardTitleShort(zenithPlan.pricing_plan, t)}
                         </CardTitle>

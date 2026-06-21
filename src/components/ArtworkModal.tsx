@@ -6,6 +6,8 @@ import { toast } from "sonner";
 
 import { AddArtistDialog } from "@/components/AddArtistDialog";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
+import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
 import {
   buildMediationStylePromptStyleMap,
@@ -562,6 +564,8 @@ export function ArtworkModal({
   const canPickAgency = typeof role_id === "number" && role_id < 4;
   const canPickExpo = typeof role_id === "number" && (role_id === 4 || role_id === 5);
   const expoAgencyId = artworkAgencyId.trim() || agency_id?.trim() || "";
+  const { limits: planLimits } = useOrganisationPlanLimits(expoAgencyId || null);
+  const isEtincellePlan = planLimits?.isEtincelle ?? false;
   const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
   const [expoOptions, setExpoOptions] = useState<{ id: string; name: string }[]>([]);
   const [artworkAgencyOpen, setArtworkAgencyOpen] = useState(false);
@@ -689,7 +693,8 @@ export function ArtworkModal({
     }
     setMediationEditLang(mediationPrimaryLang);
     setSourceMaterialEditLang(mediationPrimaryLang);
-  }, [open, mediationPrimaryLang, setMediationOptionalLang]);
+    if (isEtincellePlan) setMediationOptionalLang(null);
+  }, [open, mediationPrimaryLang, setMediationOptionalLang, isEtincellePlan]);
 
   useEffect(() => {
     if (!generationLangs.includes(sourceMaterialEditLang)) {
@@ -1004,6 +1009,12 @@ export function ArtworkModal({
 
   const handleSave = async () => {
     if (isVisitorLocked) return;
+    if (!persistedArtworkId && planLimits?.isEtincelle && !planLimits.canCreateArtwork) {
+      toast.error(
+        `Quota atteint : ${planLimits.maxArtworks ?? 0} œuvres maximum avec l'abonnement Étincelle.`,
+      );
+      return;
+    }
     if (!title.trim()) {
       toast.error(t("toast_error_title_required"));
       return;
@@ -2232,7 +2243,9 @@ export function ArtworkModal({
                 aria-label={t("source_material_lang_group_aria")}
               >
                 {MEDIATION_UI_LANGS.map((lng) => {
-                  const langEnabled = activeSourceMaterialLangSet.has(lng);
+                  const langEnabled = isEtincellePlan
+                    ? lng === mediationPrimaryLang
+                    : activeSourceMaterialLangSet.has(lng);
                   return (
                     <Button
                       key={lng}
@@ -2301,7 +2314,7 @@ export function ArtworkModal({
                 </ul>
               </details>
             ) : null}
-            {allowsOptionalLang ? (
+            {allowsOptionalLang || isEtincellePlan ? (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200/70 bg-amber-50/50 px-3 py-2">
                 <Label htmlFor="mediation-optional-lang" className="text-xs text-amber-950 shrink-0">
                   {t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
@@ -2313,6 +2326,7 @@ export function ArtworkModal({
                     className="h-8 min-w-[5.5rem] rounded-md border border-amber-300/60 bg-background px-2 text-xs font-semibold text-amber-950 disabled:cursor-not-allowed disabled:opacity-50"
                     value={mediationOptionalLang ?? ""}
                     disabled={
+                      isEtincellePlan ||
                       !imageAnalysisDone ||
                       generatingMediation ||
                       regeneratingMediationStyleKey !== null ||
@@ -2334,9 +2348,13 @@ export function ArtworkModal({
                   </select>
                 </div>
                 <p className="text-[11px] font-medium text-destructive shrink-0">
-                  {t("mediation_optional_lang_limit_hint")}
+                  {isEtincellePlan
+                    ? ETINCELLE_UI.optionalLangBlocked
+                    : t("mediation_optional_lang_limit_hint")}
                 </p>
-                <p className="w-full text-[11px] text-muted-foreground">{t("mediation_optional_lang_hint")}</p>
+                {!isEtincellePlan ? (
+                  <p className="w-full text-[11px] text-muted-foreground">{t("mediation_optional_lang_hint")}</p>
+                ) : null}
               </div>
             ) : null}
             <div className="relative w-fit max-w-full">
@@ -2526,7 +2544,9 @@ export function ArtworkModal({
           <Label>{t("label_mediations")}</Label>
           <div className="flex flex-wrap items-center gap-2">
             {MEDIATION_UI_LANGS.map((lng) => {
-              const langEnabled = activeMediationLangSet.has(lng);
+              const langEnabled = isEtincellePlan
+                ? lng === mediationPrimaryLang
+                : activeMediationLangSet.has(lng);
               return (
               <Button
                 key={lng}
@@ -2571,6 +2591,7 @@ export function ArtworkModal({
               const placeholderLabel = [tab.icon?.trim(), tab.label.trim()].filter(Boolean).join(" ").trim();
               return (
               <TabsContent key={tab.key} value={tab.key}>
+                {!isEtincellePlan ? (
                 <div className="mb-2 space-y-2">
                   <div className="flex flex-wrap items-end justify-end gap-x-2 gap-y-1">
                     <p className="w-[450px] py-1 text-[11px] font-medium leading-snug text-destructive">
@@ -2616,6 +2637,7 @@ export function ArtworkModal({
                     />
                   ) : null}
                 </div>
+                ) : null}
                 <Textarea
                   value={(descriptionsByLang?.[mediationEditLang] ?? {})[tab.key] ?? ""}
                   onChange={(e) =>
@@ -2644,6 +2666,8 @@ export function ArtworkModal({
                       lang={mediationEditLang}
                       prompt_style_id={tab.promptStyleId}
                       variant="onLight"
+                      generateDisabled={isEtincellePlan}
+                      generateDisabledHint={isEtincellePlan ? ETINCELLE_UI.audioBlocked : undefined}
                       onGenerateClick={() =>
                         openPersonaAudioDialog(tab, { triggerGeneration: true })
                       }

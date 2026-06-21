@@ -23,10 +23,14 @@ import {
   formatBirthDisplay,
   mergeProfileValues,
 } from "@/components/dashboard/DashboardProfileEditDialog";
+import { DashboardGrantedCommercialTermsCard } from "@/components/dashboard/DashboardGrantedCommercialTermsCard";
+import { DashboardOrganisationCommercialTermsBlock } from "@/components/dashboard/DashboardOrganisationCommercialTermsBlock";
+import { DashboardNavigationModeSelector } from "@/components/dashboard/DashboardNavigationModeSelector";
 import { DashboardProfileSelector } from "@/components/dashboard/DashboardProfileSelector";
 import { DashboardPlanActions } from "@/components/dashboard/DashboardPlanActions";
 import { DashboardStandbyButton } from "@/components/dashboard/DashboardStandbyButton";
 import { DashboardTeamMembersTable } from "@/components/dashboard/DashboardTeamMembersTable";
+import { SponsoringConventionButton } from "@/components/dashboard/SponsoringConventionButton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,12 +46,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
+import { ETINCELLE_UI, resolveGrantedPlanSubscribeButtons, subscribePlanHref, subscriptionIsEtincellePlan } from "@/lib/organisation/planLimits";
+import {
+  commercialKindLabel,
+  hasAgencyPresetDiscount,
+  hasCommercialDiscount,
+  hasGrantedCommercialTerms,
+} from "@/lib/organisation/commercialTerms";
 import { useDashboardProfile, type DashboardSubscription, type DashboardTeamMember } from "@/hooks/useDashboardProfile";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
-import { hasFullDataAccess } from "@/lib/authUser";
+import { hasFullDataAccess, mapRoleNameFromRoleId } from "@/lib/authUser";
 import { ProfileAvatarImage } from "@/components/ProfileAvatarImage";
 import { resolveProfileAvatarSource } from "@/lib/resolveProfileAvatarSource";
 import {
@@ -166,6 +177,16 @@ function standbyStatusLabel(status: string | null | undefined): string {
   }
 }
 
+function formatDaysRemaining(days: number): string {
+  if (days > 0) return `${days} jour${days > 1 ? "s" : ""} restant${days > 1 ? "s" : ""}`;
+  if (days === 0) return "Échéance aujourd'hui";
+  return "Période échue";
+}
+
+function subscriptionIsEtincelle(subscription: DashboardSubscription | null | undefined): boolean {
+  return subscriptionIsEtincellePlan(subscription);
+}
+
 function formatLangRange(min: number | null | undefined, max: number | null | undefined): string {
   if (min == null && max == null) return "—";
   if (min != null && max != null && min !== max) return `${min} à ${max}`;
@@ -174,7 +195,21 @@ function formatLangRange(min: number | null | undefined, max: number | null | un
 }
 
 const Dashboard = () => {
-  const { user, role_id, role_label, role_name, agency_id, expo_id, loading: authLoading } = useAuthUser();
+  const {
+    user,
+    role_id,
+    role_label,
+    role_name,
+    agency_id,
+    expo_id,
+    loading: authLoading,
+    canSwitchNavigationMode,
+    navigationMode,
+    setNavigationMode,
+    globalRoleId,
+    agencyRoleId,
+    hasGlobalStaffRole,
+  } = useEffectiveAuth();
   const { can } = useNavigationMatrix();
   const { state: standbyState, isStandbyNavRestricted } = useOrganisationStandby();
   const effectiveAgencyId = agency_id ?? standbyState.agency_id ?? null;
@@ -248,7 +283,7 @@ const Dashboard = () => {
     mergedProfile.lastName,
     isViewingSelf ? email || "Utilisateur" : profile?.username || "Membre",
   );
-  const isGlobalAdmin = hasFullDataAccess(role_name) || (typeof role_id === "number" && role_id >= 1 && role_id <= 3);
+  const isGlobalAdmin = hasGlobalStaffRole || hasFullDataAccess(mapRoleNameFromRoleId(globalRoleId));
   const dashboardAgencyId = agency?.id ?? effectiveAgencyId ?? null;
   const profileAgencyId = agency?.id ?? null;
   const canSwitchProfiles = isGlobalAdmin;
@@ -282,6 +317,38 @@ const Dashboard = () => {
     () => (member: DashboardTeamMember) =>
       canAssignExpoToMember(effectiveRoleId, member.agency_role_id ?? member.role_id),
     [effectiveRoleId],
+  );
+
+  const showGlobalCommercialTermsCard =
+    isViewingSelf && canSwitchNavigationMode && navigationMode === "global";
+
+  const showOrganisationCommercialTermsBlock = useMemo(
+    () =>
+      Boolean(profileAgencyId) &&
+      hasGrantedCommercialTerms(agency) &&
+      subscription?.status === "none" &&
+      !showGlobalCommercialTermsCard,
+    [agency, profileAgencyId, showGlobalCommercialTermsCard, subscription?.status],
+  );
+
+  const grantedPlanSubscribeButtons = useMemo(
+    () =>
+      resolveGrantedPlanSubscribeButtons(
+        agency?.commercial_plan_code,
+        hasGrantedCommercialTerms(agency),
+        showOrganisationCommercialTermsBlock,
+      ),
+    [agency, showOrganisationCommercialTermsBlock],
+  );
+
+  const showSponsoringConventionButton = useMemo(
+    () =>
+      isViewingSelf &&
+      (effectiveRoleId === 4 || agencyRoleId === 4) &&
+      Boolean(profileAgencyId) &&
+      hasAgencyPresetDiscount(agency) &&
+      !showOrganisationCommercialTermsBlock,
+    [agency, agencyRoleId, effectiveRoleId, isViewingSelf, profileAgencyId, showOrganisationCommercialTermsBlock],
   );
 
   const handleMemberExposChange = async (member: DashboardTeamMember, nextExpoIds: string[]) => {
@@ -377,6 +444,8 @@ const Dashboard = () => {
     const elapsed = Date.now() - start;
     return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
   }, [subscription?.expires_at, subscription?.started_at]);
+
+  const isEtincelleSubscription = subscriptionIsEtincelle(subscription);
 
   const quickLinks = useMemo(() => {
     const teamUsersHref = dashboardAgencyId
@@ -526,32 +595,51 @@ const Dashboard = () => {
                     }
                   />
                   <ProfileField icon={Calendar} label="Membre depuis" value={formatDateFr(profile?.created_at)} />
-                  <ProfileField label="Langue" value={textOrDash(mergedProfile.language?.toUpperCase())} />
                 </dl>
 
+                {showSponsoringConventionButton && profileAgencyId ? (
+                  <SponsoringConventionButton organisationId={profileAgencyId} />
+                ) : null}
+
+                {isViewingSelf && canSwitchNavigationMode ? (
+                  <DashboardNavigationModeSelector
+                    navigationMode={navigationMode}
+                    globalRoleId={globalRoleId}
+                    agencyRoleId={agencyRoleId}
+                    onChange={setNavigationMode}
+                  />
+                ) : null}
+
                 {(agency || agencyExpos.length > 0) && (
-                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Périmètre</p>
-                    {agency && (
-                      <p className="text-sm">
-                        <Building2 className="inline h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                        {agency.name_agency || agency.id}
-                      </p>
-                    )}
-                    {agencyExpos.length > 0 ? (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Expositions</p>
-                        <ul className="space-y-0.5 text-sm text-muted-foreground">
-                          {agencyExpos.map((item) => (
-                            <li key={item.id}>{item.label}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : expo ? (
-                      <p className="text-sm text-muted-foreground">
-                        Exposition : {expo.expo_name || expo.id}
-                      </p>
-                    ) : null}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                    <div className="min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Périmètre</p>
+                      {agency && (
+                        <p className="text-sm">
+                          <Building2 className="inline h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                          {agency.name_agency || agency.id}
+                        </p>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
+                      {agencyExpos.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Expositions</p>
+                          <ul className="space-y-0.5 text-sm text-muted-foreground">
+                            {agencyExpos.map((item) => (
+                              <li key={item.id}>{item.label}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : expo ? (
+                        <p className="text-sm text-muted-foreground">
+                          Exposition : {expo.expo_name || expo.id}
+                        </p>
+                      ) : null}
+                      {isEtincelleSubscription ? (
+                        <p className="text-sm font-medium text-destructive">{ETINCELLE_UI.expoLimitBlocked}</p>
+                      ) : null}
+                    </div>
                   </div>
                 )}
 
@@ -563,15 +651,28 @@ const Dashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Abonnement */}
+            {/* Abonnement ou conditions commerciales (mode admin global) */}
+            {showGlobalCommercialTermsCard ? (
+              <DashboardGrantedCommercialTermsCard />
+            ) : (
             <Card className="glass-card">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-xl flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <CardTitle className="text-xl flex shrink-0 items-center gap-2">
                     <CreditCard className="h-5 w-5 text-gold" />
                     Mon abonnement
                   </CardTitle>
-                  <Badge variant={subscriptionBadgeVariant(subscription?.status)}>
+                  {isEtincelleSubscription && subscriptionProgress != null ? (
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <Progress value={subscriptionProgress} className="h-2" />
+                      <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+                        {subscriptionProgress}%
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex-1" aria-hidden />
+                  )}
+                  <Badge variant={subscriptionBadgeVariant(subscription?.status)} className="shrink-0">
                     {subscriptionStatusLabel(subscription?.status)}
                   </Badge>
                 </div>
@@ -600,53 +701,271 @@ const Dashboard = () => {
                       Aucun abonnement actif enregistré pour{" "}
                       <strong className="text-foreground">{agency?.name_agency || "votre organisation"}</strong>.
                     </p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link to="/organisation#tarifs">Voir les offres</Link>
-                    </Button>
+
+                    {showOrganisationCommercialTermsBlock && profileAgencyId && agency ? (
+                      <DashboardOrganisationCommercialTermsBlock
+                        agency={agency}
+                        organisationId={profileAgencyId}
+                        subscriptionStartedAt={subscription?.started_at}
+                        subscriptionExpiresAt={subscription?.expires_at}
+                        subscribeButtons={grantedPlanSubscribeButtons}
+                      />
+                    ) : null}
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      {showOrganisationCommercialTermsBlock
+                        ? null
+                        : grantedPlanSubscribeButtons.map((button) =>
+                            button.variant === "primary" ? (
+                              <Button
+                                key={button.plan}
+                                asChild
+                                size="sm"
+                                className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                              >
+                                <Link to={subscribePlanHref(button.plan)}>{button.label}</Link>
+                              </Button>
+                            ) : (
+                              <Button key={button.plan} asChild variant="outline" size="sm">
+                                <Link to={subscribePlanHref(button.plan)}>{button.label}</Link>
+                              </Button>
+                            ),
+                          )}
+                      <Button asChild variant="ghost" size="sm">
+                        <Link to="/organisation#tarifs">Comparer les offres</Link>
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
+                      <div className="w-full shrink-0 sm:w-[260px] sm:max-w-[260px]">
                         <p className="text-2xl font-serif font-bold">
                           {subscription?.display_name ||
                             subscription?.pricing_label ||
                             subscription?.plan_code ||
                             "Plan inconnu"}
                         </p>
-                        {subscription?.plan_code && subscription.plan_code !== subscription?.display_name ? (
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground mt-0.5">
-                            {subscription.plan_code}
+                        <p
+                          className={`text-sm mt-1 ${
+                            isEtincelleSubscription ? "font-medium text-destructive" : "text-muted-foreground"
+                          }`}
+                        >
+                          {isEtincelleSubscription
+                            ? ETINCELLE_UI.trialLabel
+                            : subscription?.billing_cycle === "annual"
+                              ? "Facturation annuelle"
+                              : "Facturation mensuelle"}
+                          {!isEtincelleSubscription &&
+                            (subscription?.net_price_eur != null || subscription?.monthly_price_eur != null) &&
+                            ` · ${formatEur(subscription.net_price_eur ?? subscription.monthly_price_eur)}${
+                              subscription?.billing_cycle === "annual" ? "/an" : "/mois"
+                            }`}
+                        </p>
+                        {commercialKindLabel(subscription?.commercial_kind) ? (
+                          <p className="mt-1 text-xs font-medium text-[#9d2525]">
+                            {commercialKindLabel(subscription?.commercial_kind)}
                           </p>
                         ) : null}
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {subscription?.billing_cycle === "annual" ? "Facturation annuelle" : "Facturation mensuelle"}
-                          {subscription?.monthly_price_eur != null &&
-                            ` · ${formatEur(subscription.monthly_price_eur)}/mois`}
-                        </p>
-                        {subscription?.started_at ? (
-                          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
-                            <span className="text-muted-foreground">
-                              Début · <span className="text-foreground font-medium">{formatDateFr(subscription.started_at)}</span>
+                        {hasCommercialDiscount(subscription) && !isEtincelleSubscription ? (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Catalogue {formatEur(subscription?.list_price_eur)}
+                            {(subscription?.discount_percent ?? 0) > 0
+                              ? ` · −${subscription?.discount_percent} %`
+                              : null}
+                            {(subscription?.discount_amount_eur ?? 0) > 0
+                              ? ` · −${formatEur(subscription?.discount_amount_eur)}`
+                              : null}
+                            {" · Net "}
+                            <span className="font-medium text-foreground">
+                              {formatEur(subscription?.net_price_eur)}
                             </span>
-                            <span className="text-muted-foreground">
-                              Ancienneté ·{" "}
-                              <span className="text-foreground font-medium">{formatSeniority(subscription.started_at)}</span>
-                            </span>
-                          </div>
+                          </p>
                         ) : null}
+                        <div className="mt-2 space-y-1 text-sm">
+                          {subscription?.started_at ? (
+                            isEtincelleSubscription ? (
+                              <>
+                                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                  <span className="text-muted-foreground">
+                                    Début ·{" "}
+                                    <span className="text-foreground font-medium">
+                                      {formatDateFr(subscription.started_at)}
+                                    </span>
+                                  </span>
+                                  {subscription.expires_at ? (
+                                    <span className="text-muted-foreground">
+                                      Fin ·{" "}
+                                      <span className="text-foreground font-medium">
+                                        {formatDateFr(subscription.expires_at)}
+                                      </span>
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {subscription.days_remaining != null ? (
+                                  <p className="font-semibold text-destructive">
+                                    {formatDaysRemaining(subscription.days_remaining)}
+                                  </p>
+                                ) : null}
+                              </>
+                            ) : (
+                              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                <span className="text-muted-foreground">
+                                  Début ·{" "}
+                                  <span className="text-foreground font-medium">
+                                    {formatDateFr(subscription.started_at)}
+                                  </span>
+                                </span>
+                                <span className="text-muted-foreground">
+                                  Ancienneté ·{" "}
+                                  <span className="text-foreground font-medium">
+                                    {formatSeniority(subscription.started_at)}
+                                  </span>
+                                </span>
+                              </div>
+                            )
+                          ) : null}
+                          <dl className="grid gap-2 pt-2">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-muted-foreground">Œuvres créées</dt>
+                                <dd className="font-medium text-right">
+                                  {formatUsageRatio(
+                                    teamStats.artworks_count,
+                                    subscription?.max_oeuvres,
+                                    subscription?.is_unlimited,
+                                  )}
+                                </dd>
+                              </div>
+                              {isEtincelleSubscription && subscription?.max_oeuvres != null ? (
+                                <p className="text-xs font-medium text-destructive text-right">
+                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count)} œuvre
+                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count) > 1 ? "s" : ""}{" "}
+                                  restante
+                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count) > 1 ? "s" : ""} à
+                                  créer
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-muted-foreground">Visiteurs (mois en cours)</dt>
+                                <dd className="font-medium text-right">
+                                  {formatUsageRatio(
+                                    teamStats.visitors_this_month,
+                                    subscription?.max_visitors,
+                                    subscription?.is_unlimited,
+                                  )}
+                                </dd>
+                              </div>
+                              {isEtincelleSubscription && subscription?.max_visitors != null ? (
+                                <p className="text-xs font-medium text-destructive text-right">
+                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month)} visiteur
+                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month) > 1
+                                    ? "s"
+                                    : ""}{" "}
+                                  restant
+                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month) > 1
+                                    ? "s"
+                                    : ""}{" "}
+                                  ce mois
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-muted-foreground">Langues médiation</dt>
+                              <dd className="font-medium text-right">
+                                {formatLangRange(
+                                  subscription?.included_mediation_langs_min,
+                                  subscription?.included_mediation_langs_max,
+                                )}
+                              </dd>
+                            </div>
+                            <div className="flex justify-between gap-3">
+                              <dt className="text-muted-foreground">Langues audio</dt>
+                              <dd className="font-medium text-right">
+                                {subscription?.included_audio_langs ?? "—"}
+                              </dd>
+                            </div>
+                            {subscription?.standby_monthly_price_eur != null ? (
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-muted-foreground">Tarif veille</dt>
+                                <dd className="font-medium text-right">
+                                  {formatEur(subscription.standby_monthly_price_eur)}/mois
+                                </dd>
+                              </div>
+                            ) : null}
+                            {subscription?.source === "organisation" ? (
+                              <>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <dt className="text-muted-foreground">Mode veille</dt>
+                                  <dd className="flex flex-wrap items-center justify-end gap-2 font-medium text-right">
+                                    <span>{standbyStatusLabel(subscription.standby_status)}</span>
+                                    {standbyState.can_request_standby &&
+                                    standbyPlanCode &&
+                                    subscription?.standby_monthly_price_eur != null ? (
+                                      <DashboardStandbyButton
+                                        planCode={standbyPlanCode}
+                                        planDisplayName={
+                                          subscription.display_name ||
+                                          subscription.pricing_label ||
+                                          standbyPlanCode
+                                        }
+                                        monthlyPriceEur={
+                                          subscription.standby_monthly_price_eur ??
+                                          subscription.monthly_price_eur ??
+                                          0
+                                        }
+                                      />
+                                    ) : null}
+                                  </dd>
+                                </div>
+                                {subscription.standby_requested_at ? (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-muted-foreground">Demande veille</dt>
+                                    <dd className="font-medium text-right">
+                                      {formatDateFr(subscription.standby_requested_at)}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                                {subscription.standby_cancel_deadline_at ? (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-muted-foreground">Annulation possible jusqu&apos;au</dt>
+                                    <dd className="font-medium text-right">
+                                      {formatDateFr(subscription.standby_cancel_deadline_at)}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                                {subscription.standby_started_at ? (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-muted-foreground">Veille effective depuis</dt>
+                                    <dd className="font-medium text-right">
+                                      {formatDateFr(subscription.standby_started_at)}
+                                    </dd>
+                                  </div>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </dl>
+                        </div>
                       </div>
-                      {isGlobalAdmin && profileAgencyId && subscription?.subscription_id ? (
-                        <DashboardPlanActions
-                          organisationId={profileAgencyId}
-                          subscriptionId={subscription.subscription_id}
-                          currentPlanCode={subscription.plan_code}
-                          onChanged={refresh}
-                        />
+                      {profileAgencyId && subscription?.subscription_id && (isGlobalAdmin || isEtincelleSubscription) ? (
+                        <div className="w-full min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3">
+                          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Changer d&apos;offre
+                          </p>
+                          <DashboardPlanActions
+                            organisationId={profileAgencyId}
+                            subscriptionId={subscription.subscription_id}
+                            currentPlanCode={subscription.plan_code}
+                            isEtincelle={isEtincelleSubscription}
+                            onChanged={refresh}
+                          />
+                        </div>
                       ) : null}
                     </div>
 
-                    {(subscription?.next_renewal_at || subscription?.expires_at) && (
+                    {!isEtincelleSubscription && (subscription?.next_renewal_at || subscription?.expires_at) && (
                       <div className="space-y-2">
                         {subscription.next_renewal_at ? (
                           <div className="flex justify-between text-sm">
@@ -680,107 +999,11 @@ const Dashboard = () => {
                         )}
                       </div>
                     )}
-
-                    <dl className="grid gap-2 text-sm border-t border-border/50 pt-4">
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">Œuvres créées</dt>
-                        <dd className="font-medium text-right">
-                          {formatUsageRatio(
-                            teamStats.artworks_count,
-                            subscription?.max_oeuvres,
-                            subscription?.is_unlimited,
-                          )}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">Visiteurs (mois en cours)</dt>
-                        <dd className="font-medium text-right">
-                          {formatUsageRatio(
-                            teamStats.visitors_this_month,
-                            subscription?.max_visitors,
-                            subscription?.is_unlimited,
-                          )}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">Langues médiation</dt>
-                        <dd className="font-medium text-right">
-                          {formatLangRange(
-                            subscription?.included_mediation_langs_min,
-                            subscription?.included_mediation_langs_max,
-                          )}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-muted-foreground">Langues audio</dt>
-                        <dd className="font-medium text-right">
-                          {subscription?.included_audio_langs ?? "—"}
-                        </dd>
-                      </div>
-                      {subscription?.standby_monthly_price_eur != null ? (
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-muted-foreground">Tarif veille</dt>
-                          <dd className="font-medium text-right">
-                            {formatEur(subscription.standby_monthly_price_eur)}/mois
-                          </dd>
-                        </div>
-                      ) : null}
-                      {subscription?.source === "organisation" ? (
-                        <>
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <dt className="text-muted-foreground">Mode veille</dt>
-                            <dd className="flex flex-wrap items-center justify-end gap-2 font-medium text-right">
-                              <span>{standbyStatusLabel(subscription.standby_status)}</span>
-                              {standbyState.can_request_standby &&
-                              standbyPlanCode &&
-                              subscription?.standby_monthly_price_eur != null ? (
-                                <DashboardStandbyButton
-                                  planCode={standbyPlanCode}
-                                  planDisplayName={
-                                    subscription.display_name ||
-                                    subscription.pricing_label ||
-                                    standbyPlanCode
-                                  }
-                                  monthlyPriceEur={
-                                    subscription.standby_monthly_price_eur ??
-                                    subscription.monthly_price_eur ??
-                                    0
-                                  }
-                                />
-                              ) : null}
-                            </dd>
-                          </div>
-                          {subscription.standby_requested_at ? (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">Demande veille</dt>
-                              <dd className="font-medium text-right">
-                                {formatDateFr(subscription.standby_requested_at)}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {subscription.standby_cancel_deadline_at ? (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">Annulation possible jusqu&apos;au</dt>
-                              <dd className="font-medium text-right">
-                                {formatDateFr(subscription.standby_cancel_deadline_at)}
-                              </dd>
-                            </div>
-                          ) : null}
-                          {subscription.standby_started_at ? (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">Veille effective depuis</dt>
-                              <dd className="font-medium text-right">
-                                {formatDateFr(subscription.standby_started_at)}
-                              </dd>
-                            </div>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </dl>
                   </>
                 )}
               </CardContent>
             </Card>
+            )}
           </div>
 
           {/* Stats équipe + actions rapides */}

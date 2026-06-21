@@ -22,8 +22,10 @@ import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAge
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { sortExpoFieldKeys } from "@/lib/expoFormUtils";
-import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
+import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { useDataScope } from "@/hooks/useDataScope";
+import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
 import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
@@ -236,7 +238,12 @@ const Expos = () => {
   } | null>(null);
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
-  const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useAuthUser();
+  const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useEffectiveAuth();
+  const orgAgencyId =
+    userAgencyId?.trim() ||
+    (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId?.trim() : "") ||
+    null;
+  const { limits: orgPlanLimits } = useOrganisationPlanLimits(orgAgencyId);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,8 +481,9 @@ const Expos = () => {
     return matched.expo_name?.trim() || matched.expo_id?.trim() || matched.id;
   }, [rows, scope.expoId]);
 
-  const canCreateExpo =
+  const canCreateExpoByRole =
     (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
+  const canCreateExpo = canCreateExpoByRole && !orgPlanLimits?.isEtincelle;
 
   const canEditExpo = (ex: ExpoRow) => {
     if ((typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name)) return true;
@@ -745,6 +753,12 @@ const Expos = () => {
           </div>
         )}
       </div>
+
+      {orgPlanLimits?.isEtincelle && typeof role_id === "number" && role_id >= 4 ? (
+        <p className="text-sm font-medium text-destructive" role="alert">
+          {ETINCELLE_UI.expoLimitBlocked}
+        </p>
+      ) : null}
 
       {showScopeHint && (
         <Alert>

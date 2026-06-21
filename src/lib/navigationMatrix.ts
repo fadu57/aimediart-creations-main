@@ -142,6 +142,10 @@ export function mergeNavAccessFromMatriceSecurite(
     const k = r.ressource as NavMatrixCible;
     if (NAV_MATRIX_CIBLES.includes(k)) out[k] = Boolean(r.lecture);
   }
+  // Admin agence (4) et commissaire (5) : accès Organisation toujours actif (fiche unique).
+  if (roleId === 4 || roleId === 5) {
+    out.menu_agence = true;
+  }
   return out;
 }
 

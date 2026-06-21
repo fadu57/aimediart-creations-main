@@ -136,7 +136,7 @@ export function StandbyPlanModal({
                 <MoonStar className="h-5 w-5" aria-hidden />
               </span>
               <div>
-                <DialogTitle className="font-serif text-xl leading-tight text-[#1f1f1f] sm:text-2xl">
+                <DialogTitle className="text-xl leading-tight text-[#1f1f1f] sm:text-2xl">
                   {t(`${ns}.title`)}
                 </DialogTitle>
                 <p className="mt-0.5 text-xs font-medium uppercase tracking-wide text-amber-800/80">

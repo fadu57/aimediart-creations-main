@@ -18,7 +18,9 @@ import { ArtworkModal } from "@/components/ArtworkModal";
 import { getArtworkIdsWithPendingAudio, getPendingAudioJobsByLang, subscribeAudioQueue } from "@/services/audioService";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
-import { useAuthUser } from "@/hooks/useAuthUser";
+import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
+import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
+import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { Plus, Search, Loader2, X, RefreshCw, Undo2, ExternalLink } from "lucide-react";
@@ -169,10 +171,107 @@ const Catalogue = () => {
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
   const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
   const { scope, loading: authLoading } = useDataScope();
-  const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useAuthUser();
+  const { state: standbyState } = useOrganisationStandby();
+  const { role_id, role_name, agency_id: userAgencyId, expo_id: userExpoId } = useEffectiveAuth();
+  const catalogueAgencyId =
+    userAgencyId?.trim() ||
+    standbyState.agency_id?.trim() ||
+    (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId?.trim() : "") ||
+    null;
+  const { limits: planLimits } = useOrganisationPlanLimits(catalogueAgencyId);
+  const defaultExpoFilterAppliedRef = useRef(false);
   const navigate = useNavigate();
   const isAdminFullAccess =
     (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
+
+  useEffect(() => {
+    if (authLoading || defaultExpoFilterAppliedRef.current) return;
+    if (searchParams.get("expo")?.trim()) {
+      defaultExpoFilterAppliedRef.current = true;
+      return;
+    }
+    if (expoOptions.length === 0) return;
+
+    const shouldAutoFilter =
+      !isAdminFullAccess || (planLimits?.isEtincelle === true && Boolean(catalogueAgencyId));
+    if (!shouldAutoFilter) {
+      defaultExpoFilterAppliedRef.current = true;
+      return;
+    }
+
+    void (async () => {
+      let targetExpoId: string | null = null;
+      const userExpo = userExpoId?.trim() || null;
+
+      if (userExpo) {
+        const matched = expoOptions.find(
+          (expo) => expo.id === userExpo || (expo.expo_id ?? "").trim() === userExpo,
+        );
+        if (matched) targetExpoId = matched.id;
+      }
+
+      if (!targetExpoId && (role_id === 5 || role_id === 6 || scope.mode === "expo")) {
+        const scopeExpo = scope.mode === "expo" ? scope.expoId?.trim() : null;
+        if (scopeExpo) {
+          const matched = expoOptions.find(
+            (expo) => expo.id === scopeExpo || (expo.expo_id ?? "").trim() === scopeExpo,
+          );
+          if (matched) targetExpoId = matched.id;
+        }
+      }
+
+      if (!targetExpoId && typeof role_id === "number" && role_id >= 4 && role_id <= 6) {
+        const { data: authSession } = await supabase.auth.getUser();
+        const uid = authSession.user?.id;
+        if (uid) {
+          const { data: assignments } = await supabase
+            .from("expo_user_role")
+            .select("expo_id")
+            .eq("user_id", uid)
+            .order("assigned_at", { ascending: false })
+            .limit(1);
+          const assignedExpoId = (assignments as Array<{ expo_id?: string | null }> | null)?.[0]?.expo_id?.trim();
+          if (assignedExpoId) {
+            const matched = expoOptions.find(
+              (expo) => expo.id === assignedExpoId || (expo.expo_id ?? "").trim() === assignedExpoId,
+            );
+            if (matched) targetExpoId = matched.id;
+          }
+        }
+      }
+
+      if (!targetExpoId && catalogueAgencyId) {
+        const agencyExpos = expoOptions.filter(
+          (expo) => (expo.agency_id ?? "").trim() === catalogueAgencyId,
+        );
+        if (agencyExpos.length === 1) {
+          targetExpoId = agencyExpos[0]?.id ?? null;
+        } else if (agencyExpos.length > 1 && planLimits?.isEtincelle) {
+          targetExpoId = agencyExpos[0]?.id ?? null;
+        }
+      }
+
+      if (!targetExpoId && expoOptions.length === 1) {
+        targetExpoId = expoOptions[0]?.id ?? null;
+      }
+
+      if (targetExpoId) {
+        setSelectedExpoFilter(targetExpoId);
+      }
+      defaultExpoFilterAppliedRef.current = true;
+    })();
+  }, [
+    authLoading,
+    catalogueAgencyId,
+    expoOptions,
+    isAdminFullAccess,
+    planLimits?.isEtincelle,
+    role_id,
+    scope.expoId,
+    scope.mode,
+    searchParams,
+    userExpoId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -545,6 +644,12 @@ const Catalogue = () => {
   }, [search, selectedExpoFilter]);
 
   const openCreateArtwork = () => {
+    if (planLimits?.isEtincelle && !planLimits.canCreateArtwork) {
+      toast.error(
+        `Quota atteint : ${planLimits.maxArtworks ?? 0} œuvres maximum avec l'abonnement Étincelle.`,
+      );
+      return;
+    }
     setEditingArtworkId(null);
     setVoicesEntryFromCatalogue(false);
     setArtworkModalOpen(true);
@@ -862,7 +967,8 @@ const Catalogue = () => {
 
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+      <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 py-2 backdrop-blur-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
           <div className="flex flex-wrap items-center gap-4">
           <div>
@@ -957,6 +1063,7 @@ const Catalogue = () => {
           <Button
             className="gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground shrink-0"
             onClick={() => openCreateArtwork()}
+            disabled={planLimits?.isEtincelle && !planLimits.canCreateArtwork}
           >
             <Plus className="h-4 w-4" />
             {t("btn_new_artwork")}
@@ -965,6 +1072,14 @@ const Catalogue = () => {
             <Link to="/catalogue/catalogue2">{t("btn_table_view")}</Link>
           </Button>
         </div>
+        </div>
+        {planLimits?.isEtincelle ? (
+          <p className="w-full text-sm font-medium text-destructive">
+            {!planLimits.canCreateArtwork
+              ? "Quota d'œuvres atteint — passez à un abonnement supérieur pour en créer davantage."
+              : `${planLimits.artworksRemaining ?? 0} œuvre${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} restante${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} à créer`}
+          </p>
+        ) : null}
       </div>
 
       {showScopeHint && (

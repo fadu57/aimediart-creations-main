@@ -22,7 +22,8 @@ import { ArtworkEntryGate } from "./components/visitor/ArtworkEntryGate";
 import { RequireBackoffice } from "./components/RequireBackoffice";
 import { NavigationMatrixProvider } from "./providers/NavigationMatrixProvider";
 import { UiLanguageProvider } from "./providers/UiLanguageProvider";
-import { useAuthUser } from "./hooks/useAuthUser";
+import { NavigationModeProvider } from "./providers/NavigationModeProvider";
+import { useEffectiveAuth } from "./hooks/useEffectiveAuth";
 import { VisitorErrorLogCapture } from "./components/visitor/VisitorErrorLogCapture";
 import { OrganizerErrorLogCapture } from "./components/organizer/OrganizerErrorLogCapture";
 import CookieConsentBanner from "./components/CookieConsentBanner";
@@ -183,7 +184,7 @@ function RootEntryRoute() {
   if (visitorLanding) {
     return <Navigate to={visitorLanding} replace />;
   }
-  const { session, loading, role_name, role_id } = useAuthUser();
+  const { session, loading, role_name, role_id } = useEffectiveAuth();
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -219,6 +220,7 @@ const AppRoutes = () => (
     {/* Landing marketing publique (sans header) */}
     <Route path="/organisation" element={<Pages.PublicHome />} />
     <Route path="/organisation/commencer" element={<Pages.PublicHomeCommencer />} />
+    <Route path="/organisation/engagement" element={<Pages.OrganisationEngagement />} />
     <Route path="/organisation/connexion" element={<Pages.OrganisationConnexion />} />
     <Route path="/connexion" element={<Navigate to="/organisation#connectivite" replace />} />
     {/* Rétrocompatibilité anciens liens /home */}
@@ -337,6 +339,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <UiLanguageProvider>
+            <NavigationModeProvider>
             <NavigationMatrixProvider>
               <OrganisationStandbyProvider>
               <NormalizeMultipleSlashPathname />
@@ -347,6 +350,7 @@ const App = () => {
               <CookieConsentBanner />
               </OrganisationStandbyProvider>
             </NavigationMatrixProvider>
+            </NavigationModeProvider>
           </UiLanguageProvider>
         </BrowserRouter>
       </TooltipProvider>
