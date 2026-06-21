@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 
 import {
-  formatMissingConventionFieldsSentence,
   listMissingConventionAgencyFields,
 } from "@/lib/agencyIdentity";
 import { formatCommercialDiscountEurInput } from "@/lib/organisation/commercialTerms";
@@ -49,7 +48,6 @@ export function DashboardOrganisationCommercialTermsBlock({
   const commercialNotes = agency.commercial_notes?.trim() || null;
   const primarySubscribeButton = subscribeButtons.find((button) => button.variant === "primary");
   const missingFields = listMissingConventionAgencyFields(agency);
-  const missingFieldsSentence = formatMissingConventionFieldsSentence(missingFields);
 
   const subscriptionStart = subscriptionStartedAt?.trim()
     ? formatDateFr(subscriptionStartedAt)
@@ -93,28 +91,41 @@ export function DashboardOrganisationCommercialTermsBlock({
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Durée</dt>
-          <dd className="mt-0.5 text-foreground">
-            Début · <span className="font-medium">{subscriptionStart}</span>
-            {" — "}
-            Fin · <span className="font-medium">{subscriptionEnd}</span>
+          <dd className="mt-0.5 space-y-1 text-foreground">
+            <div>
+              Début · <span className="font-medium">{subscriptionStart}</span>
+            </div>
+            <div>
+              Fin · <span className="font-medium">{subscriptionEnd}</span>
+            </div>
           </dd>
         </div>
       </dl>
 
-      <p className="text-sm leading-4 text-muted-foreground">
+      <div className="space-y-2 text-sm leading-4 text-muted-foreground">
         {missingFields.length > 0 ? (
           <>
-            Si vous acceptez ces conditions commerciales, {missingFieldsSentence} Une fois que vous avez complété
-            ces informations manquantes, cliquez sur le bouton ci-dessous « Convention de sponsoring avec AIMEDIArt
-            », apposez votre tampon et votre signature et envoyez-nous ce document.
+            <p>
+              Si vous acceptez ces conditions commerciales, merci de compléter les champs manquants dans votre fiche
+              organisation suivants :
+            </p>
+            <ul className="list-disc space-y-1 pl-5 text-[#9d2525]">
+              {missingFields.map((field) => (
+                <li key={field}>{field}</li>
+              ))}
+            </ul>
+            <p>
+              Une fois que vous avez complété ces informations manquantes, cliquez sur le bouton ci-dessous « Convention
+              de sponsoring avec AIMEDIArt », apposez votre tampon et votre signature et envoyez-nous ce document.
+            </p>
           </>
         ) : (
-          <>
-            Si vous acceptez ces conditions commerciales, cliquez sur le bouton ci-dessous « Convention de
-            sponsoring avec AIMEDIArt », apposez votre tampon et votre signature et envoyez-nous ce document.
-          </>
+          <p>
+            Si vous acceptez ces conditions commerciales, cliquez sur le bouton ci-dessous « Convention de sponsoring
+            avec AIMEDIArt », apposez votre tampon et votre signature et envoyez-nous ce document.
+          </p>
         )}
-      </p>
+      </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <SponsoringConventionButton organisationId={organisationId} />
