@@ -7,6 +7,7 @@ import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
 export const VITRINE_ANCHOR_IDS = [
   "accueil",
   "exposition-vivante",
+  "production",
   "parcours",
   "tarifs",
   "accessibilite",

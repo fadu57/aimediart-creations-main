@@ -19,6 +19,7 @@ export const BRAND_RED_DARK = "hsl(0 62% 38%)";
 export const AIMEDIART_WORD_RED = "text-[#E63946]";
 
 function LogoMark({ compact }: { compact?: boolean }) {
+  const { t } = useTranslation("home");
   return (
     <div className="flex items-center gap-3.5">
       <div
@@ -36,7 +37,7 @@ function LogoMark({ compact }: { compact?: boolean }) {
           <span style={{ color: BRAND_RED }}>.com</span>
         </div>
         <div className={`${compact ? "text-[12.5px]" : "text-[15.5px]"} font-semibold italic`} style={{ color: BRAND_RED }}>
-          Art-mediation with AI
+          {t("brand.baseline")}
         </div>
       </div>
     </div>
@@ -80,12 +81,12 @@ function FloatingNav({
         <div className="mx-auto flex h-[74px] w-full max-w-[1060px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-6">
           <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
             <LogoMark compact />
-            <div className="inline-flex items-center gap-1 rounded-lg border border-neutral-300/80 bg-white px-2 py-1.5 shadow-sm">
+            <div className="inline-flex shrink-0 items-center gap-0.5 rounded-lg border border-neutral-300/80 bg-white px-1 py-1 shadow-sm">
               <LanguageFlag lang={activeLanguage.value} />
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value as UiLanguage)}
-                className="h-6 w-[58px] cursor-pointer bg-transparent text-[11px] font-semibold outline-none"
+                className="h-5 w-[42px] cursor-pointer bg-transparent text-[10px] font-semibold outline-none"
                 aria-label={t("nav.language_label")}
               >
                 {UI_LANGUAGE_OPTIONS.map((opt) => (

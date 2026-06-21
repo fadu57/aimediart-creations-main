@@ -10,20 +10,29 @@ import { Link, useLocation } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
 import {
   ArrowRight,
+  BarChart3,
+  Camera,
   Check,
   Cloud,
+  FileText,
   HeartHandshake,
+  Languages,
   Loader2,
+  MapPin,
   MessagesSquare,
   MonitorPlay,
   QrCode,
+  ScanSearch,
   Smartphone,
   ThermometerSun,
+  Volume2,
   Wind,
 } from "lucide-react";
 
 import { PublicVitrineShell, AIMEDIART_WORD_RED, BRAND_RED, BRAND_RED_DARK } from "@/components/PublicVitrineShell";
 import { AiGenerationInfoTrigger } from "@/components/AiGenerationInfoModal";
+import { VitrineGeographyDemoMap } from "@/components/vitrine/VitrineGeographyDemoMap";
+import { VitrineStatsDemoPreview } from "@/components/vitrine/VitrineStatsDemoPreview";
 import { LazyWhenVisible } from "@/components/ui/LazyWhenVisible";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { cn } from "@/lib/utils";
@@ -61,6 +70,31 @@ export type PublicHomeProps = {
   initialData?: PublicHomeInitialData | null;
 };
 
+function ProductionStatCard({
+  prefix,
+  value,
+  label,
+  sublabel,
+}: {
+  prefix?: string;
+  value: string;
+  label: string;
+  sublabel?: string;
+}) {
+  return (
+    <div className="flex min-h-[7.5rem] flex-col items-center justify-center rounded-2xl border border-[#E63946]/20 bg-[#fdf8f7] px-3 py-4 text-center">
+      <div className="flex flex-col items-center leading-none">
+        {prefix ? (
+          <span className="mb-1 text-[10px] font-medium lowercase tracking-wide text-[#E63946]/75">{prefix}</span>
+        ) : null}
+        <span className="text-3xl font-semibold tabular-nums text-[#E63946]">{value}</span>
+      </div>
+      <p className="mt-2 text-xs leading-snug text-muted-foreground">{label}</p>
+      {sublabel ? <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/90">{sublabel}</p> : null}
+    </div>
+  );
+}
+
 function highlightAimediartWord(text: string, textSpanClassName?: string): ReactNode {
   const parts = text.split(/(AIMEDIArt)/g);
   return parts.map((part, i) =>
@@ -78,8 +112,6 @@ function highlightAimediartWord(text: string, textSpanClassName?: string): React
 
 const UNSPLASH_HERO_IMAGE =
   "/landing-hero-new.png";
-const UNSPLASH_DASHBOARD_IMAGE =
-  "/landing-dashboard-new.png";
 
 function formatEur(value: number | null | undefined, locale: string): string {
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
@@ -490,6 +522,7 @@ function Section({
   id,
   eyebrow,
   eyebrowClassName,
+  titleClassName,
   title,
   children,
   surfaceCard = false,
@@ -503,6 +536,8 @@ function Section({
   eyebrow?: string;
   /** Classes additionnelles pour le surtitre (eyebrow), ex. alignement ou largeur ciblée */
   eyebrowClassName?: string;
+  /** Classes additionnelles pour le titre h2, ex. max-w plus large */
+  titleClassName?: string;
   title: ReactNode;
   children: ReactNode;
   /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
@@ -525,7 +560,12 @@ function Section({
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="mt-2 max-w-[23ch] text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]">
+      <h2
+        className={cn(
+          "mt-2 max-w-[23ch] text-[1.95rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[2.2rem]",
+          titleClassName,
+        )}
+      >
         {title}
       </h2>
       <div className="mt-9">{children}</div>
@@ -919,6 +959,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="live-scenographie"
           eyebrow={t("live.eyebrow")}
           title={t("live.title")}
+          titleClassName="max-w-[800px]"
         >
           <div className="w-full space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
             <p className="w-full">{highlightAimediartWord(t("live.text_1"))}</p>
@@ -991,6 +1032,101 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 </div>
               </div>
             </div>
+          </div>
+        </Section>
+
+        <Section
+          surfaceCard
+          id="production"
+          eyebrow={t("production.eyebrow")}
+          title={t("production.title")}
+          titleClassName="max-w-[800px]"
+        >
+          <div className="max-w-[72ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
+            <p>{highlightAimediartWord(t("production.text_1"))}</p>
+            <p>{t("production.text_2")}</p>
+          </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                id: "prod-photo",
+                label: t("production.step_photo_label"),
+                title: t("production.step_photo_title"),
+                text: t("production.step_photo_text"),
+                icon: Camera,
+              },
+              {
+                id: "prod-analysis",
+                label: t("production.step_analysis_label"),
+                title: t("production.step_analysis_title"),
+                text: t("production.step_analysis_text"),
+                icon: ScanSearch,
+              },
+              {
+                id: "prod-personas",
+                label: t("production.step_personas_label"),
+                title: t("production.step_personas_title"),
+                text: t("production.step_personas_text"),
+                icon: Languages,
+              },
+              {
+                id: "prod-audio",
+                label: t("production.step_audio_label"),
+                title: t("production.step_audio_title"),
+                text: t("production.step_audio_text"),
+                icon: Volume2,
+              },
+              {
+                id: "prod-cartel",
+                label: t("production.step_cartel_label"),
+                title: t("production.step_cartel_title"),
+                text: t("production.step_cartel_text"),
+                icon: FileText,
+              },
+              {
+                id: "prod-stats",
+                label: t("production.step_stats_label"),
+                title: t("production.step_stats_title"),
+                text: t("production.step_stats_text"),
+                icon: BarChart3,
+              },
+            ].map((step) => (
+              <article
+                key={step.id}
+                className="rounded-2xl border border-neutral-300/70 bg-white p-4 shadow-[0_8px_18px_rgba(0,0,0,0.04)] ph-fold-card"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{step.label}</p>
+                  <div className="rounded-full border border-neutral-300 bg-neutral-50 p-2">
+                    <step.icon className="h-4 w-4 text-foreground/70" aria-hidden />
+                  </div>
+                </div>
+                <h3 className="mt-2 text-lg font-semibold tracking-tight">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-foreground/80">{step.text}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ProductionStatCard
+              prefix={t("production.stat_up_to")}
+              value={t("production.stat_personas_number")}
+              label={t("production.stat_personas_label")}
+            />
+            <ProductionStatCard
+              prefix={t("production.stat_up_to")}
+              value={t("production.stat_languages_number")}
+              label={t("production.stat_languages_label")}
+            />
+            <ProductionStatCard
+              value={t("production.stat_voices_number")}
+              label={t("production.stat_voices_label")}
+              sublabel={t("production.stat_voices_sublabel")}
+            />
+            <ProductionStatCard
+              prefix={t("production.stat_up_to")}
+              value={t("production.stat_texts_number")}
+              label={t("production.stat_texts_label")}
+            />
           </div>
         </Section>
 
@@ -1093,27 +1229,51 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
             </article>
             <article className="rounded-3xl border border-neutral-300/70 bg-white p-5 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t("parcours.benefices_label")}</p>
-              <OptimizedImage
-                src={UNSPLASH_DASHBOARD_IMAGE}
-                alt={t("parcours.benefices_image_alt")}
-                className="mt-3 h-32 w-full rounded-xl border border-neutral-200 object-cover"
-                loading="lazy"
-                width={800}
-                height={128}
-              />
               <div className="mt-3 grid gap-2">
                 {[
                   t("parcours.benefit_1"),
                   t("parcours.benefit_2"),
                   t("parcours.benefit_3"),
                   t("parcours.benefit_4"),
+                  t("parcours.benefit_5"),
+                  t("parcours.benefit_6"),
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-2 rounded-xl bg-neutral-50 p-3">
                     <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: BRAND_RED }} aria-hidden />
-                    <p className="text-sm leading-relaxed text-foreground/80">{item}</p>
+                    <p className="text-sm leading-4 text-foreground/80">{item}</p>
                   </div>
                 ))}
               </div>
+            </article>
+          </div>
+
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            <article className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full border border-neutral-300 bg-white p-2">
+                  <MapPin className="h-5 w-5 text-[#E63946]" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.geography_eyebrow")}</p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight">{t("parcours.geography_title")}</h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-foreground/80">{t("parcours.geography_text")}</p>
+              <p className="mt-3 text-[11px] italic leading-relaxed text-muted-foreground">{t("parcours.geography_disclaimer")}</p>
+              <VitrineGeographyDemoMap />
+            </article>
+            <article className="rounded-3xl border border-neutral-300/70 bg-white p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
+              <div className="flex items-start gap-3">
+                <div className="rounded-full border border-neutral-300 bg-neutral-50 p-2">
+                  <FileText className="h-5 w-5 text-[#E63946]" aria-hidden />
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.pdf_eyebrow")}</p>
+                  <h3 className="mt-2 text-xl font-semibold tracking-tight">{t("parcours.pdf_title")}</h3>
+                </div>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-foreground/80">{t("parcours.pdf_text")}</p>
+              <VitrineStatsDemoPreview />
             </article>
           </div>
 
