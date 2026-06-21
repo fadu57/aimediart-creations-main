@@ -75,11 +75,13 @@ function ProductionStatCard({
   value,
   label,
   sublabel,
+  valueGenderIcons,
 }: {
   prefix?: string;
   value: string;
   label: string;
   sublabel?: string;
+  valueGenderIcons?: boolean;
 }) {
   return (
     <div className="flex min-h-[7.5rem] flex-col items-center justify-center rounded-2xl border border-[#E63946]/20 bg-[#fdf8f7] px-3 py-4 text-center">
@@ -87,10 +89,26 @@ function ProductionStatCard({
         {prefix ? (
           <span className="mb-1 text-[10px] font-medium lowercase tracking-wide text-[#E63946]/75">{prefix}</span>
         ) : null}
-        <span className="text-3xl font-semibold tabular-nums text-[#E63946]">{value}</span>
+        <div className="flex items-center justify-center gap-1.5">
+          {valueGenderIcons ? (
+            <span className="flex items-center gap-0.5 text-[1.35rem] leading-none" aria-hidden="true">
+              <span>👩</span>
+              <span>👨</span>
+            </span>
+          ) : null}
+          <span className="text-3xl font-semibold tabular-nums text-[#E63946]">{value}</span>
+        </div>
       </div>
-      <p className="mt-2 text-xs leading-snug text-muted-foreground">{label}</p>
-      {sublabel ? <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/90">{sublabel}</p> : null}
+      <p className="mt-2 text-xs leading-snug text-muted-foreground">
+        {label}
+        <span className="text-[#E63946]">*</span>
+      </p>
+      {sublabel ? (
+        <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/90">
+          {sublabel}
+          <span className="text-[#E63946]">*</span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1040,7 +1058,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="production"
           eyebrow={t("production.eyebrow")}
           title={t("production.title")}
-          titleClassName="max-w-[800px]"
+          titleClassName="max-w-[600px] text-left whitespace-pre-line"
         >
           <div className="max-w-[72ch] space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
             <p>{highlightAimediartWord(t("production.text_1"))}</p>
@@ -1096,7 +1114,12 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 className="rounded-2xl border border-neutral-300/70 bg-white p-4 shadow-[0_8px_18px_rgba(0,0,0,0.04)] ph-fold-card"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{step.label}</p>
+                  <span
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-[#E63946] bg-[#fdf8f7] text-xs font-bold tabular-nums text-[#E63946]"
+                    aria-hidden
+                  >
+                    {step.label}
+                  </span>
                   <div className="rounded-full border border-neutral-300 bg-neutral-50 p-2">
                     <step.icon className="h-4 w-4 text-foreground/70" aria-hidden />
                   </div>
@@ -1121,6 +1144,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               value={t("production.stat_voices_number")}
               label={t("production.stat_voices_label")}
               sublabel={t("production.stat_voices_sublabel")}
+              valueGenderIcons
             />
             <ProductionStatCard
               prefix={t("production.stat_up_to")}
@@ -1128,6 +1152,9 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               label={t("production.stat_texts_label")}
             />
           </div>
+          <p className="mt-2 max-w-[600px] text-left text-[11px] italic leading-relaxed text-[#E63946]">
+            {t("production.stat_footnote")}
+          </p>
         </Section>
 
         <Section
@@ -1135,6 +1162,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="parcours"
           eyebrow={t("parcours.eyebrow")}
           title={t("parcours.title")}
+          titleClassName="max-w-[600px] text-left whitespace-pre-line"
         >
           <div className="relative grid gap-4 lg:grid-cols-3">
             <div className="pointer-events-none absolute left-[16.66%] right-[16.66%] top-[30px] hidden h-px bg-neutral-300 lg:block" aria-hidden />
@@ -1180,7 +1208,15 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       <x.icon className="h-4 w-4 text-foreground/70" aria-hidden />
                     </div>
                   </div>
-                  <CardTitle id={`${x.id}-title`} className="text-xl">{x.title}</CardTitle>
+                  <CardTitle
+                    id={`${x.id}-title`}
+                    className={cn(
+                      "text-xl",
+                      x.id === "step2" && "max-w-[600px] text-left whitespace-pre-line",
+                    )}
+                  >
+                    {x.title}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm leading-relaxed text-foreground/80">
                   <p style={{ whiteSpace: "pre-line" }}>{x.text}</p>
@@ -1211,7 +1247,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           <div className="mt-10 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
             <article className="rounded-3xl border border-neutral-300/70 bg-[#fdfdfc] p-6 shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.commissaire_eyebrow")}</p>
-              <h3 className="mt-2 text-2xl font-semibold tracking-tight">{t("parcours.commissaire_title")}</h3>
+              <h3 className="mt-2 max-w-[600px] text-left text-2xl font-semibold tracking-tight whitespace-pre-line">{t("parcours.commissaire_title")}</h3>
               <p className="mt-3 text-sm leading-relaxed text-foreground/80">{t("parcours.commissaire_text")}</p>
               <div className="mt-5 grid gap-2 sm:grid-cols-2">
                 {[
@@ -1255,7 +1291,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.geography_eyebrow")}</p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight">{t("parcours.geography_title")}</h3>
+                  <h3 className="mt-2 max-w-[600px] text-left text-xl font-semibold tracking-tight whitespace-pre-line">{t("parcours.geography_title")}</h3>
                 </div>
               </div>
               <p className="mt-4 text-sm leading-relaxed text-foreground/80">{t("parcours.geography_text")}</p>
@@ -1269,7 +1305,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("parcours.pdf_eyebrow")}</p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight">{t("parcours.pdf_title")}</h3>
+                  <h3 className="mt-2 max-w-[600px] text-left text-xl font-semibold tracking-tight whitespace-pre-line">{t("parcours.pdf_title")}</h3>
                 </div>
               </div>
               <p className="mt-4 text-sm leading-relaxed text-foreground/80">{t("parcours.pdf_text")}</p>
@@ -1283,6 +1319,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           surfaceCard
           id="tarifs"
           title={t("tarifs.title")}
+          titleClassName="max-w-[600px] text-left whitespace-pre-line"
           backgroundImage={tarifsPhoto}
           backgroundWebp={tarifsWebp}
           backgroundImageAlt={t("tarifs.image_alt")}
@@ -1573,6 +1610,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="accessibilite"
           eyebrow={t("access.eyebrow")}
           title={t("access.title")}
+          titleClassName="max-w-[600px] text-left whitespace-pre-line"
         >
           <p className="w-full text-sm leading-relaxed text-foreground/80">
             {t("access.intro")}

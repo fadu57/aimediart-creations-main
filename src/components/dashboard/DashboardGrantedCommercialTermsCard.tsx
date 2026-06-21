@@ -100,7 +100,7 @@ export function DashboardGrantedCommercialTermsCard() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-[#fff9f7]/80 hover:bg-[#fff9f7]/80 dark:bg-[#fff9f7]/10">
-                  <TableHead className="h-8 min-w-[160px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
+                  <TableHead className="h-8 min-w-[180px] max-w-[240px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
                     Organisation
                   </TableHead>
                   <TableHead className="h-8 min-w-[72px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
@@ -121,10 +121,10 @@ export function DashboardGrantedCommercialTermsCard() {
                   const kindLabel = commercialKindLabel(row.commercial_kind as CommercialKind | null);
                   return (
                     <TableRow key={row.id} className="hover:bg-muted/30">
-                      <TableCell className="max-w-[200px] px-2 py-1.5 text-xs font-medium">
+                      <TableCell className="min-w-[180px] max-w-[240px] px-2 py-1.5 align-top text-xs font-medium">
                         <Link
                           to={`/agencies?agency=${encodeURIComponent(row.id)}`}
-                          className="block truncate text-primary hover:underline"
+                          className="block whitespace-normal text-primary leading-snug hover:underline line-clamp-2"
                           title={label}
                         >
                           {label}
