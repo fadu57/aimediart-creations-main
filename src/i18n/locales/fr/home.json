@@ -249,7 +249,7 @@
     "languages_included_range": "{{min}} à {{max}} incluses",
     "languages_included_many": "{{count}} incluses",
     "languages_extra": "+{{price}}/langue suppl.",
-    "languages_extra_on_quote": "(langue(s) supplémentaire(s) sur devis)",
+    "languages_extra_on_quote": "(Sur devis pour toute langue supplémentaire)",
     "languages_extra_none": "—",
     "languages_custom": "Sur mesure",
     "audio_none": "Non",
@@ -506,9 +506,24 @@
     }
   },
   "commencer": {
+    "devis_header": "Offre sur mesure",
     "rayonnement_header": "Offre sur mesure RAYONNEMENT",
+    "zenith_header": "Offre sur mesure ZÉNITH",
+    "rayonnement_intro": "L’offre Rayonnement s’adapte à votre réseau ou à votre événement. Voici comment poursuivre, selon votre situation.",
+    "zenith_intro": "L’offre Zénith s’adapte aux festivals, biennales et grands rendez-vous culturels. Voici comment poursuivre, selon votre situation.",
+    "devis_intro": "Voici comment poursuivre votre demande sur mesure, selon votre situation.",
+    "rayonnement_quote_box_title": "Proposition de contenu — devis Rayonnement",
+    "zenith_quote_box_title": "Proposition de contenu — devis Zénith",
+    "devis_quote_box_title": "Proposition de contenu — demande sur devis",
+    "rayonnement_quote_bullet_1": "Indiquez dates, lieu, fréquentation attendue et besoins (œuvres, médiation, diffusion).",
+    "rayonnement_quote_bullet_2": "Un membre de l’équipe vous répond pour caler un échange et une proposition chiffrée.",
+    "zenith_quote_bullet_1": "Indiquez dates, lieu, fréquentation attendue et échelle de l’événement (festivals, biennales, salons…).",
+    "zenith_quote_bullet_2": "Un membre de l’équipe vous répond pour caler un échange et une proposition sur mesure.",
     "quote_form_title": "Demande de devis - Rayonnement",
+    "zenith_quote_form_title": "Demande de devis - Zénith",
+    "devis_quote_form_title": "Demande de devis",
     "quote_cta": "Aller au formulaire contact",
-    "need_description": "Description de mon besoin (type d'événement, nombre d'œuvres exposées, nombre attendu de visiteurs, …)"
+    "need_description": "Description de mon besoin (type d'événement, nombre d'œuvres exposées, nombre attendu de visiteurs, …)",
+    "zenith_need_description": "Description de mon événement (type, dates, lieu, fréquentation attendue, nombre d'œuvres, besoins médiation et diffusion…)"
   }
 }

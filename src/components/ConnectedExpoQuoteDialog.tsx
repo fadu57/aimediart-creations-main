@@ -87,6 +87,8 @@ type Props = {
   showFloorPlan?: boolean;
   /** Libellé du champ description (défaut : Pack connexion). */
   needDescriptionLabel?: string;
+  /** Préremplit la description du besoin à l'ouverture (ex. pack sélectionné). */
+  defaultNeedDescription?: string;
 };
 
 const EMPTY: ConnectedExpoQuoteFormValues = {
@@ -126,6 +128,7 @@ export function ConnectedExpoQuoteDialog({
   title,
   showFloorPlan = true,
   needDescriptionLabel,
+  defaultNeedDescription = "",
 }: Props) {
   const { t } = useTranslation("home");
   const dialogTitle = title?.trim() || t("connexion.form.title");
@@ -140,8 +143,9 @@ export function ConnectedExpoQuoteDialog({
     setValues((prev) => ({
       ...prev,
       org_name: defaultOrgName.trim() || prev.org_name,
+      need_description: defaultNeedDescription.trim() || prev.need_description,
     }));
-  }, [open, defaultOrgName]);
+  }, [open, defaultOrgName, defaultNeedDescription]);
 
   const setField = useCallback((key: keyof ConnectedExpoQuoteFormValues, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -151,10 +155,11 @@ export function ConnectedExpoQuoteDialog({
     setValues({
       ...EMPTY,
       org_name: defaultOrgName.trim(),
+      need_description: defaultNeedDescription.trim(),
     });
     setFloorPlanFile(null);
     setPhoneValid(true);
-  }, [defaultOrgName]);
+  }, [defaultOrgName, defaultNeedDescription]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

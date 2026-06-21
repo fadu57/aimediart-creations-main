@@ -18,12 +18,27 @@ import {
 
 const BRAND_WORD = "text-[#E63946]";
 
+function planNameAsciiUpper(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toUpperCase();
+}
+
+function isZenithPlanName(plan: string): boolean {
+  return planNameAsciiUpper(plan).includes("ZENITH");
+}
+
+function isRayonnementPlanName(plan: string): boolean {
+  return planNameAsciiUpper(plan).includes("RAYONNEMENT");
+}
+
 async function getVisitorData(): Promise<VisitorCaptureResult> {
   return fetchVisitorSnapshot();
 }
 
 /**
- * Hub « après les tarifs » : connexion, création de compte, devis Rayonnement.
+ * Hub « après les tarifs » : connexion, création de compte, devis Rayonnement / Zénith.
  */
 export default function PublicHomeCommencer() {
   const { t } = useTranslation("home");
@@ -33,6 +48,8 @@ export default function PublicHomeCommencer() {
   const isDevis = intent === "devis";
   const isVeille = intent === "veille";
   const plan = searchParams.get("plan")?.trim() ?? "";
+  const isZenithDevis = isDevis && isZenithPlanName(plan);
+  const isRayonnementDevis = isDevis && isRayonnementPlanName(plan);
   const isAuthenticated = Boolean(session?.user);
 
   const [geoData, setGeoData] = useState<VisitorCaptureResult | null>(null);
@@ -93,7 +110,11 @@ export default function PublicHomeCommencer() {
                   BRAND_WORD,
                 )}
               >
-                {t("commencer.rayonnement_header")}
+                {isZenithDevis
+                  ? t("commencer.zenith_header")
+                  : isRayonnementDevis
+                    ? t("commencer.rayonnement_header")
+                    : t("commencer.devis_header")}
               </p>
             ) : (
               <span className="justify-self-center" aria-hidden />
@@ -111,11 +132,43 @@ export default function PublicHomeCommencer() {
         <main className="mx-auto max-w-[640px] px-5 py-10 sm:px-6 sm:py-14">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">Étape suivante</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-[2.1rem]">
-            {isDevis ? "Demande sur mesure" : isVeille ? "Passer en plan veille" : "Accéder à votre espace"}
+            {isDevis ? (
+              isZenithDevis ? (
+                <>
+                  Offre <span className="text-[#9d2525]">ZÉNITH</span>
+                  <br />
+                  Demande sur mesure
+                </>
+              ) : isRayonnementDevis ? (
+                <>
+                  Offre <span className="text-[#9d2525]">RAYONNEMENT</span>
+                  <br />
+                  Demande sur mesure
+                </>
+              ) : (
+                <>
+                  Demande sur mesure
+                  {plan ? (
+                    <>
+                      <br />
+                      <span className="text-[#9d2525]">{plan}</span>
+                    </>
+                  ) : null}
+                </>
+              )
+            ) : isVeille ? (
+              "Passer en plan veille"
+            ) : (
+              "Accéder à votre espace"
+            )}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             {isDevis
-              ? "L’offre Rayonnement s’adapte à votre événement. Voici comment poursuivre, selon votre situation."
+              ? isZenithDevis
+                ? t("commencer.zenith_intro")
+                : isRayonnementDevis
+                  ? t("commencer.rayonnement_intro")
+                  : t("commencer.devis_intro")
               : isVeille
                 ? "Connectez-vous pour demander le passage en plan veille (Atelier ou Horizon, abonnement mensuel uniquement)."
                 : "Pour commander ou activer une offre, vous passez par l’espace sécurisé AIMEDIArt (connexion ou création de compte organisation)."}
@@ -162,10 +215,25 @@ export default function PublicHomeCommencer() {
 
           {isDevis ? (
             <div className="mt-10 space-y-4 rounded-2xl border border-neutral-300/70 bg-[#faf9f7] p-5 shadow-[0_10px_22px_rgba(0,0,0,0.04)]">
-              <p className="text-sm font-semibold text-foreground">Proposition de contenu — devis Rayonnement</p>
+              <p className="text-sm font-semibold text-foreground">
+                {isZenithDevis
+                  ? t("commencer.zenith_quote_box_title")
+                  : isRayonnementDevis
+                    ? t("commencer.rayonnement_quote_box_title")
+                    : t("commencer.devis_quote_box_title")}
+              </p>
               <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>Indiquez dates, lieu, fréquentation attendue et besoins (œuvres, médiation, diffusion).</li>
-                <li>Un membre de l’équipe vous répond pour caler un échange et une proposition chiffrée.</li>
+                {isZenithDevis ? (
+                  <>
+                    <li>{t("commencer.zenith_quote_bullet_1")}</li>
+                    <li>{t("commencer.zenith_quote_bullet_2")}</li>
+                  </>
+                ) : (
+                  <>
+                    <li>{t("commencer.rayonnement_quote_bullet_1")}</li>
+                    <li>{t("commencer.rayonnement_quote_bullet_2")}</li>
+                  </>
+                )}
               </ul>
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
                 <Button
@@ -207,8 +275,16 @@ export default function PublicHomeCommencer() {
       <ConnectedExpoQuoteDialog
         open={quoteOpen}
         onOpenChange={setQuoteOpen}
-        title={t("commencer.quote_form_title")}
-        needDescriptionLabel={t("commencer.need_description")}
+        title={
+          isZenithDevis
+            ? t("commencer.zenith_quote_form_title")
+            : isRayonnementDevis
+              ? t("commencer.quote_form_title")
+              : t("commencer.devis_quote_form_title")
+        }
+        needDescriptionLabel={
+          isZenithDevis ? t("commencer.zenith_need_description") : t("commencer.need_description")
+        }
         showFloorPlan={false}
       />
     </div>

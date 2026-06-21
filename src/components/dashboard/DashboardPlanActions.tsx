@@ -87,7 +87,6 @@ function planActionButtonStyle(stepIndex: number): CSSProperties {
 
 const DEVIS_QUOTE_BTN_CLASS = `${PLAN_ACTION_BTN_CLASS} text-base font-semibold`;
 
-const RAYONNEMENT_DEVIS_HREF = "/organisation/commencer?intent=devis&plan=Rayonnement";
 const ZENITH_DEVIS_HREF = "/organisation/commencer?intent=devis&plan=ZENITH";
 
 function formatMonthlyTtcLabel(value: unknown): string {
@@ -197,7 +196,7 @@ export function DashboardPlanActions({
           style={planActionButtonStyle(2)}
         >
           <Link
-            to={RAYONNEMENT_DEVIS_HREF}
+            to={engagementPlanHref("RAYONNEMENT")}
             className="flex flex-col items-center justify-center gap-0.5 leading-tight"
           >
             <span className="text-xs font-normal">Passer à l&apos;abonnement</span>

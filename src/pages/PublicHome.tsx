@@ -99,12 +99,12 @@ function ProductionStatCard({
           <span className="text-3xl font-semibold tabular-nums text-[#E63946]">{value}</span>
         </div>
       </div>
-      <p className="mt-2 text-xs leading-snug text-muted-foreground">
+      <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
         {label}
         <span className="text-[#E63946]">*</span>
       </p>
       {sublabel ? (
-        <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground/90">
+        <p className="mt-1.5 text-center text-[10px] leading-snug text-muted-foreground/90">
           {sublabel}
           <span className="text-[#E63946]">*</span>
         </p>
@@ -977,7 +977,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="live-scenographie"
           eyebrow={t("live.eyebrow")}
           title={t("live.title")}
-          titleClassName="max-w-[800px]"
+          titleClassName="max-w-[600px]"
         >
           <div className="w-full space-y-4 text-sm leading-[1.85] text-foreground/85 sm:text-base">
             <p className="w-full">{highlightAimediartWord(t("live.text_1"))}</p>
@@ -1397,9 +1397,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             </span>
                             <Link
                               to={
-                                isQuoteOnlyCard
-                                  ? `/organisation/commencer?intent=devis&plan=${encodeURIComponent(displayPlan)}`
-                                  : `/organisation/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
+                                isRayonnementCard
+                                  ? "/organisation/engagement?plan=RAYONNEMENT"
+                                  : isQuoteOnlyCard
+                                    ? `/organisation/commencer?intent=devis&plan=${encodeURIComponent(displayPlan)}`
+                                    : `/organisation/commencer?intent=souscrire&plan=${encodeURIComponent(displayPlan)}`
                               }
                             >
                               <Button
@@ -1407,7 +1409,9 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                 className="h-8 rounded-lg px-3 text-xs font-semibold"
                                 style={{ backgroundColor: "#9D2525", color: "white" }}
                               >
-                                {isQuoteOnlyCard ? t("tarifs.cta_devis") : t("tarifs.cta_commander")}
+                                {isRayonnementCard || !isQuoteOnlyCard
+                                  ? t("tarifs.cta_commander")
+                                  : t("tarifs.cta_devis")}
                               </Button>
                             </Link>
                           </div>

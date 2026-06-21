@@ -25,6 +25,7 @@ import {
 } from "@/components/dashboard/DashboardProfileEditDialog";
 import { DashboardGrantedCommercialTermsCard } from "@/components/dashboard/DashboardGrantedCommercialTermsCard";
 import { DashboardOrganisationCommercialTermsBlock } from "@/components/dashboard/DashboardOrganisationCommercialTermsBlock";
+import { DashboardNetworkInfrastructureBlock } from "@/components/dashboard/DashboardNetworkInfrastructureBlock";
 import { DashboardNavigationModeSelector } from "@/components/dashboard/DashboardNavigationModeSelector";
 import { DashboardProfileSelector } from "@/components/dashboard/DashboardProfileSelector";
 import { DashboardPlanActions } from "@/components/dashboard/DashboardPlanActions";
@@ -637,7 +638,7 @@ const Dashboard = () => {
                         </p>
                       ) : null}
                       {isEtincelleSubscription ? (
-                        <p className="text-sm font-medium text-destructive">{ETINCELLE_UI.expoLimitBlocked}</p>
+                        <p className="text-xs font-medium text-destructive">{ETINCELLE_UI.expoLimitBlocked}</p>
                       ) : null}
                     </div>
                   </div>
@@ -1001,6 +1002,10 @@ const Dashboard = () => {
                     )}
                   </>
                 )}
+
+                {profileAgencyId ? (
+                  <DashboardNetworkInfrastructureBlock defaultOrgName={agency?.name_agency ?? ""} />
+                ) : null}
               </CardContent>
             </Card>
             )}

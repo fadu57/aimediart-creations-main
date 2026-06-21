@@ -103,7 +103,9 @@ export function applyEtincelleLimitDefaults(snapshot: PlanLimitsSnapshot): PlanL
 
 export type UpgradePlanCode = "ATELIER" | "HORIZON";
 
-export type SubscribePlanCode = "ETINCELLE" | UpgradePlanCode;
+export type EngagementPlanCode = UpgradePlanCode | "RAYONNEMENT";
+
+export type SubscribePlanCode = "ETINCELLE" | EngagementPlanCode;
 
 export function normalizeUpgradePlanCode(raw: string | null | undefined): UpgradePlanCode | null {
   const code = (raw ?? "").trim().toUpperCase();
@@ -113,7 +115,9 @@ export function normalizeUpgradePlanCode(raw: string | null | undefined): Upgrad
 
 export function normalizeSubscribePlanCode(raw: string | null | undefined): SubscribePlanCode | null {
   const code = (raw ?? "").trim().toUpperCase();
-  if (code === "ETINCELLE" || code === "ATELIER" || code === "HORIZON") return code;
+  if (code === "ETINCELLE" || code === "ATELIER" || code === "HORIZON" || code === "RAYONNEMENT") {
+    return code;
+  }
   return null;
 }
 
@@ -123,6 +127,7 @@ export function subscribePlanHref(plan: SubscribePlanCode): string {
 
 export function subscribePlanDisplayName(plan: SubscribePlanCode): string {
   if (plan === "ETINCELLE") return "Étincelle";
+  if (plan === "RAYONNEMENT") return "Rayonnement";
   return upgradePlanDisplayName(plan);
 }
 
@@ -164,6 +169,6 @@ export function upgradePlanDisplayName(plan: UpgradePlanCode): string {
   return plan === "ATELIER" ? "Atelier" : "Horizon";
 }
 
-export function engagementPlanHref(plan: UpgradePlanCode): string {
+export function engagementPlanHref(plan: EngagementPlanCode): string {
   return `/organisation/engagement?plan=${plan}`;
 }
