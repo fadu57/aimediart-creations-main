@@ -1,5 +1,7 @@
 import { isAgencyIdentityFormKey } from "@/lib/agencyIdentity";
 
+export { isAgencyIdentityFormKey };
+
 /** Colonnes commerciales — éditées via bloc dédié (admins globaux). */
 export const COMMERCIAL_AGENCY_KEYS = [
   "commercial_kind",
