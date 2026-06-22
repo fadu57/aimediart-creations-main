@@ -5,6 +5,8 @@ export function isEtincellePlanCode(planCode: string | null | undefined): boolea
 
 export type PlanLimitsSnapshot = {
   isEtincelle: boolean;
+  includedMediationLangsMin: number | null;
+  includedMediationLangsMax: number | null;
   maxArtworks: number | null;
   maxVisitors: number | null;
   artworksUsed: number;
@@ -53,6 +55,8 @@ export function buildPlanLimitsSnapshot(input: {
   plan_code?: string | null;
   pricing_plan?: string | null;
   pricing_label?: string | null;
+  included_mediation_langs_min?: number | null;
+  included_mediation_langs_max?: number | null;
   max_oeuvres?: number | null;
   max_visitors?: number | null;
   is_unlimited?: boolean | null;
@@ -72,6 +76,8 @@ export function buildPlanLimitsSnapshot(input: {
 
   return {
     isEtincelle,
+    includedMediationLangsMin: input.included_mediation_langs_min ?? null,
+    includedMediationLangsMax: input.included_mediation_langs_max ?? null,
     maxArtworks,
     maxVisitors,
     artworksUsed: input.artworksUsed,

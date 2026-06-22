@@ -8,6 +8,14 @@ import { AddArtistDialog } from "@/components/AddArtistDialog";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
+import {
+  buildPlanEnabledMediationLangSet,
+  isMediationLangEnabledForPlan,
+  planMediationAllLanguagesUnlocked,
+  planMediationAllowsOptionalLang,
+  resolvePlanMaxMediationLangs,
+  resolvePlanMediationGenerationLangs,
+} from "@/lib/organisation/planMediationLangs";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
 import {
   buildMediationStylePromptStyleMap,
@@ -548,9 +556,6 @@ export function ArtworkModal({
     primaryLang: mediationPrimaryLang,
     optionalLang: mediationOptionalLang,
     setOptionalLang: setMediationOptionalLang,
-    generationLangs,
-    allowsOptionalLang,
-    isAllLanguagesMode,
   } = useMediationGenerationConfig();
 
   const [artists, setArtists] = useState<ArtistOption[]>([]);
@@ -566,6 +571,35 @@ export function ArtworkModal({
   const expoAgencyId = artworkAgencyId.trim() || agency_id?.trim() || "";
   const { limits: planLimits } = useOrganisationPlanLimits(expoAgencyId || null);
   const isEtincellePlan = planLimits?.isEtincelle ?? false;
+  const planMaxMediationLangs = useMemo(
+    () =>
+      resolvePlanMaxMediationLangs({
+        includedMax: planLimits?.includedMediationLangsMax,
+        includedMin: planLimits?.includedMediationLangsMin,
+        isEtincelle: isEtincellePlan,
+      }),
+    [planLimits?.includedMediationLangsMax, planLimits?.includedMediationLangsMin, isEtincellePlan],
+  );
+  const planAllowsOptionalLang = planMediationAllowsOptionalLang(planMaxMediationLangs);
+  const planAllLanguagesMode = planMediationAllLanguagesUnlocked(planMaxMediationLangs);
+  const planGenerationLangs = useMemo(
+    () =>
+      resolvePlanMediationGenerationLangs({
+        maxLangs: planMaxMediationLangs,
+        primaryLang: mediationPrimaryLang,
+        optionalLang: mediationOptionalLang,
+      }),
+    [planMaxMediationLangs, mediationPrimaryLang, mediationOptionalLang],
+  );
+  const planEnabledLangSet = useMemo(
+    () =>
+      buildPlanEnabledMediationLangSet({
+        maxLangs: planMaxMediationLangs,
+        primaryLang: mediationPrimaryLang,
+        optionalLang: mediationOptionalLang,
+      }),
+    [planMaxMediationLangs, mediationPrimaryLang, mediationOptionalLang],
+  );
   const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
   const [expoOptions, setExpoOptions] = useState<{ id: string; name: string }[]>([]);
   const [artworkAgencyOpen, setArtworkAgencyOpen] = useState(false);
@@ -576,6 +610,14 @@ export function ArtworkModal({
   /** Langue affichée / éditée dans le matériau source (boutons verticaux). */
   const [sourceMaterialEditLang, setSourceMaterialEditLang] = useState<MediationUiLang>("fr");
   const [descriptionsByLang, setDescriptionsByLang] = useState(createEmptyDescriptionsByLang);
+  const sourceMaterialLegacyLangs = useMemo(
+    () => sourceMaterialLangsWithContent(sourceMaterialByLang),
+    [sourceMaterialByLang],
+  );
+  const mediationLegacyLangs = useMemo(
+    () => mediationLangsWithContent(descriptionsByLang),
+    [descriptionsByLang],
+  );
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [audioStatusRefreshKey, setAudioStatusRefreshKey] = useState(0);
   const [audioOptimisticCells, setAudioOptimisticCells] = useState<string[]>([]);
@@ -652,9 +694,9 @@ export function ArtworkModal({
 
   const activeSourceMaterialLangSet = useMemo(() => {
     const filled = sourceMaterialLangsWithContent(sourceMaterialByLang);
-    const langs = filled.length > 0 ? filled : generationLangs;
+    const langs = filled.length > 0 ? filled : planGenerationLangs;
     return new Set(langs);
-  }, [sourceMaterialByLang, generationLangs]);
+  }, [sourceMaterialByLang, planGenerationLangs]);
 
   const persistArtworkSourceMaterial = useCallback(
     async (byLang: Record<MediationUiLang, string>): Promise<void> => {
@@ -693,14 +735,14 @@ export function ArtworkModal({
     }
     setMediationEditLang(mediationPrimaryLang);
     setSourceMaterialEditLang(mediationPrimaryLang);
-    if (isEtincellePlan) setMediationOptionalLang(null);
-  }, [open, mediationPrimaryLang, setMediationOptionalLang, isEtincellePlan]);
+    if (planMaxMediationLangs <= 1) setMediationOptionalLang(null);
+  }, [open, mediationPrimaryLang, setMediationOptionalLang, planMaxMediationLangs]);
 
   useEffect(() => {
-    if (!generationLangs.includes(sourceMaterialEditLang)) {
+    if (!planGenerationLangs.includes(sourceMaterialEditLang)) {
       setSourceMaterialEditLang(mediationPrimaryLang);
     }
-  }, [generationLangs, sourceMaterialEditLang, mediationPrimaryLang]);
+  }, [planGenerationLangs, sourceMaterialEditLang, mediationPrimaryLang]);
 
   // Charger les agences (super-admins uniquement)
   useEffect(() => {
@@ -1197,8 +1239,8 @@ export function ArtworkModal({
   const activeMediationLangs = useMemo(() => {
     const filled = mediationLangsWithContent(descriptionsByLang);
     if (filled.length > 0) return filled;
-    return imageAnalysisDone ? generationLangs : [];
-  }, [generationLangs, descriptionsByLang, imageAnalysisDone]);
+    return imageAnalysisDone ? planGenerationLangs : [];
+  }, [planGenerationLangs, descriptionsByLang, imageAnalysisDone]);
 
   const activeMediationLangSet = useMemo(
     () => new Set(activeMediationLangs),
@@ -1219,7 +1261,7 @@ export function ArtworkModal({
   /** À l’édition : resynchroniser la langue optionnelle si plusieurs langues ont du contenu. */
   useEffect(() => {
     if (!open || artworkDraftLoading || !isEditingExisting) return;
-    if (!allowsOptionalLang || isAllLanguagesMode) return;
+    if (!planAllowsOptionalLang || planAllLanguagesMode) return;
 
     const filled = mediationLangsWithContent(descriptionsByLang);
     const secondary = filled.find((L) => L !== mediationPrimaryLang);
@@ -1231,8 +1273,8 @@ export function ArtworkModal({
     open,
     artworkDraftLoading,
     isEditingExisting,
-    allowsOptionalLang,
-    isAllLanguagesMode,
+    planAllowsOptionalLang,
+    planAllLanguagesMode,
     descriptionsByLang,
     mediationPrimaryLang,
     mediationOptionalLang,
@@ -1240,7 +1282,7 @@ export function ArtworkModal({
   ]);
 
   const mediationLangHelp = useMemo(() => {
-    if (isAllLanguagesMode) {
+    if (planAllLanguagesMode) {
       return t("mediation_lang_help_all");
     }
     if (mediationOptionalLang) {
@@ -1249,8 +1291,11 @@ export function ArtworkModal({
         optional: mediationOptionalLang.toUpperCase(),
       });
     }
+    if (planMaxMediationLangs > 1) {
+      return t("mediation_lang_help_plan_range", { count: planMaxMediationLangs });
+    }
     return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
-  }, [isAllLanguagesMode, mediationOptionalLang, mediationPrimaryLang, t]);
+  }, [planAllLanguagesMode, planMaxMediationLangs, mediationOptionalLang, mediationPrimaryLang, t]);
 
   const handlePersonaAudioRetryCell = useCallback(
     (lang: string, styleKey: string, promptStyleId: string) => {
@@ -1497,7 +1542,7 @@ export function ArtworkModal({
   };
 
   const handleSourceMaterialLangSelect = (lng: MediationUiLang) => {
-    if (!activeSourceMaterialLangSet.has(lng)) return;
+    if (!isMediationLangEnabledForPlan(lng, planEnabledLangSet, sourceMaterialLegacyLangs)) return;
     if (isVisitorLocked || isLoading || analyzingImage) return;
     if (lng === sourceMaterialEditLang) return;
 
@@ -1758,7 +1803,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = generationLangs;
+      const langsToGenerate = planGenerationLangs;
       const totalSteps = langsToGenerate.length;
       const missingSlots: string[] = [];
 
@@ -1881,7 +1926,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = generationLangs;
+      const langsToGenerate = planGenerationLangs;
       for (let i = 0; i < langsToGenerate.length; i++) {
         const lang = langsToGenerate[i];
         const langDetail = t("mediation_progress_lang", {
@@ -2243,9 +2288,11 @@ export function ArtworkModal({
                 aria-label={t("source_material_lang_group_aria")}
               >
                 {MEDIATION_UI_LANGS.map((lng) => {
-                  const langEnabled = isEtincellePlan
-                    ? lng === mediationPrimaryLang
-                    : activeSourceMaterialLangSet.has(lng);
+                  const langEnabled = isMediationLangEnabledForPlan(
+                    lng,
+                    planEnabledLangSet,
+                    sourceMaterialLegacyLangs,
+                  );
                   return (
                     <Button
                       key={lng}
@@ -2314,7 +2361,7 @@ export function ArtworkModal({
                 </ul>
               </details>
             ) : null}
-            {allowsOptionalLang || isEtincellePlan ? (
+            {planAllowsOptionalLang || planMaxMediationLangs <= 1 ? (
               <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200/70 bg-amber-50/50 px-3 py-2">
                 <Label htmlFor="mediation-optional-lang" className="text-xs text-amber-950 shrink-0">
                   {t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
@@ -2326,7 +2373,7 @@ export function ArtworkModal({
                     className="h-8 min-w-[5.5rem] rounded-md border border-amber-300/60 bg-background px-2 text-xs font-semibold text-amber-950 disabled:cursor-not-allowed disabled:opacity-50"
                     value={mediationOptionalLang ?? ""}
                     disabled={
-                      isEtincellePlan ||
+                      planMaxMediationLangs <= 1 ||
                       !imageAnalysisDone ||
                       generatingMediation ||
                       regeneratingMediationStyleKey !== null ||
@@ -2348,11 +2395,13 @@ export function ArtworkModal({
                   </select>
                 </div>
                 <p className="text-[11px] font-medium text-destructive shrink-0">
-                  {isEtincellePlan
+                  {planMaxMediationLangs <= 1
                     ? ETINCELLE_UI.optionalLangBlocked
-                    : t("mediation_optional_lang_limit_hint")}
+                    : t("mediation_optional_lang_limit_hint", {
+                        count: planMaxMediationLangs - 1,
+                      })}
                 </p>
-                {!isEtincellePlan ? (
+                {planAllowsOptionalLang ? (
                   <p className="w-full text-[11px] text-muted-foreground">{t("mediation_optional_lang_hint")}</p>
                 ) : null}
               </div>
@@ -2544,9 +2593,11 @@ export function ArtworkModal({
           <Label>{t("label_mediations")}</Label>
           <div className="flex flex-wrap items-center gap-2">
             {MEDIATION_UI_LANGS.map((lng) => {
-              const langEnabled = isEtincellePlan
-                ? lng === mediationPrimaryLang
-                : activeMediationLangSet.has(lng);
+              const langEnabled = isMediationLangEnabledForPlan(
+                lng,
+                planEnabledLangSet,
+                mediationLegacyLangs,
+              );
               return (
               <Button
                 key={lng}
