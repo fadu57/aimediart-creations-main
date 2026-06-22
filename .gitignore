@@ -29,3 +29,6 @@ tmp-*
 tmp-legal-pack/
 .vercel
 .env*.local
+
+# Supabase CLI (fichiers temporaires locaux)
+supabase/.temp/
