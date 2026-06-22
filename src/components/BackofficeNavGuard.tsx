@@ -5,9 +5,8 @@ import { getBackofficeFallbackPath } from "@/lib/navigationMatrix";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
 
 /**
- * Redirige vers la première route de menu autorisée (ou `/settings`) si la route courante est interdite
- * par `matrice_securite`. Ne cible pas systématiquement `/dashboard` : si « Accueil » est décoché,
- * une redirection vers `/dashboard` provoquerait une boucle infinie avec `<Navigate>`.
+ * Redirige vers la première route de menu autorisée (ou `/dashboard`) si la route courante est interdite
+ * par `matrice_securite`. `/dashboard` reste toujours accessible comme page d'accueil profil.
  */
 export function BackofficeNavGuard() {
   const location = useLocation();

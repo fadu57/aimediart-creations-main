@@ -26,6 +26,8 @@ import {
   audioVoiceCellKey,
   mediationLangNeedsAudioGeneration,
   triggerMediationAudioForLang,
+  fetchMediationVoiceFillState,
+  type MediationVoiceFillState,
 } from "@/services/audioService";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { MediationPersonaAudioDialog } from "@/components/MediationPersonaAudioDialog";
@@ -83,6 +85,8 @@ import {
   resolveMediationUiLang,
   serializeMediationDescriptionsByLang,
   serializeMediationDraftFingerprint,
+  countMaxMediationStylesAcrossLangs,
+  getMediationFilledUiLangs,
 } from "@/lib/artworkDescriptionI18n";
 import {
   createEmptySourceMaterialByLang,
@@ -102,6 +106,12 @@ import {
 } from "@/lib/mediationGenerationProgress";
 import { useMediationGenerationConfig } from "@/hooks/useMediationGenerationConfig";
 import { Progress } from "@/components/ui/progress";
+import { ArtworkModalWorkflowLayout } from "@/components/artwork-workflow/ArtworkModalWorkflowLayout";
+import { ArtworkWorkflowMarkdown, isVerseMediationStyleKey } from "@/components/artwork-workflow/ArtworkWorkflowMarkdown";
+import { TextEditModal } from "@/components/artwork-workflow/TextEditModal";
+import { WorkflowIaStatusBadges } from "@/components/artwork-workflow/WorkflowIaStatusBadges";
+import { WorkflowPersonaVoiceStatus } from "@/components/artwork-workflow/WorkflowPersonaVoiceStatus";
+import { areAllPlanMediationsGenerated } from "@/lib/artworkWorkflowGenerationState";
 
 async function generateAndSaveQrCode(artworkId: string, expoId?: string | null): Promise<string | null> {
   const originOverride = await fetchQrPublicSiteOriginFromSettings();
@@ -138,6 +148,8 @@ type ArtworkModalProps = {
   openMediationAudioOnLoad?: boolean;
   /** Ferme la fiche œuvre quand le modal voix se ferme (retour catalogue). */
   closeOnMediationAudioClose?: boolean;
+  /** Prototype UX : parcours guidé responsive (catalogue → bouton test). */
+  experimentalWorkflow?: boolean;
 };
 
 type ArtistOption = {
@@ -548,9 +560,10 @@ export function ArtworkModal({
   artworkId,
   openMediationAudioOnLoad = false,
   closeOnMediationAudioClose = false,
+  experimentalWorkflow = false,
 }: ArtworkModalProps) {
   const { t, i18n } = useTranslation("artwork_modal");
-  const { role_id, agency_id, expo_id } = useAuthUser();
+  const { role_id, agency_id, expo_id, agency_role_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
   const {
     primaryLang: mediationPrimaryLang,
@@ -566,9 +579,17 @@ export function ArtworkModal({
   const [artistId, setArtistId] = useState("");
   const [artworkExpoId, setArtworkExpoId] = useState("");
   const [artworkAgencyId, setArtworkAgencyId] = useState("");
-  const canPickAgency = typeof role_id === "number" && role_id < 4;
-  const canPickExpo = typeof role_id === "number" && (role_id === 4 || role_id === 5);
-  const expoAgencyId = artworkAgencyId.trim() || agency_id?.trim() || "";
+  const isAgencyBound = Boolean(agency_id?.trim());
+  const canPickAgency = !isAgencyBound && typeof role_id === "number" && role_id < 4;
+  const canPickExpo = isAgencyBound
+    ? agency_role_id === 4 ||
+      agency_role_id === 5 ||
+      role_id === 4 ||
+      role_id === 5
+    : typeof role_id === "number" && (role_id === 4 || role_id === 5);
+  const expoAgencyId = isAgencyBound
+    ? agency_id!.trim()
+    : artworkAgencyId.trim() || agency_id?.trim() || "";
   const { limits: planLimits } = useOrganisationPlanLimits(expoAgencyId || null);
   const isEtincellePlan = planLimits?.isEtincelle ?? false;
   const planMaxMediationLangs = useMemo(
@@ -582,6 +603,7 @@ export function ArtworkModal({
   );
   const planAllowsOptionalLang = planMediationAllowsOptionalLang(planMaxMediationLangs);
   const planAllLanguagesMode = planMediationAllLanguagesUnlocked(planMaxMediationLangs);
+  const [workflowOptionalLangs, setWorkflowOptionalLangs] = useState<MediationUiLang[]>([]);
   const planGenerationLangs = useMemo(
     () =>
       resolvePlanMediationGenerationLangs({
@@ -591,6 +613,20 @@ export function ArtworkModal({
       }),
     [planMaxMediationLangs, mediationPrimaryLang, mediationOptionalLang],
   );
+  const workflowPlanGenerationLangs = useMemo(() => {
+    if (planMaxMediationLangs <= 1) return [mediationPrimaryLang];
+    if (planAllLanguagesMode) return [...MEDIATION_UI_LANGS];
+    const extras = workflowOptionalLangs.filter((lng) => lng !== mediationPrimaryLang);
+    return [mediationPrimaryLang, ...extras].slice(0, planMaxMediationLangs);
+  }, [
+    planMaxMediationLangs,
+    planAllLanguagesMode,
+    mediationPrimaryLang,
+    workflowOptionalLangs,
+  ]);
+  const effectivePlanGenerationLangs = experimentalWorkflow
+    ? workflowPlanGenerationLangs
+    : planGenerationLangs;
   const planEnabledLangSet = useMemo(
     () =>
       buildPlanEnabledMediationLangSet({
@@ -600,6 +636,19 @@ export function ArtworkModal({
       }),
     [planMaxMediationLangs, mediationPrimaryLang, mediationOptionalLang],
   );
+  const effectivePlanEnabledLangSet = useMemo(() => {
+    if (!experimentalWorkflow) return planEnabledLangSet;
+    if (planMaxMediationLangs <= 1) return new Set([mediationPrimaryLang]);
+    if (planAllLanguagesMode) return new Set(MEDIATION_UI_LANGS);
+    return new Set(workflowPlanGenerationLangs);
+  }, [
+    experimentalWorkflow,
+    planEnabledLangSet,
+    planMaxMediationLangs,
+    planAllLanguagesMode,
+    mediationPrimaryLang,
+    workflowPlanGenerationLangs,
+  ]);
   const [agencyOptions, setAgencyOptions] = useState<{ id: string; name: string }[]>([]);
   const [expoOptions, setExpoOptions] = useState<{ id: string; name: string }[]>([]);
   const [artworkAgencyOpen, setArtworkAgencyOpen] = useState(false);
@@ -660,6 +709,23 @@ export function ArtworkModal({
   const [imagePersonasFromAnalysis, setImagePersonasFromAnalysis] = useState<ImageAnalysisPersonaItem[]>([]);
   /** Étape 1 : analyse d’image effectuée (matériau source disponible). */
   const [imageAnalysisDone, setImageAnalysisDone] = useState(false);
+  const [workflowHasSavedOnce, setWorkflowHasSavedOnce] = useState(false);
+  const [sourceMaterialEditOpen, setSourceMaterialEditOpen] = useState(false);
+  const [mediationTextEdit, setMediationTextEdit] = useState<{
+    styleKey: DescriptionKey;
+    label: string;
+  } | null>(null);
+  const [resolvedAgencyName, setResolvedAgencyName] = useState("");
+  const [workflowArtworkStatus, setWorkflowArtworkStatus] = useState("");
+  const [workflowMediationUnlock, setWorkflowMediationUnlock] = useState(false);
+  const [workflowAudioUnlock, setWorkflowAudioUnlock] = useState(false);
+  const [workflowVoiceFillState, setWorkflowVoiceFillState] = useState<MediationVoiceFillState>({
+    totalExpected: 0,
+    readyCount: 0,
+    missingCount: 0,
+    inProgressCount: 0,
+    allReady: false,
+  });
 
   const selectedArtist = useMemo(
     () => artists.find((a) => a.artist_id === artistId) ?? null,
@@ -694,9 +760,34 @@ export function ArtworkModal({
 
   const activeSourceMaterialLangSet = useMemo(() => {
     const filled = sourceMaterialLangsWithContent(sourceMaterialByLang);
-    const langs = filled.length > 0 ? filled : planGenerationLangs;
+    const langs = filled.length > 0 ? filled : effectivePlanGenerationLangs;
     return new Set(langs);
-  }, [sourceMaterialByLang, planGenerationLangs]);
+  }, [sourceMaterialByLang, effectivePlanGenerationLangs]);
+
+  const coreFieldsComplete = Boolean(
+    artworkAgencyId.trim() &&
+      artworkExpoId.trim() &&
+      title.trim() &&
+      artistId &&
+      imageUrl.trim(),
+  );
+  const hasMediations = useMemo(
+    () => mediationLangsWithContent(descriptionsByLang).length > 0,
+    [descriptionsByLang],
+  );
+
+  const modalMediationCount = useMemo(
+    () => countMaxMediationStylesAcrossLangs(serializeMediationDescriptionsByLang(descriptionsByLang)),
+    [descriptionsByLang],
+  );
+  const modalMediationLangsLabel = useMemo(
+    () =>
+      getMediationFilledUiLangs(serializeMediationDescriptionsByLang(descriptionsByLang))
+        .map((lang) => lang.toUpperCase())
+        .join(" - "),
+    [descriptionsByLang],
+  );
+  const modalVoiceLangsLabel = modalMediationLangsLabel;
 
   const persistArtworkSourceMaterial = useCallback(
     async (byLang: Record<MediationUiLang, string>): Promise<void> => {
@@ -729,6 +820,21 @@ export function ArtworkModal({
       setRegeneratingMediationStyleKey(null);
       setMediationProgress(null);
       setMediationOptionalLang(null);
+      setWorkflowOptionalLangs([]);
+      setWorkflowHasSavedOnce(false);
+      setSourceMaterialEditOpen(false);
+      setMediationTextEdit(null);
+      setResolvedAgencyName("");
+      setWorkflowArtworkStatus("");
+      setWorkflowMediationUnlock(false);
+      setWorkflowAudioUnlock(false);
+      setWorkflowVoiceFillState({
+        totalExpected: 0,
+        readyCount: 0,
+        missingCount: 0,
+        inProgressCount: 0,
+        allReady: false,
+      });
       setAnalyzeProgress(null);
       setMediationAudioDialogOpen(false);
       return;
@@ -739,10 +845,27 @@ export function ArtworkModal({
   }, [open, mediationPrimaryLang, setMediationOptionalLang, planMaxMediationLangs]);
 
   useEffect(() => {
-    if (!planGenerationLangs.includes(sourceMaterialEditLang)) {
+    if (!effectivePlanGenerationLangs.includes(sourceMaterialEditLang)) {
       setSourceMaterialEditLang(mediationPrimaryLang);
     }
-  }, [planGenerationLangs, sourceMaterialEditLang, mediationPrimaryLang]);
+  }, [effectivePlanGenerationLangs, sourceMaterialEditLang, mediationPrimaryLang]);
+
+  useEffect(() => {
+    if (!open || !experimentalWorkflow) return;
+    const agencyIdToResolve = artworkAgencyId.trim() || agency_id?.trim() || "";
+    if (!agencyIdToResolve) {
+      setResolvedAgencyName("");
+      return;
+    }
+    void supabase
+      .from("agencies")
+      .select("name_agency")
+      .eq("id", agencyIdToResolve)
+      .maybeSingle()
+      .then(({ data }) => {
+        setResolvedAgencyName((data?.name_agency as string | undefined) ?? "");
+      });
+  }, [open, experimentalWorkflow, artworkAgencyId, agency_id]);
 
   // Charger les agences (super-admins uniquement)
   useEffect(() => {
@@ -756,13 +879,13 @@ export function ArtworkModal({
       });
   }, [canPickAgency, open]);
 
-  // Rôles 4–5 : agence implicite (profil utilisateur)
+  // Rattachement agence : agence implicite et verrouillée (y compris admin global rattaché)
   useEffect(() => {
-    if (!open || canPickAgency || !canPickExpo || !agency_id?.trim()) return;
-    setArtworkAgencyId((prev) => prev.trim() || agency_id.trim());
-  }, [open, canPickAgency, canPickExpo, agency_id]);
+    if (!open || !isAgencyBound || !agency_id?.trim()) return;
+    setArtworkAgencyId(agency_id.trim());
+  }, [open, isAgencyBound, agency_id]);
 
-  const canManageExpoLink = canPickAgency || canPickExpo;
+  const canManageExpoLink = canPickAgency || canPickExpo || isAgencyBound;
 
   // Charger les expos filtrées par agence (sélectionnée ou profil)
   useEffect(() => {
@@ -774,13 +897,13 @@ export function ArtworkModal({
       .eq("agency_id", expoAgencyId)
       .is("deleted_at", null)
       .order("expo_name", { ascending: true });
-    if (role_id === 5 && expo_id?.trim()) {
+    if ((agency_role_id === 5 || role_id === 5) && expo_id?.trim()) {
       query = query.eq("id", expo_id.trim());
     }
     void query.then(({ data }) => {
       setExpoOptions((data ?? []).map((r) => ({ id: r.id as string, name: (r.expo_name as string) ?? "" })));
     });
-  }, [open, canManageExpoLink, expoAgencyId, role_id, expo_id]);
+  }, [open, canManageExpoLink, expoAgencyId, role_id, agency_role_id, expo_id]);
 
   useEffect(() => {
     if (!open) {
@@ -914,7 +1037,7 @@ export function ArtworkModal({
         const { data, error } = await supabase
           .from("artworks")
           .select(
-            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_source_material_i18n, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url",
+            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_source_material_i18n, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url, artwork_status",
           )
           .eq("artwork_id", id)
           .is("deleted_at", null)
@@ -947,6 +1070,7 @@ export function ArtworkModal({
         setImagePersonasFromAnalysis([]);
         setDescriptionsByLang(nextByLang);
         savedMediationBaselineRef.current = serializeMediationDescriptionsByLang(nextByLang);
+        setWorkflowArtworkStatus(((data as { artwork_status?: string | null }).artwork_status ?? "").trim());
         setMediationEditLang(resolveMediationUiLang(i18n.language));
         const initialSnapshot = buildDraftSnapshot({
           title: (data.artwork_title as string | null) ?? "",
@@ -958,6 +1082,14 @@ export function ArtworkModal({
           descriptionsByLang: nextByLang,
         });
         setInitialDraftSignature(serializeDraftSnapshot(initialSnapshot));
+        if (experimentalWorkflow) {
+          setWorkflowHasSavedOnce(true);
+          const filledLangs = mediationLangsWithContent(nextByLang);
+          const optionalLangs = filledLangs.filter((lng) => lng !== mediationPrimaryLang);
+          setWorkflowOptionalLangs(
+            optionalLangs.slice(0, Math.max(0, planMaxMediationLangs - 1)),
+          );
+        }
       } finally {
         if (!cancelled) setArtworkDraftLoading(false);
       }
@@ -984,6 +1116,7 @@ export function ArtworkModal({
       setImagePersonasFromAnalysis([]);
       const emptyMed = createEmptyDescriptionsByLang();
       setDescriptionsByLang(emptyMed);
+      setWorkflowArtworkStatus("");
       savedMediationBaselineRef.current = {};
       setMediationEditLang(resolveMediationUiLang(i18n.language));
       setDuplicateArtwork(null);
@@ -1065,6 +1198,10 @@ export function ArtworkModal({
       toast.error(t("toast_error_artist_required"));
       return;
     }
+    if (experimentalWorkflow && !coreFieldsComplete) {
+      toast.error("Complétez l'exposition, le titre, l'artiste et la photo avant d'enregistrer.");
+      return;
+    }
     setIsSubmitting(true);
     let newArtworkId: string | null = null;
     try {
@@ -1074,6 +1211,7 @@ export function ArtworkModal({
         sourceMaterialTextForLang(sourceMaterialByLang, i18n.language) ||
         sourceMaterialTextForLang(sourceMaterialByLang, "fr") ||
         null;
+      const workflowStatus = hasMediations ? "active" : "draft";
       const payload = {
         artwork_title: title.trim(),
         artwork_artist_id: artistId,
@@ -1084,7 +1222,12 @@ export function ArtworkModal({
         artwork_source_material_i18n: serializedSource,
         artwork_description_i18n: serializedMediation,
         artwork_fingerprint: fingerprint || null,
+        ...(experimentalWorkflow ? { artwork_status: workflowStatus } : {}),
       };
+
+      if (experimentalWorkflow) {
+        setWorkflowArtworkStatus(workflowStatus);
+      }
 
       if (persistedArtworkId) {
         const { data: updatedRows, error } = await supabase
@@ -1114,9 +1257,19 @@ export function ArtworkModal({
             }),
           ),
         );
-        void generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null).catch((e) => {
-          console.warn("[ArtworkModal] QR régénération échouée :", e);
-        });
+        if (!experimentalWorkflow) {
+          void generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null).catch((e) => {
+            console.warn("[ArtworkModal] QR régénération échouée :", e);
+          });
+        } else if (hasMediations) {
+          void generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null)
+            .then((url) => {
+              if (url) setArtworkQrImageUrl(`${url}${url.includes("?") ? "&" : "?"}cb=${Date.now()}`);
+            })
+            .catch((e) => {
+              console.warn("[ArtworkModal] QR régénération échouée :", e);
+            });
+        }
       } else {
         const { data: inserted, error } = await supabase
           .from("artworks")
@@ -1126,13 +1279,32 @@ export function ArtworkModal({
         if (error) throw error;
         newArtworkId = (inserted as { artwork_id: string } | null)?.artwork_id ?? null;
         if (newArtworkId) {
+          setEditingArtworkId(newArtworkId);
           triggerMediationAudioOnChanges(newArtworkId, descriptionsByLang);
           updateMediationBaseline(descriptionsByLang);
+          setInitialDraftSignature(
+            serializeDraftSnapshot(
+              buildDraftSnapshot({
+                title,
+                artistId,
+                artworkExpoId,
+                artworkAgencyId,
+                imageUrl,
+                sourceMaterialByLang,
+                descriptionsByLang,
+              }),
+            ),
+          );
         }
         toast.success(t("toast_artwork_created"));
       }
-      onOpenChange(false);
-      onSuccess?.();
+      if (experimentalWorkflow) {
+        setWorkflowHasSavedOnce(true);
+        onSuccess?.();
+      } else {
+        onOpenChange(false);
+        onSuccess?.();
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("toast_error_save");
       toast.error(msg);
@@ -1140,7 +1312,7 @@ export function ArtworkModal({
       setIsSubmitting(false);
     }
 
-    if (newArtworkId) {
+    if (newArtworkId && !experimentalWorkflow) {
       void generateAndSaveQrCode(newArtworkId, artworkExpoId.trim() || null).catch((e) => {
         console.warn("[ArtworkModal] QR auto-génération échouée :", e);
       });
@@ -1233,14 +1405,44 @@ export function ArtworkModal({
     regeneratingMediationStyleKey === null &&
     !analyzingImage;
 
-  const canAnalyzeImage = !isVisitorLocked && Boolean(imageUrl) && !analyzingImage;
+  const canUnlockWorkflowRegen = typeof role_id === "number" && role_id < 4;
+
+  const workflowStyleKeys = useMemo(
+    () => (styleTabs ?? []).map((tab) => tab.key),
+    [styleTabs],
+  );
+
+  const allWorkflowMediationsGenerated = useMemo(
+    () =>
+      areAllPlanMediationsGenerated({
+        descriptionsByLang,
+        langs: effectivePlanGenerationLangs,
+        styleKeys: workflowStyleKeys,
+      }),
+    [descriptionsByLang, effectivePlanGenerationLangs, workflowStyleKeys],
+  );
+
+  const workflowMediationBlocked =
+    allWorkflowMediationsGenerated && !workflowMediationUnlock;
+
+  const workflowAudioBlocked =
+    workflowVoiceFillState.allReady &&
+    workflowVoiceFillState.totalExpected > 0 &&
+    !workflowAudioUnlock;
+
+  const canGenerateMediationsEffective =
+    canGenerateMediations && !workflowMediationBlocked;
+
+  const canAnalyzeImage = experimentalWorkflow
+    ? !isVisitorLocked && coreFieldsComplete && !analyzingImage
+    : !isVisitorLocked && Boolean(imageUrl) && !analyzingImage;
 
   /** Langues accessibles : toutes celles avec texte sauvegardé, sinon la config étape 2. */
   const activeMediationLangs = useMemo(() => {
     const filled = mediationLangsWithContent(descriptionsByLang);
     if (filled.length > 0) return filled;
-    return imageAnalysisDone ? planGenerationLangs : [];
-  }, [planGenerationLangs, descriptionsByLang, imageAnalysisDone]);
+    return imageAnalysisDone ? effectivePlanGenerationLangs : [];
+  }, [effectivePlanGenerationLangs, descriptionsByLang, imageAnalysisDone]);
 
   const activeMediationLangSet = useMemo(
     () => new Set(activeMediationLangs),
@@ -1254,9 +1456,45 @@ export function ArtworkModal({
   }, [activeMediationLangs, activeMediationLangSet, mediationEditLang]);
 
   useEffect(() => {
+    if (!open || !persistedArtworkId || !hasMediations) {
+      setWorkflowVoiceFillState({
+        totalExpected: 0,
+        readyCount: 0,
+        missingCount: 0,
+        inProgressCount: 0,
+        allReady: false,
+      });
+      return;
+    }
+    let cancelled = false;
+    void fetchMediationVoiceFillState({
+      artworkId: persistedArtworkId,
+      personas: (styleTabs ?? []).map((tab) => ({
+        key: tab.key,
+        promptStyleId: tab.promptStyleId,
+      })),
+      languages: activeMediationLangs,
+      descriptionsByLang: descriptionsByLang as Record<string, Record<string, string>>,
+    }).then((state) => {
+      if (!cancelled) setWorkflowVoiceFillState(state);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    persistedArtworkId,
+    hasMediations,
+    styleTabs,
+    activeMediationLangs,
+    descriptionsByLang,
+    audioStatusRefreshKey,
+  ]);
+
+  useEffect(() => {
     if (!open || !openMediationAudioOnLoad || artworkDraftLoading || !persistedArtworkId) return;
-    setMediationAudioDialogOpen(true);
-  }, [open, openMediationAudioOnLoad, artworkDraftLoading, persistedArtworkId]);
+    if (!experimentalWorkflow) setMediationAudioDialogOpen(true);
+  }, [open, openMediationAudioOnLoad, artworkDraftLoading, persistedArtworkId, experimentalWorkflow]);
 
   /** À l’édition : resynchroniser la langue optionnelle si plusieurs langues ont du contenu. */
   useEffect(() => {
@@ -1439,6 +1677,17 @@ export function ArtworkModal({
   }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterialByLang, descriptionsByLang]);
   const hasUnsavedChanges =
     !artworkDraftLoading && currentDraftSignature !== initialDraftSignature;
+
+  const canSaveWorkflow =
+    experimentalWorkflow &&
+    coreFieldsComplete &&
+    (!isEditingExisting || hasUnsavedChanges || !workflowHasSavedOnce);
+  const canGenerateAudioWorkflow =
+    experimentalWorkflow &&
+    Boolean(persistedArtworkId) &&
+    workflowHasSavedOnce &&
+    hasMediations &&
+    !workflowAudioBlocked;
 
   const requestCloseModal = () => {
     if (isAiBusy) return;
@@ -1764,6 +2013,7 @@ export function ArtworkModal({
 
   const handleGenerateMediations = async () => {
     if (isVisitorLocked) return;
+    if (workflowMediationBlocked) return;
     if (!artistId) {
       toast.error(t("toast_error_artist_generate"));
       return;
@@ -1803,7 +2053,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = planGenerationLangs;
+      const langsToGenerate = effectivePlanGenerationLangs;
       const totalSteps = langsToGenerate.length;
       const missingSlots: string[] = [];
 
@@ -1862,6 +2112,17 @@ export function ArtworkModal({
         personas: stylesPayload.length,
         langs: langsToGenerate.map(langCodeForProgress).join(" - "),
       });
+      if (experimentalWorkflow && persistedArtworkId) {
+        await supabase
+          .from("artworks")
+          .update({ artwork_status: "active" } as never)
+          .eq("artwork_id", persistedArtworkId);
+        setWorkflowArtworkStatus("active");
+        const qrUrl = await generateAndSaveQrCode(persistedArtworkId, artworkExpoId.trim() || null);
+        if (qrUrl) {
+          setArtworkQrImageUrl(`${qrUrl}${qrUrl.includes("?") ? "&" : "?"}cb=${Date.now()}`);
+        }
+      }
       setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
       await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {
@@ -1926,7 +2187,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = planGenerationLangs;
+      const langsToGenerate = effectivePlanGenerationLangs;
       for (let i = 0; i < langsToGenerate.length; i++) {
         const lang = langsToGenerate[i];
         const langDetail = t("mediation_progress_lang", {
@@ -1976,6 +2237,17 @@ export function ArtworkModal({
     }
   };
 
+  const agencyLabel = useMemo(() => {
+    const fromOptions = agencyOptions.find((a) => a.id === artworkAgencyId)?.name;
+    return fromOptions ?? resolvedAgencyName ?? t("agency_unknown");
+  }, [agencyOptions, artworkAgencyId, resolvedAgencyName, t]);
+
+  const workflowSourceMaterialPreview =
+    sourceMaterialTextForLang(sourceMaterialByLang, mediationPrimaryLang) ||
+    sourceMaterialForGeneration;
+
+  const nestedTextEditOpen = Boolean(mediationTextEdit) || sourceMaterialEditOpen;
+
   return (
     <>
     <Dialog
@@ -1983,6 +2255,7 @@ export function ArtworkModal({
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           if (isAiBusy || artistDialogOpen) return;
+          if (nestedTextEditOpen) return;
           if (hasUnsavedChanges) {
             setShowCloseConfirm(true);
             return;
@@ -1993,6 +2266,10 @@ export function ArtworkModal({
     >
       <DialogContent
         onEscapeKeyDown={(e) => {
+          if (nestedTextEditOpen) {
+            e.preventDefault();
+            return;
+          }
           if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
             if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
@@ -2001,6 +2278,10 @@ export function ArtworkModal({
           }
         }}
         onPointerDownOutside={(e) => {
+          if (nestedTextEditOpen) {
+            e.preventDefault();
+            return;
+          }
           if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
             if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
@@ -2009,6 +2290,10 @@ export function ArtworkModal({
           }
         }}
         onInteractOutside={(e) => {
+          if (nestedTextEditOpen) {
+            e.preventDefault();
+            return;
+          }
           if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
             if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
@@ -2017,10 +2302,145 @@ export function ArtworkModal({
           }
         }}
         className={cn(
-          "max-w-3xl w-[96vw] max-h-[92vh] overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl",
-          "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]",
+          experimentalWorkflow
+            ? "fixed left-1/2 top-1/2 z-50 flex h-[730px] max-h-[min(730px,100dvh)] w-[min(100vw-1rem,42rem)] max-w-none -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border p-0"
+            : "max-w-3xl w-[96vw] max-h-[92vh] overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl",
+          "bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] shadow-xl",
         )}
       >
+        {experimentalWorkflow ? (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <ArtworkModalWorkflowLayout
+              t={t}
+              isEditingExisting={isEditingExisting}
+              title={title}
+              onTitleChange={setTitle}
+              agencyLabel={agencyLabel}
+              canPickAgency={canPickAgency}
+              agencyOptions={agencyOptions}
+              artworkAgencyId={artworkAgencyId}
+              onAgencyChange={(id) => {
+                setArtworkAgencyId(id);
+                setArtworkExpoId("");
+              }}
+              artworkAgencyOpen={artworkAgencyOpen}
+              onAgencyOpenChange={setArtworkAgencyOpen}
+              expoOptions={expoOptions}
+              artworkExpoId={artworkExpoId}
+              onExpoChange={setArtworkExpoId}
+              artworkExpoOpen={artworkExpoOpen}
+              onExpoOpenChange={setArtworkExpoOpen}
+              canManageExpoLink={canManageExpoLink}
+              artistSearch={artistSearch}
+              onArtistSearchChange={setArtistSearch}
+              showArtistSuggestions={showArtistSuggestions}
+              onArtistSuggestionsOpen={setShowArtistSuggestions}
+              selectedArtistDisplay={selectedArtistDisplay}
+              filteredArtists={filteredArtists}
+              artistId={artistId}
+              onSelectArtist={(id, label) => {
+                setArtistId(id);
+                setArtistSearch(label);
+                setShowArtistSuggestions(false);
+              }}
+              onOpenCreateArtist={() => {
+                setShowArtistSuggestions(false);
+                setArtistDialogOpen(true);
+              }}
+              imageUrl={imageUrl}
+              uploadingImage={uploadingImage}
+              onUploadImage={(file) => void uploadArtworkImage(file)}
+              artworkQrImageUrl={artworkQrImageUrl}
+              coreFieldsComplete={coreFieldsComplete}
+              imageAnalysisDone={imageAnalysisDone}
+              hasMediations={hasMediations}
+              workflowHasSavedOnce={workflowHasSavedOnce}
+              isVisitorLocked={isVisitorLocked}
+              isLoading={isLoading}
+              isSubmitting={isSubmitting}
+              isAiBusy={isAiBusy}
+              canSave={Boolean(canSaveWorkflow)}
+              canAnalyze={canAnalyzeImage}
+              canGenerateMediations={canGenerateMediationsEffective}
+              canGenerateAudio={canGenerateAudioWorkflow}
+              mediationGenerationBlocked={workflowMediationBlocked}
+              audioGenerationBlocked={workflowAudioBlocked}
+              canUnlockRegeneration={canUnlockWorkflowRegen}
+              mediationUnlock={workflowMediationUnlock}
+              audioUnlock={workflowAudioUnlock}
+              onUnlockMediationGeneration={() => setWorkflowMediationUnlock(true)}
+              onUnlockAudioGeneration={() => setWorkflowAudioUnlock(true)}
+              voiceFillState={workflowVoiceFillState}
+              audioStatusRefreshKey={audioStatusRefreshKey}
+              analyzingImage={analyzingImage}
+              analyzeProgress={analyzeProgress}
+              analyzeImageError={analyzeImageError}
+              onAnalyze={() => void handleAnalyzeImage()}
+              onSave={() => void handleSave()}
+              onClose={requestCloseModal}
+              onGenerateMediations={() => void handleGenerateMediations()}
+              generatingMediation={generatingMediation}
+              mediationProgress={mediationProgress}
+              sourceMaterialPreview={workflowSourceMaterialPreview}
+              sourceMaterialEditOpen={sourceMaterialEditOpen}
+              onSourceMaterialEditOpenChange={setSourceMaterialEditOpen}
+              onSourceMaterialSave={(value) => {
+                setSourceMaterialByLang((prev) => ({ ...prev, [mediationPrimaryLang]: value }));
+              }}
+              mediationEditLang={mediationEditLang}
+              onMediationLangSelect={(lng) => handleMediationLangSelect(lng)}
+              mediationLangHelp={mediationLangHelp}
+              planMaxMediationLangs={planMaxMediationLangs}
+              mediationPrimaryLang={mediationPrimaryLang}
+              workflowOptionalLangs={workflowOptionalLangs}
+              onWorkflowOptionalLangsChange={setWorkflowOptionalLangs}
+              planAllowsOptionalLang={planAllowsOptionalLang}
+              planEnabledLangSet={effectivePlanEnabledLangSet}
+              mediationLegacyLangs={mediationLegacyLangs}
+              styleTabs={styleTabs ?? []}
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
+              descriptionsByLang={descriptionsByLang}
+              onMediationTextSave={(styleKey, value) => {
+                setDescriptionsByLang((prev) => ({
+                  ...prev,
+                  [mediationEditLang]: {
+                    ...(prev[mediationEditLang] ?? {}),
+                    [styleKey]: value,
+                  },
+                }));
+              }}
+              mediationTextEdit={mediationTextEdit}
+              onMediationTextEditChange={setMediationTextEdit}
+              persistedArtworkId={persistedArtworkId}
+              isEtincellePlan={isEtincellePlan}
+              onOpenPersonaAudio={openPersonaAudioDialog}
+              duplicateArtwork={duplicateArtwork}
+              checkingDuplicate={checkingDuplicate}
+              regeneratingMediationStyleKey={regeneratingMediationStyleKey}
+              onRegenerateMediationForStyle={(key) => void handleRegenerateMediationForStyle(key)}
+              isEditingArtwork={Boolean(artworkId?.trim())}
+              artworkDraftLoading={artworkDraftLoading}
+              artworkStatus={workflowArtworkStatus}
+              hasImageAnalysis={imageAnalysisDone}
+              mediationCount={modalMediationCount}
+              mediationLangsLabel={modalMediationLangsLabel}
+              voiceReadyCount={workflowVoiceFillState.readyCount}
+              voiceExpectedCount={workflowVoiceFillState.totalExpected}
+              voiceLangsLabel={modalVoiceLangsLabel}
+              activeMediationLangs={activeMediationLangs}
+              audioOptimisticCells={audioOptimisticCells}
+              onAudioOptimisticCellDone={(cellKey) =>
+                setAudioOptimisticCells((prev) => prev.filter((key) => key !== cellKey))
+              }
+              onAudioRetryCell={handlePersonaAudioRetryCell}
+              onAudioCancelCell={handlePersonaAudioCancelCell}
+              onFillMissingMediationVoices={handleFillMissingMediationVoices}
+              initialWorkflowTab={openMediationAudioOnLoad ? "audio" : undefined}
+            />
+          </div>
+        ) : (
+          <>
         <DialogTitle className="sr-only">
           {isEditingExisting ? t("title_edit") : t("title_new")}
           {title.trim() ? ` — ${title.trim()}` : ""}
@@ -2408,26 +2828,46 @@ export function ArtworkModal({
             ) : null}
             <div className="relative w-fit max-w-full">
               <WorkflowStepBadge step={3} />
-              <Button
-                type="button"
-                variant="secondary"
-                className="gap-2 border border-amber-300/60 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                disabled={!canGenerateMediations || isLoading}
-                onClick={() => void handleGenerateMediations()}
-              >
-                {generatingMediation ? (
-                  <>
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                    {t("btn_generating")}
-                  </>
-                ) : !imageAnalysisDone ? (
-                  t("btn_waiting_analyze")
-                ) : sourceMaterialForGeneration.trim().length === 0 ? (
-                  t("btn_waiting_notes")
-                ) : (
-                  t("btn_generate")
-                )}
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="gap-2 border border-amber-300/60 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                  disabled={!canGenerateMediationsEffective || isLoading}
+                  onClick={() => void handleGenerateMediations()}
+                >
+                  {generatingMediation ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                      {t("btn_generating")}
+                    </>
+                  ) : !imageAnalysisDone ? (
+                    t("btn_waiting_analyze")
+                  ) : sourceMaterialForGeneration.trim().length === 0 ? (
+                    t("btn_waiting_notes")
+                  ) : (
+                    t("btn_generate")
+                  )}
+                </Button>
+                {workflowMediationBlocked ? (
+                  <div className="max-w-md text-xs font-medium leading-snug text-destructive">
+                    <p>Les textes de médiation ont tous été déjà générés.</p>
+                    <p>Une 2e génération n&apos;est plus possible.</p>
+                    <p>Mais vous pouvez toujours modifier ce texte en cliquant sur le texte.</p>
+                    {canUnlockWorkflowRegen && !workflowMediationUnlock ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 h-7 border-destructive/40 px-2 text-[11px] text-destructive hover:bg-destructive/5"
+                        onClick={() => setWorkflowMediationUnlock(true)}
+                      >
+                        Débloquer une regénération (admin)
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
             {generatingMediation && mediationProgress ? (
               <div className="pt-1">
@@ -2566,29 +3006,6 @@ export function ArtworkModal({
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("dialog_close_title")}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t("dialog_close_desc")}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("btn_no")}</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-red-600 text-white hover:bg-red-700"
-                onClick={() => {
-                  setShowCloseConfirm(false);
-                  onOpenChange(false);
-                }}
-              >
-                {t("btn_yes")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
         <div className="space-y-2">
           <Label>{t("label_mediations")}</Label>
           <div className="flex flex-wrap items-center gap-2">
@@ -2617,6 +3034,19 @@ export function ArtworkModal({
             })}
           </div>
           <p className="text-xs text-muted-foreground">{mediationLangHelp}</p>
+          <WorkflowIaStatusBadges
+            hasImageAnalysis={imageAnalysisDone}
+            mediationCount={modalMediationCount}
+            mediationLangsLabel={modalMediationLangsLabel}
+            voiceReadyCount={workflowVoiceFillState.readyCount}
+            voiceExpectedCount={workflowVoiceFillState.totalExpected}
+            voiceLangsLabel={modalVoiceLangsLabel}
+            onOpenVoices={
+              persistedArtworkId && hasMediations
+                ? () => setMediationAudioDialogOpen(true)
+                : undefined
+            }
+          />
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DescriptionKey)}>
             <TabsList className="grid w-full grid-cols-4 gap-2 rounded-none border-0 bg-transparent p-2 text-amber-900 shadow-none [grid-auto-rows:minmax(0,auto)]">
               {(styleTabs ?? []).map((tab) => (
@@ -2689,26 +3119,50 @@ export function ArtworkModal({
                   ) : null}
                 </div>
                 ) : null}
-                <Textarea
-                  value={(descriptionsByLang?.[mediationEditLang] ?? {})[tab.key] ?? ""}
-                  onChange={(e) =>
-                    setDescriptionsByLang((prev) => ({
-                      ...prev,
-                      [mediationEditLang]: {
-                        ...(prev[mediationEditLang] ?? {}),
-                        [tab.key]: e.target.value,
-                      },
-                    }))
-                  }
-                  disabled={
-                    isVisitorLocked ||
-                    isLoading ||
-                    generatingMediation ||
-                    regeneratingMediationStyleKey !== null
-                  }
-                  className="min-h-[140px] w-full text-sm"
-                  placeholder={t("tab_version_placeholder", { label: placeholderLabel })}
-                />
+                {(() => {
+                  const text = ((descriptionsByLang?.[mediationEditLang] ?? {})[tab.key] ?? "").trim();
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        className={cn(
+                          "min-h-[140px] w-full rounded-md border border-border/60 bg-background px-3 py-2 text-left",
+                          "hover:border-amber-400 hover:bg-amber-50/30",
+                          !text && "text-sm italic text-muted-foreground",
+                        )}
+                        disabled={
+                          isVisitorLocked ||
+                          isLoading ||
+                          generatingMediation ||
+                          regeneratingMediationStyleKey !== null
+                        }
+                        onClick={() =>
+                          setMediationTextEdit({ styleKey: tab.key, label: tab.label })
+                        }
+                      >
+                        {text ? (
+                          <ArtworkWorkflowMarkdown
+                            text={text}
+                            clampPreview
+                            className="text-sm"
+                            verseMode={isVerseMediationStyleKey(tab.key)}
+                          />
+                        ) : (
+                          t("tab_version_placeholder", { label: placeholderLabel })
+                        )}
+                      </button>
+                      {persistedArtworkId && tab.promptStyleId ? (
+                        <WorkflowPersonaVoiceStatus
+                          artworkId={persistedArtworkId}
+                          lang={mediationEditLang}
+                          promptStyleId={tab.promptStyleId}
+                          hasText={Boolean(text)}
+                          refreshKey={audioStatusRefreshKey}
+                        />
+                      ) : null}
+                    </>
+                  );
+                })()}
                 {persistedArtworkId && tab.promptStyleId ? (
                   <div className="mt-2">
                     <AudioPlayer
@@ -2732,10 +3186,35 @@ export function ArtworkModal({
           </Tabs>
         </div>
         </div>
+          </>
+        )}
+
+        <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("dialog_close_title")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("dialog_close_desc")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("btn_no")}</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={() => {
+                  setShowCloseConfirm(false);
+                  onOpenChange(false);
+                }}
+              >
+                {t("btn_yes")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
       </DialogContent>
     </Dialog>
-    {persistedArtworkId ? (
+    {persistedArtworkId && !experimentalWorkflow ? (
       <MediationPersonaAudioDialog
         open={mediationAudioDialogOpen}
         onOpenChange={(next) => {
@@ -2769,6 +3248,31 @@ export function ArtworkModal({
         void handleArtistCreated(createdArtistId);
       }}
     />
+    {!experimentalWorkflow && mediationTextEdit ? (
+      <TextEditModal
+        open
+        onOpenChange={(next) => {
+          if (!next) setMediationTextEdit(null);
+        }}
+        title={`Médiation — ${mediationTextEdit.label}`}
+        description={`Langue : ${mediationEditLang.toUpperCase()}`}
+        value={
+          (descriptionsByLang?.[mediationEditLang] ?? {})[mediationTextEdit.styleKey] ?? ""
+        }
+        onSave={(value) => {
+          setDescriptionsByLang((prev) => ({
+            ...prev,
+            [mediationEditLang]: {
+              ...(prev[mediationEditLang] ?? {}),
+              [mediationTextEdit.styleKey]: value,
+            },
+          }));
+        }}
+        placeholder={t("tab_version_placeholder", { label: mediationTextEdit.label })}
+        editorKind="mediation"
+        contentLang={mediationEditLang}
+      />
+    ) : null}
     </>
   );
 }

@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArtworkModal } from "@/components/ArtworkModal";
+import { ArtworkModalWorkflow } from "@/components/artwork-workflow/ArtworkModalWorkflow";
 import { getArtworkIdsWithPendingAudio, getPendingAudioJobsByLang, subscribeAudioQueue } from "@/services/audioService";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
 import { supabase } from "@/lib/supabase";
@@ -1123,6 +1123,7 @@ const Catalogue = () => {
           const artworkImage = aw.artwork_image_url || aw.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
           const currentStatusRaw = (aw.artwork_status ?? "").trim();
           const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
+          const isArtworkDraft = currentStatusRaw.toLowerCase() === "draft";
           const statusLabel = artworkStatusLabel(currentStatusRaw, t);
           const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
           const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description_i18n);
@@ -1247,7 +1248,7 @@ const Catalogue = () => {
                           type="checkbox"
                           className="h-4 w-4 accent-[#E63946]"
                           checked={isArtworkActive}
-                          disabled={updatingArtworkStatusId === aw.artwork_id}
+                          disabled={updatingArtworkStatusId === aw.artwork_id || isArtworkDraft}
                           onChange={(e) => {
                             void updateArtworkStatus(aw.artwork_id, e.target.checked);
                           }}
@@ -1493,13 +1494,14 @@ const Catalogue = () => {
         }}
       />
 
-      <ArtworkModal
+      <ArtworkModalWorkflow
         open={artworkModalOpen}
         onOpenChange={(next) => {
           setArtworkModalOpen(next);
           if (!next) {
             setVoicesEntryFromCatalogue(false);
             void loadCatalogue();
+            navigate(catalogueFiltersPath(), { replace: true });
           }
         }}
         artworkId={editingArtworkId}

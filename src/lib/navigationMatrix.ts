@@ -47,15 +47,14 @@ export const NAV_MATRIX_MENU_ROWS: { key: NavMatrixCible; label: string; to: str
 export type NavAccessMap = Record<NavMatrixCible, boolean>;
 
 /**
- * Première entrée de menu autorisée pour la matrice courante, sinon `/settings` (hors matrice).
- * Utilisé pour les redirections « route interdite » : évite de cibler `/dashboard` si `menu_home` est faux
- * (sinon boucle infinie avec `<Navigate>`).
+ * Première entrée de menu autorisée pour la matrice courante, sinon `/dashboard` (profil).
+ * `/dashboard` reste toujours accessible (voir `pathnameToNavCible`) pour éviter les boucles.
  */
 export function getBackofficeFallbackPath(access: NavAccessMap): string {
   for (const item of HEADER_NAV_ITEMS) {
     if (access[item.key]) return item.to;
   }
-  return "/settings";
+  return "/dashboard";
 }
 
 /** Entrées de menu principal (header) — utilisé pour détecter une matrice « tout à faux » par erreur. */
@@ -154,7 +153,9 @@ export function mergeNavAccessFromMatriceSecurite(
  */
 export function pathnameToNavCible(pathname: string): NavMatrixCible | null {
   const p = pathname.toLowerCase();
-  if (p === "/organisation" || p === "/dashboard") return "menu_home";
+  // Profil : toujours accessible (page d'accueil backoffice), indépendamment de menu_home.
+  if (p === "/dashboard") return null;
+  if (p === "/organisation") return "menu_home";
   // Configuration : hors matrice navigation — sinon décocher « Organisation » bloque /settings
   // et empêche de corriger la matrice (effet « serpent qui se mord la queue »).
   if (p.startsWith("/settings") || p.startsWith("/setting")) return null;

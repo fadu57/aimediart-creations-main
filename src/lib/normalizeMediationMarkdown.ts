@@ -18,5 +18,8 @@ export function normalizeMediationMarkdownSource(raw: string): string {
     t = t.replace(/^```[\w-]*\s*\n?/gm, "").replace(/\n?```\s*$/gm, "").trim();
   }
 
+  // L'IA insère parfois des lignes vides excessives entre chaque phrase.
+  t = t.replace(/\n{3,}/g, "\n\n");
+
   return t;
 }

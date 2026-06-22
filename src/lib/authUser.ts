@@ -87,14 +87,12 @@ export function isVisitorRole(
   return normalizeRoleName(role_name) === normalizeRoleName(ROLE_VISITEUR);
 }
 
-/** Cible après connexion selon le rôle (admins globaux → /agencies). */
+/** Cible après connexion : tableau de bord profil pour tout le backoffice. */
 export function resolveAuthenticatedHomePath(
   role_name: string | null | undefined,
   role_id: number | null | undefined,
 ): string {
   if (isVisitorRole(role_name, role_id)) return "/scan-work1";
-  if (role_id === 4) return "/expos";
-  if (typeof role_id === "number" && role_id < 4) return "/agencies";
   return "/dashboard";
 }
 
