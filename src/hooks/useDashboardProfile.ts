@@ -225,27 +225,37 @@ async function fetchPricingForPlan(plan: string | null): Promise<{
       monthly_price_eur: null,
     };
   }
-  const { data } = await supabase
-    .from("pricing")
-    .select(
-      "pricing_label,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur",
-    )
-    .eq("pricing_plan", trimmed)
-    .limit(1)
-    .maybeSingle();
+  const pricingSelectTiers = [
+    "pricing_label,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur",
+    "pricing_label,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur",
+  ] as const;
 
-  const row = data as {
+  let row: {
     pricing_label?: string | null;
     pricing_max_oeuvres?: number | null;
+    pricing_max_visitors?: number | null;
     princing_max_visitors?: number | null;
     pricing_is_unlimited?: boolean | null;
     pricing_monthly_ttc_eur?: number | null;
-  } | null;
+  } | null = null;
+
+  for (const select of pricingSelectTiers) {
+    const { data, error } = await supabase
+      .from("pricing")
+      .select(select)
+      .eq("pricing_plan", trimmed)
+      .limit(1)
+      .maybeSingle();
+    if (!error && data) {
+      row = data as typeof row;
+      break;
+    }
+  }
 
   return {
     pricing_label: row?.pricing_label ?? null,
     max_oeuvres: row?.pricing_max_oeuvres ?? null,
-    max_visitors: row?.princing_max_visitors ?? null,
+    max_visitors: row?.pricing_max_visitors ?? row?.princing_max_visitors ?? null,
     is_unlimited: row?.pricing_is_unlimited ?? null,
     monthly_price_eur: row?.pricing_monthly_ttc_eur ?? null,
   };
@@ -321,6 +331,8 @@ type PricingJoinRow = {
 const PRICING_JOIN_SELECTS = [
   "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs, trial_duration_days",
   "pricing_label, display_name, plan_code, pricing_monthly_ttc_eur, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, standby_monthly_price_ttc_eur, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs, trial_duration_days",
+  "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days",
+  "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, trial_duration_days",
 ] as const;
 
 async function fetchPricingJoinByPlanCode(planCode: string | null): Promise<PricingJoinRow | null> {

@@ -81,26 +81,36 @@ export function useOrganisationPlanLimits(agencyId: string | null | undefined): 
           princing_max_visitors?: number | null;
           pricing_is_unlimited?: boolean | null;
           trial_duration_days?: number | null;
+          included_mediation_langs_min?: number | null;
+          included_mediation_langs_max?: number | null;
         } | null = null;
 
+        const pricingSelectTiers = [
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max",
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max",
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days",
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, trial_duration_days",
+        ] as const;
+
+        const loadPricingRow = async (
+          filter: { column: "pricing_id"; value: number } | { column: "plan_code"; value: string },
+        ) => {
+          for (const select of pricingSelectTiers) {
+            const { data, error } = await supabase
+              .from("pricing")
+              .select(select)
+              .eq(filter.column, filter.value)
+              .limit(1)
+              .maybeSingle();
+            if (!error && data) return data as typeof pricing;
+          }
+          return null;
+        };
+
         if (subRow?.pricing_id != null) {
-          const { data } = await supabase
-            .from("pricing")
-            .select(
-              "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, princing_max_visitors, pricing_is_unlimited, trial_duration_days",
-            )
-            .eq("pricing_id", subRow.pricing_id)
-            .maybeSingle();
-          pricing = (data as typeof pricing) ?? null;
+          pricing = await loadPricingRow({ column: "pricing_id", value: subRow.pricing_id });
         } else if (subRow?.plan_code) {
-          const { data } = await supabase
-            .from("pricing")
-            .select(
-              "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, princing_max_visitors, pricing_is_unlimited, trial_duration_days",
-            )
-            .eq("plan_code", subRow.plan_code)
-            .maybeSingle();
-          pricing = (data as typeof pricing) ?? null;
+          pricing = await loadPricingRow({ column: "plan_code", value: subRow.plan_code });
         }
 
         let daysRemaining: number | null = null;
@@ -125,6 +135,8 @@ export function useOrganisationPlanLimits(agencyId: string | null | undefined): 
             plan_code: subRow?.plan_code ?? pricing?.plan_code ?? null,
             pricing_plan: pricing?.pricing_plan ?? pricing?.pricing_label ?? null,
             pricing_label: pricing?.pricing_label ?? null,
+            included_mediation_langs_min: pricing?.included_mediation_langs_min ?? null,
+            included_mediation_langs_max: pricing?.included_mediation_langs_max ?? null,
             max_oeuvres: pricing?.pricing_max_oeuvres ?? null,
             max_visitors: pricing?.pricing_max_visitors ?? pricing?.princing_max_visitors ?? null,
             is_unlimited: pricing?.pricing_is_unlimited ?? null,
