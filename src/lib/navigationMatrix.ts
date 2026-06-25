@@ -53,6 +53,10 @@ export const NAV_MATRIX_SUBPAGE_DEFS = [
   { key: "page_prompts", label: "Prompts IA", to: "/prompts" },
   // Contrôle IA (sous-page /settings)
   { key: "page_controle_ia", label: "Contrôle IA", to: "/settings/controle-ia" },
+  // Documents AIMEDIArt (accordéons de la page /settings)
+  { key: "page_aimediart_legal", label: "AIMEDIArt-Légal", to: "/settings/aimediart-legal" },
+  { key: "page_aimediart_bp", label: "AIMEDIArt-BP", to: "/settings/aimediart-bp" },
+  { key: "page_aimediart_marketing", label: "AIMEDIArt-Marketing", to: "/settings/aimediart-marketing" },
 ] as const;
 
 /** Clés des pages hors menu (Œuvre + sous-pages). */

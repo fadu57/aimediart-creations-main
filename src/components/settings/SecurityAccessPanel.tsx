@@ -49,6 +49,9 @@ const NAV_MATRIX_I18N_KEYS: Record<NavMatrixCible, string> = {
   page_expos2: "nav_entry_page_expos2",
   page_prompts: "nav_entry_page_prompts",
   page_controle_ia: "nav_entry_page_controle_ia",
+  page_aimediart_legal: "nav_entry_page_aimediart_legal",
+  page_aimediart_bp: "nav_entry_page_aimediart_bp",
+  page_aimediart_marketing: "nav_entry_page_aimediart_marketing",
 };
 
 const ROLE_FB_I18N: Partial<Record<number, string>> = {
