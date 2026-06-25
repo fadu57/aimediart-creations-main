@@ -265,6 +265,81 @@ function pickEntities(
   return aggregateFromSummaries(summaries, field, startIso, endIso);
 }
 
+function isCursorEditor(name: string): boolean {
+  return /cursor/i.test(name.trim());
+}
+
+function formatDurationFr(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
+}
+
+function cursorSecondsFromSummaryDay(day: Record<string, unknown>): number {
+  const items = day.editors as WakaEntityInput[] | undefined;
+  let sec = 0;
+  for (const item of items ?? []) {
+    const name = String(item.name ?? "").trim();
+    if (!isCursorEditor(name)) continue;
+    const part = Number(item.total_seconds);
+    if (Number.isFinite(part) && part > 0) sec += part;
+  }
+  return sec;
+}
+
+function buildCursorBlock(
+  summariesRaw: Array<Record<string, unknown>>,
+  daily: Array<{ date: string; seconds: number; hours: number; label: string }>,
+  editors: WakaEntity[],
+  totalCodingSeconds: number,
+  dateFrom: string,
+  dateTo: string,
+): Record<string, unknown> {
+  const cursorDaily = daily.map((d) => {
+    const summary = summariesRaw.find((row) => {
+      const range = row.range as { date?: string } | undefined;
+      return range?.date === d.date;
+    });
+    const seconds = summary ? cursorSecondsFromSummaryDay(summary) : 0;
+    return {
+      date: d.date,
+      seconds,
+      hours: Math.round((seconds / 3600) * 100) / 100,
+      label: formatDurationFr(seconds),
+    };
+  });
+
+  const total_seconds = cursorDaily.reduce((sum, d) => sum + d.seconds, 0)
+    || editors.filter((e) => isCursorEditor(e.name)).reduce((sum, e) => sum + e.total_seconds, 0);
+
+  const spanDays = Math.max(
+    1,
+    Math.round(
+      (new Date(`${dateTo}T12:00:00`).getTime() - new Date(`${dateFrom}T12:00:00`).getTime())
+        / (24 * 3600 * 1000),
+    ) + 1,
+  );
+  const daily_average_seconds = total_seconds / spanDays;
+  const active_days = cursorDaily.filter((d) => d.seconds > 0).length;
+  const editor_names = editors.filter((e) => isCursorEditor(e.name)).map((e) => e.name);
+  const share_percent = totalCodingSeconds > 0
+    ? Math.round((total_seconds / totalCodingSeconds) * 1000) / 10
+    : 0;
+
+  return {
+    total_seconds,
+    human_readable_total: formatDurationFr(total_seconds),
+    share_percent,
+    daily_average_seconds,
+    human_readable_daily_average: formatDurationFr(daily_average_seconds),
+    active_days,
+    daily: cursorDaily,
+    editor_names,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return corsPreflightResponse();
   if (req.method !== "POST") return jsonResponse({ error: "method_not_allowed" }, 405);
@@ -386,6 +461,16 @@ Deno.serve(async (req) => {
       ? daily.find((d) => d.date === dateFrom)
       : null;
 
+    const totalCodingSeconds = Number(statsRange.total_seconds ?? 0);
+    const cursor = buildCursorBlock(
+      summariesRaw,
+      daily,
+      editors,
+      totalCodingSeconds,
+      dateFrom,
+      dateTo,
+    );
+
     return jsonResponse({
       stats: {
         total_seconds: Number(statsRange.total_seconds ?? 0),
@@ -412,6 +497,7 @@ Deno.serve(async (req) => {
       weekdays: computeWeekdays(daily),
       project_timeline: isSingleDay ? buildTimelineRows(heartbeats, "project") : [],
       language_timeline: isSingleDay ? buildTimelineRows(heartbeats, "language") : [],
+      cursor,
       range: { dateFrom, dateTo },
       fetched_at: new Date().toISOString(),
     });

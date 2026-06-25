@@ -94,3 +94,13 @@ entrypoint = "./functions/supabase-db-monitoring/index.ts"
 verify_jwt = true
 entrypoint = "./functions/generate-sponsoring-convention/index.ts"
 static_files = [ "./functions/generate-sponsoring-convention/template.docx" ]
+
+[functions.cursor-git-stats]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/cursor-git-stats/index.ts"
+
+[functions.wakatime-stats]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/wakatime-stats/index.ts"

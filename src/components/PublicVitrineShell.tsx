@@ -310,6 +310,9 @@ function PublicVitrineFooter() {
             </nav>
           </div>
         </div>
+        <p className="mt-2.5 text-center text-[11px] text-neutral-500 sm:text-left">
+          {t("footer.copyright")}
+        </p>
       </div>
     </footer>
   );

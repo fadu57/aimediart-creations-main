@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
+import { ArchiveRestore, ArrowLeft } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -10,6 +10,7 @@ import { useRetentionSettings } from "@/hooks/useRetentionSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import RetentionBadge from "@/components/settings/RetentionBadge";
+import RetentionSettingCard from "@/components/settings/RetentionSettingCard";
 
 type VisitorTrashRow = {
   id: string;
@@ -145,21 +146,6 @@ export default function VisiteursCorbeille() {
     await loadTrash();
   };
 
-  const retentionBanner = useMemo(() => {
-    const entries = [retentionVisitors, retentionProfiles].filter(Boolean);
-    if (entries.length === 0) return null;
-    const auto = entries.find((e) => e?.auto_purge);
-    if (auto) {
-      return (
-        <>
-          Les fiches sont conservées <strong>{auto.retention_days} jours</strong> après archivage.
-          La purge automatique s&apos;exécute chaque nuit à 2h.
-        </>
-      );
-    }
-    return "La purge automatique est désactivée pour cette entité.";
-  }, [retentionVisitors, retentionProfiles]);
-
   if (authLoading) {
     return <p className="text-sm text-muted-foreground px-6 py-8">Chargement…</p>;
   }
@@ -179,12 +165,8 @@ export default function VisiteursCorbeille() {
         </Button>
       </div>
 
-      {retentionBanner && (
-        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{retentionBanner}</span>
-        </div>
-      )}
+      {/* Paramètres de rétention (édition admin) */}
+      <RetentionSettingCard tableNames={["visitors", "profiles"]} roleId={currentRoleId} />
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>

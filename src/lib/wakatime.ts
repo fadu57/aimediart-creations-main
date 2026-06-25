@@ -1,4 +1,9 @@
 import { supabase } from "@/lib/supabase";
+import {
+  cursorSharePercent,
+  filterCursorEditors,
+  sumCursorEditorSeconds,
+} from "@/lib/wakatimeCursor";
 
 export type WakaEntity = { name: string; total_seconds: number };
 
@@ -45,6 +50,17 @@ export type WakaWeekdayPoint = {
   total_seconds: number;
 };
 
+export type WakaCursorBlock = {
+  total_seconds: number;
+  human_readable_total: string;
+  share_percent: number;
+  daily_average_seconds: number;
+  human_readable_daily_average: string;
+  active_days: number;
+  daily: WakaDailyPoint[];
+  editor_names: string[];
+};
+
 export type WakaTimeDashboard = {
   stats: WakaStatsBlock;
   daily: WakaDailyPoint[];
@@ -55,6 +71,7 @@ export type WakaTimeDashboard = {
   weekdays: WakaWeekdayPoint[];
   project_timeline: WakaTimelineRow[];
   language_timeline: WakaTimelineRow[];
+  cursor?: WakaCursorBlock;
   range: { dateFrom: string; dateTo: string };
   fetched_at: string;
 };
@@ -81,6 +98,32 @@ async function parseInvokeError(error: unknown): Promise<string> {
   return "Erreur lors de l'appel WakaTime.";
 }
 
+function buildCursorBlockFallback(dash: WakaTimeDashboard): WakaCursorBlock {
+  const editors = dash.stats?.editors ?? [];
+  const cursorEditors = filterCursorEditors(editors);
+  const total_seconds = sumCursorEditorSeconds(editors);
+  const totalCoding = dash.stats?.total_seconds ?? 0;
+  const spanDays = Math.max(1, dash.daily?.length ?? 1);
+  const daily_average_seconds = total_seconds / spanDays;
+  const daily = (dash.daily ?? []).map((d) => ({
+    date: d.date,
+    seconds: 0,
+    hours: 0,
+    label: formatWakaSeconds(0),
+  }));
+
+  return {
+    total_seconds,
+    human_readable_total: formatWakaSeconds(total_seconds),
+    share_percent: cursorSharePercent(total_seconds, totalCoding),
+    daily_average_seconds,
+    human_readable_daily_average: formatWakaSeconds(daily_average_seconds),
+    active_days: 0,
+    daily,
+    editor_names: cursorEditors.map((e) => e.name),
+  };
+}
+
 export async function fetchWakaTimeDashboard(
   range: { dateFrom: string; dateTo: string },
 ): Promise<{ data: WakaTimeDashboard | null; error: string | null }> {
@@ -100,33 +143,32 @@ export async function fetchWakaTimeDashboard(
     return { data: null, error: msg || "Erreur WakaTime." };
   }
   const dash = payload as WakaTimeDashboard;
-  return {
-    data: {
-      ...dash,
-      stats: dash.stats ?? {
-        total_seconds: 0,
-        human_readable_total: "",
-        daily_average_seconds: 0,
-        human_readable_daily_average: "",
-        best_day: null,
-        range: "",
-        languages: [],
-        projects: [],
-        editors: [],
-      },
-      today: dash.today ?? { total_seconds: 0, human_readable_total: "" },
-      categories: dash.categories?.length ? dash.categories : (dash.stats?.categories ?? []),
-      operating_systems: dash.operating_systems?.length
-        ? dash.operating_systems
-        : (dash.stats?.operating_systems ?? []),
-      machines: dash.machines?.length ? dash.machines : (dash.stats?.machines ?? []),
-      weekdays: dash.weekdays ?? [],
-      project_timeline: dash.project_timeline ?? [],
-      language_timeline: dash.language_timeline ?? [],
-      range: dash.range ?? { dateFrom: range.dateFrom, dateTo: range.dateTo },
+  const normalized: WakaTimeDashboard = {
+    ...dash,
+    stats: dash.stats ?? {
+      total_seconds: 0,
+      human_readable_total: "",
+      daily_average_seconds: 0,
+      human_readable_daily_average: "",
+      best_day: null,
+      range: "",
+      languages: [],
+      projects: [],
+      editors: [],
     },
-    error: null,
+    today: dash.today ?? { total_seconds: 0, human_readable_total: "" },
+    categories: dash.categories?.length ? dash.categories : (dash.stats?.categories ?? []),
+    operating_systems: dash.operating_systems?.length
+      ? dash.operating_systems
+      : (dash.stats?.operating_systems ?? []),
+    machines: dash.machines?.length ? dash.machines : (dash.stats?.machines ?? []),
+    weekdays: dash.weekdays ?? [],
+    project_timeline: dash.project_timeline ?? [],
+    language_timeline: dash.language_timeline ?? [],
+    cursor: dash.cursor ?? buildCursorBlockFallback(dash),
+    range: dash.range ?? { dateFrom: range.dateFrom, dateTo: range.dateTo },
   };
+  return { data: normalized, error: null };
 }
 
 export function formatWakaSeconds(seconds: number): string {

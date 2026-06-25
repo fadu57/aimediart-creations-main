@@ -20,6 +20,12 @@ interface UseRetentionSettingsResult {
 let _cache: RetentionMap | null = null;
 let _fetchPromise: Promise<RetentionMap> | null = null;
 
+/** Invalide le cache (à appeler après une modification des paramètres de rétention). */
+export function invalidateRetentionCache(): void {
+  _cache = null;
+  _fetchPromise = null;
+}
+
 async function fetchRetentionSettings(): Promise<RetentionMap> {
   if (_cache) return _cache;
   if (_fetchPromise) return _fetchPromise;

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import {
-  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 import {
   ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
   Euro, Activity, TrendingUp, Award, RefreshCw, Search, CheckCircle2, XCircle, HelpCircle, History, ExternalLink,
-  ArrowUp, ArrowDown, ArrowUpDown, Database,
+  ArrowUp, ArrowDown, ArrowUpDown, Database, Plus, Paperclip, Trash2, Upload, FileText, Pencil,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -57,6 +60,11 @@ import {
   GOOGLE_TTS_FREE_CHARS_PER_MONTH,
   GOOGLE_TTS_USD_PER_MILLION_CHARS,
 } from "@/lib/ttsCostEstimator";
+import {
+  createManualCost, updateManualCost, deleteManualCost, uploadCostDocument, deleteCostDocument,
+  getCostDocumentSignedUrl, manualCostDocuments, isManualCostEvent, updateCostDocuments,
+  type CostDocument,
+} from "@/lib/manualCosts";
 import { formatTokenCount } from "@/lib/aiTokenUsage";
 import { formatProjectDate, PROJECT_CREATED_DATE } from "@/lib/projectMeta";
 import {
@@ -286,6 +294,20 @@ function frDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/**
+ * Montant en euros formaté pour les labels de barres (ex. « 12,34 € »).
+ * Espaces insécables (séparateur de milliers + avant « € ») pour éviter
+ * que recharts ne renvoie le symbole « € » à la ligne.
+ */
+function formatEurChartLabel(value: unknown): string {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return "";
+  const formatted = n
+    .toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    .replace(/\s/g, "\u00A0");
+  return `${formatted}\u00A0€`;
 }
 
 /** Date ISO (YYYY-MM-DD) → jj/mm pour les axes de graphiques. */
@@ -684,6 +706,591 @@ function ProjectDbActivitySection() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Saisie manuelle de coûts (admins) + documents joints
+// ---------------------------------------------------------------------------
+
+/** Catégories proposées pour une saisie manuelle (tool_type). */
+const MANUAL_COST_TOOL_TYPES = ["infrastructure", "service", "abonnement", "materiel", "other"] as const;
+const MANUAL_COST_CURRENCIES = ["EUR", "USD", "GBP"] as const;
+/** Taille max document (10 Mo) — alignée sur la policy du bucket. */
+const MANUAL_DOC_MAX_BYTES = 10 * 1024 * 1024;
+
+type ManualCostDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+  /** Si fourni : mode édition (formulaire pré-rempli). Sinon : création. */
+  editEvent?: CostEvent | null;
+};
+
+function metaString(meta: Record<string, unknown> | null | undefined, key: string): string {
+  const v = meta?.[key];
+  return typeof v === "string" ? v : "";
+}
+
+function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: ManualCostDialogProps) {
+  const { t } = useTranslation("settings");
+  const inputClass = BACKOFFICE_FORM_CONTROL_CLASS;
+  const isEdit = editEvent != null;
+
+  const [date, setDate] = useState(TODAY);
+  const [label, setLabel] = useState("");
+  const [provider, setProvider] = useState("");
+  const [toolType, setToolType] = useState<string>("service");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState<string>("EUR");
+  const [invoiceRef, setInvoiceRef] = useState("");
+  const [note, setNote] = useState("");
+  /** Nouveaux fichiers à téléverser. */
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  /** Documents déjà en base conservés (état final souhaité). */
+  const [existingDocs, setExistingDocs] = useState<CostDocument[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const reset = useCallback(() => {
+    if (editEvent) {
+      const meta = editEvent.metadata ?? {};
+      setDate(editEvent.created_at.slice(0, 10));
+      setLabel(metaString(meta, "label") || editEvent.operation_name || "");
+      setProvider(editEvent.provider);
+      setToolType(editEvent.tool_type || "service");
+      setAmount(String(editEvent.cost_estimated ?? ""));
+      setCurrency(editEvent.currency || "EUR");
+      setInvoiceRef(metaString(meta, "invoice_ref"));
+      setNote(metaString(meta, "note"));
+      setExistingDocs(manualCostDocuments(meta));
+    } else {
+      setDate(TODAY); setLabel(""); setProvider(""); setToolType("service");
+      setAmount(""); setCurrency("EUR"); setInvoiceRef(""); setNote("");
+      setExistingDocs([]);
+    }
+    setNewFiles([]); setError(null); setSaving(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [editEvent]);
+
+  useEffect(() => {
+    if (open) reset();
+  }, [open, reset]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+    const tooBig = picked.find((f) => f.size > MANUAL_DOC_MAX_BYTES);
+    if (tooBig) {
+      setError(t("couts.manual.error_file_too_big"));
+      return;
+    }
+    setError(null);
+    setNewFiles((prev) => [...prev, ...picked]);
+  };
+
+  const removeNewFile = (idx: number) => {
+    setNewFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeExistingDoc = (path: string) => {
+    setExistingDocs((prev) => prev.filter((d) => d.path !== path));
+  };
+
+  const handleSubmit = async () => {
+    const amountNum = Number(amount.replace(",", "."));
+    if (!label.trim() || !provider.trim()) {
+      setError(t("couts.manual.error_required"));
+      return;
+    }
+    if (!Number.isFinite(amountNum) || amountNum < 0) {
+      setError(t("couts.manual.error_amount"));
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    const originalDocs = editEvent ? manualCostDocuments(editEvent.metadata) : [];
+
+    // Téléverse les nouveaux fichiers
+    const uploaded: CostDocument[] = [];
+    for (const f of newFiles) {
+      const up = await uploadCostDocument(f);
+      if (up.error) {
+        // Rollback des fichiers déjà téléversés dans cette session
+        for (const u of uploaded) await deleteCostDocument(u.path);
+        setSaving(false);
+        setError(t("couts.manual.error_upload", { detail: up.error }));
+        return;
+      }
+      uploaded.push({ path: up.path, name: up.name });
+    }
+
+    const documents: CostDocument[] = [...existingDocs, ...uploaded];
+
+    const payload = {
+      date, label: label.trim(), provider, toolType,
+      amount: amountNum, currency, invoiceRef, note, documents,
+    };
+
+    const { error: saveErr } = isEdit
+      ? await updateManualCost(editEvent.id, payload)
+      : (await createManualCost(payload));
+
+    if (saveErr) {
+      // Rollback des fichiers fraîchement uploadés si l'enregistrement échoue
+      for (const u of uploaded) await deleteCostDocument(u.path);
+      setSaving(false);
+      setError(t("couts.manual.error_save", { detail: saveErr }));
+      return;
+    }
+
+    // Nettoyage : supprime du bucket les documents retirés
+    const keptPaths = new Set(documents.map((d) => d.path));
+    for (const d of originalDocs) {
+      if (!keptPaths.has(d.path)) await deleteCostDocument(d.path);
+    }
+
+    setSaving(false);
+    toast.success(isEdit ? t("couts.manual.updated") : t("couts.manual.saved"));
+    onOpenChange(false);
+    onSaved();
+  };
+
+  const knownToolType = MANUAL_COST_TOOL_TYPES.includes(toolType as (typeof MANUAL_COST_TOOL_TYPES)[number]);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? t("couts.manual.dialog_title_edit") : t("couts.manual.dialog_title")}</DialogTitle>
+          <DialogDescription>{t("couts.manual.dialog_desc")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4 py-1">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="mc-date" className="text-xs">{t("couts.manual.field_date")}</Label>
+              <input
+                id="mc-date" type="date" className={inputClass} value={date} max={TODAY}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="mc-toolType" className="text-xs">{t("couts.manual.field_tooltype")}</Label>
+              <select
+                id="mc-toolType" className={inputClass} value={toolType}
+                onChange={(e) => setToolType(e.target.value)}
+              >
+                {!knownToolType && toolType && <option value={toolType}>{toolType}</option>}
+                {MANUAL_COST_TOOL_TYPES.map((tt) => (
+                  <option key={tt} value={tt}>{t(`couts.manual.tooltype_${tt}`)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mc-label" className="text-xs">{t("couts.manual.field_label")}</Label>
+            <input
+              id="mc-label" type="text" className={inputClass} value={label}
+              placeholder={t("couts.manual.field_label_ph")}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="mc-provider" className="text-xs">{t("couts.manual.field_provider")}</Label>
+              <input
+                id="mc-provider" type="text" className={inputClass} value={provider}
+                placeholder={t("couts.manual.field_provider_ph")}
+                onChange={(e) => setProvider(e.target.value)}
+              />
+            </div>
+            <div className="flex w-full flex-col gap-1.5 sm:w-32">
+              <Label htmlFor="mc-amount" className="text-xs">{t("couts.manual.field_amount")}</Label>
+              <input
+                id="mc-amount" type="text" inputMode="decimal" className={inputClass} value={amount}
+                placeholder="0,00"
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="flex w-full flex-col gap-1.5 sm:w-24">
+              <Label htmlFor="mc-currency" className="text-xs">{t("couts.manual.field_currency")}</Label>
+              <select
+                id="mc-currency" className={inputClass} value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {MANUAL_COST_CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mc-invoice" className="text-xs">{t("couts.manual.field_invoice")}</Label>
+            <input
+              id="mc-invoice" type="text" className={inputClass} value={invoiceRef}
+              placeholder={t("couts.manual.field_invoice_ph")}
+              onChange={(e) => setInvoiceRef(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="mc-note" className="text-xs">{t("couts.manual.field_note")}</Label>
+            <textarea
+              id="mc-note" rows={2} className={cn(inputClass, "resize-none")} value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">{t("couts.manual.field_document")}</Label>
+            <input
+              ref={fileInputRef} type="file" multiple
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls"
+              className="hidden" onChange={handleFileChange}
+            />
+
+            {(existingDocs.length > 0 || newFiles.length > 0) && (
+              <div className="flex flex-col gap-1.5">
+                {existingDocs.map((doc) => (
+                  <div
+                    key={doc.path}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-xs">
+                      <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      <span className="truncate">{doc.name || t("couts.manual.existing_document")}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <CostDocumentButton path={doc.path} />
+                      <button
+                        type="button"
+                        className="inline-flex items-center text-muted-foreground hover:text-red-600"
+                        onClick={() => removeExistingDoc(doc.path)}
+                        aria-label={t("couts.manual.remove_file")}
+                        title={t("couts.manual.remove_file")}
+                      >
+                        <XCircle className="h-4 w-4" aria-hidden />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+                {newFiles.map((f, idx) => (
+                  <div
+                    key={`${f.name}-${idx}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                  >
+                    <span className="flex min-w-0 items-center gap-2 text-xs">
+                      <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      <span className="truncate">{f.name}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-muted-foreground hover:text-red-600"
+                      onClick={() => removeNewFile(idx)}
+                      aria-label={t("couts.manual.remove_file")}
+                      title={t("couts.manual.remove_file")}
+                    >
+                      <XCircle className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              type="button" variant="outline" size="sm" className="w-fit gap-2"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-3.5 w-3.5" aria-hidden />
+              {existingDocs.length > 0 || newFiles.length > 0
+                ? t("couts.manual.btn_add_file")
+                : t("couts.manual.btn_choose_file")}
+            </Button>
+            <span className="text-[11px] text-muted-foreground">{t("couts.manual.document_hint")}</span>
+          </div>
+
+          {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
+            {t("couts.manual.cancel")}
+          </Button>
+          <Button type="button" disabled={saving} className="gap-2" onClick={() => void handleSubmit()}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {isEdit ? t("couts.manual.submit_edit") : t("couts.manual.submit")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Bouton d'ouverture d'un document joint (URL signée à la demande). */
+function CostDocumentButton({ path, title }: { path: string; title?: string }) {
+  const { t } = useTranslation("settings");
+  const [loading, setLoading] = useState(false);
+
+  const handleOpen = async () => {
+    setLoading(true);
+    const url = await getCostDocumentSignedUrl(path);
+    setLoading(false);
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      toast.error(t("couts.manual.error_document_open"));
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleOpen()}
+      className="inline-flex items-center text-primary hover:text-primary/80 disabled:opacity-50"
+      title={title || t("couts.manual.open_document")}
+      aria-label={t("couts.manual.open_document")}
+      disabled={loading}
+    >
+      {loading
+        ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+        : <Paperclip className="h-3.5 w-3.5" aria-hidden />}
+    </button>
+  );
+}
+
+/**
+ * Affiche les documents joints d'un coût dans le tableau :
+ * - 1 document  → trombone (ouverture directe) ;
+ * - N documents → trombone + nombre, avec un menu déroulant pour choisir lequel ouvrir.
+ */
+function CostDocumentsCell({ documents }: { documents: CostDocument[] }) {
+  const { t } = useTranslation("settings");
+  const [loadingPath, setLoadingPath] = useState<string | null>(null);
+
+  const openDoc = async (path: string) => {
+    setLoadingPath(path);
+    const url = await getCostDocumentSignedUrl(path);
+    setLoadingPath(null);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else toast.error(t("couts.manual.error_document_open"));
+  };
+
+  if (documents.length === 0) return null;
+  if (documents.length === 1) {
+    return <CostDocumentButton path={documents[0].path} title={documents[0].name} />;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-0.5 text-primary hover:text-primary/80"
+          title={t("couts.manual.open_documents_count", { count: documents.length })}
+          aria-label={t("couts.manual.open_documents_count", { count: documents.length })}
+        >
+          <Paperclip className="h-3.5 w-3.5" aria-hidden />
+          <span className="text-[10px] font-semibold tabular-nums leading-none">{documents.length}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-w-[280px]">
+        {documents.map((doc) => (
+          <DropdownMenuItem
+            key={doc.path}
+            disabled={loadingPath === doc.path}
+            onSelect={(e) => { e.preventDefault(); void openDoc(doc.path); }}
+            className="gap-2 text-xs"
+          >
+            {loadingPath === doc.path
+              ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+              : <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />}
+            <span className="truncate">{doc.name || doc.path}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+type CostDocumentsDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+  /** Coût concerné (manuel ou automatique). */
+  event: CostEvent | null;
+};
+
+/**
+ * Dialogue dédié à la gestion des pièces jointes d'un coût SANS toucher
+ * aux autres champs — utilisé notamment pour les coûts automatiques (OVH…).
+ */
+function CostDocumentsDialog({ open, onOpenChange, onSaved, event }: CostDocumentsDialogProps) {
+  const { t } = useTranslation("settings");
+  const [existingDocs, setExistingDocs] = useState<CostDocument[]>([]);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setExistingDocs(event ? manualCostDocuments(event.metadata) : []);
+      setNewFiles([]);
+      setError(null);
+      setSaving(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [open, event]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+    if (picked.find((f) => f.size > MANUAL_DOC_MAX_BYTES)) {
+      setError(t("couts.manual.error_file_too_big"));
+      return;
+    }
+    setError(null);
+    setNewFiles((prev) => [...prev, ...picked]);
+  };
+
+  const handleSubmit = async () => {
+    if (!event) return;
+    setSaving(true);
+    setError(null);
+
+    const originalDocs = manualCostDocuments(event.metadata);
+    const uploaded: CostDocument[] = [];
+    for (const f of newFiles) {
+      const up = await uploadCostDocument(f);
+      if (up.error) {
+        for (const u of uploaded) await deleteCostDocument(u.path);
+        setSaving(false);
+        setError(t("couts.manual.error_upload", { detail: up.error }));
+        return;
+      }
+      uploaded.push({ path: up.path, name: up.name });
+    }
+
+    const documents = [...existingDocs, ...uploaded];
+    const { error: saveErr } = await updateCostDocuments(event.id, documents, event.metadata);
+
+    if (saveErr) {
+      for (const u of uploaded) await deleteCostDocument(u.path);
+      setSaving(false);
+      setError(t("couts.manual.error_save", { detail: saveErr }));
+      return;
+    }
+
+    const keptPaths = new Set(documents.map((d) => d.path));
+    for (const d of originalDocs) {
+      if (!keptPaths.has(d.path)) await deleteCostDocument(d.path);
+    }
+
+    setSaving(false);
+    toast.success(t("couts.manual.documents_saved"));
+    onOpenChange(false);
+    onSaved();
+  };
+
+  const title = event
+    ? `${costProviderDisplayName(event.provider)}${event.operation_name ? ` — ${costOperationLabel(event.operation_name, t)}` : ""}`
+    : "";
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("couts.manual.documents_dialog_title")}</DialogTitle>
+          <DialogDescription className="truncate" title={title}>{title}</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-3 py-1">
+          <input
+            ref={fileInputRef} type="file" multiple
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls"
+            className="hidden" onChange={handleFileChange}
+          />
+
+          {(existingDocs.length > 0 || newFiles.length > 0) && (
+            <div className="flex flex-col gap-1.5">
+              {existingDocs.map((doc) => (
+                <div
+                  key={doc.path}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-xs">
+                    <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span className="truncate">{doc.name || t("couts.manual.existing_document")}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <CostDocumentButton path={doc.path} />
+                    <button
+                      type="button"
+                      className="inline-flex items-center text-muted-foreground hover:text-red-600"
+                      onClick={() => setExistingDocs((prev) => prev.filter((d) => d.path !== doc.path))}
+                      aria-label={t("couts.manual.remove_file")}
+                      title={t("couts.manual.remove_file")}
+                    >
+                      <XCircle className="h-4 w-4" aria-hidden />
+                    </button>
+                  </span>
+                </div>
+              ))}
+              {newFiles.map((f, idx) => (
+                <div
+                  key={`${f.name}-${idx}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-xs">
+                    <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                    <span className="truncate">{f.name}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground hover:text-red-600"
+                    onClick={() => setNewFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    aria-label={t("couts.manual.remove_file")}
+                    title={t("couts.manual.remove_file")}
+                  >
+                    <XCircle className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Button
+            type="button" variant="outline" size="sm" className="w-fit gap-2"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-3.5 w-3.5" aria-hidden />
+            {existingDocs.length > 0 || newFiles.length > 0
+              ? t("couts.manual.btn_add_file")
+              : t("couts.manual.btn_choose_file")}
+          </Button>
+          <span className="text-[11px] text-muted-foreground">{t("couts.manual.document_hint")}</span>
+
+          {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
+            {t("couts.manual.cancel")}
+          </Button>
+          <Button type="button" disabled={saving} className="gap-2" onClick={() => void handleSubmit()}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {t("couts.manual.submit_edit")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type CostsTableProps = {
   events: CostEvent[];
   loading: boolean;
@@ -698,6 +1305,11 @@ type CostsTableProps = {
   totals: CostEventsTotals | null;
   loadingTotals: boolean;
   usdEurRate: number | null;
+  isAdmin?: boolean;
+  onAddCost?: () => void;
+  onEditCost?: (event: CostEvent) => void;
+  onAttachCost?: (event: CostEvent) => void;
+  onDeleted?: () => void;
 };
 
 const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[] = [
@@ -737,18 +1349,18 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
   const SortIcon = active ? (sort.ascending ? ArrowUp : ArrowDown) : ArrowUpDown;
 
   return (
-    <th className="px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground">
+    <th className="px-1.5 py-2.5 text-left text-[11px] font-semibold leading-tight text-muted-foreground">
       <button
         type="button"
         onClick={() => onSort(column)}
         className={cn(
-          "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex items-start gap-0.5 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           active && "text-foreground",
         )}
         aria-sort={active ? (sort.ascending ? "ascending" : "descending") : "none"}
       >
         {label}
-        <SortIcon className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "opacity-40")} aria-hidden />
+        <SortIcon className={cn("h-3 w-3 shrink-0", active ? "text-primary" : "opacity-40")} aria-hidden />
       </button>
     </th>
   );
@@ -756,13 +1368,30 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
 
 function CostsTable({
   events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, currency,
-  totals, loadingTotals, usdEurRate,
+  totals, loadingTotals, usdEurRate, isAdmin = false, onAddCost, onEditCost, onAttachCost, onDeleted,
 }: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleSort = (column: CostSortColumn) => {
     onSortChange(nextCostSort(column, sort));
+  };
+
+  const handleDeleteManual = async (e: CostEvent) => {
+    if (!window.confirm(t("couts.manual.confirm_delete"))) return;
+    setDeletingId(e.id);
+    const { error: delErr } = await deleteManualCost(
+      e.id,
+      manualCostDocuments(e.metadata).map((d) => d.path),
+    );
+    setDeletingId(null);
+    if (delErr) {
+      toast.error(t("couts.manual.error_delete", { detail: delErr }));
+      return;
+    }
+    toast.success(t("couts.manual.deleted"));
+    onDeleted?.();
   };
 
   if (error) {
@@ -789,6 +1418,12 @@ function CostsTable({
         <Euro className="h-10 w-10 text-muted-foreground/30 mb-3" aria-hidden />
         <p className="font-medium text-muted-foreground">{t("couts.empty_title")}</p>
         <p className="text-sm text-muted-foreground mt-1">{t("couts.empty_sub")}</p>
+        {isAdmin && onAddCost && (
+          <Button type="button" size="sm" onClick={onAddCost} className="mt-4 gap-2">
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            {t("couts.manual.btn_add")}
+          </Button>
+        )}
       </div>
     );
   }
@@ -799,26 +1434,34 @@ function CostsTable({
         <p className="text-sm text-muted-foreground">
           {total.toLocaleString("fr-FR")} {t("couts.events_count")}
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={onExport} className="gap-2">
-          <Download className="h-3.5 w-3.5" aria-hidden />
-          {t("couts.btn_export_csv")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && onAddCost && (
+            <Button type="button" size="sm" onClick={onAddCost} className="gap-2">
+              <Plus className="h-3.5 w-3.5" aria-hidden />
+              {t("couts.manual.btn_add")}
+            </Button>
+          )}
+          <Button type="button" variant="outline" size="sm" onClick={onExport} className="gap-2">
+            <Download className="h-3.5 w-3.5" aria-hidden />
+            {t("couts.btn_export_csv")}
+          </Button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border/50">
-        <table className="w-full min-w-[900px] table-fixed text-sm">
+        <table className="w-full min-w-[800px] table-fixed text-sm">
           <colgroup>
-            <col className="w-[108px]" />
-            <col className="w-[68px]" />
+            <col className="w-[96px]" />
+            <col className="w-[60px]" />
+            <col className="w-[78px]" />
+            <col className="w-[80px]" />
+            <col className="w-[92px]" />
             <col className="w-[84px]" />
-            <col className="w-[88px]" />
-            <col className="w-[88px]" />
-            <col className="w-[88px]" />
-            <col className="w-[54px]" />
-            <col className="w-[54px]" />
+            <col className="w-[46px]" />
+            <col className="w-[46px]" />
+            <col className="w-[44px]" />
             <col className="w-[56px]" />
-            <col className="w-[64px]" />
-            <col className="w-[100px]" />
+            <col className="w-[92px]" />
           </colgroup>
           <thead>
             <tr className="border-b border-border/50 bg-muted/40">
@@ -846,7 +1489,7 @@ function CostsTable({
                 return (
                   <th
                     key={labelKey}
-                    className="px-2 py-2.5 text-left text-xs font-semibold text-muted-foreground"
+                    className="px-1.5 py-2.5 text-left text-[11px] font-semibold leading-tight text-muted-foreground"
                   >
                     {t(labelKey)}
                   </th>
@@ -916,8 +1559,47 @@ function CostsTable({
                 </td>
                 <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight">{e.unit_type ?? "—"}</td>
                 <td className="px-2 py-1 truncate leading-tight">{statusBadge(e.status, costEventStatusLabel(e.status, t))}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight" title={e.source ?? undefined}>
-                  {e.source ?? "—"}
+                <td className="px-2 py-1 text-[11px] text-muted-foreground leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate" title={e.source ?? undefined}>{e.source ?? "—"}</span>
+                    <CostDocumentsCell documents={manualCostDocuments(e.metadata)} />
+                    {isAdmin && !isManualCostEvent(e) && onAttachCost && (
+                      <button
+                        type="button"
+                        onClick={() => onAttachCost(e)}
+                        className="inline-flex items-center text-muted-foreground hover:text-primary"
+                        title={t("couts.manual.attach_documents")}
+                        aria-label={t("couts.manual.attach_documents")}
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
+                    {isAdmin && isManualCostEvent(e) && onEditCost && (
+                      <button
+                        type="button"
+                        onClick={() => onEditCost(e)}
+                        className="inline-flex items-center text-muted-foreground hover:text-primary"
+                        title={t("couts.manual.edit")}
+                        aria-label={t("couts.manual.edit")}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
+                    {isAdmin && isManualCostEvent(e) && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteManual(e)}
+                        disabled={deletingId === e.id}
+                        className="inline-flex items-center text-muted-foreground hover:text-red-600 disabled:opacity-50"
+                        title={t("couts.manual.delete")}
+                        aria-label={t("couts.manual.delete")}
+                      >
+                        {deletingId === e.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          : <Trash2 className="h-3.5 w-3.5" aria-hidden />}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -2376,8 +3058,13 @@ function ProvidersSection({ onCostsRefresh, showOpenAiTtsReconciliation = false 
 
 export default function SettingsCouts() {
   const { t } = useTranslation("settings");
-  const { role_id } = useAuthUser();
+  const { role_id, global_role_id } = useAuthUser();
   const showOpenAiTtsReconciliation = role_id === 1;
+  /** Saisie manuelle des coûts réservée aux admins globaux (role_id 1-2). */
+  const isCostAdmin = global_role_id === 1 || global_role_id === 2;
+  const [manualCostOpen, setManualCostOpen] = useState(false);
+  const [editCostEvent, setEditCostEvent] = useState<CostEvent | null>(null);
+  const [attachCostEvent, setAttachCostEvent] = useState<CostEvent | null>(null);
 
   // ---- State ----
   const [filters, setFilters] = useState<CostFilters>(EMPTY_FILTERS);
@@ -2554,15 +3241,20 @@ export default function SettingsCouts() {
   }, [summary, currency, isUsd, usdEurRate, fxSub, t]);
 
   // ---- Chart data ----
+  // Montant converti en euros (les barres affichent le coût en €, 2 décimales).
+  const toEur = (v: number) => (isUsd && usdEurRate ? v * usdEurRate : v);
+
   const providerChartData = byProvider.slice(0, 8).map((item) => ({
     name: item.label,
     coût: parseFloat(item.totalCost.toFixed(6)),
+    eur: toEur(item.totalCost),
     appels: item.callCount,
   }));
 
   const timeSeriesChartData = timeSeries.slice(-60).map((p) => ({
     date: chartDateFr(p.date),
     coût: parseFloat(p.totalCost.toFixed(6)),
+    eur: toEur(p.totalCost),
     appels: p.callCount,
   }));
 
@@ -2640,16 +3332,25 @@ export default function SettingsCouts() {
                 {t("settings_no_data")}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={timeSeriesChartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={timeSeriesChartData} margin={{ top: 48, right: 28, bottom: 4, left: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={48} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip
-                    formatter={(value: number) => [`${value} ${currency}`, "Coût"]}
+                    formatter={(_value: number, _name, item) => [formatEurChartLabel(item?.payload?.eur), "Coût"]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Bar dataKey="coût" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                  <Bar dataKey="coût" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                    <LabelList
+                      dataKey="eur"
+                      position="top"
+                      angle={-45}
+                      offset={12}
+                      formatter={formatEurChartLabel}
+                      style={{ fontSize: 9, fill: "hsl(var(--foreground))", textAnchor: "start" }}
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -2671,22 +3372,28 @@ export default function SettingsCouts() {
                 {t("settings_no_data")}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={providerChartData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 40 }}>
+              <ResponsiveContainer width="100%" height={Math.max(200, providerChartData.length * 34 + 40)}>
+                <BarChart data={providerChartData} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={60} />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={110} interval={0} />
                   <Tooltip
-                    formatter={(value: number) => [`${value} ${currency}`, "Coût"]}
+                    formatter={(_value: number, _name, item) => [formatEurChartLabel(item?.payload?.eur), "Coût"]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Bar dataKey="coût" radius={[0, 3, 3, 0]} maxBarSize={20}>
+                  <Bar dataKey="coût" radius={[0, 3, 3, 0]} maxBarSize={22}>
                     {providerChartData.map((entry, index) => (
                       <Cell
                         key={entry.name}
                         fill={costProviderChartColor(entry.name, index)}
                       />
                     ))}
+                    <LabelList
+                      dataKey="eur"
+                      position="right"
+                      formatter={formatEurChartLabel}
+                      style={{ fontSize: 9, fill: "hsl(var(--foreground))" }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -2715,6 +3422,11 @@ export default function SettingsCouts() {
             totals={eventsTotals}
             loadingTotals={loadingEventsTotals}
             usdEurRate={usdEurRate}
+            isAdmin={isCostAdmin}
+            onAddCost={() => { setEditCostEvent(null); setManualCostOpen(true); }}
+            onEditCost={(ev) => { setEditCostEvent(ev); setManualCostOpen(true); }}
+            onAttachCost={(ev) => setAttachCostEvent(ev)}
+            onDeleted={refreshCostData}
           />
         </CardContent>
       </Card>
@@ -2727,6 +3439,24 @@ export default function SettingsCouts() {
         onCostsRefresh={refreshCostData}
         showOpenAiTtsReconciliation={showOpenAiTtsReconciliation}
       />
+
+      {isCostAdmin && (
+        <ManualCostDialog
+          open={manualCostOpen}
+          onOpenChange={(o) => { setManualCostOpen(o); if (!o) setEditCostEvent(null); }}
+          onSaved={refreshCostData}
+          editEvent={editCostEvent}
+        />
+      )}
+
+      {isCostAdmin && (
+        <CostDocumentsDialog
+          open={attachCostEvent != null}
+          onOpenChange={(o) => { if (!o) setAttachCostEvent(null); }}
+          onSaved={refreshCostData}
+          event={attachCostEvent}
+        />
+      )}
     </div>
   );
 }

@@ -4,12 +4,15 @@ import {
   AlertTriangle,
   ArchiveRestore,
   BarChart3,
+  BrainCircuit,
   ChevronDown,
   Clock,
   Coins,
   Database,
   Euro,
   Settings,
+  Shield,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +33,15 @@ import {
 import { SETTINGS_TRASH_MENU_LINKS } from "@/lib/trashMenuLinks";
 import { cn } from "@/lib/utils";
 
+/** Page « Accès » (matrice des droits) — réservée aux admins (rôles 1-3). */
+const ACCES_LINK = { to: "/settings/acces", labelKey: "settings_submenu_acces", Icon: Shield } as const;
+
+/** Sous-menu « IA » : Prompts + Contrôle — réservé aux admins (rôles 1-3). */
+const IA_LINKS = [
+  { to: "/settings/prompts-ia", labelKey: "settings_submenu_ia_prompts", Icon: BrainCircuit },
+  { to: "/settings/controle-ia", labelKey: "settings_submenu_ia_controle", Icon: Sparkles },
+] as const;
+
 const SUIVI_LINKS = [
   { to: "/settings/couts", labelKey: "settings_submenu_couts", Icon: Euro },
   { to: "/suivi_tokens", labelKey: "settings_submenu_suivi_tokens", Icon: Coins },
@@ -48,7 +60,7 @@ const ONLINE_PRESENCE_LINK = {
   Icon: Users,
 } as const;
 
-type FabSection = "suivis" | "errors" | "trash";
+type FabSection = "ia" | "suivis" | "errors" | "trash";
 
 type SettingsMenuDropdownProps = {
   triggerClassName?: string;
@@ -57,10 +69,12 @@ type SettingsMenuDropdownProps = {
 };
 
 function resolveInitialFabSection(
+  iaActive: boolean,
   suiviActive: boolean,
   errorLogsActive: boolean,
   trashActive: boolean,
 ): FabSection | null {
+  if (iaActive) return "ia";
   if (suiviActive) return "suivis";
   if (errorLogsActive) return "errors";
   if (trashActive) return "trash";
@@ -81,17 +95,21 @@ export function SettingsMenuDropdown({
   const location = useLocation();
   const { role_id } = useAuthUser();
   const showOnlinePresence = role_id === 1;
+  const showConfigLinks = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
 
+  const accesActive = location.pathname.startsWith(ACCES_LINK.to);
+  const iaActive = IA_LINKS.some((link) => location.pathname.startsWith(link.to));
+  const configActive = accesActive || iaActive;
   const suiviActive =
     SUIVI_LINKS.some((link) => location.pathname.startsWith(link.to)) ||
     (showOnlinePresence && location.pathname.startsWith(ONLINE_PRESENCE_LINK.to));
   const errorLogsActive = ERROR_LOG_LINKS.some((link) => location.pathname.startsWith(link.to));
   const trashActive = SETTINGS_TRASH_MENU_LINKS.some((link) => location.pathname.startsWith(link.to));
   const paramsActive = location.pathname === "/settings";
-  const menuActive = paramsActive || suiviActive || errorLogsActive || trashActive;
+  const menuActive = paramsActive || configActive || suiviActive || errorLogsActive || trashActive;
 
   const [openFabSection, setOpenFabSection] = useState<FabSection | null>(() =>
-    resolveInitialFabSection(suiviActive, errorLogsActive, trashActive),
+    resolveInitialFabSection(iaActive, suiviActive, errorLogsActive, trashActive),
   );
 
   const toggleFabSection = (section: FabSection) => {
@@ -116,6 +134,48 @@ export function SettingsMenuDropdown({
           <Settings className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span>{t("settings_submenu_params")}</span>
         </NavLink>
+
+        {showConfigLinks && (
+          <>
+            <NavLink
+              to={ACCES_LINK.to}
+              className={cn(fabRowClass, accesActive && "font-medium text-[#E63946]")}
+              onClick={handleFabNavigate}
+            >
+              <ACCES_LINK.Icon className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+              <span>{t(ACCES_LINK.labelKey)}</span>
+            </NavLink>
+
+            <button
+              type="button"
+              className={cn(fabRowClass, iaActive && "text-[#E63946]")}
+              aria-expanded={openFabSection === "ia"}
+              onClick={() => toggleFabSection("ia")}
+            >
+              <BrainCircuit className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+              <span className="flex-1">{t("settings_submenu_ia")}</span>
+              <ChevronDown
+                className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "ia" && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+            {openFabSection === "ia" && (
+              <div className="flex flex-col gap-0.5 pb-1">
+                {IA_LINKS.map(({ to, labelKey, Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={cn(fabSubLinkClass, location.pathname.startsWith(to) && "font-medium text-[#E63946]")}
+                    onClick={handleFabNavigate}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-[#121212]" aria-hidden />
+                    {t(labelKey)}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
         <button
           type="button"
@@ -252,6 +312,45 @@ export function SettingsMenuDropdown({
             {t("settings_submenu_params")}
           </Link>
         </DropdownMenuItem>
+
+        {showConfigLinks && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link
+                to={ACCES_LINK.to}
+                className={cn("flex items-center gap-2", accesActive && "font-medium text-[#E63946]")}
+              >
+                <ACCES_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
+                {t(ACCES_LINK.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                className={cn("flex items-center gap-2", iaActive && "text-[#E63946] focus:text-[#E63946]")}
+              >
+                <BrainCircuit className="h-4 w-4 opacity-70" aria-hidden />
+                {t("settings_submenu_ia")}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {IA_LINKS.map(({ to, labelKey, Icon }) => (
+                  <DropdownMenuItem key={to} asChild>
+                    <Link
+                      to={to}
+                      className={cn(
+                        "flex items-center gap-2",
+                        location.pathname.startsWith(to) && "font-medium text-[#E63946]",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 opacity-70" aria-hidden />
+                      {t(labelKey)}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        )}
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger

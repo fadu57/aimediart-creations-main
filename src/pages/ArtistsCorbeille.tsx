@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { ArchiveRestore, ArrowLeft, Info } from "lucide-react";
+import { ArchiveRestore, ArrowLeft } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { useAuthUser } from "@/hooks/useAuthUser";
@@ -11,6 +11,7 @@ import { useRetentionSettings } from "@/hooks/useRetentionSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import RetentionBadge from "@/components/settings/RetentionBadge";
+import RetentionSettingCard from "@/components/settings/RetentionSettingCard";
 
 type ArtistRow = {
   artist_id: string;
@@ -113,17 +114,8 @@ export default function ArtistsCorbeille() {
         </Button>
       </div>
 
-      {/* Bandeau d'information rétention */}
-      {retentionEntry && (
-        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            {retentionEntry.auto_purge
-              ? <>Les fiches sont conservées <strong>{retentionEntry.retention_days} jours</strong> après archivage. La purge automatique s'exécute chaque nuit à 2h.</>
-              : "La purge automatique est désactivée pour cette entité."}
-          </span>
-        </div>
-      )}
+      {/* Paramètres de rétention (édition admin) */}
+      <RetentionSettingCard tableNames={["artists"]} roleId={role_id} />
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>

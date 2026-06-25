@@ -15,6 +15,9 @@ export const CatalogueCorbeille = lazy(() => import("@/pages/CatalogueCorbeille"
 export const Statistics = lazy(() => import("@/pages/Statistics"));
 export const SettingsPage = lazy(() => import("@/pages/Settings"));
 export const SettingsCouts = lazy(() => import("@/pages/SettingsCouts"));
+export const SettingsAcces = lazy(() => import("@/pages/SettingsAcces"));
+export const SettingsPromptsIa = lazy(() => import("@/pages/SettingsPromptsIa"));
+export const SettingsControleIa = lazy(() => import("@/pages/SettingsControleIa"));
 export const SettingsSuiviTemps = lazy(() => import("@/pages/SettingsSuiviTemps"));
 export const SettingsSupabaseMonitoring = lazy(() => import("@/pages/SettingsSupabaseMonitoring"));
 export const SettingsSuiviTokens = lazy(() => import("@/pages/SettingsSuiviTokens"));

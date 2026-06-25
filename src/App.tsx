@@ -297,6 +297,9 @@ const AppRoutes = () => (
           <Route path="statistiques" element={<Pages.Statistics />} />
           <Route path="settings" element={<Pages.SettingsPage />} />
           <Route path="settings/couts" element={<Pages.SettingsCouts />} />
+          <Route path="settings/acces" element={<Pages.SettingsAcces />} />
+          <Route path="settings/prompts-ia" element={<Pages.SettingsPromptsIa />} />
+          <Route path="settings/controle-ia" element={<Pages.SettingsControleIa />} />
           <Route path="suivi_temps" element={<Pages.SettingsSuiviTemps />} />
           <Route path="suivi_supabase" element={<Pages.SettingsSupabaseMonitoring />} />
           <Route path="suivi_vercel" element={<Navigate to="/settings" replace />} />

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw } from "lucide-react";
 
 import { WakaTimeDashboardCharts } from "@/components/settings/WakaTimeDashboardCharts";
+import { CursorGitFilesPanel } from "@/components/settings/CursorGitFilesPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import {
   formatWakaSeconds,
   type WakaTimeDashboard,
 } from "@/lib/wakatime";
+import { fetchCursorGitStats, type CursorGitStats } from "@/lib/cursorGitStats";
 import {
   formatWakaPeriodDate,
   DEFAULT_WAKA_PERIOD,
@@ -40,8 +42,11 @@ export default function SettingsSuiviTemps() {
   const [period, setPeriod] = useState<WakaPeriod>(DEFAULT_WAKA_PERIOD);
   const [periodOffset, setPeriodOffset] = useState(0);
   const [data, setData] = useState<WakaTimeDashboard | null>(null);
+  const [gitData, setGitData] = useState<CursorGitStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gitLoading, setGitLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gitError, setGitError] = useState<string | null>(null);
 
   const range = useMemo(
     () => getWakaPeriodRange(period, periodOffset),
@@ -57,18 +62,32 @@ export default function SettingsSuiviTemps() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setGitLoading(true);
     setError(null);
-    const { data: dash, error: err } = await fetchWakaTimeDashboard({
-      dateFrom: range.dateFrom,
-      dateTo: range.dateTo,
-    });
+    setGitError(null);
+
+    const rangeParams = { dateFrom: range.dateFrom, dateTo: range.dateTo };
+    const [wakaResult, gitResult] = await Promise.all([
+      fetchWakaTimeDashboard(rangeParams),
+      fetchCursorGitStats(rangeParams),
+    ]);
+
     setLoading(false);
-    if (err) {
-      setError(err);
+    setGitLoading(false);
+
+    if (wakaResult.error) {
+      setError(wakaResult.error);
       setData(null);
-      return;
+    } else {
+      setData(wakaResult.data);
     }
-    setData(dash);
+
+    if (gitResult.error) {
+      setGitError(gitResult.error);
+      setGitData(null);
+    } else {
+      setGitData(gitResult.data);
+    }
   }, [range.dateFrom, range.dateTo]);
 
   useEffect(() => {
@@ -158,7 +177,7 @@ export default function SettingsSuiviTemps() {
           variant="outline"
           size="sm"
           className="gap-2 shrink-0"
-          disabled={loading}
+          disabled={loading || gitLoading}
           onClick={() => void load()}
         >
           {loading
@@ -239,12 +258,22 @@ export default function SettingsSuiviTemps() {
         </Alert>
       )}
 
-      {loading && !data ? (
+      {loading && !data && gitLoading && !gitData ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : data ? (
+      ) : (
         <>
+          <CursorGitFilesPanel
+            stats={gitData}
+            loading={gitLoading}
+            error={gitError}
+            cursor={data?.cursor ?? null}
+            cursorLoading={loading}
+          />
+
+          {data ? (
+            <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
               <Card key={kpi.label} className="glass-card">
@@ -258,8 +287,10 @@ export default function SettingsSuiviTemps() {
           </div>
 
           <WakaTimeDashboardCharts data={data} t={t} />
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </div>
   );
 }
