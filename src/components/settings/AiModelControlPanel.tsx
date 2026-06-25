@@ -652,7 +652,7 @@ export function AiModelControlPanel({ appSettingsRows, onRefreshRows }: AiModelC
         </p>
       )}
 
-      <div className="w-full max-w-[1084px] mx-auto overflow-hidden rounded-md border border-border/50 bg-background/80">
+      <div className="w-full max-w-[1084px] mx-auto overflow-hidden rounded-md border border-black/50 bg-background/80">
         <table className="w-full min-w-0 table-fixed border-collapse text-xs">
           <colgroup>
             <col className="w-[23%]" />
