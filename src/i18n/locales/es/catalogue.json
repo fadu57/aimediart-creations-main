@@ -29,10 +29,8 @@
   "expo_move_confirm_no": "Cancelar",
   "expo_move_undo": "Deshacer traslado",
   "expo_move_undo_aria": "Volver a la exposición anterior",
-
   "error_artist_join": "Unión con artistas no disponible ({{message}}). Mostrando alternativa.",
   "error_status_update": "No se puede actualizar el estado: {{message}}",
-
   "qr_error_no_url": "No se puede construir la URL del QR.",
   "qr_success": "Código QR generado y guardado.",
   "qr_error_generate": "Error al generar el código QR.",
@@ -48,7 +46,6 @@
   "qr_confirm_description": "Cualquier código QR ya impreso o exhibido para esta obra deberá ser reemplazado para que los visitantes puedan acceder a ella.",
   "qr_confirm_action": "Regenerar de todas formas",
   "qr_confirm_cancel": "Cancelar",
-
   "qr_bulk_regenerate_btn": "Regenerar todos los QR",
   "qr_bulk_regenerate_title": "Regenerar todos los códigos QR del catálogo",
   "qr_bulk_confirm_title": "¿Regenerar todos los códigos QR?",
@@ -58,7 +55,6 @@
   "qr_bulk_progress": "{{done}} / {{total}}",
   "qr_bulk_success": "{{count}} códigos QR regenerados con éxito.",
   "qr_bulk_partial": "{{success}} QR regenerados, {{error}} error(es).",
-
   "pdf_error_no_id": "Identificador de la obra no disponible.",
   "pdf_error_no_qr_url": "No se puede construir la URL QR para esta obra.",
   "pdf_error_generate": "No se puede generar el cartel PDF.",
@@ -68,7 +64,6 @@
   "pdf_explore_single_scan_line2": "con el asistente del artista",
   "pdf_explore_same_artist_line1": "Explora las obras del artista",
   "pdf_explore_same_artist_line2": "con su asistente",
-
   "pdf_format_dialog_title": "Formato del cartel",
   "pdf_format_dialog_desc": "Elija el formato de impresión y la orientación del cartel.",
   "pdf_format_dialog_desc_named": "Elija el formato de impresión para « {{title}} ».",
@@ -87,7 +82,6 @@
   "pdf_duplex_screen_hint": "Puede imprimir un 2.º cartel en la misma hoja: voltee la hoja en la impresora e imprima este 2.º cartel en la zona en blanco.",
   "pdf_format_confirm": "Generar PDF",
   "pdf_format_cancel": "Cancelar",
-
   "badge_ia_image_yes": "Imagen analizada: Sí",
   "badge_ia_image_no": "Imagen analizada: No",
   "badge_ia_mediation_zero": "Mediaciones generadas: 0",
@@ -102,14 +96,12 @@
   "badge_ia_voice_generating_partial": "Voces generadas: {{ready}}/{{expected}} · en curso ({{langs}})",
   "badge_ia_voice_open_aria": "Abrir seguimiento de voces generadas",
   "badge_ia_voice_generating_aria": "Generación de voces en curso — abrir seguimiento",
-
   "scope_agency_hint": "Exposiciones de la agencia {{agencyId}}.",
   "scope_expo_hint": "Solo exposición {{expoId}}.",
   "status_empty": "vacío",
   "status_active": "Activo",
   "status_inactive": "Inactivo",
   "status_draft": "Borrador",
-
   "tableau_title": "Catálogo — Tabla completa",
   "tableau_back": "Volver",
   "tableau_corbeille": "Papelera",
@@ -128,5 +120,6 @@
   "tableau_warning": "ATENCIÓN - La eliminación es definitiva. Elimine con el máximo discernimiento, de lo contrario arriesga problemas con su aplicación",
   "tableau_cancel": "Cancelar",
   "tableau_confirm": "Eliminar",
-  "tableau_archiving": "Archivando..."
+  "tableau_archiving": "Archivando...",
+  "qr_bulk_warn_no_expo": "{{count}} obra(s) sin exposición asignada — su código QR no incluirá el contexto de la exposición (el visitante verá la obra pero no podrá navegar por la exposición)."
 }

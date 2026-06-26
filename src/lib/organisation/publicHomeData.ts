@@ -30,6 +30,7 @@ export type PricingRow = {
   included_audio_langs: number | null;
   trial_duration_days: number | null;
   is_quote_only: boolean | null;
+  sort_order: number | null;
   pricing_options: PricingOptionRow[];
 };
 
@@ -40,10 +41,10 @@ export type PublicHomeInitialData = {
 
 /** Requêtes du plus riche au plus compatible (évite HTTP 400 si migration partielle). */
 const PRICING_SELECT_TIERS = [
-  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only,pricing_options(option_code,unit_price_ttc_eur)",
-  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only",
-  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
-  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel",
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only,sort_order,pricing_options(option_code,unit_price_ttc_eur)",
+  "pricing_label,pricing_plan,plan_code,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,standby_monthly_price_ttc_eur,included_mediation_langs_min,included_mediation_langs_max,included_audio_langs,trial_duration_days,is_quote_only,sort_order",
+  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,pricing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,sort_order",
+  "pricing_label,pricing_plan,pricing_id,pricing_max_oeuvres,princing_max_visitors,pricing_is_unlimited,pricing_monthly_ttc_eur,pricing_annuel,pricing_annual_remis,éco_annuel,sort_order",
 ] as const;
 
 /** Requêtes ciblées page engagement (sans jointure pricing_options). */
@@ -92,12 +93,25 @@ const PLAN_EDITORIAL_DEFAULTS: Record<string, PlanEditorialDefaults> = {
     standby_monthly_price_ttc_eur: 49,
     included_mediation_langs_min: 1,
     included_mediation_langs_max: 2,
-    included_audio_langs: 1,
+    included_audio_langs: 2,
     trial_duration_days: null,
     pricing_options: [
       { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: 5 },
       { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: 5 },
       { option_code: "STANDBY", unit_price_ttc_eur: 49 },
+    ],
+  },
+  ENVERGURE: {
+    plan_code: "ENVERGURE",
+    standby_monthly_price_ttc_eur: 79,
+    included_mediation_langs_min: 3,
+    included_mediation_langs_max: 3,
+    included_audio_langs: 3,
+    trial_duration_days: null,
+    pricing_options: [
+      { option_code: "EXTRA_MEDIATION_LANG", unit_price_ttc_eur: 15 },
+      { option_code: "EXTRA_AUDIO_LANG", unit_price_ttc_eur: 15 },
+      { option_code: "STANDBY", unit_price_ttc_eur: 79 },
     ],
   },
   RAYONNEMENT: {
@@ -157,6 +171,7 @@ function inferPlanCode(row: Pick<PricingRow, "plan_code" | "pricing_plan">): str
   if (plan.includes("ETINCELLE") || plan.includes("ÉTINCELLE")) return "ETINCELLE";
   if (plan.includes("ATELIER")) return "ATELIER";
   if (plan.includes("HORIZON")) return "HORIZON";
+  if (plan.includes("ENVERGURE")) return "ENVERGURE";
   if (plan.includes("RAYONNEMENT")) return "RAYONNEMENT";
   if (plan.includes("ZENITH") || plan.includes("ZÉNITH")) return "ZENITH";
   return null;
@@ -216,6 +231,7 @@ function normalizePricingRow(row: Record<string, unknown>): PricingRow {
     included_audio_langs: toPricingNumber(row.included_audio_langs),
     trial_duration_days: toPricingNumber(row.trial_duration_days),
     is_quote_only: row.is_quote_only === true ? true : row.is_quote_only === false ? false : null,
+    sort_order: toPricingNumber(row.sort_order),
     pricing_options: normalizePricingOptions(row.pricing_options),
   };
   return enrichPricingRowFromPlanDefaults(normalized);

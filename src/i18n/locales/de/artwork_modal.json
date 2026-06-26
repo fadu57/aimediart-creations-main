@@ -130,5 +130,53 @@
     "fill_missing": "Fehlende Stimmen ergänzen",
     "all_voices_ready": "Alle Stimmen wurden generiert",
     "background_hint": "Sie können schließen — die Generierung läuft im Hintergrund weiter."
+  },
+  "qr_warn_no_expo": "Keine Ausstellung zugewiesen — der QR-Code funktioniert, jedoch ohne Ausstellungskontext für den Besucher.",
+  "mediation_regenerate_hint_line3": "Sie können einen Vermittlungstext auch jederzeit selbst bearbeiten / eingeben. Es ist jedoch nur 1 Änderung pro Persona möglich",
+  "mediation_lang_help_plan_range": "KI-Generierung: bis zu {{count}} Sprachen in Ihrem Abonnement enthalten. Wählen Sie oben eine optionale Sprache, um die zweite Sprache zu aktivieren.",
+  "dialog_lang_audio_title": "Stimmen auf {{lang}} generieren?",
+  "dialog_lang_audio_desc": "Es gibt Vermittlungstexte auf {{lang}}, aber die Audioguides (Stimme F und M) sind noch nicht bereit. Möchten Sie die Generierung jetzt starten?",
+  "dialog_lang_audio_yes": "Ja, Stimmen generieren",
+  "dialog_lang_audio_no": "Später",
+  "audio_player": {
+    "loading": "Audio wird geladen…",
+    "generating": "Audio wird erstellt…",
+    "generate": "Audio generieren",
+    "retry": "Erneut versuchen",
+    "error": "Die Audiogenerierung ist fehlgeschlagen oder abgelaufen.",
+    "voice_f": "Stimme F",
+    "voice_m": "Stimme M",
+    "play_f": "Weibliche Stimme abspielen",
+    "play_m": "Männliche Stimme abspielen",
+    "manage_voices": "Stimmen verwalten"
+  },
+  "audio_voice_status": {
+    "label": "Generierte Stimmen",
+    "aria": "Status der Audioguides nach Sprache",
+    "voice_f": "Weibliche Stimme",
+    "voice_m": "Männliche Stimme",
+    "progress": "{{ready}}/{{total}}",
+    "progress_generating": "{{ready}}/{{total}} · {{active}} laufend",
+    "progress_errors": "{{ready}}/{{total}} · {{error}} Fehler",
+    "progress_errors_pending": "{{ready}}/{{total}} · {{error}} Fehler · {{pending}} ausstehend",
+    "retry_lang": "Audiogenerierung für diese Sprache neu starten",
+    "cancel_lang": "Generierung für diese Sprache stoppen",
+    "continue_lang": "Audiogenerierung für diese Sprache fortsetzen",
+    "no_text": "Kein Vermittlungstext",
+    "no_persona_audio": "Persona nicht für Audio konfiguriert"
+  },
+  "text_edit": {
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "unsaved_title": "Nicht gespeicherte Änderungen",
+    "unsaved_desc": "Sie haben den Text bearbeitet, ohne ihn zu speichern. Möchten Sie wirklich schließen, ohne zu speichern?",
+    "continue_editing": "Bearbeitung fortsetzen",
+    "discard": "Ohne Speichern schließen"
+  },
+  "photo_capture": {
+    "required": "Foto erforderlich",
+    "import": "Importieren",
+    "change": "Foto ändern",
+    "photograph": "Fotografieren"
   }
 }

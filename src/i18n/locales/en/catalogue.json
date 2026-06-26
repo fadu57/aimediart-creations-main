@@ -29,10 +29,8 @@
   "expo_move_confirm_no": "Cancel",
   "expo_move_undo": "Undo move",
   "expo_move_undo_aria": "Return to previous exhibition",
-
   "error_artist_join": "Artist join unavailable ({{message}}). Showing fallback.",
   "error_status_update": "Unable to update status: {{message}}",
-
   "qr_error_no_url": "Unable to build the QR URL.",
   "qr_success": "QR code generated and saved.",
   "qr_error_generate": "QR code generation failed.",
@@ -48,7 +46,6 @@
   "qr_confirm_description": "Any QR code already printed or displayed for this artwork will need to be replaced so visitors can access it.",
   "qr_confirm_action": "Regenerate anyway",
   "qr_confirm_cancel": "Cancel",
-
   "qr_bulk_regenerate_btn": "Regenerate all QR codes",
   "qr_bulk_regenerate_title": "Regenerate all QR codes in the catalogue",
   "qr_bulk_confirm_title": "Regenerate all QR codes?",
@@ -58,7 +55,6 @@
   "qr_bulk_progress": "{{done}} / {{total}}",
   "qr_bulk_success": "{{count}} QR codes successfully regenerated.",
   "qr_bulk_partial": "{{success}} QR codes regenerated, {{error}} error(s).",
-
   "pdf_error_no_id": "Artwork identifier unavailable.",
   "pdf_error_no_qr_url": "Unable to build QR URL for this artwork.",
   "pdf_error_generate": "Unable to generate the label PDF.",
@@ -68,7 +64,6 @@
   "pdf_explore_single_scan_line2": "with the artist's assistant",
   "pdf_explore_same_artist_line1": "Explore the artist's artworks",
   "pdf_explore_same_artist_line2": "with their assistant",
-
   "pdf_format_dialog_title": "Label format",
   "pdf_format_dialog_desc": "Choose the print format and orientation for the label.",
   "pdf_format_dialog_desc_named": "Choose the print format for \"{{title}}\".",
@@ -87,7 +82,6 @@
   "pdf_duplex_screen_hint": "You can print a 2nd label on the same sheet: flip the sheet in the printer, then print this 2nd label on the blank area.",
   "pdf_format_confirm": "Generate PDF",
   "pdf_format_cancel": "Cancel",
-
   "badge_ia_image_yes": "Image analyzed: Yes",
   "badge_ia_image_no": "Image analyzed: No",
   "badge_ia_mediation_zero": "Generated mediations: 0",
@@ -102,14 +96,12 @@
   "badge_ia_voice_generating_partial": "Generated voices: {{ready}}/{{expected}} · in progress ({{langs}})",
   "badge_ia_voice_open_aria": "Open generated voices tracking",
   "badge_ia_voice_generating_aria": "Voice generation in progress — open tracking",
-
   "scope_agency_hint": "Agency {{agencyId}} exhibitions.",
   "scope_expo_hint": "Exhibition {{expoId}} only.",
   "status_empty": "empty",
   "status_active": "Active",
   "status_inactive": "Inactive",
   "status_draft": "Draft",
-
   "tableau_title": "Catalogue — Full table",
   "tableau_back": "Back",
   "tableau_corbeille": "Trash",
@@ -128,5 +120,6 @@
   "tableau_warning": "WARNING - Deletion is permanent. Delete with maximum discernment otherwise you risk problems with your application",
   "tableau_cancel": "Cancel",
   "tableau_confirm": "Delete",
-  "tableau_archiving": "Archiving..."
+  "tableau_archiving": "Archiving...",
+  "qr_bulk_warn_no_expo": "{{count}} artwork(s) without an assigned exhibition — their QR code won't include exhibition context (the visitor will see the artwork but won't be able to browse the exhibition)."
 }

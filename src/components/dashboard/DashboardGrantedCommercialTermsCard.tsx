@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2, Percent } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,7 @@ function formatAnnualDiscount(row: GrantedCommercialAgency): string {
 }
 
 export function DashboardGrantedCommercialTermsCard() {
+  const { t } = useTranslation("dashboard");
   const [rows, setRows] = useState<GrantedCommercialAgency[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +82,20 @@ export function DashboardGrantedCommercialTermsCard() {
       <CardHeader className="pb-3">
         <CardTitle className="text-xl flex items-center gap-2">
           <Percent className="h-5 w-5 text-gold" />
-          Conditions commerciales accordées
+          {t("granted_terms.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Chargement des organisations…
+            {t("granted_terms.loading")}
           </div>
         ) : error ? (
           <p className="text-sm text-destructive py-4">{error}</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
-            Aucune organisation avec des conditions commerciales enregistrées pour le moment.
+            {t("granted_terms.empty")}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-[#9d2525]/20">
@@ -101,22 +103,22 @@ export function DashboardGrantedCommercialTermsCard() {
               <TableHeader>
                 <TableRow className="bg-[#fff9f7]/80 hover:bg-[#fff9f7]/80 dark:bg-[#fff9f7]/10">
                   <TableHead className="h-8 min-w-[180px] max-w-[240px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-                    Organisation
+                    {t("granted_terms.col_org")}
                   </TableHead>
                   <TableHead className="h-8 min-w-[72px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-                    Plan
+                    {t("granted_terms.col_plan")}
                   </TableHead>
                   <TableHead className="h-8 min-w-[120px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-                    Profil
+                    {t("granted_terms.col_profile")}
                   </TableHead>
                   <TableHead className="h-8 min-w-[100px] px-2 py-1.5 text-right text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-                    Remise annuelle TTC
+                    {t("granted_terms.col_annual_discount")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row) => {
-                  const label = row.name_agency?.trim() || "Sans nom";
+                  const label = row.name_agency?.trim() || t("granted_terms.no_name");
                   const planLabel = commercialPlanLabel(row.commercial_plan_code as CommercialPlanCode | null);
                   const kindLabel = commercialKindLabel(row.commercial_kind as CommercialKind | null);
                   return (

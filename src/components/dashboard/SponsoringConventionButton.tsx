@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { openSponsoringConventionDocument } from "@/lib/sponsoringConvention";
@@ -10,6 +11,7 @@ type SponsoringConventionButtonProps = {
 };
 
 export function SponsoringConventionButton({ organisationId }: SponsoringConventionButtonProps) {
+  const { t } = useTranslation("dashboard");
   const [loading, setLoading] = useState(false);
 
   return (
@@ -23,7 +25,7 @@ export function SponsoringConventionButton({ organisationId }: SponsoringConvent
         setLoading(true);
         void openSponsoringConventionDocument(organisationId)
           .catch((error: unknown) => {
-            toast.error(error instanceof Error ? error.message : "Génération impossible.");
+            toast.error(error instanceof Error ? error.message : t("sponsoring.generate_error"));
           })
           .finally(() => setLoading(false));
       }}
@@ -33,7 +35,7 @@ export function SponsoringConventionButton({ organisationId }: SponsoringConvent
       ) : (
         <FileText className="mr-2 h-4 w-4" />
       )}
-      Convention de sponsoring avec AIMEDIArt
+      {t("sponsoring.convention_button")}
     </Button>
   );
 }

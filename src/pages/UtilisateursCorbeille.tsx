@@ -69,7 +69,7 @@ export default function UtilisateursCorbeille() {
   };
 
   if (authLoading || navLoading) {
-    return <p className="text-sm text-muted-foreground px-6 py-8">Chargement…</p>;
+    return <p className="text-sm text-muted-foreground px-6 py-8">{t("loading")}</p>;
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
@@ -77,12 +77,12 @@ export default function UtilisateursCorbeille() {
     <div className="container py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Corbeille — Utilisateurs</h2>
-          <p className="text-muted-foreground">Restaurez une fiche archivée par erreur.</p>
+          <h2 className="text-3xl font-serif font-bold">{t("title_users")}</h2>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button variant="outline" className="gap-2" asChild>
           <Link to="/user/utilisateurs">
-            <ArrowLeft className="h-4 w-4" /> Retour
+            <ArrowLeft className="h-4 w-4" /> {t("back")}
           </Link>
         </Button>
       </div>
@@ -91,7 +91,7 @@ export default function UtilisateursCorbeille() {
       <RetentionSettingCard tableNames={["profiles"]} roleId={role_id} />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
@@ -104,7 +104,7 @@ export default function UtilisateursCorbeille() {
                   <div className="min-w-0 space-y-1">
                     <p className="font-semibold truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Archivé le {u.deleted_at ? new Date(u.deleted_at).toLocaleString("fr-FR") : "—"}
+                      {t("archived_on", { date: u.deleted_at ? new Date(u.deleted_at).toLocaleString("fr-FR") : "—" })}
                     </p>
                     <RetentionBadge
                       deleted_at={u.deleted_at}

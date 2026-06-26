@@ -29,10 +29,8 @@
   "expo_move_confirm_no": "Abbrechen",
   "expo_move_undo": "Verschieben rückgängig",
   "expo_move_undo_aria": "Zur vorherigen Ausstellung zurück",
-
   "error_artist_join": "Künstlerverknüpfung nicht verfügbar ({{message}}). Anzeige über Fallback.",
   "error_status_update": "Statusaktualisierung nicht möglich: {{message}}",
-
   "qr_error_no_url": "QR-URL konnte nicht erstellt werden.",
   "qr_success": "QR-Code generiert und gespeichert.",
   "qr_error_generate": "QR-Code-Generierung fehlgeschlagen.",
@@ -48,7 +46,6 @@
   "qr_confirm_description": "Jeder bereits gedruckte oder ausgestellte QR-Code für dieses Kunstwerk muss ersetzt werden, damit Besucher darauf zugreifen können.",
   "qr_confirm_action": "Trotzdem neu generieren",
   "qr_confirm_cancel": "Abbrechen",
-
   "qr_bulk_regenerate_btn": "Alle QR-Codes neu generieren",
   "qr_bulk_regenerate_title": "Alle QR-Codes des Katalogs neu generieren",
   "qr_bulk_confirm_title": "Alle QR-Codes neu generieren?",
@@ -58,7 +55,6 @@
   "qr_bulk_progress": "{{done}} / {{total}}",
   "qr_bulk_success": "{{count}} QR-Codes erfolgreich neu generiert.",
   "qr_bulk_partial": "{{success}} QR-Codes neu generiert, {{error}} Fehler.",
-
   "pdf_error_no_id": "Kunstwerk-ID nicht verfügbar.",
   "pdf_error_no_qr_url": "QR-URL für dieses Kunstwerk konnte nicht erstellt werden.",
   "pdf_error_generate": "Etikett-PDF konnte nicht generiert werden.",
@@ -68,7 +64,6 @@
   "pdf_explore_single_scan_line2": "mit dem Assistenten des Künstlers",
   "pdf_explore_same_artist_line1": "Erkunden Sie die Werke des Künstlers",
   "pdf_explore_same_artist_line2": "mit seinem Assistenten",
-
   "pdf_format_dialog_title": "Etikettformat",
   "pdf_format_dialog_desc": "Wählen Sie das Druckformat und die Ausrichtung des Etiketts.",
   "pdf_format_dialog_desc_named": "Druckformat für « {{title}} » wählen.",
@@ -87,7 +82,6 @@
   "pdf_duplex_screen_hint": "Sie können ein 2. Etikett auf demselben Blatt drucken: wenden Sie das Blatt im Drucker und drucken Sie dieses 2. Etikett auf die freie Fläche.",
   "pdf_format_confirm": "PDF erstellen",
   "pdf_format_cancel": "Abbrechen",
-
   "badge_ia_image_yes": "Bild analysiert: Ja",
   "badge_ia_image_no": "Bild analysiert: Nein",
   "badge_ia_mediation_zero": "Generierte Mediationen: 0",
@@ -102,14 +96,12 @@
   "badge_ia_voice_generating_partial": "Generierte Stimmen: {{ready}}/{{expected}} · in Bearbeitung ({{langs}})",
   "badge_ia_voice_open_aria": "Stimmengenerierung öffnen",
   "badge_ia_voice_generating_aria": "Stimmengenerierung läuft — Verfolgung öffnen",
-
   "scope_agency_hint": "Ausstellungen der Agentur {{agencyId}}.",
   "scope_expo_hint": "Nur Ausstellung {{expoId}}.",
   "status_empty": "leer",
   "status_active": "Aktiv",
   "status_inactive": "Inaktiv",
   "status_draft": "Entwurf",
-
   "tableau_title": "Katalog — Vollständige Tabelle",
   "tableau_back": "Zurück",
   "tableau_corbeille": "Papierkorb",
@@ -128,5 +120,6 @@
   "tableau_warning": "ACHTUNG - Die Löschung ist endgültig. Löschen Sie mit größter Sorgfalt, da Sie sonst Probleme mit Ihrer Anwendung riskieren",
   "tableau_cancel": "Abbrechen",
   "tableau_confirm": "Löschen",
-  "tableau_archiving": "Archivierung..."
+  "tableau_archiving": "Archivierung...",
+  "qr_bulk_warn_no_expo": "{{count}} Werk(e) ohne zugewiesene Ausstellung — ihr QR-Code enthält keinen Ausstellungskontext (der Besucher sieht das Werk, kann aber nicht durch die Ausstellung navigieren)."
 }

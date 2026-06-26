@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -82,6 +83,7 @@ async function fetchExpoRowForVisitor(expoIdRaw: string): Promise<ExpoRow | null
 
 const ScanWelcome = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("visitor");
   const { session, loading } = useAuthUser();
   const [searchParams] = useSearchParams();
   const [expoName, setExpoName] = useState<string>("");
@@ -121,7 +123,7 @@ const ScanWelcome = () => {
   useEffect(() => {
     const loadExpoName = async () => {
       if (!expoId) {
-        setExpoName("Exposition en cours");
+        setExpoName(t("scan_welcome.expo_default"));
         return;
       }
       const row = await fetchExpoRowForVisitor(expoId);
@@ -129,10 +131,10 @@ const ScanWelcome = () => {
       if (import.meta.env.DEV && row && !picked) {
         console.warn("[ScanWelcome] exposition trouvée mais aucun champ de nom exploitable (expo_name, title…). Clés:", Object.keys(row));
       }
-      setExpoName(picked || "Exposition en cours");
+      setExpoName(picked || t("scan_welcome.expo_default"));
     };
     void loadExpoName();
-  }, [expoId]);
+  }, [expoId, t]);
 
   useEffect(() => {
     const trackGuestVisit = async () => {
@@ -160,7 +162,7 @@ const ScanWelcome = () => {
     const { data, error } = await supabase.rpc("generate_visitor_pseudo", { locale: pseudoLocale });
     if (error) throw new Error(error.message);
     if (typeof data !== "string" || !data.trim()) {
-      throw new Error("Pseudo vide renvoyé par le serveur.");
+      throw new Error(t("scan_welcome.pseudo_empty_server"));
     }
     return data.trim();
   };
@@ -168,7 +170,7 @@ const ScanWelcome = () => {
   const handleContinueAnonymous = async () => {
     setPseudoFlowError(null);
     if (!visitorUuid) {
-      setPseudoFlowError("Identifiant visiteur indisponible. Rechargez la page.");
+      setPseudoFlowError(t("scan_welcome.visitor_id_unavailable"));
       return;
     }
 
@@ -219,7 +221,7 @@ const ScanWelcome = () => {
         navigate(œuvreLink);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de l’enregistrement du mode anonyme.";
+      const message = err instanceof Error ? err.message : t("scan_welcome.anon_register_error");
       setPseudoFlowError(message);
       if (import.meta.env.DEV) {
         console.warn("[ScanWelcome] register_anonymous_visitor :", err);
@@ -236,7 +238,7 @@ const ScanWelcome = () => {
       const next = await fetchSuggestedPseudo();
       setPseudoValue(next);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible de régénérer le pseudo.";
+      const message = err instanceof Error ? err.message : t("scan_welcome.regen_error");
       setPseudoFlowError(message);
     } finally {
       setPseudoActionBusy(false);
@@ -246,7 +248,7 @@ const ScanWelcome = () => {
   const handlePseudoConfirm = async () => {
     const trimmed = pseudoValue.trim();
     if (!trimmed) {
-      setPseudoFlowError("Choisissez un pseudo ou régénérez-en un.");
+      setPseudoFlowError(t("scan_welcome.pseudo_choose"));
       return;
     }
 
@@ -265,7 +267,7 @@ const ScanWelcome = () => {
       navigate(œuvreLink);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Erreur lors de l’enregistrement du pseudo. Réessayez ou continuez depuis le scanner.";
+        err instanceof Error ? err.message : t("scan_welcome.pseudo_confirm_error");
       setPseudoFlowError(message);
       if (import.meta.env.DEV) {
         console.warn("[ScanWelcome] confirm_visitor_pseudo_from_client :", err);
@@ -291,15 +293,15 @@ const ScanWelcome = () => {
       <Dialog open={pseudoDialogOpen} onOpenChange={(o) => setPseudoDialogOpen(o)}>
         <DialogContent hideCloseButton className="gap-3 px-5 py-6 sm:max-w-md">
           <DialogHeader className="text-left">
-            <DialogTitle>Votre pseudo anonyme</DialogTitle>
+            <DialogTitle>{t("scan_welcome.pseudo_dialog_title")}</DialogTitle>
             <DialogDescription>
-              Une proposition aléatoire (nom commun + qualificatif + 3 chiffres) — vous pouvez la modifier avant de poursuivre.
+              {t("scan_welcome.pseudo_dialog_desc")}
             </DialogDescription>
           </DialogHeader>
           <Input
             value={pseudoValue}
             onChange={(e) => setPseudoValue(e.target.value)}
-            placeholder="Pseudo"
+            placeholder={t("scan_welcome.pseudo_placeholder")}
             maxLength={80}
             autoCorrect="off"
             spellCheck={false}
@@ -308,14 +310,14 @@ const ScanWelcome = () => {
           {pseudoFlowError ? <p className="text-sm text-destructive">{pseudoFlowError}</p> : null}
           <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
             <Button type="button" variant="ghost" className="w-full sm:w-auto" disabled={pseudoActionBusy} onClick={() => handlePseudoSkipNavigate()}>
-              Plus tard
+              {t("scan_welcome.later")}
             </Button>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={pseudoActionBusy} onClick={() => void handlePseudoRegenerate()}>
-                {pseudoActionBusy ? "…" : "Autre suggestion"}
+                {pseudoActionBusy ? "…" : t("scan_welcome.other_suggestion")}
               </Button>
               <Button type="button" className="w-full sm:w-auto" disabled={pseudoActionBusy} onClick={() => void handlePseudoConfirm()}>
-                Valider et continuer
+                {t("scan_welcome.validate_continue")}
               </Button>
             </div>
           </DialogFooter>
@@ -325,13 +327,13 @@ const ScanWelcome = () => {
       <Card className="mt-5 w-full max-w-[320px] border-border shadow-lg">
         <CardContent className="space-y-4 px-3 pb-4 pt-4">
           <div className="space-y-1 text-center">
-            <p className="text-sm text-muted-foreground">Bienvenue à l'exposition</p>
-            <p className="font-serif text-xl font-bold leading-tight">{expoName || "Exposition en cours"}</p>
+            <p className="text-sm text-muted-foreground">{t("scan_welcome.welcome")}</p>
+            <p className="font-serif text-xl font-bold leading-tight">{expoName || t("scan_welcome.expo_default")}</p>
           </div>
 
           <div className="space-y-2">
             <Button asChild className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground">
-              <Link to={registerLink}>S'inscrire pour une expérience complète</Link>
+              <Link to={registerLink}>{t("scan_welcome.register_cta")}</Link>
             </Button>
             <Button
               type="button"
@@ -340,7 +342,7 @@ const ScanWelcome = () => {
               onClick={() => void handleContinueAnonymous()}
               disabled={anonymousBusy || !visitorUuid}
             >
-              {anonymousBusy ? "Préparation…" : "Continuer en mode visiteur anonyme"}
+              {anonymousBusy ? t("scan_welcome.preparing") : t("scan_welcome.continue_anonymous")}
             </Button>
           </div>
 
@@ -349,10 +351,11 @@ const ScanWelcome = () => {
           ) : null}
 
           <p className="pt-1 text-center text-[11px] leading-snug text-muted-foreground">
-            Votre inscription permet de{" "}
-            <span className="underline underline-offset-[3px] decoration-foreground/70">personnaliser</span>
-            <br />
-            tout votre parcours d&apos;exposition.
+            <Trans
+              t={t}
+              i18nKey="scan_welcome.footer_register"
+              components={{ p: <span className="underline underline-offset-[3px] decoration-foreground/70" /> }}
+            />
           </p>
         </CardContent>
       </Card>

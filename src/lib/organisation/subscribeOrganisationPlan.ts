@@ -1,7 +1,7 @@
 import type { AgencyCommercialPreset } from "@/lib/organisation/commercialTerms";
 import { supabase } from "@/lib/supabase";
 
-export type SubscribePlanCode = "ETINCELLE" | "ATELIER" | "HORIZON";
+export type SubscribePlanCode = "ETINCELLE" | "ATELIER" | "HORIZON" | "ENVERGURE";
 export type SubscribeBillingCycle = "monthly" | "annual";
 
 export type SubscribeOrganisationPlanResult = {

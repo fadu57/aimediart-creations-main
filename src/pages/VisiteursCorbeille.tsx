@@ -110,7 +110,7 @@ export default function VisiteursCorbeille() {
     }>).map((v) => ({
       id: String(v.id ?? ""),
       source: "visitors" as const,
-      first_name: "Anonyme",
+      first_name: t("anonymous"),
       last_name: null,
       pseudo: v.visitor_pseudo?.trim() || null,
       deleted_at: v.deleted_at ?? null,
@@ -124,7 +124,7 @@ export default function VisiteursCorbeille() {
 
     setRows(merged);
     setLoading(false);
-  }, [currentRoleId, currentAgencyId]);
+  }, [currentRoleId, currentAgencyId, t]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -147,7 +147,7 @@ export default function VisiteursCorbeille() {
   };
 
   if (authLoading) {
-    return <p className="text-sm text-muted-foreground px-6 py-8">Chargement…</p>;
+    return <p className="text-sm text-muted-foreground px-6 py-8">{t("loading")}</p>;
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
@@ -155,12 +155,12 @@ export default function VisiteursCorbeille() {
     <div className="container py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Corbeille — Visiteurs</h2>
-          <p className="text-muted-foreground">Restaurez un visiteur archivé par erreur.</p>
+          <h2 className="text-3xl font-serif font-bold">{t("title_visitors")}</h2>
+          <p className="text-muted-foreground">{t("subtitle_visitors")}</p>
         </div>
         <Button variant="outline" className="gap-2" asChild>
           <Link to="/expos/visitors">
-            <ArrowLeft className="h-4 w-4" /> Retour
+            <ArrowLeft className="h-4 w-4" /> {t("back")}
           </Link>
         </Button>
       </div>
@@ -169,7 +169,7 @@ export default function VisiteursCorbeille() {
       <RetentionSettingCard tableNames={["visitors", "profiles"]} roleId={currentRoleId} />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
@@ -187,11 +187,11 @@ export default function VisiteursCorbeille() {
                       <p className="text-xs text-muted-foreground truncate">@{row.pseudo}</p>
                     ) : null}
                     <p className="text-xs text-muted-foreground">
-                      {row.source === "visitors" ? "Visiteur anonyme" : "Visiteur inscrit"}
+                      {row.source === "visitors" ? t("visitor_anonymous_label") : t("visitor_registered_label")}
                       {expo ? ` · ${expo}` : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Archivé le {row.deleted_at ? new Date(row.deleted_at).toLocaleString("fr-FR") : "—"}
+                      {t("archived_on", { date: row.deleted_at ? new Date(row.deleted_at).toLocaleString("fr-FR") : "—" })}
                     </p>
                     <RetentionBadge
                       deleted_at={row.deleted_at}

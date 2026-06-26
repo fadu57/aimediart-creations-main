@@ -35,13 +35,13 @@ export function DashboardNetworkInfrastructureBlock({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[#211A16]">
             <Wifi className="h-3.5 w-3.5 shrink-0 text-gold" aria-hidden />
-            Infrastructure Réseau
+            {t("connexion.sections.packs.infra_title")}
           </p>
           <Link
             to="/organisation#connectivite"
             className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
-            Voir la présentation
+            {t("connexion.sections.packs.see_presentation")}
           </Link>
         </div>
 

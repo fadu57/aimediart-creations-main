@@ -46,7 +46,7 @@ export function PhotoCaptureField({
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center text-muted-foreground">
             <Upload className="h-8 w-8 opacity-60" aria-hidden />
-            <p className="text-xs">Photo obligatoire</p>
+            <p className="text-xs">{t("photo_capture.required")}</p>
           </div>
         )}
 
@@ -70,7 +70,7 @@ export function PhotoCaptureField({
                 onClick={() => uploadInputRef.current?.click()}
               >
                 <Upload className="h-4 w-4 shrink-0" aria-hidden />
-                {showCameraButton ? "Importer" : "Changer la photo"}
+                {showCameraButton ? t("photo_capture.import") : t("photo_capture.change")}
               </Button>
               {showCameraButton ? (
                 <Button
@@ -81,7 +81,7 @@ export function PhotoCaptureField({
                   onClick={() => cameraInputRef.current?.click()}
                 >
                   <Camera className="h-4 w-4 shrink-0" aria-hidden />
-                  Photographier
+                  {t("photo_capture.photograph")}
                 </Button>
               ) : null}
             </div>

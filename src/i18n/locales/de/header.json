@@ -34,5 +34,18 @@
   "settings_submenu_trash_expos": "Ausstellungen",
   "settings_submenu_trash_visitors": "Besucher",
   "logout": "Abmelden",
-  "login": "Anmelden"
+  "login": "Anmelden",
+  "standby_mode_badge": "Standby-Modus aktiviert",
+  "standby_mode_active_title": "Standby-Plan angefragt",
+  "standby_mode_active_desc": "Ihr Bereich befindet sich im Standby-Modus: Nur Startseite und Ihr Profil bleiben zugänglich. Ihre Daten und Ihr Back-Office bleiben erhalten.",
+  "standby_mode_effective_at": "Wird zum nächsten Fälligkeitstermin wirksam: {{date}}.",
+  "standby_cancel_cta": "Standby-Anfrage stornieren",
+  "standby_cancel_loading": "Wird storniert…",
+  "standby_cancel_success": "Anfrage für Standby-Plan storniert.",
+  "standby_cancel_error": "Die Standby-Anfrage konnte nicht storniert werden.",
+  "standby_cancel_closed": "Die 24-stündige Widerrufsfrist ist abgelaufen oder der neue Abrechnungszeitraum hat begonnen.",
+  "not_found": {
+    "title": "Hoppla! Seite nicht gefunden",
+    "home": "Zurück zur Startseite"
+  }
 }

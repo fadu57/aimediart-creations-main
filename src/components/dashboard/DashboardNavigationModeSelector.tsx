@@ -1,9 +1,9 @@
 import { Building2, Shield } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { NavigationMode } from "@/lib/navigationMode";
-import { navigationModeLabel } from "@/lib/resolveEffectiveAuth";
 
 type DashboardNavigationModeSelectorProps = {
   navigationMode: NavigationMode;
@@ -18,9 +18,10 @@ export function DashboardNavigationModeSelector({
   agencyRoleId,
   onChange,
 }: DashboardNavigationModeSelectorProps) {
+  const { t } = useTranslation("dashboard");
   return (
     <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mode de navigation</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("navigation.title")}</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button
           type="button"
@@ -33,9 +34,9 @@ export function DashboardNavigationModeSelector({
         >
           <Shield className="h-4 w-4 shrink-0" aria-hidden />
           <span className="min-w-0">
-            <span className="block text-sm font-medium">{navigationModeLabel("global")}</span>
+            <span className="block text-sm font-medium">{t("navigation.global")}</span>
             {globalRoleId != null ? (
-              <span className="block text-xs opacity-80">Niveau {globalRoleId}</span>
+              <span className="block text-xs opacity-80">{t("navigation.level", { level: globalRoleId })}</span>
             ) : null}
           </span>
         </Button>
@@ -50,9 +51,9 @@ export function DashboardNavigationModeSelector({
         >
           <Building2 className="h-4 w-4 shrink-0" aria-hidden />
           <span className="min-w-0">
-            <span className="block text-sm font-medium">{navigationModeLabel("organisation")}</span>
+            <span className="block text-sm font-medium">{t("navigation.organisation")}</span>
             {agencyRoleId != null ? (
-              <span className="block text-xs opacity-80">Niveau {agencyRoleId}</span>
+              <span className="block text-xs opacity-80">{t("navigation.level", { level: agencyRoleId })}</span>
             ) : null}
           </span>
         </Button>

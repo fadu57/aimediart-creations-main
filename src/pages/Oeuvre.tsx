@@ -15,7 +15,7 @@ import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptSt
 import { primaryBlurbFromArtworkDescription } from "@/lib/artworkDescriptionI18n";
 import { SETTINGS_KEYS, type SettingsVisitorsBehavior, DEFAULT_VISITORS, parseJsonSetting } from "@/lib/settingsKeys";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 type PromptStyleRow = PromptStyleLabelFields & {
   id: string | number;
@@ -64,7 +64,7 @@ type ArtworkRow = {
 
 const Oeuvre = () => {
   const { artworkId: artworkIdFromPath } = useParams<{ artworkId?: string }>();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation("visitor");
   const { session, role_id, agency_id, expo_id, loading: authLoading } = useAuthUser();
   const [styles, setStyles] = useState<PromptStyleRow[]>([]);
   const [stylesLoading, setStylesLoading] = useState(true);
@@ -234,7 +234,7 @@ const Oeuvre = () => {
       if (error) {
         setArtwork(null);
         setArtworkNotFound(false);
-        setArtworkLoadError(error.message || "Impossible de charger cette œuvre.");
+        setArtworkLoadError(error.message || t("oeuvre.load_error"));
         setArtistName("");
         setArtistBioByLang({});
         setArtistPhotoUrl("");
@@ -270,7 +270,7 @@ const Oeuvre = () => {
     };
 
     void chargerOeuvreEtArtiste();
-  }, [requestedArtworkId, role_id, agency_id, expo_id]);
+  }, [requestedArtworkId, role_id, agency_id, expo_id, t]);
 
   useEffect(() => {
     const chargerEmotions = async () => {
@@ -316,7 +316,7 @@ const Oeuvre = () => {
   }, [artistBioByLang, currentLocale]);
   const artistBioLimited = (() => {
     const bio = (artistBio ?? "").trim();
-    if (!bio) return "Biographie de l'artiste indisponible pour le moment.";
+    if (!bio) return t("oeuvre.bio_unavailable");
     if (bio.length <= 400) return bio;
     return `${bio.slice(0, 400).trimEnd()}...`;
   })();
@@ -324,7 +324,7 @@ const Oeuvre = () => {
   const artworkDescriptionText = (() => {
     const raw = artwork?.artwork_description_i18n;
     const text = primaryBlurbFromArtworkDescription(raw, i18n.language);
-    return text || "Description de l'œuvre indisponible pour le moment.";
+    return text || t("oeuvre.description_unavailable");
   })();
   const artworkDimensions = (artwork?.artwork_dimensions ?? artwork?.dimensions ?? "").trim();
   const artworkTechnique = (artwork?.artwork_technique ?? artwork?.technique ?? "").trim();
@@ -407,14 +407,14 @@ const Oeuvre = () => {
 
     try {
       if (!expoId || !agencyId) {
-        throw new Error("expo_id ou agency_id manquant pour enregistrer le feedback.");
+        throw new Error(t("oeuvre.feedback_missing_ids"));
       }
 
       const authUserId = session?.user?.id?.trim() || null;
       await ensureVisitorSessionBeforeFeedback(authUserId);
       const visitorId = resolveFeedbackVisitorId(authUserId);
       if (!visitorId) {
-        throw new Error("Identifiant visiteur indisponible.");
+        throw new Error(t("oeuvre.visitor_id_unavailable"));
       }
 
       const { error } = await supabase.from("visitor_feedback").insert({
@@ -430,9 +430,9 @@ const Oeuvre = () => {
         throw new Error(error.message);
       }
 
-      setFeedbackSuccess("Merci, votre ressenti a bien été enregistré.");
+      setFeedbackSuccess(t("oeuvre.feedback_success"));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur inconnue lors de l'enregistrement.";
+      const message = err instanceof Error ? err.message : t("oeuvre.feedback_unknown_error");
       setFeedbackError(message);
     } finally {
       setSavingFeedback(false);
@@ -469,7 +469,7 @@ const Oeuvre = () => {
               onClick={() => void handleAuthAffordanceClick()}
               className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-[0_4px_10px_rgba(0,0,0,0.12)] transition hover:bg-gray-50"
             >
-              {isAuthenticated ? "Déconnexion" : "Se connecter"}
+              {isAuthenticated ? t("oeuvre.logout") : t("oeuvre.login")}
             </button>
             {!isAuthenticated && (
               <button
@@ -477,7 +477,7 @@ const Oeuvre = () => {
                 onClick={handleSignupClick}
                 className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white shadow-[0_4px_10px_rgba(0,0,0,0.18)] transition hover:bg-red-700"
               >
-                S&apos;inscrire
+                {t("oeuvre.signup")}
               </button>
             )}
           </div>
@@ -485,16 +485,16 @@ const Oeuvre = () => {
           <main className="px-5 py-10">
             <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
               <p className="text-5xl">🎨</p>
-              <h1 className="mt-3 font-serif text-2xl font-semibold text-gray-800">Œuvre introuvable</h1>
+              <h1 className="mt-3 font-serif text-2xl font-semibold text-gray-800">{t("oeuvre.not_found_title")}</h1>
               <p className="mt-2 text-sm leading-[1.6] text-gray-600">
-                Cette œuvre n&apos;est pas disponible ou n&apos;est plus accessible pour le moment.
+                {t("oeuvre.not_found_desc")}
               </p>
               <button
                 type="button"
                 onClick={handleBackHome}
                 className="mt-6 w-full rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,0,0,0.2)] transition hover:bg-black"
               >
-                Retour à l&apos;accueil
+                {t("oeuvre.back_home")}
               </button>
             </div>
           </main>
@@ -516,7 +516,7 @@ const Oeuvre = () => {
               onClick={() => void handleAuthAffordanceClick()}
               className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 shadow-[0_4px_10px_rgba(0,0,0,0.12)] transition hover:bg-gray-50"
             >
-              {isAuthenticated ? "Déconnexion" : "Se connecter"}
+              {isAuthenticated ? t("oeuvre.logout") : t("oeuvre.login")}
             </button>
             {isAnonymousVisitor && (
               <button
@@ -524,7 +524,7 @@ const Oeuvre = () => {
                 onClick={handleSignupClick}
                 className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white shadow-[0_4px_10px_rgba(0,0,0,0.18)] transition hover:bg-red-700"
               >
-                S&apos;inscrire
+                {t("oeuvre.signup")}
               </button>
             )}
           </div>
@@ -536,23 +536,23 @@ const Oeuvre = () => {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1 text-right">
                 <h2 className="font-serif text-xl font-semibold text-gray-800">
-                  {artwork?.artwork_title || "Œuvre sans titre"}
+                  {artwork?.artwork_title || t("oeuvre.untitled")}
                 </h2>
                 <p className="text-sm italic text-gray-500">
-                  {artistName || "Artiste inconnu"}
+                  {artistName || t("oeuvre.unknown_artist")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsArtistPhotoModalOpen(true)}
                 disabled={!artistPhoto}
-                aria-label="Ouvrir la photo de l'artiste"
+                aria-label={t("oeuvre.open_artist_photo")}
                 className="h-[70px] w-[70px] shrink-0 overflow-hidden rounded-full border border-gray-300 bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {artistPhoto ? (
-                  <img src={artistPhoto} alt={artistName || "Artiste"} className="h-full w-full object-cover" />
+                  <img src={artistPhoto} alt={artistName || t("oeuvre.artist_alt")} className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-[10px] text-gray-500">Aucune photo</span>
+                  <span className="text-[10px] text-gray-500">{t("oeuvre.no_photo")}</span>
                 )}
               </button>
             </div>
@@ -562,7 +562,7 @@ const Oeuvre = () => {
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/45 bg-white/25 px-4 py-2.5 text-sm font-medium text-gray-800 shadow-[0_10px_30px_rgba(0,0,0,0.10)] backdrop-blur-md"
               >
                 <Play className="h-4 w-4" aria-hidden />
-                Écouter l&apos;analyse
+                {t("oeuvre.listen_analysis")}
               </button>
             )}
           </div>
@@ -571,7 +571,7 @@ const Oeuvre = () => {
           <div className="w-full m-0 p-0">
             <img
               src={artworkMainImage}
-              alt="œuvre"
+              alt={t("oeuvre.image_alt")}
               className="block w-full h-56 object-cover m-0 p-0 border-0 rounded-none"
               style={{ imageRendering: "auto" }}
             />
@@ -585,19 +585,19 @@ const Oeuvre = () => {
           </div>
 
           <div className="mb-4 px-5">
-            <h3 className="mb-1 font-semibold text-gray-700">🧾 Détails de l'œuvre</h3>
+            <h3 className="mb-1 font-semibold text-gray-700">{t("oeuvre.details_title")}</h3>
             <p className="text-sm text-gray-600 leading-[1.6]">
-              <span className="font-semibold">Dimensions :</span> {artworkDimensions || "Non renseignées"}
+              <span className="font-semibold">{t("oeuvre.dimensions_label")}</span> {artworkDimensions || t("oeuvre.dimensions_empty")}
             </p>
             <p className="text-sm text-gray-600 leading-[1.6]">
-              <span className="font-semibold">Technique :</span> {artworkTechnique || "Non renseignée"}
+              <span className="font-semibold">{t("oeuvre.technique_label")}</span> {artworkTechnique || t("oeuvre.technique_empty")}
             </p>
           </div>
 
           {/* STYLES */}
           <div className="mx-5 mb-6 rounded-xl border-2 border-yellow-500 pb-4 pl-[10px] pr-[10px] pt-1">
             <h3 className="mb-2 text-sm font-semibold">
-              Comment veux-tu que l'IA te parle ?
+              {t("oeuvre.styles_title")}
             </h3>
             <div className="w-full grid grid-cols-4 gap-[6px]">
               {styles.slice(0, 8).map((style) => {
@@ -627,13 +627,13 @@ const Oeuvre = () => {
                 </button>
               )})}
             </div>
-            {stylesLoading && <p className="text-xs text-gray-500 mt-2">Chargement des styles…</p>}
+            {stylesLoading && <p className="text-xs text-gray-500 mt-2">{t("oeuvre.styles_loading")}</p>}
           </div>
 
           {/* À PROPOS */}
           <div className="-mt-4 mb-6 !h-auto px-5" style={{ height: "auto" }}>
             <h3 className="mb-0 font-semibold text-gray-700">
-              📖 À propos de cette œuvre
+              {t("oeuvre.about_title")}
             </h3>
             <p className="text-sm text-gray-600 leading-[1.6]">
               {artworkDescriptionText}
@@ -643,7 +643,7 @@ const Oeuvre = () => {
           {/* EMOTIONS */}
           <div className="-mt-4 mb-6 px-5">
             <h3 className="mb-1 font-semibold text-gray-700">
-              💛 Quel est ton ressenti devant cette œuvre ?
+              {t("oeuvre.emotions_title")}
             </h3>
 
             <div
@@ -671,16 +671,16 @@ const Oeuvre = () => {
                 );
               })}
             </div>
-            {emotionsLoading && <p className="text-xs text-gray-500 mt-2">Chargement des émotions…</p>}
+            {emotionsLoading && <p className="text-xs text-gray-500 mt-2">{t("oeuvre.emotions_loading")}</p>}
           </div>
 
           {/* NOTE */}
           <div className="-mt-4 px-5 pb-8 text-center">
             <p className="mb-2 text-sm leading-[1.6]">
-              Donnez <span className="font-bold">VOTRE</span> note en cœurs
+              <Trans i18nKey="oeuvre.rate_prompt" ns="visitor" components={{ b: <span className="font-bold" /> }} />
             </p>
             <p className="-mt-2 mb-0 text-xs italic text-gray-500 leading-[1.6]">
-              Ici, c'est votre ressenti qui compte avant tout.
+              {t("oeuvre.rate_subtitle")}
             </p>
 
             <div className="flex w-full justify-between -mt-7 cursor-pointer">
@@ -704,7 +704,7 @@ const Oeuvre = () => {
                 disabled={savingFeedback}
                 className="-mt-4 w-full rounded-lg bg-yellow-400 border border-yellow-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {savingFeedback ? "Validation..." : "Valider"}
+                {savingFeedback ? t("oeuvre.validating") : t("oeuvre.validate")}
               </button>
             )}
             {feedbackError && <p className="mt-2 text-xs text-red-600">{feedbackError}</p>}
@@ -719,7 +719,7 @@ const Oeuvre = () => {
           {artistPhoto ? (
             <img
               src={artistPhoto}
-              alt={artistName || "Artiste"}
+              alt={artistName || t("oeuvre.artist_alt")}
               className="max-h-[82vh] w-full rounded-lg object-contain"
             />
           ) : null}

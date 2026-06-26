@@ -162,5 +162,21 @@
     "continue_lang": "Continue audio generation for this language",
     "no_text": "No mediation text",
     "no_persona_audio": "Persona not configured for audio"
+  },
+  "qr_warn_no_expo": "No exhibition assigned — the QR code will work but without exhibition context for the visitor.",
+  "mediation_lang_help_plan_range": "AI generation: up to {{count}} languages included in your subscription. Choose an optional language above to enable the second language.",
+  "text_edit": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "unsaved_title": "Unsaved changes",
+    "unsaved_desc": "You have edited the text without saving it. Do you really want to close without saving?",
+    "continue_editing": "Continue editing",
+    "discard": "Close without saving"
+  },
+  "photo_capture": {
+    "required": "Photo required",
+    "import": "Import",
+    "change": "Change photo",
+    "photograph": "Take photo"
   }
 }

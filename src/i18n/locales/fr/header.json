@@ -43,5 +43,9 @@
   "standby_cancel_loading": "Annulation…",
   "standby_cancel_success": "Demande de plan veille annulée.",
   "standby_cancel_error": "Impossible d'annuler la demande de veille.",
-  "standby_cancel_closed": "Le délai de rétractation de 24 h est écoulé ou la nouvelle échéance a démarré."
+  "standby_cancel_closed": "Le délai de rétractation de 24 h est écoulé ou la nouvelle échéance a démarré.",
+  "not_found": {
+    "title": "Oups ! Page introuvable",
+    "home": "Retour à l'accueil"
+  }
 }

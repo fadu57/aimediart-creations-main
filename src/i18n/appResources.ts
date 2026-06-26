@@ -77,6 +77,12 @@ import deSponsors from "./locales/de/sponsors.json";
 import esSponsors from "./locales/es/sponsors.json";
 import itSponsors from "./locales/it/sponsors.json";
 
+import frDashboard from "./locales/fr/dashboard.json";
+import enDashboard from "./locales/en/dashboard.json";
+import deDashboard from "./locales/de/dashboard.json";
+import esDashboard from "./locales/es/dashboard.json";
+import itDashboard from "./locales/it/dashboard.json";
+
 type AppResourceBundle = {
   catalogue: typeof frCatalogue;
   artists: typeof frArtists;
@@ -90,6 +96,7 @@ type AppResourceBundle = {
   trash: typeof frTrash;
   settings: typeof frSettings;
   sponsors: typeof frSponsors;
+  dashboard: typeof frDashboard;
 };
 
 export const appResources: Record<SupportedLang, AppResourceBundle> = {
@@ -106,6 +113,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     trash: frTrash,
     settings: frSettings,
     sponsors: frSponsors,
+    dashboard: frDashboard,
   },
   en: {
     catalogue: enCatalogue,
@@ -120,6 +128,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     trash: enTrash,
     settings: enSettings,
     sponsors: enSponsors,
+    dashboard: enDashboard,
   },
   de: {
     catalogue: deCatalogue,
@@ -134,6 +143,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     trash: deTrash,
     settings: deSettings,
     sponsors: deSponsors,
+    dashboard: deDashboard,
   },
   es: {
     catalogue: esCatalogue,
@@ -148,6 +158,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     trash: esTrash,
     settings: esSettings,
     sponsors: esSponsors,
+    dashboard: esDashboard,
   },
   it: {
     catalogue: itCatalogue,
@@ -162,5 +173,6 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     trash: itTrash,
     settings: itSettings,
     sponsors: itSponsors,
+    dashboard: itDashboard,
   },
 };

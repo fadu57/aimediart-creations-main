@@ -463,7 +463,7 @@ export function AddArtistDialog({
         }
       } catch (error) {
         if (cancelled) return;
-        const msg = error instanceof Error ? error.message : "Chargement impossible.";
+        const msg = error instanceof Error ? error.message : t("messages.bio_load_failed");
         toast.error(`artist_bios : ${msg}`);
         console.warn("[AddArtistDialog] artist_bios", msg);
         biosLoadedRef.current = false;
@@ -477,7 +477,7 @@ export function AddArtistDialog({
     return () => {
       cancelled = true;
     };
-  }, [bioArtistId]);
+  }, [bioArtistId, t]);
 
   useEffect(() => {
     void resolveBioPromptStyleId().then(setBioPromptStyleId);
@@ -864,7 +864,7 @@ export function AddArtistDialog({
 
         if (error || !data) {
           artistLoadInFlightRef.current = null;
-          toast.error(error?.message ?? "Fiche introuvable.");
+          toast.error(error?.message ?? t("messages.artist_not_found"));
           onOpenChangeRef.current(false);
           return;
         }
@@ -886,7 +886,7 @@ export function AddArtistDialog({
     artistLoadInFlightRef.current = null;
     resetAll();
     setFicheReadOnly(false);
-  }, [open, artistIdProp, initialEditMode, resetAll]);
+  }, [open, artistIdProp, initialEditMode, resetAll, t]);
 
   const handleUseExistingArtistFiche = () => {
     if (!duplicateRow) return;
@@ -911,7 +911,7 @@ export function AddArtistDialog({
     const types = form.getValues("artist_typ");
   
     if (!p || !n || !types.length) {
-      toast.error("Renseignez le prénom, le nom et au moins un type d’art.");
+      toast.error(t("messages.bio_required_triple"));
       return;
     }
   
@@ -934,7 +934,7 @@ export function AddArtistDialog({
       setActiveLanguage("fr");
       toast.success(t("messages.bio_generated"));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erreur lors de la génération.";
+      const msg = e instanceof Error ? e.message : t("messages.bio_generation_error");
       toast.error(msg);
     } finally {
       setGeneratingBio(false);
@@ -943,7 +943,7 @@ export function AddArtistDialog({
 
   const uploadPendingPhotoFile = async (): Promise<string> => {
     if (!pendingPhotoFile) {
-      throw new Error("Aucun fichier à envoyer.");
+      throw new Error(t("messages.no_file"));
     }
 
     const ext =
@@ -989,7 +989,7 @@ export function AddArtistDialog({
       try {
         new URL(url);
       } catch {
-        toast.error(`URL invalide pour ${type}.`);
+        toast.error(t("messages.invalid_url", { type }));
         throw new Error("url");
       }
 
@@ -1001,7 +1001,7 @@ export function AddArtistDialog({
     if (rows.length === 0) return;
 
     const { error } = await supabase.from("social_links").insert(rows);
-    if (error) throw new Error(`Réseaux sociaux : ${error.message}`);
+    if (error) throw new Error(t("messages.social_links_prefix", { message: error.message }));
   };
 
   const onSubmit = async (values: ArtistFormInput) => {
@@ -1019,12 +1019,12 @@ export function AddArtistDialog({
       shouldPersistBios &&
       !ARTIST_BIO_LANGUAGES.some((lang) => (artistBios[lang] ?? "").trim())
     ) {
-      toast.error("La biographie est requise avant l’enregistrement.");
+      toast.error(t("messages.bio_required"));
       return;
     }
 
     if (!phoneValid) {
-      toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+      toast.error(t("messages.phone_invalid"));
       return;
     }
 
@@ -1052,7 +1052,7 @@ export function AddArtistDialog({
         sessionAgency || resolvedStable || resolved || fallbackArtistAgency;
 
       if (!currentAgencyId) {
-        throw new Error("Impossible de déterminer l'agence de l'utilisateur connecté.");
+        throw new Error(t("messages.agency_undetermined"));
       }
 
       let photoPublicUrl: string | null = null;
@@ -1132,7 +1132,7 @@ export function AddArtistDialog({
           savedArtistId = editingArtistId;
         }
 
-        toast.success("Artiste mis à jour.");
+        toast.success(t("messages.artist_updated"));
       } else {
         const payloadCandidates: ArtistsTableInsert[] = [
           { ...(payloadBase as ArtistsTableInsert), artist_image: photoPublicUrl },
@@ -1165,11 +1165,11 @@ export function AddArtistDialog({
         if (lastError) throw lastError;
 
         savedArtistId = createdArtistId;
-        toast.success("Artiste enregistré.");
+        toast.success(t("messages.artist_saved"));
       }
 
       if (!savedArtistId) {
-        throw new Error("artist_id introuvable après sauvegarde.");
+        throw new Error(t("messages.artist_id_missing"));
       }
 
       if (shouldPersistBios) {
@@ -1181,7 +1181,7 @@ export function AddArtistDialog({
           );
 
         if (agencyLinkError) {
-          throw new Error(`Liaison agence : ${agencyLinkError.message}`);
+          throw new Error(t("messages.agency_link_prefix", { message: agencyLinkError.message }));
         }
 
         for (const lang of ARTIST_BIO_LANGUAGES) {
@@ -1211,7 +1211,7 @@ export function AddArtistDialog({
       onOpenChangeRef.current(false);
       onSuccess?.(savedArtistId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Enregistrement impossible.";
+      const msg = e instanceof Error ? e.message : t("messages.save_failed");
       if (msg !== "url") toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -1752,7 +1752,7 @@ export function AddArtistDialog({
                             onChange={(e) => {
                               setArtistBios((prev) => ({ ...prev, [lang]: e.target.value }));
                             }}
-                            placeholder={`Bio en ${lang.toUpperCase()}… (spécifique à votre organisation)`}
+                            placeholder={t("bio_placeholder_lang", { lang: lang.toUpperCase() })}
                             disabled={ficheReadOnly}
                             spellCheck
                             lang={lang}
@@ -1823,7 +1823,7 @@ export function AddArtistDialog({
                           const prepared = await prepareImageForSupabaseUpload(f);
                           markPhotoAsChanged(prepared);
                         } catch (err) {
-                          const msg = err instanceof Error ? err.message : "Traitement de l’image impossible.";
+                          const msg = err instanceof Error ? err.message : t("messages.image_processing_failed");
                           toast.error(msg);
                           markPhotoAsChanged(null);
                         } finally {
@@ -2078,14 +2078,14 @@ export function AddArtistDialog({
       <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
         <AlertDialogContent className="z-[250]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Modifications non enregistrées</AlertDialogTitle>
+            <AlertDialogTitle>{t("discard.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Des modifications non enregistrées existent. Fermer la fiche ?
+              {t("discard.desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Continuer l&apos;édition</AlertDialogCancel>
-            <AlertDialogAction onClick={finalizeClose}>Fermer sans enregistrer</AlertDialogAction>
+            <AlertDialogCancel>{t("discard.continue")}</AlertDialogCancel>
+            <AlertDialogAction onClick={finalizeClose}>{t("discard.close")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

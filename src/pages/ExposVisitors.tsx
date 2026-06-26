@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import { ArchiveRestore, Eye, Loader2, Trash2 } from "lucide-react";
 
 import {
@@ -56,6 +57,7 @@ function openDatePickerOnClick(e: React.MouseEvent<HTMLInputElement>) {
 }
 
 export default function ExposVisitors() {
+  const { t } = useTranslation("expos");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const filterExpoId = searchParams.get("expo_id")?.trim() || null;
@@ -124,7 +126,7 @@ export default function ExposVisitors() {
       .map((v) => ({
         id: String(v.id),
         source: "visitors" as const,
-        first_name: "Anonyme",
+        first_name: t("visitors.anonymous"),
         last_name: null,
         pseudo: v.visitor_pseudo?.trim() || null,
         email: null,
@@ -221,7 +223,7 @@ export default function ExposVisitors() {
     const merged = [...profileRows, ...anonRows.filter((r) => !seen.has(r.id))];
     setRows(merged);
     setLoading(false);
-  }, [canAccess, currentRoleId, currentAgencyId]);
+  }, [canAccess, currentRoleId, currentAgencyId, t]);
 
   const softDelete = async (row: VisitorRow) => {
     const table = row.source === "visitors" ? "visitors" : "profiles";
@@ -229,7 +231,7 @@ export default function ExposVisitors() {
       .from(table)
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", row.id);
-    if (err) { alert(`Erreur : ${err.message}`); return; }
+    if (err) { alert(t("visitors.alert_error", { message: err.message })); return; }
     setRows((prev) => prev.filter((r) => r.id !== row.id));
   };
 
@@ -314,7 +316,7 @@ export default function ExposVisitors() {
     <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
       <div className="flex items-center gap-2">
         <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn" onClick={() => navigate("/expos")}>
-          ← Retour aux expositions
+          {t("visitors.back_to_expos")}
         </Button>
       </div>
 
@@ -322,24 +324,24 @@ export default function ExposVisitors() {
         <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle>
             {filterExpoId
-              ? `Visiteurs — ${expoById.get(filterExpoId) ?? filterExpoId}`
-              : "Visiteurs inscrits"}
+              ? t("visitors.title_for_expo", { name: expoById.get(filterExpoId) ?? filterExpoId })
+              : t("visitors.title_registered")}
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" className="backoffice-toolbar-outline-btn h-7 gap-1 text-xs" asChild>
               <Link to="/visiteurs-corbeille">
                 <ArchiveRestore className="h-3.5 w-3.5" />
-                Corbeille
+                {t("visitors.trash")}
               </Link>
             </Button>
             <span className="text-sm text-muted-foreground whitespace-nowrap">
-              {sortedRows.length} visiteur{sortedRows.length !== 1 ? "s" : ""}
+              {t("visitors.count", { count: sortedRows.length })}
             </span>
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Chargement…</p>
+            <p className="text-sm text-muted-foreground">{t("visitors.loading")}</p>
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
           ) : (
@@ -347,12 +349,12 @@ export default function ExposVisitors() {
               <thead>
                 <tr className="border-b text-left">
                   <th className="w-8 px-1 py-1" />
-                  <th className="w-44 px-2 py-1">Nom <SortButtons column="name" /></th>
-                  <th className="w-36 px-2 py-1">Pseudo <SortButtons column="pseudo" /></th>
-                  <th className="w-52 px-2 py-1">Email <SortButtons column="email" /></th>
-                  <th className="w-36 px-2 py-1">Exposition <SortButtons column="expo" /></th>
+                  <th className="w-44 px-2 py-1">{t("visitors.col_name")} <SortButtons column="name" /></th>
+                  <th className="w-36 px-2 py-1">{t("visitors.col_pseudo")} <SortButtons column="pseudo" /></th>
+                  <th className="w-52 px-2 py-1">{t("visitors.col_email")} <SortButtons column="email" /></th>
+                  <th className="w-36 px-2 py-1">{t("visitors.col_expo")} <SortButtons column="expo" /></th>
                   <th className="w-64 px-2 py-1 text-center">
-                    Inscription du … au <SortButtons column="created_at" />
+                    {t("visitors.col_registration")} <SortButtons column="created_at" />
                   </th>
                   <th className="w-8 px-1 py-1" />
                 </tr>
@@ -363,7 +365,7 @@ export default function ExposVisitors() {
                       type="text"
                       value={filterName}
                       onChange={(e) => setFilterName(e.target.value)}
-                      placeholder="Filtrer…"
+                      placeholder={t("visitors.filter_placeholder")}
                       className="h-7 text-xs"
                     />
                   </td>
@@ -372,7 +374,7 @@ export default function ExposVisitors() {
                       type="text"
                       value={filterPseudo}
                       onChange={(e) => setFilterPseudo(e.target.value)}
-                      placeholder="Filtrer…"
+                      placeholder={t("visitors.filter_placeholder")}
                       className="h-7 text-xs"
                     />
                   </td>
@@ -383,7 +385,7 @@ export default function ExposVisitors() {
                       onChange={(e) => setFilterExpoFilter(e.target.value)}
                       className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
                     >
-                      <option value="">Toutes</option>
+                      <option value="">{t("visitors.all_f")}</option>
                       {expos.map((e) => (
                         <option key={e.id} value={e.id}>{e.expo_name ?? e.id}</option>
                       ))}
@@ -396,7 +398,7 @@ export default function ExposVisitors() {
                         value={filterDateFrom}
                         onChange={(e) => setFilterDateFrom(e.target.value)}
                         onClick={openDatePickerOnClick}
-                        title="Du"
+                        title={t("visitors.date_from")}
                         className={DATE_FILTER_INPUT_CLASS}
                       />
                       <Input
@@ -404,7 +406,7 @@ export default function ExposVisitors() {
                         value={filterDateTo}
                         onChange={(e) => setFilterDateTo(e.target.value)}
                         onClick={openDatePickerOnClick}
-                        title="Au"
+                        title={t("visitors.date_to")}
                         className={DATE_FILTER_INPUT_CLASS}
                       />
                     </div>
@@ -439,7 +441,7 @@ export default function ExposVisitors() {
                       <td className="px-1 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          title="Supprimer"
+                          title={t("visitors.delete")}
                           onClick={() => setDeleteConfirmRow(row)}
                           className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-destructive"
                         >
@@ -452,7 +454,7 @@ export default function ExposVisitors() {
                 {sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-2 py-2 text-muted-foreground">
-                      Aucun visiteur inscrit.
+                      {t("visitors.none")}
                     </td>
                   </tr>
                 )}
@@ -468,38 +470,45 @@ export default function ExposVisitors() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce visiteur ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("visitors.delete_confirm_title")}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  Vous allez supprimer{" "}
-                  <span className="font-medium text-foreground">
-                    {deleteConfirmRow
-                      ? `${deleteConfirmRow.first_name || ""} ${deleteConfirmRow.last_name || ""}`.trim()
-                        || deleteConfirmRow.pseudo?.trim()
-                        || "ce visiteur"
-                      : "ce visiteur"}
-                  </span>
-                  .
+                  <Trans
+                    i18nKey="visitors.delete_intro"
+                    ns="expos"
+                    values={{
+                      name: deleteConfirmRow
+                        ? `${deleteConfirmRow.first_name || ""} ${deleteConfirmRow.last_name || ""}`.trim()
+                          || deleteConfirmRow.pseudo?.trim()
+                          || t("visitors.this_visitor")
+                        : t("visitors.this_visitor"),
+                    }}
+                    components={{ name: <span className="font-medium text-foreground" /> }}
+                  />
                 </p>
                 <p className="font-semibold text-destructive">
-                  Cette suppression n&apos;est pas définitive.
+                  {t("visitors.delete_not_permanent")}
                 </p>
                 <p>
-                  Le visiteur sera déplacé dans la{" "}
-                  <Link to="/visiteurs-corbeille" className="font-medium text-foreground underline underline-offset-2">
-                    corbeille visiteurs
-                  </Link>
-                  {" "}et pourra être restauré
-                  {canRestore
-                    ? " depuis cette page."
-                    : " par un administrateur (niveaux 1 à 3)."}
+                  <Trans
+                    i18nKey={canRestore ? "visitors.delete_moved_self" : "visitors.delete_moved_admin"}
+                    ns="expos"
+                    components={{
+                      link: (
+                        <Link
+                          to="/visiteurs-corbeille"
+                          className="font-medium text-foreground underline underline-offset-2"
+                        />
+                      ),
+                    }}
+                  />
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t("visitors.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -508,7 +517,7 @@ export default function ExposVisitors() {
                 setDeleteConfirmRow(null);
               }}
             >
-              Supprimer
+              {t("visitors.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

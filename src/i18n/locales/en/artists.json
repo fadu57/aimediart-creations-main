@@ -11,7 +11,6 @@
   "error_load_crash": "Loading error",
   "error_supabase_config": "Supabase configuration missing: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.",
   "error_load_unexpected": "Unexpected error while loading artists.",
-
   "dialog_title_edit": "Profile: {{name}}",
   "dialog_title_artist_fallback": "the artist",
   "dialog_title_create": "Create artist biography",
@@ -22,11 +21,9 @@
   "btn_submitting": "Saving…",
   "btn_save_changes": "Save changes",
   "btn_save": "Save",
-
   "bio_label": "Biography",
   "bio_placeholder": "Editable text after generation or manual input.",
   "required_fields_note": "Required fields",
-
   "duplicate_title": "Duplicate detected",
   "duplicate_desc": "This artist profile already exists. Edit it?",
   "btn_duplicate_no": "No",
@@ -37,18 +34,15 @@
   "duplicate_existing_types": "Art types",
   "btn_use_existing_fiche": "Use this profile",
   "btn_create_new_anyway": "Create a new profile anyway",
-
   "agency_label": "Agency",
   "agency_hint": "Your account is not linked to an agency: select the one concerned by this profile (agency bio).",
   "agency_loading": "Loading agencies…",
   "agency_select_placeholder": "Select an agency",
   "agency_select_empty": "No agency available",
-
   "photo_alt_preview": "Preview",
   "photo_processing_aria": "Processing image",
   "btn_photo_replace": "Replace photo",
   "btn_photo_change": "Change photo",
-
   "form_firstname_label": "First name",
   "form_firstname_placeholder": "First name",
   "form_lastname_label": "Last name",
@@ -92,7 +86,6 @@
   "missing_field_hint_email": "Visitors won't be able to email them, and artwork visit statistics can't be sent to them.",
   "missing_field_learn_why": "Learn more: {{field}}",
   "form_social_label": "Links & social media",
-
   "tableau_title": "Artists — Full table",
   "tableau_back": "Back",
   "tableau_corbeille": "Trash",
@@ -111,12 +104,45 @@
   "tableau_cancel": "Cancel",
   "tableau_confirm": "Delete",
   "tableau_archiving": "Archiving...",
-
   "btn_report_error": "Report incorrect information",
   "btn_report_error_title": "Report incorrect information to the aimediart team",
   "btn_report_error_email_subject": "Artist profile: incorrect information",
   "bio_regen": "✨ Regenerate (AI)",
   "bio_new": "✏️ New bio",
-  "info_shared_profiles": "Artist profiles are shared across all organisations. They can be completed (missing information) but not deleted. If an error is found in existing information, please click «\u00a0Report incorrect information\u00a0» in the profile.",
-  "info_bio_only": "Only the biography can be rewritten to match your organisation."
+  "info_shared_profiles": "Artist profiles are shared across all organisations. They can be completed (missing information) but not deleted. If an error is found in existing information, please click « Report incorrect information » in the profile.",
+  "info_bio_only": "Only the biography can be rewritten to match your organisation.",
+  "detail": {
+    "not_found": "Artist not found.",
+    "back": "Back",
+    "back_to_artists": "Back to artists",
+    "works_count": "Artworks ({{count}})",
+    "visits": "{{count}} visits"
+  },
+  "messages": {
+    "bio_load_failed": "Loading failed.",
+    "artist_not_found": "Record not found.",
+    "bio_required_triple": "Enter the first name, last name and at least one art type.",
+    "bio_generated": "Biography generated successfully.",
+    "bio_generation_error": "Error during generation.",
+    "no_file": "No file to upload.",
+    "invalid_url": "Invalid URL for {{type}}.",
+    "social_links_prefix": "Social links: {{message}}",
+    "bio_required": "A biography is required before saving.",
+    "phone_invalid": "The phone number is invalid for the selected country.",
+    "agency_undetermined": "Unable to determine the logged-in user's organisation.",
+    "artist_updated": "Artist updated.",
+    "artist_saved": "Artist saved.",
+    "artist_id_missing": "artist_id not found after saving.",
+    "agency_link_prefix": "Organisation link: {{message}}",
+    "save_failed": "Saving failed.",
+    "image_processing_failed": "Unable to process the image."
+  },
+  "bio_placeholder_lang": "Bio in {{lang}}… (specific to your organisation)",
+  "loading_bio_tabs": "Loading biographies…",
+  "discard": {
+    "title": "Unsaved changes",
+    "desc": "There are unsaved changes. Close the record?",
+    "continue": "Continue editing",
+    "close": "Close without saving"
+  }
 }

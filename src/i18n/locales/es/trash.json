@@ -7,5 +7,21 @@
   "success_restore": "Elemento restaurado.",
   "success_delete": "Elemento eliminado definitivamente.",
   "error_restore": "No se pudo restaurar el elemento.",
-  "error_delete": "No se pudo eliminar definitivamente el elemento."
+  "error_delete": "No se pudo eliminar definitivamente el elemento.",
+  "back": "Volver",
+  "loading": "Cargando…",
+  "archived_on": "Archivado el {{date}}",
+  "access_restricted": "Acceso reservado a los niveles 1 a 3.",
+  "subtitle": "Restaure una ficha archivada por error.",
+  "subtitle_visitors": "Restaure un visitante archivado por error.",
+  "title_catalogue": "Papelera — Obras",
+  "title_artists": "Papelera — Artistas",
+  "title_expos": "Papelera — Exposiciones",
+  "title_agencies": "Papelera — Organizaciones",
+  "title_users": "Papelera — Usuarios",
+  "title_visitors": "Papelera — Visitantes",
+  "restore_no_rows": "Restauración enviada pero ninguna fila modificada (verifique los permisos RLS).",
+  "visitor_anonymous_label": "Visitante anónimo",
+  "visitor_registered_label": "Visitante registrado",
+  "anonymous": "Anónimo"
 }

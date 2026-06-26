@@ -80,7 +80,7 @@ export default function ArtistsCorbeille() {
 
       if (!data || data.length === 0) {
         console.warn("[ArtistsCorbeille] update OK mais data vide — vérifier RLS sur artists");
-        toast.warning("Restauration envoyée mais aucune ligne modifiée (vérifier les permissions RLS).");
+        toast.warning(t("restore_no_rows"));
         return;
       }
 
@@ -95,7 +95,7 @@ export default function ArtistsCorbeille() {
   if (!canAccess && !authLoading) {
     return (
       <div className="container py-8">
-        <p className="text-sm text-destructive">Accès réservé aux niveaux 1 à 3.</p>
+        <p className="text-sm text-destructive">{t("access_restricted")}</p>
       </div>
     );
   }
@@ -104,12 +104,12 @@ export default function ArtistsCorbeille() {
     <div className="container py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Corbeille — Artistes</h2>
-          <p className="text-muted-foreground">Restaurez une fiche archivée par erreur.</p>
+          <h2 className="text-3xl font-serif font-bold">{t("title_artists")}</h2>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button variant="outline" className="gap-2" asChild>
           <Link to="/artistes">
-            <ArrowLeft className="h-4 w-4" /> Retour
+            <ArrowLeft className="h-4 w-4" /> {t("back")}
           </Link>
         </Button>
       </div>
@@ -118,7 +118,7 @@ export default function ArtistsCorbeille() {
       <RetentionSettingCard tableNames={["artists"]} roleId={role_id} />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
@@ -134,7 +134,7 @@ export default function ArtistsCorbeille() {
                   <div className="min-w-0 space-y-1">
                     <p className="font-semibold truncate">{name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Archivé le {a.deleted_at ? new Date(a.deleted_at).toLocaleString("fr-FR") : "—"}
+                      {t("archived_on", { date: a.deleted_at ? new Date(a.deleted_at).toLocaleString("fr-FR") : "—" })}
                     </p>
                     <RetentionBadge
                       deleted_at={a.deleted_at}

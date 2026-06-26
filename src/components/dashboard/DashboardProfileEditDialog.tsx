@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Check, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
+import i18nInstance from "@/i18n/instance";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,10 +103,16 @@ export function mergeProfileValues(
   };
 }
 
+/** Locale active i18n (fr/en/de/es/it) pour les libellés de mois. */
+function monthLocale(): string {
+  return i18nInstance.language || "fr";
+}
+
 function birthMonthOptions(): Array<{ value: string; label: string }> {
+  const locale = monthLocale();
   return Array.from({ length: 12 }, (_, idx) => {
     const value = String(idx + 1).padStart(2, "0");
-    const raw = new Intl.DateTimeFormat("fr", { month: "long" }).format(new Date(2000, idx, 1));
+    const raw = new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(2000, idx, 1));
     const label = raw.charAt(0).toUpperCase() + raw.slice(1);
     return { value, label };
   });
@@ -115,7 +123,7 @@ function formatBirthMonthLabel(month: string | null | undefined): string {
   if (!m) return "—";
   const idx = Number.parseInt(m, 10) - 1;
   if (!Number.isFinite(idx) || idx < 0 || idx > 11) return m;
-  const raw = new Intl.DateTimeFormat("fr", { month: "long" }).format(new Date(2000, idx, 1));
+  const raw = new Intl.DateTimeFormat(monthLocale(), { month: "long" }).format(new Date(2000, idx, 1));
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
@@ -171,7 +179,8 @@ export function DashboardProfileEditDialog({
   email,
   onSaved,
 }: DashboardProfileEditDialogProps) {
-  const monthOptions = useMemo(() => birthMonthOptions(), []);
+  const { t, i18n } = useTranslation("dashboard");
+  const monthOptions = useMemo(() => birthMonthOptions(), [i18n.language]);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -289,15 +298,15 @@ export function DashboardProfileEditDialog({
     const prenom = firstName.trim();
     const nom = lastName.trim();
     if (!prenom || !nom) {
-      toast.error("Le prénom et le nom sont requis.");
+      toast.error(t("profile_edit.toast_name_required"));
       return;
     }
     if (usernameBlocked) {
-      toast.error("Ce pseudo est déjà utilisé.");
+      toast.error(t("profile_edit.toast_username_taken"));
       return;
     }
     if (!phoneValid) {
-      toast.error("Numéro de téléphone invalide.");
+      toast.error(t("profile_edit.toast_phone_invalid"));
       return;
     }
 
@@ -334,11 +343,11 @@ export function DashboardProfileEditDialog({
       });
       if (authErr) throw authErr;
 
-      toast.success("Profil mis à jour.");
+      toast.success(t("profile_edit.toast_saved"));
       onOpenChange(false);
       onSaved();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Enregistrement impossible.";
+      const msg = e instanceof Error ? e.message : t("profile_edit.toast_save_error");
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -349,27 +358,27 @@ export function DashboardProfileEditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Modifier mon profil</DialogTitle>
+          <DialogTitle>{t("profile_edit.title")}</DialogTitle>
         </DialogHeader>
 
         {loadingForm ? (
           <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            Chargement de vos informations…
+            {t("profile_edit.loading")}
           </div>
         ) : (
           <div className="grid gap-4 py-2">
             {email && (
               <div className="space-y-1.5">
-                <Label>E-mail</Label>
+                <Label>{t("profile_edit.email_label")}</Label>
                 <Input value={email} disabled className="bg-muted/50" />
-                <p className="text-xs text-muted-foreground">L&apos;e-mail ne peut pas être modifié ici.</p>
+                <p className="text-xs text-muted-foreground">{t("profile_edit.email_immutable")}</p>
               </div>
             )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-first">Prénom *</Label>
+                <Label htmlFor="dash-profile-first">{t("profile_edit.firstname")} *</Label>
                 <Input
                   id="dash-profile-first"
                   value={firstName}
@@ -379,7 +388,7 @@ export function DashboardProfileEditDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-last">Nom *</Label>
+                <Label htmlFor="dash-profile-last">{t("profile_edit.lastname")} *</Label>
                 <Input
                   id="dash-profile-last"
                   value={lastName}
@@ -391,7 +400,7 @@ export function DashboardProfileEditDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dash-profile-username">Pseudo</Label>
+              <Label htmlFor="dash-profile-username">{t("profile_edit.username")}</Label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground select-none">
                   @
@@ -420,17 +429,17 @@ export function DashboardProfileEditDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-birth-month">Mois de naissance</Label>
+                <Label htmlFor="dash-profile-birth-month">{t("profile_edit.birth_month")}</Label>
                 <Select
                   value={birthMonth || "__none__"}
                   onValueChange={(v) => setBirthMonth(v === "__none__" ? "" : v)}
                   disabled={saving}
                 >
                   <SelectTrigger id="dash-profile-birth-month">
-                    <SelectValue placeholder="Mois" />
+                    <SelectValue placeholder={t("profile_edit.birth_month_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Non renseigné</SelectItem>
+                    <SelectItem value="__none__">{t("profile_edit.not_provided")}</SelectItem>
                     {monthOptions.map((m) => (
                       <SelectItem key={m.value} value={m.value}>
                         {m.label}
@@ -440,17 +449,17 @@ export function DashboardProfileEditDialog({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-birth-year">Année de naissance</Label>
+                <Label htmlFor="dash-profile-birth-year">{t("profile_edit.birth_year")}</Label>
                 <Select
                   value={birthYear || "__none__"}
                   onValueChange={(v) => setBirthYear(v === "__none__" ? "" : v)}
                   disabled={saving}
                 >
                   <SelectTrigger id="dash-profile-birth-year">
-                    <SelectValue placeholder="Année" />
+                    <SelectValue placeholder={t("profile_edit.birth_year_placeholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Non renseigné</SelectItem>
+                    <SelectItem value="__none__">{t("profile_edit.not_provided")}</SelectItem>
                     {BIRTH_YEARS.map((y) => (
                       <SelectItem key={y} value={y}>
                         {y}
@@ -462,7 +471,7 @@ export function DashboardProfileEditDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dash-profile-phone">Téléphone</Label>
+              <Label htmlFor="dash-profile-phone">{t("profile_edit.phone")}</Label>
               <SmartPhoneInput
                 id="dash-profile-phone"
                 value={phone}
@@ -474,17 +483,17 @@ export function DashboardProfileEditDialog({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-city">Ville</Label>
+                <Label htmlFor="dash-profile-city">{t("profile_edit.city")}</Label>
                 <Input id="dash-profile-city" value={city} onChange={(e) => setCity(e.target.value)} disabled={saving} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="dash-profile-zip">Code postal</Label>
+                <Label htmlFor="dash-profile-zip">{t("profile_edit.zip")}</Label>
                 <Input id="dash-profile-zip" value={zipCode} onChange={(e) => setZipCode(e.target.value)} disabled={saving} />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dash-profile-lang">Langue</Label>
+              <Label htmlFor="dash-profile-lang">{t("profile_edit.language")}</Label>
               <Select value={language || "fr"} onValueChange={setLanguage} disabled={saving}>
                 <SelectTrigger id="dash-profile-lang">
                   <SelectValue />
@@ -503,7 +512,7 @@ export function DashboardProfileEditDialog({
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Annuler
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -514,10 +523,10 @@ export function DashboardProfileEditDialog({
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enregistrement…
+                {t("profile_edit.saving")}
               </>
             ) : (
-              "Enregistrer"
+              t("profile_edit.save")
             )}
           </Button>
         </DialogFooter>

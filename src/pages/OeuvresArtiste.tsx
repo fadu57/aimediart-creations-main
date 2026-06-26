@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import ArtistWorksHeader from "../components/ArtistWorksHeader";
 import CubeSlider from "../components/CubeSlider";
 import { type ArtworkCubeItem } from "../components/CubeFace";
@@ -25,7 +26,8 @@ const NEXT_ARTWORK_MESSAGE = "artworks-artist-next";
 
 const OeuvresArtiste = () => {
   const { artistId } = useParams<{ artistId: string }>();
-  const [artistName, setArtistName] = useState("Artiste");
+  const { t } = useTranslation("visitor");
+  const [artistName, setArtistName] = useState(() => t("artist_works.default_artist"));
   const [artworks, setArtworks] = useState<ArtworkCubeItem[]>([]);
   const [currentArtworkIndex, setCurrentArtworkIndex] = useState(0);
   const [rotationStep, setRotationStep] = useState(0);
@@ -38,7 +40,7 @@ const OeuvresArtiste = () => {
       const routeParam = artistId?.trim();
       if (!routeParam) {
         setArtworks([]);
-        setArtistName("Artiste");
+        setArtistName(t("artist_works.default_artist"));
         setCurrentArtworkIndex(0);
         setRotationStep(0);
         setLoading(false);
@@ -92,18 +94,18 @@ const OeuvresArtiste = () => {
         const computedName =
           artistData.artist_nickname ||
           [artistData.artist_firstname, artistData.artist_lastname].filter(Boolean).join(" ") ||
-          "Artiste";
+          t("artist_works.default_artist");
         setArtistName(computedName);
       }
 
       const mapped =
         artworksData?.map((row) => ({
           id: row.artwork_id,
-          title: row.artwork_title || "Oeuvre sans titre",
+          title: row.artwork_title || t("artist_works.untitled"),
           imageUrl: row.artwork_image_url || "/placeholder.svg",
           description: (() => {
             const teaser = teaserFromArtworkDescription(row.artwork_description_i18n).trim();
-            return teaser || "Sans description";
+            return teaser || t("artist_works.no_description");
           })(),
         })) ?? [];
 
@@ -117,7 +119,7 @@ const OeuvresArtiste = () => {
     };
 
     void loadArtistAndArtworks();
-  }, [artistId]);
+  }, [artistId, t]);
 
   const controlsDisabled = artworks.length <= 1;
 
@@ -168,7 +170,7 @@ const OeuvresArtiste = () => {
       <main className="relative mx-auto h-screen w-[360px] overflow-hidden pt-[56px]">
         {loading ? (
           <div className="flex h-full items-start justify-center pt-16 text-sm text-slate-200/90">
-            Chargement des œuvres...
+            {t("artist_works.loading")}
           </div>
         ) : (
           <CubeSlider

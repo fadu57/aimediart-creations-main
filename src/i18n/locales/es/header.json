@@ -34,5 +34,18 @@
   "settings_submenu_trash_expos": "Exposiciones",
   "settings_submenu_trash_visitors": "Visitantes",
   "logout": "Cerrar sesión",
-  "login": "Iniciar sesión"
+  "login": "Iniciar sesión",
+  "standby_mode_badge": "Modo en espera activado",
+  "standby_mode_active_title": "Plan en espera solicitado",
+  "standby_mode_active_desc": "Su espacio está en modo en espera: solo Inicio y su perfil siguen accesibles. Sus datos y su back-office se conservan.",
+  "standby_mode_effective_at": "Entra en vigor en el próximo vencimiento: {{date}}.",
+  "standby_cancel_cta": "Cancelar la solicitud de espera",
+  "standby_cancel_loading": "Cancelando…",
+  "standby_cancel_success": "Solicitud de plan en espera cancelada.",
+  "standby_cancel_error": "No se pudo cancelar la solicitud de espera.",
+  "standby_cancel_closed": "El plazo de retractación de 24 h ha expirado o el nuevo vencimiento ha comenzado.",
+  "not_found": {
+    "title": "¡Vaya! Página no encontrada",
+    "home": "Volver al inicio"
+  }
 }

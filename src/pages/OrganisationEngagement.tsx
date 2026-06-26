@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { ArrowLeft, Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,39 +47,22 @@ const MEDIATION_LANG_TOOLTIPS: Record<MediationUiLang, string> = {
 };
 
 /** Langues européennes hors catalogue FR/EN/DE/ES/IT — demande de devis Rayonnement. */
-const EUROPEAN_QUOTE_LANGS = [
-  { code: "pt", label: "Portugais" },
-  { code: "nl", label: "Néerlandais" },
-  { code: "pl", label: "Polonais" },
-  { code: "ro", label: "Roumain" },
-  { code: "el", label: "Grec" },
-  { code: "cs", label: "Tchèque" },
-  { code: "hu", label: "Hongrois" },
-  { code: "sv", label: "Suédois" },
-  { code: "da", label: "Danois" },
-  { code: "fi", label: "Finnois" },
-  { code: "no", label: "Norvégien" },
-  { code: "bg", label: "Bulgare" },
-  { code: "hr", label: "Croate" },
-  { code: "sk", label: "Slovaque" },
-  { code: "sl", label: "Slovène" },
-  { code: "lt", label: "Lituanien" },
-  { code: "lv", label: "Letton" },
-  { code: "et", label: "Estonien" },
-  { code: "ga", label: "Irlandais" },
-  { code: "mt", label: "Maltais" },
-  { code: "uk", label: "Ukrainien" },
-  { code: "ca", label: "Catalan" },
+const EUROPEAN_QUOTE_LANG_CODES = [
+  "pt", "nl", "pl", "ro", "el", "cs", "hu", "sv", "da", "fi", "no",
+  "bg", "hr", "sk", "sl", "lt", "lv", "et", "ga", "mt", "uk", "ca",
 ] as const;
 
-type EuropeanQuoteLangCode = (typeof EUROPEAN_QUOTE_LANGS)[number]["code"];
+type EuropeanQuoteLangCode = (typeof EUROPEAN_QUOTE_LANG_CODES)[number];
 
-function formatEuropeanQuoteLangSummary(selectedCodes: EuropeanQuoteLangCode[]): string {
-  if (selectedCodes.length === 0) return "Sélectionner une ou plusieurs langues";
-  if (selectedCodes.length === 1) {
-    return EUROPEAN_QUOTE_LANGS.find((lang) => lang.code === selectedCodes[0])?.label ?? "1 langue";
+/** Nom localisé d'une langue via Intl.DisplayNames (auto-traduit selon la locale UI). */
+function getEuropeanLangLabel(code: string, locale: string): string {
+  try {
+    const label = new Intl.DisplayNames([locale], { type: "language" }).of(code);
+    if (label) return label.charAt(0).toUpperCase() + label.slice(1);
+  } catch {
+    // navigateur non compatible
   }
-  return `${selectedCodes.length} langues sélectionnées`;
+  return code.toUpperCase();
 }
 
 function EngagementEuropeanLangMultiSelect({
@@ -87,7 +72,16 @@ function EngagementEuropeanLangMultiSelect({
   selectedCodes: EuropeanQuoteLangCode[];
   onChange: (codes: EuropeanQuoteLangCode[]) => void;
 }) {
+  const { t, i18n } = useTranslation("home");
+  const locale = i18n.language.slice(0, 2);
   const [open, setOpen] = useState(false);
+
+  const summary =
+    selectedCodes.length === 0
+      ? t("engagement.select_langs_placeholder")
+      : selectedCodes.length === 1
+        ? getEuropeanLangLabel(selectedCodes[0], locale)
+        : t("engagement.n_langs_selected", { count: selectedCodes.length });
 
   const toggleLang = (code: EuropeanQuoteLangCode) => {
     onChange(
@@ -109,7 +103,7 @@ function EngagementEuropeanLangMultiSelect({
           aria-controls="extra-languages-quote-request-list"
           className="h-10 w-full justify-between rounded-xl border-neutral-300 bg-white px-3 text-sm font-normal text-foreground hover:bg-neutral-50"
         >
-          <span className="truncate">{formatEuropeanQuoteLangSummary(selectedCodes)}</span>
+          <span className="truncate">{summary}</span>
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" aria-hidden />
         </Button>
       </PopoverTrigger>
@@ -119,19 +113,20 @@ function EngagementEuropeanLangMultiSelect({
         align="start"
       >
         <div className="flex max-h-[240px] flex-col gap-0.5 overflow-y-auto">
-          {EUROPEAN_QUOTE_LANGS.map((lang) => {
-            const isSelected = selectedCodes.includes(lang.code);
+          {EUROPEAN_QUOTE_LANG_CODES.map((code) => {
+            const isSelected = selectedCodes.includes(code);
+            const label = getEuropeanLangLabel(code, locale);
             return (
               <label
-                key={lang.code}
+                key={code}
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-neutral-100"
               >
                 <Checkbox
                   checked={isSelected}
-                  onCheckedChange={() => toggleLang(lang.code)}
-                  aria-label={lang.label}
+                  onCheckedChange={() => toggleLang(code)}
+                  aria-label={label}
                 />
-                <span>{lang.label}</span>
+                <span>{label}</span>
               </label>
             );
           })}
@@ -184,20 +179,21 @@ function billableExtraLangCount(selectedCount: number, includedFreeCount: number
 function formatMediationLangsIncluded(
   min: number | null | undefined,
   max: number | null | undefined,
+  t: TFunction,
 ): string | null {
   if (min == null && max == null) return null;
   const resolvedMin = min ?? max;
   const resolvedMax = max ?? min;
   if (resolvedMin == null || resolvedMax == null) return null;
   if (resolvedMin === resolvedMax) {
-    return resolvedMin === 1 ? "1 langue" : `${resolvedMin} langues`;
+    return t("engagement.langs_count", { count: resolvedMin });
   }
-  return `${resolvedMin} à ${resolvedMax} langues`;
+  return t("engagement.langs_range", { min: resolvedMin, max: resolvedMax });
 }
 
-function formatAudioLangsIncluded(count: number | null | undefined): string {
-  if (count == null || count <= 0) return "Non";
-  return count === 1 ? "1 langue" : `${count} langues`;
+function formatAudioLangsIncluded(count: number | null | undefined, t: TFunction): string {
+  if (count == null || count <= 0) return t("engagement.no");
+  return t("engagement.langs_count", { count });
 }
 
 function optionUnitPrice(row: PricingRow | null, optionCode: string): number | null {
@@ -308,6 +304,7 @@ function EngagementExtraLangOptionRow({
   pricingVariant?: "priced" | "included";
   onToggleLang: (lang: MediationUiLang) => void;
 }) {
+  const { t } = useTranslation("home");
   const count = selectedLangs.length;
   const billableCount =
     pricingVariant === "included" ? 0 : billableExtraLangCount(count, includedFreeCount);
@@ -323,7 +320,7 @@ function EngagementExtraLangOptionRow({
         <span className="text-[#9d2525]">*</span>
       </p>
       <p className="text-xs text-muted-foreground">
-        Sélectionner la ou les langues supplémentaires souhaitées
+        {t("engagement.select_extra_langs")}
       </p>
       {helperText ? <p className="text-xs italic text-muted-foreground">{helperText}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
@@ -366,11 +363,11 @@ function EngagementExtraLangOptionRow({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
                   {MEDIATION_LANG_TOOLTIPS[lang]}
-                  {isDefaultLang ? " (langue de connexion)" : ""}
+                  {isDefaultLang ? t("engagement.connection_lang_suffix") : ""}
                   {!isDefaultLang && !isSelectable && isLangSelectable(lang)
-                    ? " — limite de langues incluses atteinte"
+                    ? t("engagement.limit_reached")
                     : !isDefaultLang && !isSelectable
-                    ? " — disponible seulement si la médiation inclut cette langue"
+                    ? t("engagement.only_if_mediation")
                     : ""}
                 </TooltipContent>
               </Tooltip>
@@ -380,12 +377,12 @@ function EngagementExtraLangOptionRow({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground/90">
           {!isIncludedPlan ? (
             <span>
-              <span className="font-medium text-foreground">Prix unitaire :</span>{" "}
+              <span className="font-medium text-foreground">{t("engagement.unit_price")}</span>{" "}
               {typeof unitPrice === "number" ? (
                 <>
-                  {formatEur(unitPrice)} / langue{" "}
+                  {formatEur(unitPrice)} {t("engagement.per_lang_suffix")}{" "}
                   <span className="text-muted-foreground">
-                    (plan veille {formatStandbyEurDisplay(standbyUnitPriceFromOption(unitPrice))}/mois)
+                    {t("engagement.standby_per_month", { price: formatStandbyEurDisplay(standbyUnitPriceFromOption(unitPrice)) })}
                   </span>
                 </>
               ) : (
@@ -393,36 +390,36 @@ function EngagementExtraLangOptionRow({
               )}
             </span>
           ) : (
-            <span className="font-medium text-foreground">Sans supplément dans votre abonnement</span>
+            <span className="font-medium text-foreground">{t("engagement.no_supplement")}</span>
           )}
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 whitespace-nowrap">
             <span>
-              <span className="font-medium text-foreground">Langues suppl. :</span> {count}
+              <span className="font-medium text-foreground">{t("engagement.extra_langs_label")}</span> {count}
               {maxSelectableCount != null ? (
-                <span className="text-muted-foreground"> / {maxSelectableCount} max.</span>
+                <span className="text-muted-foreground"> {t("engagement.max_suffix", { max: maxSelectableCount })}</span>
               ) : null}
               {includedSelectedCount > 0 ? (
                 <span className="text-muted-foreground">
                   {" "}
-                  (dont {includedSelectedCount} incluse{includedSelectedCount > 1 ? "s" : ""} dans l&apos;abonnement)
+                  {t("engagement.included_in_subscription", { count: includedSelectedCount })}
                 </span>
               ) : null}
             </span>
             {!isIncludedPlan ? (
               <span>
-                <span className="font-medium text-foreground">Total :</span>{" "}
+                <span className="font-medium text-foreground">{t("engagement.total_label")}</span>{" "}
                 <span className="font-bold text-[#9d2525]">
-                  {typeof totalMonthly === "number" ? `${formatEur(totalMonthly)} / mois TTC` : "—"}
+                  {typeof totalMonthly === "number" ? t("engagement.per_month_ttc", { price: formatEur(totalMonthly) }) : "—"}
                 </span>
               </span>
             ) : (
-              <span className="font-bold text-[#9d2525]">Inclus</span>
+              <span className="font-bold text-[#9d2525]">{t("engagement.included")}</span>
             )}
           </span>
         </div>
       </div>
       <p className="text-xs italic text-[#9d2525]">
-        * La langue par défaut est toujours la langue de connexion
+        {t("engagement.default_lang_note")}
       </p>
     </div>
   );
@@ -460,6 +457,7 @@ async function resolveUserAgencyId(userId: string): Promise<string | null> {
  * Souscription self-service : Étincelle (essai), Atelier / Horizon / Rayonnement.
  */
 export default function OrganisationEngagement() {
+  const { t } = useTranslation("home");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const plan = normalizeSubscribePlanCode(searchParams.get("plan"));
@@ -528,14 +526,14 @@ export default function OrganisationEngagement() {
         if (cancelled) return;
         setPricing(row);
         if (!isEtincelle && !isRayonnement && !row?.pricing_monthly_ttc_eur) {
-          toast.message("Tarifs indisponibles", {
-            description: "Les prix TTC n'ont pas pu être chargés pour ce plan.",
+          toast.message(t("engagement.toast_prices_unavailable_title"), {
+            description: t("engagement.toast_prices_unavailable_desc"),
           });
         }
       } catch (e) {
         if (cancelled) return;
-        toast.error("Impossible de charger les tarifs", {
-          description: e instanceof Error ? e.message : "Erreur inconnue",
+        toast.error(t("engagement.toast_prices_load_failed"), {
+          description: e instanceof Error ? e.message : t("engagement.unknown_error"),
         });
         setPricing(null);
       } finally {
@@ -545,7 +543,7 @@ export default function OrganisationEngagement() {
     return () => {
       cancelled = true;
     };
-  }, [plan, isEtincelle, isRayonnement]);
+  }, [plan, isEtincelle, isRayonnement, t]);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -680,13 +678,14 @@ export default function OrganisationEngagement() {
       formatMediationLangsIncluded(
         pricing?.included_mediation_langs_min,
         pricing?.included_mediation_langs_max,
+        t,
       ),
-    [pricing],
+    [pricing, t],
   );
 
   const audioLangsLabel = useMemo(
-    () => formatAudioLangsIncluded(pricing?.included_audio_langs),
-    [pricing],
+    () => formatAudioLangsIncluded(pricing?.included_audio_langs, t),
+    [pricing, t],
   );
 
   const showSubscribedOptions =
@@ -708,10 +707,10 @@ export default function OrganisationEngagement() {
 
   const handleConfirm = async () => {
     if (isRayonnement) {
-      toast.success(`Demande ${planLabel} enregistrée`, {
+      toast.success(t("engagement.toast_request_saved", { plan: planLabel }), {
         description: extraQuoteEuropeanLangs.length > 0
-          ? "Votre sélection de langues et votre demande complémentaire seront transmises à AIMediArt pour finalisation du devis."
-          : "Votre sélection de langues incluses a été enregistrée. AIMediArt vous contactera pour finaliser le contrat sur mesure.",
+          ? t("engagement.toast_request_desc_quote")
+          : t("engagement.toast_request_desc_default"),
       });
       navigate("/dashboard", { replace: true });
       return;
@@ -724,16 +723,16 @@ export default function OrganisationEngagement() {
         billingCycle: isEtincelle ? "monthly" : billingCycle,
       });
       if (error || !data) {
-        toast.error("Souscription impossible", { description: error ?? "Erreur inconnue" });
+        toast.error(t("engagement.toast_subscribe_failed"), { description: error ?? t("engagement.unknown_error") });
         return;
       }
 
       toast.success(
-        isEtincelle ? "Essai Étincelle activé" : `Abonnement ${planLabel} activé`,
+        isEtincelle ? t("engagement.toast_trial_activated") : t("engagement.toast_subscription_activated", { plan: planLabel }),
         {
           description: hasCommercialDiscount(commercialPreview)
-            ? `Tarif net après remise : ${formatEur(data.net_price_eur)}`
-            : "Votre tableau de bord a été mis à jour.",
+            ? t("engagement.toast_net_price", { price: formatEur(data.net_price_eur) })
+            : t("engagement.toast_dashboard_updated"),
         },
       );
       navigate("/dashboard", { replace: true });
@@ -756,15 +755,15 @@ export default function OrganisationEngagement() {
               className="inline-flex items-center gap-2 justify-self-start text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-              Retour au tableau de bord
+              {t("engagement.back_to_dashboard")}
             </Link>
             <p className="justify-self-center text-center text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-              {isEtincelle ? "Première souscription" : "Passage depuis Étincelle"}
+              {isEtincelle ? t("engagement.first_subscription") : t("engagement.switch_from_etincelle")}
             </p>
             <Link
               to="/organisation"
               className="inline-flex shrink-0 justify-self-end"
-              aria-label="AIMEDIArt — accueil vitrine"
+              aria-label={t("engagement.brand_home_aria")}
             >
               <AimediartBrandLogoBlock size="sm" />
             </Link>
@@ -772,37 +771,37 @@ export default function OrganisationEngagement() {
         </header>
 
         <main className="mx-auto max-w-[720px] px-5 py-10 sm:px-6 sm:py-14">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">Abonnement</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">{t("engagement.subscription")}</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-[2.1rem]">
             {isEtincelle ? (
-              <>
-                Activer l&apos;essai <span className="text-[#9d2525]">Étincelle</span>
-              </>
+              <Trans i18nKey="engagement.activate_trial" ns="home" components={{ accent: <span className="text-[#9d2525]" /> }} />
             ) : (
-              <>
-                Passer à l&apos;abonnement <span className="text-[#9d2525]">{planLabel}</span>
-              </>
+              <Trans
+                i18nKey="engagement.switch_to_plan"
+                ns="home"
+                values={{ plan: planLabel }}
+                components={{ accent: <span className="text-[#9d2525]" /> }}
+              />
             )}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             {isEtincelle
-              ? "Activez l'essai gratuit d'un mois pour votre organisation. Les remises commerciales éventuelles s'appliqueront automatiquement lors d'un passage à un plan payant."
+              ? t("engagement.intro_etincelle")
               : isRayonnement
-                ? "Offre sur mesure pour les réseaux et grands événements. Sélectionnez les langues incluses dans votre contrat ; toute langue au-delà fera l'objet d'un devis complémentaire."
-                : "Choisissez votre mode de facturation. L'offre annuelle applique la réduction affichée par rapport à 12 mois au tarif mensuel."}
+                ? t("engagement.intro_rayonnement")
+                : t("engagement.intro_default")}
           </p>
 
           {loadingPricing ? (
             <p className="mt-8 inline-flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Chargement des tarifs…
+              {t("engagement.loading_prices")}
             </p>
           ) : isEtincelle ? (
             <div className="mt-8 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-5">
-              <p className="text-2xl font-serif font-bold text-[#9d2525]">Essai gratuit · 1 mois</p>
+              <p className="text-2xl font-serif font-bold text-[#9d2525]">{t("engagement.free_trial_1month")}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {pricing?.trial_duration_days ?? 30} jours pour découvrir AIMediArt avec les limites du plan
-                Étincelle.
+                {t("engagement.trial_days_desc", { days: pricing?.trial_duration_days ?? 30 })}
               </p>
             </div>
           ) : (
@@ -819,7 +818,7 @@ export default function OrganisationEngagement() {
                   onClick={() => setBillingCycle("monthly")}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">Facturation mensuelle</span>
+                    <span className="text-sm font-semibold text-foreground">{t("engagement.billing_monthly")}</span>
                     {billingCycle === "monthly" ? (
                       <Check className="h-4 w-4 text-[#9d2525]" aria-hidden />
                     ) : null}
@@ -827,15 +826,15 @@ export default function OrganisationEngagement() {
                   <p className="mt-3 text-2xl font-serif font-bold text-[#9d2525]">
                     {isRayonnement && monthly == null ? (
                       <>
-                        Sur devis
+                        {t("engagement.on_quote")}
                         <span className="mt-1 block font-sans text-sm font-normal text-muted-foreground">
-                          Tarif négocié avec AIMediArt
+                          {t("engagement.negotiated_price")}
                         </span>
                       </>
                     ) : (
                       <>
                         {formatEur(adjustedMonthly)}
-                        <span className="text-sm font-sans font-normal text-muted-foreground"> / mois</span>
+                        <span className="text-sm font-sans font-normal text-muted-foreground"> {t("engagement.per_month")}</span>
                       </>
                     )}
                   </p>
@@ -852,7 +851,7 @@ export default function OrganisationEngagement() {
                   onClick={() => setBillingCycle("annual")}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">Facturation annuelle</span>
+                    <span className="text-sm font-semibold text-foreground">{t("engagement.billing_annual")}</span>
                     {billingCycle === "annual" ? (
                       <Check className="h-4 w-4 text-[#9d2525]" aria-hidden />
                     ) : null}
@@ -860,15 +859,15 @@ export default function OrganisationEngagement() {
                   <p className="mt-3 text-2xl font-serif font-bold text-[#9d2525]">
                     {isRayonnement && adjustedAnnualDiscounted == null ? (
                       <>
-                        Sur devis
+                        {t("engagement.on_quote")}
                         <span className="mt-1 block font-sans text-sm font-normal text-muted-foreground">
-                          Facturation annuelle sur mesure
+                          {t("engagement.custom_annual_billing")}
                         </span>
                       </>
                     ) : (
                       <>
                         {formatEur(adjustedAnnualDiscounted)}
-                        <span className="text-sm font-sans font-normal text-muted-foreground"> / an</span>
+                        <span className="text-sm font-sans font-normal text-muted-foreground"> {t("engagement.per_year")}</span>
                       </>
                     )}
                   </p>
@@ -879,7 +878,7 @@ export default function OrganisationEngagement() {
                       <span className="line-through">{formatEur(adjustedAnnualList)}</span>
                       {adjustedAnnualSavings != null && adjustedAnnualSavings > 0 ? (
                         <span className="ml-2 font-medium text-[#9d2525]">
-                          Économie {formatEur(adjustedAnnualSavings)}
+                          {t("engagement.savings", { price: formatEur(adjustedAnnualSavings) })}
                         </span>
                       ) : null}
                     </p>
@@ -902,38 +901,38 @@ export default function OrganisationEngagement() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="space-y-2">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[#9d2525]">
-                        Votre tarif partenaire
+                        {t("engagement.your_partner_price")}
                       </p>
                       <p className="font-serif text-4xl font-bold leading-none text-[#9d2525] sm:text-[2.75rem]">
                         {formatEur(commercialPreview.net_price_eur)}
                         <span className="ml-2 font-sans text-base font-medium text-muted-foreground">
-                          {billingCycle === "annual" ? "/ an TTC" : "/ mois TTC"}
+                          {billingCycle === "annual" ? t("engagement.per_year_ttc") : t("engagement.per_month_ttc_short")}
                         </span>
                       </p>
                     </div>
 
                     <div className="flex flex-col gap-1 rounded-xl border border-[#9d2525]/20 bg-white/80 px-4 py-3 text-sm">
                       <p className="text-muted-foreground">
-                        Tarif catalogue{" "}
+                        {t("engagement.catalog_price")}{" "}
                         <span className="font-medium line-through decoration-[#9d2525]/60">
                           {formatEur(commercialPreview.list_price_eur)}
                         </span>
                       </p>
                       {(commercialPreview.discount_percent ?? 0) > 0 ? (
                         <p className="font-semibold text-[#9d2525]">
-                          Remise {commercialPreview.discount_percent} %
+                          {t("engagement.discount_percent", { percent: commercialPreview.discount_percent })}
                         </p>
                       ) : null}
                       {(commercialPreview.discount_amount_eur ?? 0) > 0 ? (
                         <p className="font-semibold text-[#9d2525]">
-                          Remise {formatEur(commercialPreview.discount_amount_eur)}
+                          {t("engagement.discount_amount", { amount: formatEur(commercialPreview.discount_amount_eur) })}
                         </p>
                       ) : null}
                     </div>
                   </div>
                 ) : commercialKindLabel(commercialPreview.commercial_kind) ? (
                   <p className="text-sm font-medium text-foreground">
-                    Conditions commerciales partenaires appliquées à votre organisation.
+                    {t("engagement.partner_terms_applied")}
                   </p>
                 ) : null}
 
@@ -949,40 +948,40 @@ export default function OrganisationEngagement() {
           {!loadingPricing && !isEtincelle ? (
             <ul className="mt-6 space-y-2 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4 text-sm text-foreground/90">
               {pricing?.pricing_max_oeuvres != null ? (
-                <li>Jusqu&apos;à {pricing.pricing_max_oeuvres} œuvres</li>
+                <li>{t("engagement.up_to_artworks", { count: pricing.pricing_max_oeuvres })}</li>
               ) : null}
-              {maxVisitors != null ? <li>Jusqu&apos;à {maxVisitors} visiteurs / mois</li> : null}
+              {maxVisitors != null ? <li>{t("engagement.up_to_visitors", { count: maxVisitors })}</li> : null}
               {mediationLangsLabel ? (
-                <li>Langues incluses de Médiation : {mediationLangsLabel}</li>
+                <li>{t("engagement.included_mediation_langs", { value: mediationLangsLabel })}</li>
               ) : null}
-              <li>Langues incluses pour l&apos;Audio-guide : {audioLangsLabel}</li>
+              <li>{t("engagement.included_audio_langs", { value: audioLangsLabel })}</li>
               {typeof displayStandbyMonthlyPrice === "number" && displayStandbyMonthlyPrice > 0 ? (
                 <li>
-                  Plan veille :{" "}
+                  {t("engagement.standby_plan_label")}{" "}
                   <span className="text-base font-bold text-[#9d2525]">
                     {billableSubscribedOptionsCount > 0
                       ? formatStandbyEurDisplay(displayStandbyMonthlyPrice)
                       : formatEur(displayStandbyMonthlyPrice)}{" "}
-                    / mois
+                    {t("engagement.per_month")}
                   </span>
                   {showSubscribedOptions && subscribedOptionsCount === 0 ? (
                     <span className="text-sm font-normal text-muted-foreground">
                       {" "}
-                      (hors options souscrites ci-dessous)
+                      {t("engagement.excl_options")}
                     </span>
                   ) : null}
                 </li>
               ) : null}
-              <li>Médiation dialoguée et outils backoffice complets</li>
+              <li>{t("engagement.dialogue_mediation")}</li>
             </ul>
           ) : null}
 
           {!loadingPricing && !isEtincelle && showSubscribedOptions ? (
             <div className="mt-6 space-y-4 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
-              <p className="text-sm font-semibold text-foreground">Options souscrites</p>
+              <p className="text-sm font-semibold text-foreground">{t("engagement.subscribed_options")}</p>
               {typeof extraMediationUnitPrice === "number" || isRayonnement ? (
                 <EngagementExtraLangOptionRow
-                  title="Médiation"
+                  title={t("engagement.mediation")}
                   selectedLangs={extraMediationLangs}
                   unitPrice={extraMediationUnitPrice}
                   defaultLang={defaultConnectionLang}
@@ -991,15 +990,15 @@ export default function OrganisationEngagement() {
                   pricingVariant={isRayonnement ? "included" : "priced"}
                   helperText={
                     isRayonnement
-                      ? "Sélectionnez jusqu'à la limite de langues incluses dans votre contrat Rayonnement, sans supplément."
-                      : "Les langues audio supplémentaires ne peuvent pas dépasser cette sélection."
+                      ? t("engagement.helper_rayonnement_mediation")
+                      : t("engagement.helper_priced_mediation")
                   }
                   onToggleLang={handleToggleExtraMediationLang}
                 />
               ) : null}
               {typeof extraAudioUnitPrice === "number" || isRayonnement ? (
                 <EngagementExtraLangOptionRow
-                  title="Audio-guide"
+                  title={t("engagement.audio_guide")}
                   selectedLangs={extraAudioLangs}
                   unitPrice={extraAudioUnitPrice}
                   defaultLang={defaultConnectionLang}
@@ -1008,10 +1007,10 @@ export default function OrganisationEngagement() {
                   pricingVariant={isRayonnement ? "included" : "priced"}
                   helperText={
                     isRayonnement
-                      ? "Langues audio incluses dans votre contrat, dans la limite de votre sélection Médiation."
+                      ? t("engagement.helper_rayonnement_audio")
                       : extraMediationLangs.length > 0
-                        ? "Seules les langues déjà choisies en Médiation sont disponibles ici (ou aucune)."
-                        : "Choisir une langue ici l'ajoute aussi automatiquement en Médiation."
+                        ? t("engagement.helper_audio_with_mediation")
+                        : t("engagement.helper_audio_default")
                   }
                   isLangSelectable={isAudioLangSelectable}
                   onToggleLang={handleToggleExtraAudioLang}
@@ -1020,10 +1019,10 @@ export default function OrganisationEngagement() {
               {isRayonnement ? (
                 <div className="space-y-2 border-t border-neutral-200 pt-4">
                   <label htmlFor="extra-languages-quote-request" className="text-sm font-semibold text-foreground">
-                    Langues supplémentaires sur devis
+                    {t("engagement.extra_langs_quote")}
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    Précisez toute langue souhaitée en dehors des langues incluses ci-dessus.
+                    {t("engagement.extra_langs_quote_desc")}
                   </p>
                   <EngagementEuropeanLangMultiSelect
                     selectedCodes={extraQuoteEuropeanLangs}
@@ -1038,7 +1037,7 @@ export default function OrganisationEngagement() {
             {!session?.user && !authLoading ? (
               <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
                 <Link to={`/login?redirect=${encodeURIComponent(`/organisation/engagement?plan=${plan}`)}`}>
-                  Connexion pour confirmer
+                  {t("engagement.login_to_confirm")}
                 </Link>
               </Button>
             ) : (
@@ -1057,28 +1056,28 @@ export default function OrganisationEngagement() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                    Souscription…
+                    {t("engagement.subscribing")}
                   </>
                 ) : isEtincelle ? (
-                  "Activer mon essai Étincelle"
+                  t("engagement.activate_my_trial")
                 ) : isRayonnement ? (
-                  "Confirmer ma demande Rayonnement"
+                  t("engagement.confirm_rayonnement")
                 ) : (
-                  "Confirmer mon abonnement"
+                  t("engagement.confirm_subscription")
                 )}
               </Button>
             )}
             <Button asChild variant="outline" className="rounded-xl border-neutral-300">
-              <Link to="/organisation#tarifs">Comparer les offres</Link>
+              <Link to="/organisation#tarifs">{t("engagement.compare_offers")}</Link>
             </Button>
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
             {isEtincelle
-              ? "L'essai est activé immédiatement pour votre organisation. Le règlement en ligne des plans payants sera finalisé prochainement."
+              ? t("engagement.footer_etincelle")
               : isRayonnement
-                ? "Votre sélection de langues et votre demande de devis complémentaire seront transmises à AIMediArt pour finalisation contractuelle."
-                : "Votre abonnement est enregistré immédiatement. Le règlement en ligne sera activé prochainement ; la remise commerciale est figée dans votre contrat."}
+                ? t("engagement.footer_rayonnement")
+                : t("engagement.footer_default")}
           </p>
         </main>
       </div>

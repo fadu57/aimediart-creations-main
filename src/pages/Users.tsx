@@ -3,6 +3,8 @@ import type { User } from "@supabase/supabase-js";
 import { X, Loader2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { ProfileAvatarImage } from "@/components/ProfileAvatarImage";
 import { Button } from "@/components/ui/button";
@@ -568,17 +570,19 @@ async function persistUserEmailChange(params: {
   previousEmail: string;
   nextEmail: string;
   isSelf: boolean;
+  t: TFunction;
 }): Promise<{ changed: boolean; message?: string }> {
+  const { t } = params;
   const prev = normalizeEmail(params.previousEmail);
   const next = normalizeEmail(params.nextEmail);
   if (!next) {
-    throw new Error("L'e-mail est requis.");
+    throw new Error(t("messages.email_required"));
   }
   if (next === prev) {
     return { changed: false };
   }
   if (!/\S+@\S+\.\S+/.test(next)) {
-    throw new Error("Adresse e-mail invalide.");
+    throw new Error(t("messages.email_invalid"));
   }
 
   if (params.isSelf) {
@@ -586,8 +590,7 @@ async function persistUserEmailChange(params: {
     if (error) throw error;
     return {
       changed: true,
-      message:
-        "Un e-mail de confirmation a été envoyé à la nouvelle adresse. Validez le lien pour finaliser le changement.",
+      message: t("messages.email_confirm_sent"),
     };
   }
 
@@ -601,14 +604,14 @@ async function persistUserEmailChange(params: {
   });
   if (error) throw error;
   if (!data?.ok) {
-    throw new Error(data?.error || "Mise à jour e-mail impossible.");
+    throw new Error(data?.error || t("messages.email_update_failed"));
   }
   if (data.unchanged) {
     return { changed: false };
   }
   return {
     changed: true,
-    message: `E-mail de connexion mis à jour : ${data.email || next}`,
+    message: t("messages.email_updated", { email: data.email || next }),
   };
 }
 
@@ -621,6 +624,7 @@ type UserPhotoFieldProps = {
 };
 
 function UserPhotoField({ avatarUrl, photoPreview, saving, inputId, onFileSelected }: UserPhotoFieldProps) {
+  const { t } = useTranslation("utilisateurs");
   return (
     <div className="relative flex h-44 w-full items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
       <ProfileAvatarImage
@@ -633,7 +637,7 @@ function UserPhotoField({ avatarUrl, photoPreview, saving, inputId, onFileSelect
         htmlFor={inputId}
         className="absolute inset-x-0 top-0 z-10 cursor-pointer bg-black/30 px-3 py-2 text-center text-xs font-medium text-white backdrop-blur-[1px] transition hover:bg-black/45"
       >
-        Changer la photo
+        {t("form.change_photo")}
       </label>
       <Input
         id={inputId}
@@ -648,7 +652,7 @@ function UserPhotoField({ avatarUrl, photoPreview, saving, inputId, onFileSelect
           try {
             assertImageFileAllowed(file);
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Image invalide.");
+            toast.error(err instanceof Error ? err.message : t("messages.image_invalid"));
             return;
           }
           onFileSelected(file);
@@ -819,6 +823,7 @@ const Users = ({
   onUserSaved,
   onAvatarResolved,
 }: UsersProps = {}) => {
+  const { t } = useTranslation("utilisateurs");
   const DEBUG_FORCE_DIALOG_OPEN = false;
   const location = useLocation();
   const navigate = useNavigate();
@@ -1300,10 +1305,10 @@ const Users = ({
 
   const resolvedAgencyLabel = useMemo(() => {
     const aid = resolvedAgencyId;
-    if (!aid) return "Aucune agence résolue";
+    if (!aid) return t("messages.no_agency_resolved");
     const byId = agenciesRef.find((a) => a.id === aid);
     return byId?.name_agency || aid;
-  }, [resolvedAgencyId, agenciesRef]);
+  }, [resolvedAgencyId, agenciesRef, t]);
 
   const editingRoleIds = useMemo(
     () => editing?.role_ids ?? (editing?.role_id != null ? [editing.role_id] : []),
@@ -1338,10 +1343,10 @@ const Users = ({
   const emailFieldHint = useMemo(() => {
     if (!canEditEmailField || mode !== "edit" || !editing?.id) return null;
     if (authUser?.id === editing.id) {
-      return "La modification envoie un e-mail de confirmation Supabase à la nouvelle adresse.";
+      return t("messages.email_hint_self");
     }
-    return "Met à jour l'e-mail de connexion (auth.users) pour cet utilisateur.";
-  }, [canEditEmailField, mode, editing?.id, authUser?.id]);
+    return t("messages.email_hint_admin");
+  }, [canEditEmailField, mode, editing?.id, authUser?.id, t]);
 
   const openEdit = (row: UserRow) => {
     const rawAgencyId = safeTrim(row.agency_id);
@@ -1419,7 +1424,7 @@ const Users = ({
         const next = new URLSearchParams(searchParams);
         next.delete("edit_user_id");
         setSearchParams(next, { replace: true });
-        toast.error("Utilisateur introuvable.");
+        toast.error(t("messages.user_not_found"));
         return;
       }
       openEdit(user);
@@ -1460,7 +1465,7 @@ const Users = ({
       if (cancelled) return;
       forcedEditFetchRef.current = null;
       if (!user) {
-        toast.error("Utilisateur introuvable.");
+        toast.error(t("messages.user_not_found"));
         onDialogClosed?.();
         return;
       }
@@ -1695,22 +1700,22 @@ const Users = ({
         const prenom = editing.first_name?.trim() || "";
         const nom = editing.last_name?.trim() || "";
         if (!prenom || !nom) {
-          toast.error("Le prénom et le nom sont requis.");
+          toast.error(t("messages.firstname_lastname_required"));
           setSaving(false);
           return;
         }
         if (!nextRoleId) {
-          toast.error("Au moins un rôle est requis pour créer l'utilisateur.");
+          toast.error(t("messages.role_required"));
           setSaving(false);
           return;
         }
         if (needsOrganisation && !effectiveAgencyId) {
-          toast.error("Sélectionnez une organisation pour les rôles métier.");
+          toast.error(t("messages.org_required"));
           setSaving(false);
           return;
         }
         if (needsExpos && effectiveExpoIds.length === 0) {
-          toast.error("Sélectionnez au moins une exposition pour ce rôle.");
+          toast.error(t("messages.expo_required"));
           setSaving(false);
           return;
         }
@@ -1719,24 +1724,24 @@ const Users = ({
           Number.isFinite(currentRoleId) &&
           !isRoleAssignableBy(currentRoleId, nextRoleId)
         ) {
-          toast.error("Vous ne pouvez pas attribuer un rôle supérieur au vôtre.");
+          toast.error(t("messages.role_too_high"));
           setSaving(false);
           return;
         }
         const effectiveEmail = (editing.email?.trim() || "").toLowerCase();
         if (!effectiveEmail) {
-          toast.error("L'email utilisateur est requis.");
+          toast.error(t("messages.email_user_required"));
           setSaving(false);
           return;
         }
         const tempPassword = temporaryPassword.trim();
         if (tempPassword.length < 6) {
-          toast.error("Le mot de passe provisoire doit contenir au moins 6 caractères.");
+          toast.error(t("messages.password_min"));
           setSaving(false);
           return;
         }
         if (!phoneValid) {
-          toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+          toast.error(t("messages.phone_invalid"));
           setSaving(false);
           return;
         }
@@ -1753,7 +1758,7 @@ const Users = ({
           (createAuthData as { data?: { user_id?: string | null } } | null)?.data?.user_id?.trim() ||
           "";
         if (!createdUserId) {
-          throw new Error("Création Auth réussie mais identifiant utilisateur introuvable.");
+          throw new Error(t("messages.auth_create_no_id"));
         }
 
         // Écriture profil
@@ -1780,21 +1785,21 @@ const Users = ({
           if (expoErr) throw expoErr;
         }
 
-        toast.success(`Utilisateur créé. Email de connexion : ${effectiveEmail}`);
+        toast.success(t("messages.user_created", { email: effectiveEmail }));
       } else {
         if (!phoneValid) {
-          toast.error("Le numéro de téléphone est invalide pour le pays sélectionné.");
+          toast.error(t("messages.phone_invalid"));
           setSaving(false);
           return;
         }
 
         if (needsOrganisation && !effectiveAgencyId) {
-          toast.error("Sélectionnez une organisation pour les rôles métier.");
+          toast.error(t("messages.org_required"));
           setSaving(false);
           return;
         }
         if (needsExpos && effectiveExpoIds.length === 0) {
-          toast.error("Sélectionnez au moins une exposition pour ce rôle.");
+          toast.error(t("messages.expo_required"));
           setSaving(false);
           return;
         }
@@ -1812,6 +1817,7 @@ const Users = ({
           previousEmail: initialEditing?.email ?? "",
           nextEmail: editing.email ?? "",
           isSelf: authUser?.id === editing.id,
+          t,
         });
         if (emailResult.message) emailToast = emailResult.message;
 
@@ -1844,7 +1850,7 @@ const Users = ({
           if (expoErr) throw expoErr;
         }
 
-        toast.success(emailToast || "Utilisateur mis à jour.");
+        toast.success(emailToast || t("messages.user_updated"));
         onAvatarResolved?.(nextPhoto || editing.avatar_url?.trim() || null);
       }
 
@@ -1860,7 +1866,7 @@ const Users = ({
         typeof (e as { message?: unknown }).message === "string"
           ? (e as { message: string }).message
           : null;
-      const msg = supaErr || (e instanceof Error ? e.message : "Enregistrement impossible.");
+      const msg = supaErr || (e instanceof Error ? e.message : t("messages.save_failed"));
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -1870,17 +1876,17 @@ const Users = ({
   const repairAuthAccess = async () => {
     if (!editing) return;
     if (mode !== "edit") {
-      toast.error("Créez d'abord l'utilisateur avant de réparer son accès Auth.");
+      toast.error(t("messages.repair_create_first"));
       return;
     }
     const loginEmail = safeTrim(editing.email).toLowerCase();
     if (!loginEmail) {
-      toast.error("L'email est requis pour réparer l'accès Auth.");
+      toast.error(t("messages.repair_email_required"));
       return;
     }
     const tempPassword = temporaryPassword.trim();
     if (tempPassword.length < 6) {
-      toast.error("Le mot de passe provisoire doit contenir au moins 6 caractères.");
+      toast.error(t("messages.password_min"));
       return;
     }
     const nextRoleId =
@@ -1888,7 +1894,7 @@ const Users = ({
       derivePrimaryRoleId(editing.role_ids ?? []) ??
       (typeof editing.role_id === "number" && editing.role_id > 0 ? editing.role_id : null);
     if (nextRoleId == null || !Number.isFinite(nextRoleId)) {
-      toast.error("Rôle utilisateur introuvable.");
+      toast.error(t("messages.role_not_found"));
       return;
     }
 
@@ -1909,10 +1915,10 @@ const Users = ({
         },
       });
       if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Réparation Auth impossible.");
+      if (!data?.ok) throw new Error(data?.error || t("messages.repair_failed"));
       const resolvedLoginEmail = (data.login_email || loginEmail).trim().toLowerCase();
       setEditing((prev) => (prev ? { ...prev, email: resolvedLoginEmail } : prev));
-      toast.success(`Accès Auth réparé. Connexion: ${resolvedLoginEmail}`);
+      toast.success(t("messages.repair_success", { email: resolvedLoginEmail }));
     } catch (e) {
       let fnMessage = "";
       const maybeContext = (e as { context?: { json?: () => Promise<unknown>; text?: () => Promise<string> } })?.context;
@@ -1932,7 +1938,7 @@ const Users = ({
           // ignorer
         }
       }
-      const msg = fnMessage || (e instanceof Error ? e.message : "Réparation Auth impossible.");
+      const msg = fnMessage || (e instanceof Error ? e.message : t("messages.repair_failed"));
       toast.error(msg);
     } finally {
       setRepairingAuth(false);
@@ -1990,11 +1996,11 @@ const Users = ({
           className="max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
           aria-describedby={undefined}
         >
-          <DialogTitle className="sr-only">{mode === "create" ? "Nouvel utilisateur" : "Fiche de l'utilisateur"}</DialogTitle>
+          <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-serif text-xl text-white sm:text-2xl">
-                {mode === "create" ? "Nouvel utilisateur" : "Fiche de l'utilisateur"}
+                {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
               <div className="flex items-center gap-2">
                 {mode === "edit" && canRepairAuthAccess && (
@@ -2004,7 +2010,7 @@ const Users = ({
                     disabled={saving || repairingAuth || !editing}
                     className="h-9 px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822]"
                   >
-                    {repairingAuth ? "Réparation Auth..." : "Réparer accès Auth"}
+                    {repairingAuth ? t("form.repairing_auth") : t("form.repair_auth")}
                   </Button>
                 )}
                 <Button
@@ -2017,7 +2023,7 @@ const Users = ({
                       : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
                   }
                 >
-                  {saving ? "Enregistrement…" : mode === "create" ? "Enregistrer" : "Enregistrer les modifications"}
+                  {saving ? t("form.saving") : mode === "create" ? t("form.save") : t("form.save_changes")}
                 </Button>
               </div>
             </div>
@@ -2053,7 +2059,7 @@ const Users = ({
               {enrichingEdit && (
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                  Mise à jour des données…
+                  {t("form.updating_data")}
                 </p>
               )}
               <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
@@ -2070,7 +2076,7 @@ const Users = ({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-prenom" className="w-[70px] shrink-0 text-xs">
-                      Prénom
+                      {t("form.firstname")}
                     </Label>
                     <Input
                       id="user-prenom"
@@ -2083,7 +2089,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-nom" className="w-[70px] shrink-0 text-xs">
-                      Nom
+                      {t("form.lastname")}
                     </Label>
                     <Input
                       id="user-nom"
@@ -2096,7 +2102,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-pseudo" className="w-[70px] shrink-0 text-xs">
-                      Pseudo
+                      {t("form.username")}
                     </Label>
                     <Input
                       id="user-pseudo"
@@ -2107,7 +2113,7 @@ const Users = ({
                     />
                   </div>
                   <div className="flex items-start gap-2">
-                    <Label className="w-[70px] shrink-0 text-xs pt-2">Naissance</Label>
+                    <Label className="w-[70px] shrink-0 text-xs pt-2">{t("form.birth")}</Label>
                     <div className="flex flex-1 flex-col gap-2 sm:flex-row">
                       <Select
                         value={editing.birth_month ?? ""}
@@ -2115,7 +2121,7 @@ const Users = ({
                         disabled={saving}
                       >
                         <SelectTrigger id="user-birth-month" className="h-9 flex-1">
-                          <SelectValue placeholder="Mois" />
+                          <SelectValue placeholder={t("form.month")} />
                         </SelectTrigger>
                         <SelectContent>
                           {birthMonthOptions().map((month) => (
@@ -2131,7 +2137,7 @@ const Users = ({
                         disabled={saving}
                       >
                         <SelectTrigger id="user-birth-year" className="h-9 flex-1">
-                          <SelectValue placeholder="Année" />
+                          <SelectValue placeholder={t("form.year")} />
                         </SelectTrigger>
                         <SelectContent>
                           {BIRTH_YEARS.map((year) => (
@@ -2145,7 +2151,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-phone" className="w-[70px] shrink-0 text-xs">
-                      Tél.
+                      {t("form.phone")}
                     </Label>
                     <SmartPhoneInput
                       id="user-phone"
@@ -2168,7 +2174,7 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-email">Email</Label>
+                  <Label htmlFor="user-email">{t("form.email")}</Label>
                   <Input
                     id="user-email"
                     type="email"
@@ -2183,14 +2189,14 @@ const Users = ({
                     <p className="text-xs text-muted-foreground">{emailFieldHint}</p>
                   ) : !canEditEmailField && mode === "edit" ? (
                     <p className="text-xs text-muted-foreground">
-                      L&apos;e-mail ne peut pas être modifié pour ce profil.
+                      {t("form.email_readonly")}
                     </p>
                   ) : null}
                 </div>
                 {(mode === "create" || mode === "edit") && (
                   <div className="space-y-1.5">
                     <Label htmlFor="user-temporary-password">
-                      {mode === "create" ? "Mot de passe provisoire" : "Nouveau mot de passe provisoire"}
+                      {mode === "create" ? t("form.temp_password") : t("form.new_temp_password")}
                     </Label>
                     <Input
                       id="user-temporary-password"
@@ -2199,7 +2205,7 @@ const Users = ({
                       value={temporaryPassword}
                       onChange={(e) => setTemporaryPassword(e.target.value)}
                       disabled={saving}
-                      placeholder="Saisir un mot de passe provisoire"
+                      placeholder={t("form.temp_password_placeholder")}
                     />
                   </div>
                 )}
@@ -2238,10 +2244,10 @@ const Users = ({
                 disabled={saving}
               />
 
-              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
+              {checkingControl && <p className="text-xs text-muted-foreground">{t("form.checking_username")}</p>}
               {!checkingControl && controlExists && (
                 <p className="text-xs text-destructive">
-                  Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.
+                  {t("form.username_taken")}
                 </p>
               )}
 
@@ -2261,7 +2267,7 @@ const Users = ({
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
         <div className="flex w-full shrink-0 flex-wrap items-center gap-4 md:max-w-[min(100%,680px)]">
           <div>
-            <h2 className="text-3xl font-serif font-bold text-white">Utilisateurs</h2>
+            <h2 className="text-3xl font-serif font-bold text-white">{t("list.title")}</h2>
           </div>
         <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
           <Input
@@ -2270,7 +2276,7 @@ const Users = ({
             list="users-search-suggestions"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Rechercher un utilisateur..."
+            placeholder={t("list.search_placeholder")}
             className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
           />
           {searchTerm.trim().length > 0 && (
@@ -2278,8 +2284,8 @@ const Users = ({
               type="button"
               onClick={() => setSearchTerm("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-              aria-label="Effacer la recherche"
-              title="Effacer"
+              aria-label={t("list.clear_search")}
+              title={t("list.clear")}
             >
               <X className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -2298,10 +2304,10 @@ const Users = ({
             className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
             onClick={openCreate}
           >
-            + Nouvel utilisateur
+            {t("list.new_user")}
           </Button>
           <Button asChild type="button" variant="outline" className="backoffice-toolbar-outline-btn">
-            <Link to="/user/utilisateurs" className="text-center leading-tight">Tableau</Link>
+            <Link to="/user/utilisateurs" className="text-center leading-tight">{t("list.table")}</Link>
           </Button>
         </div>
       </div>
@@ -2313,9 +2319,9 @@ const Users = ({
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {loading && <p className="text-sm text-muted-foreground text-center py-12">Chargement des utilisateurs…</p>}
+        {loading && <p className="text-sm text-muted-foreground text-center py-12">{t("list.loading")}</p>}
         {!loading && !error && filteredUsers.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-12">Aucun utilisateur visible.</p>
+          <p className="text-sm text-muted-foreground text-center py-12">{t("list.empty")}</p>
         )}
 
         {filteredUsers.map((u) => (
@@ -2340,12 +2346,12 @@ const Users = ({
                     className="font-sans text-[12px] font-bold italic text-[#000091]"
                     style={{ fontFamily: "Inter, sans-serif" }}
                   >
-                    {`alias "${u.username.trim()}"`}
+                    {t("list.alias", { name: u.username.trim() })}
                   </p>
                 ) : null}
                 <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
                 <p className="text-xs text-muted-foreground">
-                  Dernière connexion&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
+                  {t("list.last_sign_in")}&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
                 </p>
                 {u.phone?.trim() ? <p className="text-sm">{u.phone.trim()}</p> : null}
               </div>
@@ -2366,7 +2372,7 @@ const Users = ({
                 <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-muted/20">
                   {Number(u.role_id) === 4 ? (
                     <span className="px-1 text-center text-[10px] leading-tight text-muted-foreground">
-                      Responsable de toutes les expos de l'organisation
+                      {t("list.org_all_expos")}
                     </span>
                   ) : u.expo_id && expoLogosByKey.get(u.expo_id) ? (
                     <img
@@ -2392,11 +2398,11 @@ const Users = ({
           className="max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
           aria-describedby={undefined}
         >
-          <DialogTitle className="sr-only">{mode === "create" ? "Nouvel utilisateur" : "Fiche de l'utilisateur"}</DialogTitle>
+          <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-serif text-xl text-white sm:text-2xl">
-                {mode === "create" ? "Nouvel utilisateur" : "Fiche de l'utilisateur"}
+                {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
               <div className="flex items-center gap-2">
                 {mode === "edit" && canRepairAuthAccess && (
@@ -2406,7 +2412,7 @@ const Users = ({
                     disabled={saving || repairingAuth || !editing}
                     className="h-9 px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822]"
                   >
-                    {repairingAuth ? "Réparation Auth..." : "Réparer accès Auth"}
+                    {repairingAuth ? t("form.repairing_auth") : t("form.repair_auth")}
                   </Button>
                 )}
                 <Button
@@ -2419,7 +2425,7 @@ const Users = ({
                       : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
                   }
                 >
-                  {saving ? "Enregistrement…" : mode === "create" ? "Enregistrer" : "Enregistrer les modifications"}
+                  {saving ? t("form.saving") : mode === "create" ? t("form.save") : t("form.save_changes")}
                 </Button>
               </div>
             </div>
@@ -2466,7 +2472,7 @@ const Users = ({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-prenom-main" className="w-[70px] shrink-0 text-xs">
-                      Prénom
+                      {t("form.firstname")}
                     </Label>
                     <Input
                       id="user-prenom-main"
@@ -2479,7 +2485,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-nom-main" className="w-[70px] shrink-0 text-xs">
-                      Nom
+                      {t("form.lastname")}
                     </Label>
                     <Input
                       id="user-nom-main"
@@ -2492,7 +2498,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-pseudo-main" className="w-[70px] shrink-0 text-xs">
-                      Pseudo
+                      {t("form.username")}
                     </Label>
                     <Input
                       id="user-pseudo-main"
@@ -2503,7 +2509,7 @@ const Users = ({
                     />
                   </div>
                   <div className="flex items-start gap-2">
-                    <Label className="w-[70px] shrink-0 text-xs pt-2">Naissance</Label>
+                    <Label className="w-[70px] shrink-0 text-xs pt-2">{t("form.birth")}</Label>
                     <div className="flex flex-1 flex-col gap-2 sm:flex-row">
                       <Select
                         value={editing.birth_month ?? ""}
@@ -2511,7 +2517,7 @@ const Users = ({
                         disabled={saving}
                       >
                         <SelectTrigger id="user-birth-month-main" className="h-9 flex-1">
-                          <SelectValue placeholder="Mois" />
+                          <SelectValue placeholder={t("form.month")} />
                         </SelectTrigger>
                         <SelectContent>
                           {birthMonthOptions().map((month) => (
@@ -2527,7 +2533,7 @@ const Users = ({
                         disabled={saving}
                       >
                         <SelectTrigger id="user-birth-year-main" className="h-9 flex-1">
-                          <SelectValue placeholder="Année" />
+                          <SelectValue placeholder={t("form.year")} />
                         </SelectTrigger>
                         <SelectContent>
                           {BIRTH_YEARS.map((year) => (
@@ -2541,7 +2547,7 @@ const Users = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Label htmlFor="user-phone-main" className="w-[70px] shrink-0 text-xs">
-                      Tél.
+                      {t("form.phone")}
                     </Label>
                     <SmartPhoneInput
                       id="user-phone-main"
@@ -2564,7 +2570,7 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-email-main">Email</Label>
+                  <Label htmlFor="user-email-main">{t("form.email")}</Label>
                   <Input
                     id="user-email-main"
                     type="email"
@@ -2579,14 +2585,14 @@ const Users = ({
                     <p className="text-xs text-muted-foreground">{emailFieldHint}</p>
                   ) : !canEditEmailField && mode === "edit" ? (
                     <p className="text-xs text-muted-foreground">
-                      L&apos;e-mail ne peut pas être modifié pour ce profil.
+                      {t("form.email_readonly")}
                     </p>
                   ) : null}
                 </div>
                 {(mode === "create" || mode === "edit") && (
                   <div className="space-y-1.5">
                     <Label htmlFor="user-temporary-password-main">
-                      {mode === "create" ? "Mot de passe provisoire" : "Nouveau mot de passe provisoire"}
+                      {mode === "create" ? t("form.temp_password") : t("form.new_temp_password")}
                     </Label>
                     <Input
                       id="user-temporary-password-main"
@@ -2595,7 +2601,7 @@ const Users = ({
                       value={temporaryPassword}
                       onChange={(e) => setTemporaryPassword(e.target.value)}
                       disabled={saving}
-                      placeholder="Saisir un mot de passe provisoire"
+                      placeholder={t("form.temp_password_placeholder")}
                     />
                   </div>
                 )}
@@ -2634,10 +2640,10 @@ const Users = ({
                 disabled={saving}
               />
 
-              {checkingControl && <p className="text-xs text-muted-foreground">Vérification du pseudo…</p>}
+              {checkingControl && <p className="text-xs text-muted-foreground">{t("form.checking_username")}</p>}
               {!checkingControl && controlExists && (
                 <p className="text-xs text-destructive">
-                  Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.
+                  {t("form.username_taken")}
                 </p>
               )}
 

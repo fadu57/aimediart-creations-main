@@ -34,5 +34,18 @@
   "settings_submenu_trash_expos": "Exhibitions",
   "settings_submenu_trash_visitors": "Visitors",
   "logout": "Log out",
-  "login": "Log in"
+  "login": "Log in",
+  "standby_mode_badge": "Standby mode enabled",
+  "standby_mode_active_title": "Standby plan requested",
+  "standby_mode_active_desc": "Your workspace is in standby mode: only Home and your profile remain accessible. Your data and back-office are preserved.",
+  "standby_mode_effective_at": "Takes effect at the next billing date: {{date}}.",
+  "standby_cancel_cta": "Cancel standby request",
+  "standby_cancel_loading": "Cancelling…",
+  "standby_cancel_success": "Standby plan request cancelled.",
+  "standby_cancel_error": "Unable to cancel the standby request.",
+  "standby_cancel_closed": "The 24-hour withdrawal period has expired or the new billing cycle has started.",
+  "not_found": {
+    "title": "Oops! Page not found",
+    "home": "Return to Home"
+  }
 }

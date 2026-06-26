@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   BarChart3,
   Building2,
@@ -68,7 +70,6 @@ import {
   canDeleteTeamMember,
   canManageTeamMember,
   resolveEffectiveRoleId,
-  roleLevelHint,
 } from "@/lib/roleHierarchy";
 import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
 import { supabase } from "@/lib/supabase";
@@ -76,23 +77,31 @@ import { softDeleteUserProfile } from "@/lib/userSoftDelete";
 import type { StandbyPlanCode } from "@/components/organisation/StandbyPlanModal";
 import Users from "@/pages/Users";
 
-function formatSeniority(startedAt: string | null | undefined): string {
+function formatSeniority(startedAt: string | null | undefined, t: TFunction): string {
   if (!startedAt) return "—";
   const start = new Date(startedAt);
   if (Number.isNaN(start.getTime())) return "—";
   const now = new Date();
   let months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
   if (now.getDate() < start.getDate()) months -= 1;
-  if (months < 1) return "< 1 mois";
-  if (months < 12) return `${months} mois`;
+  if (months < 1) return t("seniority_less_than_month");
+  if (months < 12) return t("seniority_months", { count: months });
   const years = Math.floor(months / 12);
   const rem = months % 12;
-  if (rem === 0) return `${years} an${years > 1 ? "s" : ""}`;
-  return `${years} an${years > 1 ? "s" : ""} ${rem} mois`;
+  if (rem === 0) return t("seniority_years", { count: years });
+  return t("seniority_years_with_months", {
+    years: t("seniority_years", { count: years }),
+    months: t("seniority_months", { count: rem }),
+  });
 }
 
-function formatUsageRatio(used: number, max: number | null | undefined, unlimited: boolean | null | undefined): string {
-  if (unlimited) return `${used} · Illimité`;
+function formatUsageRatio(
+  used: number,
+  max: number | null | undefined,
+  unlimited: boolean | null | undefined,
+  t: TFunction,
+): string {
+  if (unlimited) return t("usage.unlimited_ratio", { used });
   if (max == null) return String(used);
   return `${used} / ${max}`;
 }
@@ -114,9 +123,9 @@ function formatDateFr(iso: string | null | undefined): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function formatEur(value: number | null | undefined): string {
+function formatEur(value: number | null | undefined, t: TFunction): string {
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
-  if (value === 0) return "Gratuit";
+  if (value === 0) return t("usage.free");
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(value);
 }
 
@@ -148,54 +157,59 @@ function subscriptionBadgeVariant(
   }
 }
 
-function subscriptionStatusLabel(status: DashboardSubscription["status"] | undefined): string {
+function subscriptionStatusLabel(status: DashboardSubscription["status"] | undefined, t: TFunction): string {
   switch (status) {
     case "active":
-      return "Actif";
+      return t("subscription.status.active");
     case "trial":
-      return "Essai";
+      return t("subscription.status.trial");
     case "standby":
-      return "Veille";
+      return t("subscription.status.standby");
     case "expired":
-      return "Expiré";
+      return t("subscription.status.expired");
     case "cancelled":
-      return "Résilié";
+      return t("subscription.status.cancelled");
     case "none":
-      return "Aucun";
+      return t("subscription.status.none");
     default:
-      return "Indisponible";
+      return t("subscription.status.unavailable");
   }
 }
 
-function standbyStatusLabel(status: string | null | undefined): string {
+function standbyStatusLabel(status: string | null | undefined, t: TFunction): string {
   switch ((status ?? "").toLowerCase()) {
     case "active":
-      return "Veille active";
+      return t("subscription.standby_status_active");
     case "inactive":
-      return "Inactive";
+      return t("subscription.standby_status_inactive");
     default:
       return "—";
   }
 }
 
-function formatDaysRemaining(days: number): string {
-  if (days > 0) return `${days} jour${days > 1 ? "s" : ""} restant${days > 1 ? "s" : ""}`;
-  if (days === 0) return "Échéance aujourd'hui";
-  return "Période échue";
+function formatDaysRemaining(days: number, t: TFunction): string {
+  if (days > 0) return t("days_remaining", { count: days });
+  if (days === 0) return t("due_today");
+  return t("period_overdue");
 }
 
 function subscriptionIsEtincelle(subscription: DashboardSubscription | null | undefined): boolean {
   return subscriptionIsEtincellePlan(subscription);
 }
 
-function formatLangRange(min: number | null | undefined, max: number | null | undefined): string {
+function formatLangRange(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  t: TFunction,
+): string {
   if (min == null && max == null) return "—";
-  if (min != null && max != null && min !== max) return `${min} à ${max}`;
+  if (min != null && max != null && min !== max) return t("lang_range", { min, max });
   const value = min ?? max;
   return value != null ? String(value) : "—";
 }
 
 const Dashboard = () => {
+  const { t } = useTranslation("dashboard");
   const {
     user,
     role_id,
@@ -282,7 +296,7 @@ const Dashboard = () => {
   const displayName = profileFullName(
     mergedProfile.firstName || (isViewingSelf ? first_name_from_auth(user) : ""),
     mergedProfile.lastName,
-    isViewingSelf ? email || "Utilisateur" : profile?.username || "Membre",
+    isViewingSelf ? email || t("profile.user_fallback") : profile?.username || t("profile.member_fallback"),
   );
   const isGlobalAdmin = hasGlobalStaffRole || hasFullDataAccess(mapRoleNameFromRoleId(globalRoleId));
   const dashboardAgencyId = agency?.id ?? effectiveAgencyId ?? null;
@@ -365,10 +379,10 @@ const Dashboard = () => {
           .insert(storageIds.map((expo_id) => ({ user_id: member.user_id, expo_id })));
         if (insertErr) throw insertErr;
       }
-      toast.success("Expositions mises à jour.");
+      toast.success(t("toast.expos_updated"));
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Mise à jour des expositions impossible.");
+      toast.error(e instanceof Error ? e.message : t("toast.expos_update_error"));
     } finally {
       setSavingExpoUserId(null);
     }
@@ -409,7 +423,7 @@ const Dashboard = () => {
 
     const targetRoleId = deleteMemberTarget.agency_role_id ?? deleteMemberTarget.role_id;
     if (effectiveRoleId === 4 && targetRoleId != null && ![4, 5, 6].includes(targetRoleId)) {
-      toast.error("Suppression non autorisée pour ce rôle.");
+      toast.error(t("toast.delete_role_forbidden"));
       return;
     }
 
@@ -418,11 +432,11 @@ const Dashboard = () => {
       const result = await softDeleteUserProfile(deleteMemberTarget.user_id);
       if (!result.ok) throw new Error(result.message);
 
-      toast.success("Utilisateur envoyé en corbeille.");
+      toast.success(t("toast.user_trashed"));
       setDeleteMemberTarget(null);
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Suppression impossible.");
+      toast.error(e instanceof Error ? e.message : t("toast.delete_error"));
     } finally {
       setDeletingMember(false);
     }
@@ -433,8 +447,8 @@ const Dashboard = () => {
     const full = [deleteMemberTarget.first_name?.trim(), deleteMemberTarget.last_name?.trim()]
       .filter(Boolean)
       .join(" ");
-    return full || deleteMemberTarget.username || "cet utilisateur";
-  }, [deleteMemberTarget]);
+    return full || deleteMemberTarget.username || t("delete_dialog.user_fallback");
+  }, [deleteMemberTarget, t]);
 
   const subscriptionProgress = useMemo(() => {
     if (!subscription?.expires_at || !subscription.started_at) return null;
@@ -455,13 +469,13 @@ const Dashboard = () => {
         ? "/user/utilisateurs?scope=site"
         : "/user/utilisateurs";
     const links: Array<{ to: string; label: string; icon: typeof BarChart3; show: boolean }> = [
-      { to: "/statistiques", label: "Statistiques", icon: BarChart3, show: can("menu_stats") },
-      { to: teamUsersHref, label: "Équipe", icon: UsersIcon, show: can("menu_user") },
-      { to: "/catalogue", label: "Catalogue", icon: ImageIcon, show: can("menu_catalogue") },
-      { to: "/agencies", label: "Organisations", icon: Building2, show: can("menu_agence") },
+      { to: "/statistiques", label: t("quick_links.stats"), icon: BarChart3, show: can("menu_stats") },
+      { to: teamUsersHref, label: t("quick_links.team"), icon: UsersIcon, show: can("menu_user") },
+      { to: "/catalogue", label: t("quick_links.catalogue"), icon: ImageIcon, show: can("menu_catalogue") },
+      { to: "/agencies", label: t("quick_links.organisations"), icon: Building2, show: can("menu_agence") },
     ];
     return links.filter((l) => l.show && !isStandbyNavRestricted);
-  }, [can, isStandbyNavRestricted, dashboardAgencyId]);
+  }, [can, isStandbyNavRestricted, dashboardAgencyId, t]);
 
   return (
     <div className="container py-8 space-y-8">
@@ -470,16 +484,18 @@ const Dashboard = () => {
         <div className="min-w-0 shrink-0 md:flex-1 space-y-3">
           <div>
             <h2 className="text-3xl font-serif font-bold text-white">
-              {loading ? "Mon espace" : `Bonjour, ${displayName.split(" ")[0] || displayName}`}
+              {loading
+                ? t("header.my_space")
+                : t("header.greeting", { name: displayName.split(" ")[0] || displayName })}
             </h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Vue d&apos;ensemble de votre compte, abonnement et équipe
+              {t("header.subtitle")}
             </p>
           </div>
           {canSwitchProfiles && userId ? (
             <div className="max-w-md">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-                Profil affiché
+                {t("header.displayed_profile")}
               </p>
               <DashboardProfileSelector
                 members={profilePickerMembers}
@@ -495,7 +511,7 @@ const Dashboard = () => {
 
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Erreur de chargement</AlertTitle>
+          <AlertTitle>{t("header.load_error")}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -505,7 +521,7 @@ const Dashboard = () => {
       {loading && (
         <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Chargement de votre espace…
+          {t("header.loading")}
         </div>
       )}
 
@@ -519,7 +535,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-gold" />
-                    {isViewingSelf ? "Mon profil" : "Profil membre"}
+                    {isViewingSelf ? t("profile.title_self") : t("profile.title_member")}
                   </CardTitle>
                   {profileUserId && isViewingSelf && (
                     <Button
@@ -530,7 +546,7 @@ const Dashboard = () => {
                       onClick={() => openUserFiche(userId)}
                     >
                       <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                      Modifier
+                      {t("common.edit")}
                     </Button>
                   )}
                 </div>
@@ -554,9 +570,9 @@ const Dashboard = () => {
                     <div className="mt-2 flex flex-wrap gap-2">
                       {isViewingSelf ? (
                         <>
-                          <Badge variant="outline">{role_label || role_name || "Rôle inconnu"}</Badge>
+                          <Badge variant="outline">{role_label || role_name || t("profile.role_unknown")}</Badge>
                           {typeof role_id === "number" && (
-                            <Badge variant="secondary">Niveau {role_id}</Badge>
+                            <Badge variant="secondary">{t("common.level", { level: role_id })}</Badge>
                           )}
                         </>
                       ) : (
@@ -567,9 +583,9 @@ const Dashboard = () => {
                             <Badge variant="outline">{viewedMember.role_label}</Badge>
                           ) : null}
                           {viewedMember?.agency_role_id != null ? (
-                            <Badge variant="secondary">Niveau {viewedMember.agency_role_id}</Badge>
+                            <Badge variant="secondary">{t("common.level", { level: viewedMember.agency_role_id })}</Badge>
                           ) : viewedMember?.role_id != null ? (
-                            <Badge variant="secondary">Niveau {viewedMember.role_id}</Badge>
+                            <Badge variant="secondary">{t("common.level", { level: viewedMember.role_id })}</Badge>
                           ) : null}
                         </>
                       )}
@@ -578,24 +594,24 @@ const Dashboard = () => {
                 </div>
 
                 <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                  <ProfileField label="Prénom" value={textOrDash(mergedProfile.firstName)} />
-                  <ProfileField label="Nom" value={textOrDash(mergedProfile.lastName)} />
-                  <ProfileField label="Pseudo" value={mergedProfile.username ? `@${mergedProfile.username}` : "—"} />
+                  <ProfileField label={t("profile.field_firstname")} value={textOrDash(mergedProfile.firstName)} />
+                  <ProfileField label={t("profile.field_lastname")} value={textOrDash(mergedProfile.lastName)} />
+                  <ProfileField label={t("profile.field_username")} value={mergedProfile.username ? `@${mergedProfile.username}` : "—"} />
                   <ProfileField
-                    label="Mois et année de naissance"
+                    label={t("profile.field_birth")}
                     value={formatBirthDisplay(mergedProfile.birthMonth, mergedProfile.birthYear)}
                   />
-                  <ProfileField icon={Mail} label="E-mail" value={isViewingSelf ? textOrDash(email) : "—"} />
-                  <ProfileField icon={Phone} label="Téléphone" value={textOrDash(mergedProfile.phone)} />
+                  <ProfileField icon={Mail} label={t("profile.field_email")} value={isViewingSelf ? textOrDash(email) : "—"} />
+                  <ProfileField icon={Phone} label={t("profile.field_phone")} value={textOrDash(mergedProfile.phone)} />
                   <ProfileField
                     icon={MapPin}
-                    label="Localisation"
+                    label={t("profile.field_location")}
                     value={
                       [mergedProfile.city, mergedProfile.zipCode, profile?.country_code].filter(Boolean).join(", ") ||
                       "—"
                     }
                   />
-                  <ProfileField icon={Calendar} label="Membre depuis" value={formatDateFr(profile?.created_at)} />
+                  <ProfileField icon={Calendar} label={t("profile.field_member_since")} value={formatDateFr(profile?.created_at)} />
                 </dl>
 
                 {showSponsoringConventionButton && profileAgencyId ? (
@@ -614,7 +630,7 @@ const Dashboard = () => {
                 {(agency || agencyExpos.length > 0) && (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
                     <div className="min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Périmètre</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("profile.scope")}</p>
                       {agency && (
                         <p className="text-sm">
                           <Building2 className="inline h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
@@ -625,7 +641,7 @@ const Dashboard = () => {
                     <div className="min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3 space-y-2">
                       {agencyExpos.length > 0 ? (
                         <div className="space-y-1">
-                          <p className="text-xs text-muted-foreground">Expositions</p>
+                          <p className="text-xs text-muted-foreground">{t("profile.expos")}</p>
                           <ul className="space-y-0.5 text-sm text-muted-foreground">
                             {agencyExpos.map((item) => (
                               <li key={item.id}>{item.label}</li>
@@ -634,7 +650,7 @@ const Dashboard = () => {
                         </div>
                       ) : expo ? (
                         <p className="text-sm text-muted-foreground">
-                          Exposition : {expo.expo_name || expo.id}
+                          {t("profile.expo_single", { name: expo.expo_name || expo.id })}
                         </p>
                       ) : null}
                       {isEtincelleSubscription ? (
@@ -646,7 +662,7 @@ const Dashboard = () => {
 
                 {isViewingSelf && isGlobalAdmin && !agency_id && !profileAgencyId && (
                   <p className="text-xs text-muted-foreground italic">
-                    Compte administrateur global — non rattaché à une organisation.
+                    {t("profile.global_admin_note")}
                   </p>
                 )}
               </CardContent>
@@ -661,7 +677,7 @@ const Dashboard = () => {
                 <div className="flex items-center gap-3">
                   <CardTitle className="text-xl flex shrink-0 items-center gap-2">
                     <CreditCard className="h-5 w-5 text-gold" />
-                    Mon abonnement
+                    {t("subscription.title")}
                   </CardTitle>
                   {isEtincelleSubscription && subscriptionProgress != null ? (
                     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -674,33 +690,34 @@ const Dashboard = () => {
                     <div className="flex-1" aria-hidden />
                   )}
                   <Badge variant={subscriptionBadgeVariant(subscription?.status)} className="shrink-0">
-                    {subscriptionStatusLabel(subscription?.status)}
+                    {subscriptionStatusLabel(subscription?.status, t)}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!profileAgencyId && isGlobalAdmin && isViewingSelf ? (
                   <p className="text-sm text-muted-foreground py-4">
-                    Les administrateurs globaux ne sont pas liés à un abonnement organisation.
+                    {t("subscription.global_admin_no_sub")}
                   </p>
                 ) : !profileAgencyId ? (
                   <p className="text-sm text-muted-foreground py-4">
-                    Aucune organisation associée — l&apos;abonnement sera visible une fois rattaché à une agence.
+                    {t("subscription.no_org")}
                   </p>
                 ) : subscription?.status === "unknown" ? (
                   <Alert>
-                    <AlertTitle>Abonnement non configuré</AlertTitle>
+                    <AlertTitle>{t("subscription.not_configured_title")}</AlertTitle>
                     <AlertDescription>
-                      Les tables de facturation ne sont pas encore disponibles. Exécutez la migration{" "}
-                      <code className="rounded bg-muted px-1">migration_79_pricing_billing_schema.sql</code> sur
-                      Supabase.
+                      {t("subscription.not_configured_desc_before")}
+                      <code className="rounded bg-muted px-1">migration_79_pricing_billing_schema.sql</code>
+                      {t("subscription.not_configured_desc_after")}
                     </AlertDescription>
                   </Alert>
                 ) : subscription?.status === "none" ? (
                   <div className="space-y-3 py-2">
                     <p className="text-sm text-muted-foreground">
-                      Aucun abonnement actif enregistré pour{" "}
-                      <strong className="text-foreground">{agency?.name_agency || "votre organisation"}</strong>.
+                      {t("subscription.none_for_org_before")}
+                      <strong className="text-foreground">{agency?.name_agency || t("subscription.org_fallback")}</strong>
+                      {t("subscription.none_for_org_after")}
                     </p>
 
                     {showOrganisationCommercialTermsBlock && profileAgencyId && agency ? (
@@ -733,7 +750,7 @@ const Dashboard = () => {
                             ),
                           )}
                       <Button asChild variant="ghost" size="sm">
-                        <Link to="/organisation#tarifs">Comparer les offres</Link>
+                        <Link to="/organisation#tarifs">{t("subscription.compare_offers")}</Link>
                       </Button>
                     </div>
                   </div>
@@ -745,7 +762,7 @@ const Dashboard = () => {
                           {subscription?.display_name ||
                             subscription?.pricing_label ||
                             subscription?.plan_code ||
-                            "Plan inconnu"}
+                            t("subscription.plan_unknown")}
                         </p>
                         <p
                           className={`text-sm mt-1 ${
@@ -755,12 +772,14 @@ const Dashboard = () => {
                           {isEtincelleSubscription
                             ? ETINCELLE_UI.trialLabel
                             : subscription?.billing_cycle === "annual"
-                              ? "Facturation annuelle"
-                              : "Facturation mensuelle"}
+                              ? t("subscription.billing_annual")
+                              : t("subscription.billing_monthly")}
                           {!isEtincelleSubscription &&
                             (subscription?.net_price_eur != null || subscription?.monthly_price_eur != null) &&
-                            ` · ${formatEur(subscription.net_price_eur ?? subscription.monthly_price_eur)}${
-                              subscription?.billing_cycle === "annual" ? "/an" : "/mois"
+                            ` · ${formatEur(subscription.net_price_eur ?? subscription.monthly_price_eur, t)}${
+                              subscription?.billing_cycle === "annual"
+                                ? t("subscription.per_year_suffix")
+                                : t("subscription.per_month_suffix")
                             }`}
                         </p>
                         {commercialKindLabel(subscription?.commercial_kind) ? (
@@ -770,16 +789,16 @@ const Dashboard = () => {
                         ) : null}
                         {hasCommercialDiscount(subscription) && !isEtincelleSubscription ? (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Catalogue {formatEur(subscription?.list_price_eur)}
+                            {t("subscription.catalogue_price", { price: formatEur(subscription?.list_price_eur, t) })}
                             {(subscription?.discount_percent ?? 0) > 0
                               ? ` · −${subscription?.discount_percent} %`
                               : null}
                             {(subscription?.discount_amount_eur ?? 0) > 0
-                              ? ` · −${formatEur(subscription?.discount_amount_eur)}`
+                              ? ` · −${formatEur(subscription?.discount_amount_eur, t)}`
                               : null}
-                            {" · Net "}
+                            {` · ${t("subscription.net")} `}
                             <span className="font-medium text-foreground">
-                              {formatEur(subscription?.net_price_eur)}
+                              {formatEur(subscription?.net_price_eur, t)}
                             </span>
                           </p>
                         ) : null}
@@ -789,14 +808,14 @@ const Dashboard = () => {
                               <>
                                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                   <span className="text-muted-foreground">
-                                    Début ·{" "}
+                                    {t("subscription.start")} ·{" "}
                                     <span className="text-foreground font-medium">
                                       {formatDateFr(subscription.started_at)}
                                     </span>
                                   </span>
                                   {subscription.expires_at ? (
                                     <span className="text-muted-foreground">
-                                      Fin ·{" "}
+                                      {t("subscription.end")} ·{" "}
                                       <span className="text-foreground font-medium">
                                         {formatDateFr(subscription.expires_at)}
                                       </span>
@@ -805,22 +824,22 @@ const Dashboard = () => {
                                 </div>
                                 {subscription.days_remaining != null ? (
                                   <p className="font-semibold text-destructive">
-                                    {formatDaysRemaining(subscription.days_remaining)}
+                                    {formatDaysRemaining(subscription.days_remaining, t)}
                                   </p>
                                 ) : null}
                               </>
                             ) : (
                               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <span className="text-muted-foreground">
-                                  Début ·{" "}
+                                  {t("subscription.start")} ·{" "}
                                   <span className="text-foreground font-medium">
                                     {formatDateFr(subscription.started_at)}
                                   </span>
                                 </span>
                                 <span className="text-muted-foreground">
-                                  Ancienneté ·{" "}
+                                  {t("subscription.seniority")} ·{" "}
                                   <span className="text-foreground font-medium">
-                                    {formatSeniority(subscription.started_at)}
+                                    {formatSeniority(subscription.started_at, t)}
                                   </span>
                                 </span>
                               </div>
@@ -829,79 +848,74 @@ const Dashboard = () => {
                           <dl className="grid gap-2 pt-2">
                             <div className="flex flex-col gap-0.5">
                               <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">Œuvres créées</dt>
+                                <dt className="text-muted-foreground">{t("subscription.artworks_created")}</dt>
                                 <dd className="font-medium text-right">
                                   {formatUsageRatio(
                                     teamStats.artworks_count,
                                     subscription?.max_oeuvres,
                                     subscription?.is_unlimited,
+                                    t,
                                   )}
                                 </dd>
                               </div>
                               {isEtincelleSubscription && subscription?.max_oeuvres != null ? (
                                 <p className="text-xs font-medium text-destructive text-right">
-                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count)} œuvre
-                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count) > 1 ? "s" : ""}{" "}
-                                  restante
-                                  {Math.max(0, subscription.max_oeuvres - teamStats.artworks_count) > 1 ? "s" : ""} à
-                                  créer
+                                  {t("subscription.artworks_remaining", {
+                                    count: Math.max(0, subscription.max_oeuvres - teamStats.artworks_count),
+                                  })}
                                 </p>
                               ) : null}
                             </div>
                             <div className="flex flex-col gap-0.5">
                               <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">Visiteurs (mois en cours)</dt>
+                                <dt className="text-muted-foreground">{t("subscription.visitors_this_month")}</dt>
                                 <dd className="font-medium text-right">
                                   {formatUsageRatio(
                                     teamStats.visitors_this_month,
                                     subscription?.max_visitors,
                                     subscription?.is_unlimited,
+                                    t,
                                   )}
                                 </dd>
                               </div>
                               {isEtincelleSubscription && subscription?.max_visitors != null ? (
                                 <p className="text-xs font-medium text-destructive text-right">
-                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month)} visiteur
-                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month) > 1
-                                    ? "s"
-                                    : ""}{" "}
-                                  restant
-                                  {Math.max(0, subscription.max_visitors - teamStats.visitors_this_month) > 1
-                                    ? "s"
-                                    : ""}{" "}
-                                  ce mois
+                                  {t("subscription.visitors_remaining", {
+                                    count: Math.max(0, subscription.max_visitors - teamStats.visitors_this_month),
+                                  })}
                                 </p>
                               ) : null}
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">Langues médiation</dt>
+                              <dt className="text-muted-foreground">{t("subscription.mediation_langs")}</dt>
                               <dd className="font-medium text-right">
                                 {formatLangRange(
                                   subscription?.included_mediation_langs_min,
                                   subscription?.included_mediation_langs_max,
+                                  t,
                                 )}
                               </dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">Langues audio</dt>
+                              <dt className="text-muted-foreground">{t("subscription.audio_langs")}</dt>
                               <dd className="font-medium text-right">
                                 {subscription?.included_audio_langs ?? "—"}
                               </dd>
                             </div>
                             {subscription?.standby_monthly_price_eur != null ? (
                               <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">Tarif veille</dt>
+                                <dt className="text-muted-foreground">{t("subscription.standby_price")}</dt>
                                 <dd className="font-medium text-right">
-                                  {formatEur(subscription.standby_monthly_price_eur)}/mois
+                                  {formatEur(subscription.standby_monthly_price_eur, t)}{t("subscription.per_month_suffix")}
                                 </dd>
                               </div>
                             ) : null}
                             {subscription?.source === "organisation" ? (
                               <>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <dt className="text-muted-foreground">Mode veille</dt>
+                                  <dt className="text-muted-foreground">{t("subscription.standby_mode")}</dt>
                                   <dd className="flex flex-wrap items-center justify-end gap-2 font-medium text-right">
-                                    <span>{standbyStatusLabel(subscription.standby_status)}</span>
+                                    <span>{standbyStatusLabel(subscription.standby_status, t)}</span>
                                     {standbyState.can_request_standby &&
                                     standbyPlanCode &&
                                     subscription?.standby_monthly_price_eur != null ? (
@@ -923,7 +937,7 @@ const Dashboard = () => {
                                 </div>
                                 {subscription.standby_requested_at ? (
                                   <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">Demande veille</dt>
+                                    <dt className="text-muted-foreground">{t("subscription.standby_request")}</dt>
                                     <dd className="font-medium text-right">
                                       {formatDateFr(subscription.standby_requested_at)}
                                     </dd>
@@ -931,7 +945,7 @@ const Dashboard = () => {
                                 ) : null}
                                 {subscription.standby_cancel_deadline_at ? (
                                   <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">Annulation possible jusqu&apos;au</dt>
+                                    <dt className="text-muted-foreground">{t("subscription.standby_cancel_until")}</dt>
                                     <dd className="font-medium text-right">
                                       {formatDateFr(subscription.standby_cancel_deadline_at)}
                                     </dd>
@@ -939,7 +953,7 @@ const Dashboard = () => {
                                 ) : null}
                                 {subscription.standby_started_at ? (
                                   <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">Veille effective depuis</dt>
+                                    <dt className="text-muted-foreground">{t("subscription.standby_effective_since")}</dt>
                                     <dd className="font-medium text-right">
                                       {formatDateFr(subscription.standby_started_at)}
                                     </dd>
@@ -953,7 +967,7 @@ const Dashboard = () => {
                       {profileAgencyId && subscription?.subscription_id && (isGlobalAdmin || isEtincelleSubscription) ? (
                         <div className="w-full min-w-0 flex-1 rounded-lg border border-border/60 bg-muted/30 p-3">
                           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                            Changer d&apos;offre
+                            {t("subscription.change_offer")}
                           </p>
                           <DashboardPlanActions
                             organisationId={profileAgencyId}
@@ -970,14 +984,14 @@ const Dashboard = () => {
                       <div className="space-y-2">
                         {subscription.next_renewal_at ? (
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Prochaine échéance</span>
+                            <span className="text-muted-foreground">{t("subscription.next_due")}</span>
                             <span className="font-medium">{formatDateFr(subscription.next_renewal_at)}</span>
                           </div>
                         ) : null}
                         {subscription.expires_at ? (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">
-                              {subscription.is_trial ? "Fin d'essai" : "Fin de période"}
+                              {subscription.is_trial ? t("subscription.trial_end") : t("subscription.period_end")}
                             </span>
                             <span className="font-medium">{formatDateFr(subscription.expires_at)}</span>
                           </div>
@@ -988,11 +1002,7 @@ const Dashboard = () => {
                               subscription.days_remaining <= 14 ? "text-destructive" : "text-foreground"
                             }`}
                           >
-                            {subscription.days_remaining > 0
-                              ? `${subscription.days_remaining} jour${subscription.days_remaining > 1 ? "s" : ""} restant${subscription.days_remaining > 1 ? "s" : ""}`
-                              : subscription.days_remaining === 0
-                                ? "Échéance aujourd'hui"
-                                : "Période échue"}
+                            {formatDaysRemaining(subscription.days_remaining, t)}
                           </p>
                         )}
                         {subscriptionProgress != null && (
@@ -1014,16 +1024,16 @@ const Dashboard = () => {
           {/* Stats équipe + actions rapides */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Membres équipe"
+              label={t("stat_cards.team_members")}
               value={teamMembersCount}
               icon={UsersIcon}
               onClick={() => document.getElementById("dashboard-team-members")?.scrollIntoView({ behavior: "smooth" })}
               clickable={teamMembersCount > 0}
             />
-            <StatCard label="Expositions" value={teamStats.expos_count} icon={Building2} href="/expos" />
-            <StatCard label="Œuvres catalogue" value={teamStats.artworks_count} icon={ImageIcon} href="/catalogue" />
+            <StatCard label={t("stat_cards.expos")} value={teamStats.expos_count} icon={Building2} href="/expos" />
+            <StatCard label={t("stat_cards.artworks")} value={teamStats.artworks_count} icon={ImageIcon} href="/catalogue" />
             <StatCard
-              label="Rôle actuel"
+              label={t("stat_cards.current_role")}
               value={
                 isViewingSelf
                   ? role_label || role_name || "—"
@@ -1039,7 +1049,7 @@ const Dashboard = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <UsersIcon className="h-5 w-5 text-gold" />
-                  Membres de l&apos;équipe
+                  {t("team.card_title")}
                   <span className="text-sm font-normal text-muted-foreground">({teamMembers.length})</span>
                 </CardTitle>
               </CardHeader>
@@ -1069,24 +1079,29 @@ const Dashboard = () => {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserPlus className="h-5 w-5 text-gold" />
-                    Gestion de l&apos;équipe
+                    {t("team.manage_title")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Créez des comptes pour votre organisation. {roleLevelHint(role_id)}
+                    {t("team.create_hint", {
+                      hint:
+                        typeof role_id === "number" && Number.isFinite(role_id)
+                          ? t("team.role_level_hint", { level: role_id })
+                          : "",
+                    })}
                   </p>
                   {teamMembers.length > 0 ? (
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 max-h-56 overflow-y-auto">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Équipe ({teamMembers.length})
+                        {t("team.team_count", { count: teamMembers.length })}
                       </p>
                       <ul className="space-y-1">
                         {teamMembers.map((member) => {
                           const name = profileFullName(
                             member.first_name,
                             member.last_name,
-                            member.username || "Membre",
+                            member.username || t("profile.member_fallback"),
                           );
                           const isSelected = member.user_id === profileUserId;
                           return (
@@ -1115,7 +1130,7 @@ const Dashboard = () => {
                       </ul>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Aucun membre dans le périmètre actuel.</p>
+                    <p className="text-sm text-muted-foreground">{t("team.no_members_scope")}</p>
                   )}
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -1124,7 +1139,7 @@ const Dashboard = () => {
                       onClick={() => setCreateUserOpen(true)}
                     >
                       <UserPlus className="h-4 w-4 mr-2" />
-                      Nouvel utilisateur
+                      {t("team.new_user")}
                     </Button>
                     <Button asChild variant="outline">
                       <Link
@@ -1134,7 +1149,7 @@ const Dashboard = () => {
                             : "/user/utilisateurs?scope=site"
                         }
                       >
-                        Voir toute l&apos;équipe
+                        {t("team.see_all")}
                       </Link>
                     </Button>
                   </div>
@@ -1145,7 +1160,7 @@ const Dashboard = () => {
             {quickLinks.length > 0 && (
               <Card className="glass-card">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-xl">Accès rapides</CardTitle>
+                  <CardTitle className="text-xl">{t("quick_links.title")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -1182,29 +1197,29 @@ const Dashboard = () => {
       <AlertDialog open={Boolean(deleteMemberTarget)} onOpenChange={(open) => !open && setDeleteMemberTarget(null)}>
         <AlertDialogContent className="z-[100]">
           <AlertDialogHeader>
-            <AlertDialogTitle>Envoyer en corbeille ?</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete_dialog.title")}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  L&apos;utilisateur <strong className="text-foreground">{deleteMemberDisplayName}</strong> sera
-                  archivé et pourra être restauré depuis la corbeille utilisateurs.
+                  {t("delete_dialog.desc_before")}
+                  <strong className="text-foreground">{deleteMemberDisplayName}</strong>
+                  {t("delete_dialog.desc_after")}
                 </p>
                 {(deleteMemberTarget?.agency_role_id === 4 || deleteMemberTarget?.role_id === 4) && (
                   <p className="font-semibold text-destructive">
-                    Attention : vous supprimez un responsable d&apos;organisation.
+                    {t("delete_dialog.warn_org_admin")}
                   </p>
                 )}
                 {deleteLastRole4InOrg && (
                   <p className="font-semibold text-destructive">
-                    C&apos;est le dernier responsable d&apos;organisation de cette organisation — l&apos;accès
-                    administrateur pourrait être compromis.
+                    {t("delete_dialog.warn_last_org_admin")}
                   </p>
                 )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingMember}>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingMember}>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deletingMember}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -1213,7 +1228,7 @@ const Dashboard = () => {
                 void confirmDeleteTeamMember();
               }}
             >
-              {deletingMember ? "Envoi…" : "Corbeille"}
+              {deletingMember ? t("delete_dialog.sending") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1267,6 +1282,7 @@ function StatCard({
   onClick?: () => void;
   href?: string;
 }) {
+  const { t } = useTranslation("dashboard");
   const inner = (
     <CardContent className="p-5">
       <div className="flex items-center justify-between mb-2">
@@ -1275,9 +1291,9 @@ function StatCard({
       </div>
       <p className={`font-serif font-bold ${isText ? "text-base truncate" : "text-3xl"}`}>{value}</p>
       {clickable && !href && (
-        <p className="text-xs text-muted-foreground mt-2">Cliquer pour voir le détail</p>
+        <p className="text-xs text-muted-foreground mt-2">{t("stat_cards.click_detail")}</p>
       )}
-      {href && <p className="text-xs text-muted-foreground mt-2">Voir la page</p>}
+      {href && <p className="text-xs text-muted-foreground mt-2">{t("stat_cards.see_page")}</p>}
     </CardContent>
   );
 

@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { type Artwork, getArtistById, getArtworksByArtist, getExpoById } from "@/data/mockData";
@@ -7,14 +8,15 @@ import { ArrowLeft, Heart, Eye, Mail } from "lucide-react";
 
 const ArtistDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("artists");
   const artist = getArtistById(id || "");
   const works: Artwork[] = getArtworksByArtist(id || "");
 
   if (!artist) {
     return (
       <div className="container py-16 text-center">
-        <p className="text-muted-foreground">Artiste introuvable.</p>
-        <Link to="/artistes"><Button variant="ghost" className="mt-4">← Retour</Button></Link>
+        <p className="text-muted-foreground">{t("detail.not_found")}</p>
+        <Link to="/artistes"><Button variant="ghost" className="mt-4">← {t("detail.back")}</Button></Link>
       </div>
     );
   }
@@ -23,7 +25,7 @@ const ArtistDetail = () => {
     <div className="container py-8 space-y-8">
       <Link to="/artistes">
         <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Retour aux artistes
+          <ArrowLeft className="h-4 w-4" /> {t("detail.back_to_artists")}
         </Button>
       </Link>
 
@@ -51,7 +53,7 @@ const ArtistDetail = () => {
 
       {/* Artworks */}
       <div>
-        <h3 className="text-2xl font-serif font-bold mb-4">Œuvres ({works.length})</h3>
+        <h3 className="text-2xl font-serif font-bold mb-4">{t("detail.works_count", { count: works.length })}</h3>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {works.map((aw) => {
             const expo = getExpoById(aw.artwork_expo_id);
@@ -74,7 +76,7 @@ const ArtistDetail = () => {
                     {teaserFromArtworkDescription(aw.artwork_description_i18n).trim() || "—"}
                   </p>
                   <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1"><Eye className="h-3 w-3" />{aw.artwork_total_visites} visites</div>
+                    <div className="flex items-center gap-1"><Eye className="h-3 w-3" />{t("detail.visits", { count: aw.artwork_total_visites })}</div>
                     <span className="bg-muted px-2 py-0.5 rounded-full">{expo?.expo_name}</span>
                   </div>
                 </CardContent>

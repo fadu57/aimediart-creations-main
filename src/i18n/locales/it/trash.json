@@ -7,5 +7,21 @@
   "success_restore": "Elemento ripristinato.",
   "success_delete": "Elemento eliminato definitivamente.",
   "error_restore": "Impossibile ripristinare l’elemento.",
-  "error_delete": "Impossibile eliminare definitivamente l’elemento."
+  "error_delete": "Impossibile eliminare definitivamente l’elemento.",
+  "back": "Indietro",
+  "loading": "Caricamento…",
+  "archived_on": "Archiviato il {{date}}",
+  "access_restricted": "Accesso riservato ai livelli da 1 a 3.",
+  "subtitle": "Ripristina una scheda archiviata per errore.",
+  "subtitle_visitors": "Ripristina un visitatore archiviato per errore.",
+  "title_catalogue": "Cestino — Opere",
+  "title_artists": "Cestino — Artisti",
+  "title_expos": "Cestino — Mostre",
+  "title_agencies": "Cestino — Organizzazioni",
+  "title_users": "Cestino — Utenti",
+  "title_visitors": "Cestino — Visitatori",
+  "restore_no_rows": "Ripristino inviato ma nessuna riga modificata (verifica i permessi RLS).",
+  "visitor_anonymous_label": "Visitatore anonimo",
+  "visitor_registered_label": "Visitatore registrato",
+  "anonymous": "Anonimo"
 }

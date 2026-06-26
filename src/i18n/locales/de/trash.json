@@ -7,5 +7,21 @@
   "success_restore": "Element wiederhergestellt.",
   "success_delete": "Element endgültig gelöscht.",
   "error_restore": "Element konnte nicht wiederhergestellt werden.",
-  "error_delete": "Element konnte nicht endgültig gelöscht werden."
+  "error_delete": "Element konnte nicht endgültig gelöscht werden.",
+  "back": "Zurück",
+  "loading": "Wird geladen…",
+  "archived_on": "Archiviert am {{date}}",
+  "access_restricted": "Zugang auf Stufen 1 bis 3 beschränkt.",
+  "subtitle": "Stellen Sie einen versehentlich archivierten Eintrag wieder her.",
+  "subtitle_visitors": "Stellen Sie einen versehentlich archivierten Besucher wieder her.",
+  "title_catalogue": "Papierkorb — Werke",
+  "title_artists": "Papierkorb — Künstler",
+  "title_expos": "Papierkorb — Ausstellungen",
+  "title_agencies": "Papierkorb — Organisationen",
+  "title_users": "Papierkorb — Benutzer",
+  "title_visitors": "Papierkorb — Besucher",
+  "restore_no_rows": "Wiederherstellung gesendet, aber keine Zeile geändert (RLS-Berechtigungen prüfen).",
+  "visitor_anonymous_label": "Anonymer Besucher",
+  "visitor_registered_label": "Registrierter Besucher",
+  "anonymous": "Anonym"
 }

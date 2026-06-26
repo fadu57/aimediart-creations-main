@@ -11,7 +11,6 @@
   "error_load_crash": "Errore di caricamento",
   "error_supabase_config": "Configurazione Supabase mancante: imposta VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY in .env.",
   "error_load_unexpected": "Errore imprevisto durante il caricamento degli artisti.",
-
   "dialog_title_edit": "Scheda di {{name}}",
   "dialog_title_artist_fallback": "l'artista",
   "dialog_title_create": "Creazione della biografia dell'artista",
@@ -22,11 +21,9 @@
   "btn_submitting": "Salvataggio…",
   "btn_save_changes": "Salva modifiche",
   "btn_save": "Salva",
-
   "bio_label": "Biografia",
   "bio_placeholder": "Testo modificabile dopo la generazione o l'inserimento manuale.",
   "required_fields_note": "Campi obbligatori",
-
   "duplicate_title": "Duplicato rilevato",
   "duplicate_desc": "Il profilo dell'artista esiste già. Modificarlo?",
   "btn_duplicate_no": "No",
@@ -37,18 +34,15 @@
   "duplicate_existing_types": "Tipi di arte",
   "btn_use_existing_fiche": "Usa questa scheda",
   "btn_create_new_anyway": "Crea comunque una nuova scheda",
-
   "agency_label": "Agenzia interessata",
   "agency_hint": "Il tuo account non è collegato a nessuna agenzia: seleziona quella interessata da questo profilo (bio per agenzia).",
   "agency_loading": "Caricamento agenzie…",
   "agency_select_placeholder": "Scegli un'agenzia",
   "agency_select_empty": "Nessuna agenzia disponibile",
-
   "photo_alt_preview": "Anteprima",
   "photo_processing_aria": "Elaborazione immagine",
   "btn_photo_replace": "Sostituisci foto",
   "btn_photo_change": "Cambia foto",
-
   "form_firstname_label": "Nome",
   "form_firstname_placeholder": "Nome",
   "form_lastname_label": "Cognome",
@@ -90,7 +84,6 @@
   "missing_field_hint_email": "I visitatori non potranno inviargli/le e-mail e non potranno essergli/le inviate le statistiche delle visite alle sue opere.",
   "missing_field_learn_why": "Scopri di più: {{field}}",
   "form_social_label": "Link e social media",
-
   "tableau_title": "Artisti — Tabella completa",
   "tableau_back": "Indietro",
   "tableau_corbeille": "Cestino",
@@ -109,12 +102,47 @@
   "tableau_cancel": "Annulla",
   "tableau_confirm": "Elimina",
   "tableau_archiving": "Archiviazione...",
-
   "btn_report_error": "Segnala un'informazione errata",
   "btn_report_error_title": "Segnala un'informazione errata al team aimediart",
   "btn_report_error_email_subject": "Scheda artista: informazione/i errata/e",
   "bio_regen": "✨ Rigenera (IA)",
   "bio_new": "✏️ Nuova bio",
-  "info_shared_profiles": "Le schede degli artisti sono condivise da tutti. Possono essere completate (informazioni mancanti) ma non eliminate. In caso di errore nelle informazioni già inserite, fare clic su «\u00a0Segnala un'informazione errata\u00a0» nella scheda.",
-  "info_bio_only": "Solo la biografia può essere riscritta per adattarsi alla vostra organizzazione."
+  "info_shared_profiles": "Le schede degli artisti sono condivise da tutti. Possono essere completate (informazioni mancanti) ma non eliminate. In caso di errore nelle informazioni già inserite, fare clic su « Segnala un'informazione errata » nella scheda.",
+  "info_bio_only": "Solo la biografia può essere riscritta per adattarsi alla vostra organizzazione.",
+  "form_address_line2_label": "Complemento d'indirizzo",
+  "form_address_line2_placeholder": "Edificio, piano, casella…",
+  "detail": {
+    "not_found": "Artista non trovato.",
+    "back": "Indietro",
+    "back_to_artists": "Torna agli artisti",
+    "works_count": "Opere ({{count}})",
+    "visits": "{{count}} visite"
+  },
+  "messages": {
+    "bio_load_failed": "Caricamento non riuscito.",
+    "artist_not_found": "Scheda non trovata.",
+    "bio_required_triple": "Inserisci nome, cognome e almeno un tipo di arte.",
+    "bio_generated": "Biografia generata con successo.",
+    "bio_generation_error": "Errore durante la generazione.",
+    "no_file": "Nessun file da inviare.",
+    "invalid_url": "URL non valido per {{type}}.",
+    "social_links_prefix": "Social network: {{message}}",
+    "bio_required": "La biografia è obbligatoria prima del salvataggio.",
+    "phone_invalid": "Il numero di telefono non è valido per il paese selezionato.",
+    "agency_undetermined": "Impossibile determinare l'organizzazione dell'utente connesso.",
+    "artist_updated": "Artista aggiornato.",
+    "artist_saved": "Artista salvato.",
+    "artist_id_missing": "artist_id non trovato dopo il salvataggio.",
+    "agency_link_prefix": "Collegamento organizzazione: {{message}}",
+    "save_failed": "Salvataggio non riuscito.",
+    "image_processing_failed": "Impossibile elaborare l'immagine."
+  },
+  "bio_placeholder_lang": "Bio in {{lang}}… (specifica della tua organizzazione)",
+  "loading_bio_tabs": "Caricamento biografie…",
+  "discard": {
+    "title": "Modifiche non salvate",
+    "desc": "Esistono modifiche non salvate. Chiudere la scheda?",
+    "continue": "Continua la modifica",
+    "close": "Chiudi senza salvare"
+  }
 }

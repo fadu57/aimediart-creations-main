@@ -164,5 +164,19 @@
     "continue_lang": "Poursuivre la génération audio pour cette langue",
     "no_text": "Aucun texte de médiation",
     "no_persona_audio": "Persona non configuré pour l'audio"
+  },
+  "text_edit": {
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "unsaved_title": "Modifications non enregistrées",
+    "unsaved_desc": "Vous avez modifié le texte sans l'enregistrer. Voulez-vous vraiment fermer sans sauvegarder ?",
+    "continue_editing": "Poursuivre l'édition",
+    "discard": "Fermer sans enregistrer"
+  },
+  "photo_capture": {
+    "required": "Photo obligatoire",
+    "import": "Importer",
+    "change": "Changer la photo",
+    "photograph": "Photographier"
   }
 }

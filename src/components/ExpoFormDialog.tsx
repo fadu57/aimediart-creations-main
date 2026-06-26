@@ -53,6 +53,7 @@ import {
 import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import type { TFunction } from "i18next";
 import { SponsorDialog, type Sponsor, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import {
   ExpoHorairesEditor,
@@ -86,10 +87,10 @@ function getErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-async function uploadExpoLogoToStorage(file: File, expoId: string): Promise<string> {
+async function uploadExpoLogoToStorage(file: File, expoId: string, t: TFunction): Promise<string> {
   const prepared = await prepareImageForSupabaseUpload(file);
   const id = expoId.trim();
-  if (!id) throw new Error("Identifiant exposition requis pour le logo.");
+  if (!id) throw new Error(t("form.logo_expo_id_required"));
   try {
     return await uploadExpoLogo(id, prepared, prepared.name);
   } catch (primaryErr) {
@@ -285,7 +286,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       if (error) throw error;
       const row = (data as Record<string, unknown> | null) ?? null;
       if (!row) {
-        toast.error("Exposition introuvable.");
+        toast.error(t("form.expo_not_found"));
         onOpenChange(false);
         return;
       }
@@ -319,12 +320,12 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       setExpoIndoor(loadedExpoIndoor);
       setInitialExpoIndoor(loadedExpoIndoor);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Impossible de charger l’exposition."));
+      toast.error(getErrorMessage(e, t("form.expo_load_failed")));
       onOpenChange(false);
     } finally {
       setLoadingRow(false);
     }
-  }, [mode, expoId, onOpenChange]);
+  }, [mode, expoId, onOpenChange, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -376,7 +377,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const handleSave = async () => {
     const expoName = (values["expo_name"] ?? "").trim();
     if (!expoName) {
-      toast.error("Le nom de l'exposition est obligatoire.");
+      toast.error(t("form.expo_name_required"));
       return;
     }
     setSaving(true);
@@ -391,7 +392,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         if (!isExpoLogoField(k)) continue;
         const file = logoFileByKey[k];
         if (file) {
-          const url = await uploadExpoLogoToStorage(file, targetExpoId);
+          const url = await uploadExpoLogoToStorage(file, targetExpoId, t);
           mergedValues[k] = url;
         }
       }
@@ -421,7 +422,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
 
         const { error } = await supabase.from("expos").insert(payload as never);
         if (error) throw error;
-        toast.success("Exposition créée.");
+        toast.success(t("form.expo_created"));
       } else {
         if (!expoId) return;
         const payload: Record<string, unknown> = {};
@@ -439,7 +440,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         }
         const { error } = await supabase.from("expos").update(payload as never).eq("id", expoId);
         if (error) throw error;
-        toast.success("Exposition mise à jour.");
+        toast.success(t("form.expo_updated"));
       }
       onSuccess();
       setValues(mergedValues);
@@ -452,7 +453,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       setLogoFileByKey({});
       onOpenChange(false);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Enregistrement impossible (vérifiez les droits RLS)."));
+      toast.error(getErrorMessage(e, t("form.save_failed_rls")));
     } finally {
       setSaving(false);
     }
@@ -480,7 +481,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const triggerExpoTranslation = async (sourceText: string, sourceLang: string) => {
     if (!canTriggerTranslation || !expoId) return;
     if (!sourceText.trim()) {
-      toast.error("Saisissez un texte dans la langue sélectionnée avant de traduire.");
+      toast.error(t("form.translate_source_required"));
       return;
     }
     const targetLangs = DESCRIPT_LANGS.filter((l) => l !== sourceLang);
@@ -499,7 +500,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         .update({ expo_descript_i18n: updatedSource })
         .eq("id", expoId);
       if (saveErr) {
-        toast.error(`Impossible d'enregistrer le texte source : ${saveErr.message}`);
+        toast.error(t("form.translate_save_source_failed", { message: saveErr.message }));
         return;
       }
 
@@ -547,14 +548,14 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       }
 
       if (okCount > 0 && failCount === 0) {
-        toast.success("Traductions terminées !");
+        toast.success(t("form.translate_done"));
       } else if (okCount > 0) {
-        toast.warning(`${okCount} traduction(s) réussie(s), ${failCount} échec(s).`);
+        toast.warning(t("form.translate_partial", { ok: okCount, fail: failCount }));
       } else {
-        toast.error("Aucune traduction n'a abouti. Vérifiez la configuration IA (Groq / Edge Functions).");
+        toast.error(t("form.translate_none"));
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erreur lors de la traduction.");
+      toast.error(e instanceof Error ? e.message : t("form.translate_error"));
     } finally {
       setTranslating(false);
       setTranslatingLangs(new Set());
@@ -595,11 +596,11 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
         className="max-h-[92vh] w-[96vw] max-w-5xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
         aria-describedby={undefined}
       >
-        <DialogTitle className="sr-only">{mode === "create" ? "Nouvelle exposition" : "Fiche de l'exposition"}</DialogTitle>
+        <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
-              {mode === "create" ? "Nouvelle exposition" : "Fiche de l'exposition"}
+              {mode === "create" ? t("form.title_create") : t("form.title_edit")}
             </h2>
             <Button
               type="button"
@@ -615,24 +616,24 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               disabled={saving || loadingRow || (mode === "edit" && !hasFormChanges)}
             >
               {saving
-                ? "Enregistrement…"
+                ? t("form.saving")
                 : mode === "create"
-                  ? "Enregistrer"
-                  : "Enregistrer les modifications"}
+                  ? t("form.save")
+                  : t("form.save_changes")}
             </Button>
           </div>
         </div>
 
         <div className="px-4 sm:px-5 pt-3 pb-4">
           {loadingRow ? (
-            <p className="text-sm text-muted-foreground py-6">Chargement…</p>
+            <p className="text-sm text-muted-foreground py-6">{t("form.loading")}</p>
           ) : (
             <div className="grid gap-3 py-1">
 
               {/* Sélecteur d'agence — admins globaux uniquement (role_id < 4) */}
               {canPickAgency && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Agence</Label>
+                  <Label className="text-xs font-medium">{t("form.agency_label")}</Label>
                   <Popover open={agencyOpen} onOpenChange={setAgencyOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -646,23 +647,23 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                         <span className="truncate">
                           {selectedAgencyId
                             ? (agencies.find((a) => a.id === selectedAgencyId)?.name ?? selectedAgencyId)
-                            : "— Aucune agence —"}
+                            : t("form.no_agency")}
                         </span>
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Rechercher une agence…" className="h-9" />
+                        <CommandInput placeholder={t("form.search_agency")} className="h-9" />
                         <CommandList>
-                          <CommandEmpty>Aucune agence trouvée.</CommandEmpty>
+                          <CommandEmpty>{t("form.no_agency_found")}</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
                               value="__none__"
                               onSelect={() => { setSelectedAgencyId(""); setAgencyOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", !selectedAgencyId ? "opacity-100" : "opacity-0")} />
-                              — Aucune agence —
+                              {t("form.no_agency")}
                             </CommandItem>
                             {agencies.map((a) => (
                               <CommandItem
@@ -685,7 +686,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               {/* Picker curator — affiché dès qu'une agence est connue */}
               {selectedAgencyId && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Commissaire d'expo</Label>
+                  <Label className="text-xs font-medium">{t("form.curator_label")}</Label>
                   <Popover open={curatorOpen} onOpenChange={setCuratorOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -698,24 +699,24 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       >
                         <span className="truncate">
                           {selectedCuratorId
-                            ? (curatorUsers.find((u) => u.id === selectedCuratorId)?.label ?? "Utilisateur inconnu")
-                            : "— Aucun commissaire —"}
+                            ? (curatorUsers.find((u) => u.id === selectedCuratorId)?.label ?? t("form.unknown_user"))
+                            : t("form.no_curator")}
                         </span>
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Rechercher un membre…" className="h-9" />
+                        <CommandInput placeholder={t("form.search_member")} className="h-9" />
                         <CommandList>
-                          <CommandEmpty>Aucun membre trouvé.</CommandEmpty>
+                          <CommandEmpty>{t("form.no_member_found")}</CommandEmpty>
                           <CommandGroup>
                             <CommandItem
                               value="__none__"
                               onSelect={() => { setSelectedCuratorId(""); setCuratorOpen(false); }}
                             >
                               <Check className={cn("mr-2 h-4 w-4", !selectedCuratorId ? "opacity-100" : "opacity-0")} />
-                              — Aucun commissaire —
+                              {t("form.no_curator")}
                             </CommandItem>
                             {curatorUsers.map((u) => (
                               <CommandItem
@@ -952,7 +953,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                           {translating
                             ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
                             : <Languages className="h-3 w-3" aria-hidden />}
-                          {`Traduire (${translateTargets})`}
+                          {t("form.translate_button", { targets: translateTargets })}
                         </Button>
                       )}
                     </div>
@@ -962,7 +963,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       className={cn("shadow-none min-h-[100px] resize-none", (!canEditFields || readonly) && "bg-muted/50")}
                       value={displayText}
                       readOnly={readonly || !canEditFields}
-                      placeholder={`Descriptif de l'exposition (${descriptLang.toUpperCase()})…`}
+                      placeholder={t("form.descript_placeholder", { lang: descriptLang.toUpperCase() })}
                       onChange={(e) => {
                         const updated = { ...parsed, [descriptLang]: e.target.value };
                         setValues((prev) => ({ ...prev, expo_descript_i18n: JSON.stringify(updated) }));
@@ -979,9 +980,9 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             type="button"
                             onClick={() => setDescriptLang(l)}
                             title={
-                              isRunning ? `${l.toUpperCase()} : traduction en cours…`
-                              : status === "filled" ? `${l.toUpperCase()} : traduit — cliquer pour éditer`
-                              : `${l.toUpperCase()} : manquant — cliquer pour saisir`
+                              isRunning ? t("form.lang_status_running", { lang: l.toUpperCase() })
+                              : status === "filled" ? t("form.lang_status_filled", { lang: l.toUpperCase() })
+                              : t("form.lang_status_empty", { lang: l.toUpperCase() })
                             }
                             className={cn(
                               "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide border transition-colors",
@@ -1035,7 +1036,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             try {
                               assertImageFileAllowed(file);
                             } catch (err) {
-                              toast.error(err instanceof Error ? err.message : "Fichier image invalide.");
+                              toast.error(err instanceof Error ? err.message : t("form.invalid_image_file"));
                               return;
                             }
                             setLogoFileByKey((prev) => ({ ...prev, [key]: file }));
@@ -1123,7 +1124,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   <Label htmlFor={`expo-field-${key}`} className="text-xs font-medium">
                     {fieldLabel(key)}
                     {key === "id" && mode === "create" && (
-                      <span className="text-muted-foreground font-normal"> (vide = UUID généré)</span>
+                      <span className="text-muted-foreground font-normal">{t("form.id_uuid_hint")}</span>
                     )}
                   </Label>
                   {multiline ? (
@@ -1169,7 +1170,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
           {!loadingRow && (
             <div className="pt-3 border-t border-border mt-1 flex items-start gap-6">
               <div className="space-y-1.5 w-[350px] shrink-0">
-                <Label className="text-xs font-medium">Horaires d'ouverture</Label>
+                <Label className="text-xs font-medium">{t("form.opening_hours")}</Label>
                 <ExpoHorairesEditor
                   value={horaires}
                   onChange={setHoraires}
@@ -1180,7 +1181,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               {sponsorLogos.length > 0 && (
                 <div className="flex-1 min-w-0 space-y-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                    Sponsors / Mécènes
+                    {t("form.sponsors_title")}
                   </p>
                   <Carousel
                     key={sponsorLogos.map((s) => s.id).join(",")}
@@ -1193,7 +1194,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                         <CarouselItem key={s.id} className="pt-2 basis-1/2">
                           <div
                             className="flex h-16 items-center justify-center rounded-md border border-border bg-muted/20 p-1 cursor-pointer hover:border-primary hover:bg-muted/40 transition-colors"
-                            title={`${s.nom} — cliquer pour modifier`}
+                            title={t("form.sponsor_edit_title", { name: s.nom })}
                             onClick={() => { setSelectedSponsorId(s.id); setShowSponsorDialog(true); }}
                           >
                             <img key={`${s.id}-${s.url}`} src={s.url} alt={s.nom} className="max-h-full max-w-full object-contain" />
@@ -1222,7 +1223,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 className="w-full text-sm"
                 onClick={() => setShowSponsorDialog(true)}
               >
-                🤝 Ajouter sponsors / mécènes
+                {t("form.add_sponsors")}
               </Button>
             </div>
           )}
@@ -1247,13 +1248,13 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la fermeture</AlertDialogTitle>
+            <AlertDialogTitle>{t("form.close_confirm_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Des modifications non enregistrées existent. Fermer la fiche ?
+              {t("form.close_confirm_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Non</AlertDialogCancel>
+            <AlertDialogCancel>{t("form.no")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               onClick={() => {
@@ -1261,7 +1262,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 onOpenChange(false);
               }}
             >
-              Oui
+              {t("form.yes")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

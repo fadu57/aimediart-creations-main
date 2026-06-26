@@ -1,14 +1,31 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   engagementPlanHref,
   type UpgradePlanCode,
 } from "@/lib/organisation/planLimits";
 import { fetchPricingByPlanCode, toPricingNumber } from "@/lib/organisation/publicHomeData";
+import {
+  countResignImpact,
+  resignOrganisationCascade,
+  type ResignImpact,
+} from "@/lib/organisation/resignOrganisation";
 import {
   getAlternatePlanCode,
   getPlanDisplayLabel,
@@ -89,30 +106,137 @@ const DEVIS_QUOTE_BTN_CLASS = `${PLAN_ACTION_BTN_CLASS} text-base font-semibold`
 
 const ZENITH_DEVIS_HREF = "/organisation/commencer?intent=devis&plan=ZENITH";
 
-function formatMonthlyTtcLabel(value: unknown): string {
+function formatMonthlyTtcLabel(value: unknown, t: TFunction): string {
   const n = toPricingNumber(value);
-  if (n == null) return "— €/mois";
+  if (n == null) return t("plan_actions.price_unknown");
   const amount = new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(n);
-  return `${amount}/mois`;
+  return `${amount}${t("plan_actions.price_monthly_suffix")}`;
 }
 
 function formatPlanSecondaryLine(
   plan: string,
   monthly: number | null | undefined,
+  t: TFunction,
   options?: { quoteFallback?: boolean },
 ): string {
   const n = toPricingNumber(monthly);
   if (n != null && n > 0) {
-    return `${plan} · ${formatMonthlyTtcLabel(n)}`;
+    return `${plan} · ${formatMonthlyTtcLabel(n, t)}`;
   }
   if (options?.quoteFallback) {
-    return `${plan} · Sur devis`;
+    return `${plan} · ${t("plan_actions.on_quote")}`;
   }
-  return `${plan} · ${formatMonthlyTtcLabel(monthly)}`;
+  return `${plan} · ${formatMonthlyTtcLabel(monthly, t)}`;
+}
+
+function ResignSubscriptionButton({
+  organisationId,
+  onResigned,
+}: {
+  organisationId: string;
+  onResigned: () => void;
+}) {
+  const { t } = useTranslation("dashboard");
+  const [open, setOpen] = useState(false);
+  const [impact, setImpact] = useState<ResignImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
+  const [resigning, setResigning] = useState(false);
+
+  const handleOpenChange = (next: boolean) => {
+    if (resigning) return;
+    setOpen(next);
+    if (next) {
+      setLoadingImpact(true);
+      setImpact(null);
+      void countResignImpact(organisationId)
+        .then((res) => setImpact(res))
+        .catch(() => setImpact(null))
+        .finally(() => setLoadingImpact(false));
+    }
+  };
+
+  const handleConfirm = async () => {
+    setResigning(true);
+    try {
+      const { error } = await resignOrganisationCascade(organisationId);
+      if (error) {
+        toast.error(t("plan_actions.toast_resign_error_title"), { description: error });
+        return;
+      }
+      toast.success(t("plan_actions.toast_resign_success"));
+      setOpen(false);
+      onResigned();
+    } finally {
+      setResigning(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => handleOpenChange(true)}
+        className="h-[30px] w-full whitespace-nowrap rounded-lg border-0 bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-none hover:bg-red-700"
+      >
+        {t("plan_actions.resign_button")}
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={handleOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+              {t("plan_actions.dialog_title")}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p className="font-medium tracking-[-0.4px] text-red-600">
+                  {t("plan_actions.dialog_intro_before")}
+                  <strong>{t("plan_actions.dialog_intro_strong")}</strong>
+                  {t("plan_actions.dialog_intro_after")}
+                </p>
+                <p className="font-semibold text-red-600">{t("plan_actions.dialog_term_notice")}</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>{t("plan_actions.dialog_item_org")}</li>
+                  <li>
+                    {loadingImpact
+                      ? t("plan_actions.dialog_expos_loading")
+                      : t("plan_actions.dialog_expos_count", { count: impact?.exposCount ?? 0 })}
+                  </li>
+                  <li>
+                    {loadingImpact
+                      ? t("plan_actions.dialog_artworks_loading")
+                      : t("plan_actions.dialog_artworks_count", { count: impact?.artworksCount ?? 0 })}
+                  </li>
+                </ul>
+                <p className="font-medium text-foreground">
+                  {t("plan_actions.dialog_reassurance")}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resigning}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resigning || loadingImpact}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirm();
+              }}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {resigning ? t("plan_actions.dialog_confirming") : t("plan_actions.dialog_confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 type DashboardPlanActionsProps = {
@@ -130,6 +254,7 @@ export function DashboardPlanActions({
   isEtincelle = false,
   onChanged,
 }: DashboardPlanActionsProps) {
+  const { t } = useTranslation("dashboard");
   const [switching, setSwitching] = useState(false);
   const [monthlyByPlan, setMonthlyByPlan] = useState<Partial<Record<EtincellePricedPlan, number | null>>>({});
   const alternatePlan = getAlternatePlanCode(currentPlanCode);
@@ -160,10 +285,10 @@ export function DashboardPlanActions({
     try {
       const { error } = await switchOrganisationPlan(organisationId, subscriptionId, target);
       if (error) {
-        toast.error("Changement de plan impossible", { description: error });
+        toast.error(t("plan_actions.toast_switch_error_title"), { description: error });
         return;
       }
-      toast.success(`Abonnement mis à jour vers ${getPlanDisplayLabel(target)}.`);
+      toast.success(t("plan_actions.toast_switch_success", { plan: getPlanDisplayLabel(target) }));
       onChanged();
     } finally {
       setSwitching(false);
@@ -182,9 +307,9 @@ export function DashboardPlanActions({
             style={planActionButtonStyle(index)}
           >
             <Link to={engagementPlanHref(plan)} className="flex flex-col items-center justify-center gap-0.5 leading-tight">
-              <span className="text-xs font-normal">Passer à l&apos;abonnement</span>
+              <span className="text-xs font-normal">{t("plan_actions.upgrade_prefix")}</span>
               <span className="text-sm font-semibold">
-                {formatPlanSecondaryLine(plan, monthlyByPlan[plan])}
+                {formatPlanSecondaryLine(plan, monthlyByPlan[plan], t)}
               </span>
             </Link>
           </Button>
@@ -199,9 +324,9 @@ export function DashboardPlanActions({
             to={engagementPlanHref("RAYONNEMENT")}
             className="flex flex-col items-center justify-center gap-0.5 leading-tight"
           >
-            <span className="text-xs font-normal">Passer à l&apos;abonnement</span>
-            <span className="w-[200px] text-sm font-semibold">
-              {formatPlanSecondaryLine("RAYONNEMENT", monthlyByPlan.RAYONNEMENT, { quoteFallback: true })}
+            <span className="text-xs font-normal">{t("plan_actions.upgrade_prefix")}</span>
+            <span className="w-[200px] text-sm font-semibold tracking-[-0.5px]">
+              {formatPlanSecondaryLine("RAYONNEMENT", monthlyByPlan.RAYONNEMENT, t, { quoteFallback: true })}
             </span>
           </Link>
         </Button>
@@ -212,9 +337,10 @@ export function DashboardPlanActions({
             className={DEVIS_QUOTE_BTN_CLASS}
             style={planActionButtonStyle(3)}
           >
-            Devis Zénith
+            {t("plan_actions.devis_zenith")}
           </Button>
         </Link>
+        <ResignSubscriptionButton organisationId={organisationId} onResigned={onChanged} />
       </div>
     );
   }
@@ -230,13 +356,13 @@ export function DashboardPlanActions({
           disabled={switching || isPaidSwitch}
           title={
             isPaidSwitch
-              ? "Passage à Horizon : paiement en ligne bientôt disponible"
+              ? t("plan_actions.switch_to_horizon_hint")
               : undefined
           }
           onClick={() => void handleSwitch(alternatePlan)}
         >
           <ArrowLeftRight className="h-4 w-4 mr-2" />
-          Passer à {getPlanDisplayLabel(alternatePlan)}
+          {t("plan_actions.switch_to", { plan: getPlanDisplayLabel(alternatePlan) })}
         </Button>
       ) : null}
       <Link to={ZENITH_DEVIS_HREF} className="block w-full">
@@ -246,9 +372,10 @@ export function DashboardPlanActions({
           className={DEVIS_QUOTE_BTN_CLASS}
           style={planActionButtonStyle(3)}
         >
-          Devis Zénith
+          {t("plan_actions.devis_zenith")}
         </Button>
       </Link>
+      <ResignSubscriptionButton organisationId={organisationId} onResigned={onChanged} />
     </div>
   );
 }

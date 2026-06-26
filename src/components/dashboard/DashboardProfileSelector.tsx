@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,7 @@ export function DashboardProfileSelector({
   onSelect,
   className,
 }: DashboardProfileSelectorProps) {
+  const { t } = useTranslation("dashboard");
   const [open, setOpen] = useState(false);
 
   const options = useMemo(() => {
@@ -55,15 +57,15 @@ export function DashboardProfileSelector({
           aria-expanded={open}
           className={cn("w-full justify-between bg-background font-normal", className)}
         >
-          <span className="truncate">{selected ? memberLabel(selected) : "Choisir un profil…"}</span>
+          <span className="truncate">{selected ? memberLabel(selected) : t("profile_selector.placeholder")}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[min(100vw-2rem,22rem)] p-0" align="start">
         <Command>
-          <CommandInput placeholder="Rechercher un membre…" />
+          <CommandInput placeholder={t("profile_selector.search")} />
           <CommandList>
-            <CommandEmpty>Aucun profil trouvé.</CommandEmpty>
+            <CommandEmpty>{t("profile_selector.empty")}</CommandEmpty>
             <CommandGroup>
               {options.map((member) => (
                 <CommandItem

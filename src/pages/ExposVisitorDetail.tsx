@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -68,11 +69,12 @@ function PersonaDefautField({
   style: PersonaStyleRow | null;
   personaId: string | null;
 }) {
-  const label = style ? getStyleLabelFromDb(style, "fr") : null;
+  const { t, i18n } = useTranslation("expos");
+  const label = style ? getStyleLabelFromDb(style, i18n.language.slice(0, 2)) : null;
   const icon = typeof style?.icon === "string" ? style.icon.trim() : "";
   return (
     <div className="py-2 border-b text-sm">
-      <p className="text-xs text-muted-foreground mb-0.5">Persona par défaut</p>
+      <p className="text-xs text-muted-foreground mb-0.5">{t("visitors.persona_default")}</p>
       {personaId && label ? (
         <p className="flex items-center gap-1.5 break-all">
           {icon ? <span aria-hidden>{icon}</span> : null}
@@ -81,7 +83,7 @@ function PersonaDefautField({
       ) : personaId ? (
         <p className="break-all text-muted-foreground">{personaId}</p>
       ) : (
-        <p className="text-muted-foreground">Non définie</p>
+        <p className="text-muted-foreground">{t("visitors.not_defined")}</p>
       )}
     </div>
   );
@@ -103,6 +105,7 @@ function formatDate(v: string | null | undefined) {
 // ── Composant principal ────────────────────────────────────────────────────
 
 export default function ExposVisitorDetail() {
+  const { t } = useTranslation("expos");
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const source = searchParams.get("source") ?? "visitors";
@@ -332,14 +335,14 @@ export default function ExposVisitorDetail() {
 
   const isAnon = source === "visitors";
   const title = isAnon
-    ? (data?.visitor_pseudo as string | null) || (data?.visitor_name as string | null) || "Visiteur anonyme"
-    : `${(data?.first_name as string | null) ?? ""} ${(data?.last_name as string | null) ?? ""}`.trim() || "Visiteur";
+    ? (data?.visitor_pseudo as string | null) || (data?.visitor_name as string | null) || t("visitors.visitor_anonymous")
+    : `${(data?.first_name as string | null) ?? ""} ${(data?.last_name as string | null) ?? ""}`.trim() || t("visitors.visitor");
 
   return (
     <div className="mx-auto w-full max-w-[900px] px-4 py-6 space-y-4">
       <div className="flex items-center gap-2">
         <Button type="button" variant="outline" onClick={() => navigate("/expos/visitors")}>
-          ← Retour aux visiteurs
+          {t("visitors.back_to_visitors")}
         </Button>
       </div>
 
@@ -349,7 +352,7 @@ export default function ExposVisitorDetail() {
           <CardTitle className="flex items-center gap-3 flex-1 min-w-0">
             <span className="truncate">{title}</span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground shrink-0">
-              {isAnon ? "Visiteur anonyme" : "Profil inscrit"}
+              {isAnon ? t("visitors.visitor_anonymous") : t("visitors.profile_registered")}
             </span>
           </CardTitle>
 
@@ -363,10 +366,10 @@ export default function ExposVisitorDetail() {
             return (
               <div className="flex items-center gap-3 shrink-0">
                 {validUrl(avatar) && (
-                  <HeaderPhoto src={avatar!} alt="avatar" label="Avatar" shape="round" />
+                  <HeaderPhoto src={avatar!} alt="avatar" label={t("visitors.avatar")} shape="round" />
                 )}
                 {validUrl(selfie) && (
-                  <HeaderPhoto src={selfie!} alt="selfie" label="Selfie" shape="square" />
+                  <HeaderPhoto src={selfie!} alt="selfie" label={t("visitors.selfie")} shape="square" />
                 )}
               </div>
             );
@@ -376,43 +379,43 @@ export default function ExposVisitorDetail() {
         <CardContent>
           {error && <p className="text-sm text-destructive mb-4">{error}</p>}
           {!data ? (
-            <p className="text-sm text-muted-foreground">Visiteur introuvable.</p>
+            <p className="text-sm text-muted-foreground">{t("visitors.not_found")}</p>
           ) : isAnon ? (
             <>
               {/* Identité */}
               <TwoCol>
-                <Field label="Pseudo choisi"      value={data.visitor_pseudo as string} />
-                <Field label="Nom visiteur"        value={data.visitor_name as string} />
+                <Field label={t("visitors.pseudo_chosen")}   value={data.visitor_pseudo as string} />
+                <Field label={t("visitors.visitor_name")}    value={data.visitor_name as string} />
                 <PersonaDefautField
                   personaId={(data.persona_defaut as string | null) ?? null}
                   style={(data.persona_style as PersonaStyleRow | null) ?? null}
                 />
-                <Field label="Dernière activité"   value={formatDate(data.last_seen_at as string)} />
+                <Field label={t("visitors.last_activity")}   value={formatDate(data.last_seen_at as string)} />
               </TwoCol>
 
               {/* Appareil */}
               <TwoCol>
-                <SectionTitle>Appareil</SectionTitle>
-                <Field label="Navigateur"          value={data.browser_name as string} />
-                <Field label="Type d'appareil"     value={data.device_type as string} />
-                <Field label="Résolution écran"    value={data.screen_resolution as string} />
-                <Field label="Langue"              value={data.client_locale as string} />
-                <Field label="Fuseau horaire"      value={data.client_timezone as string} />
+                <SectionTitle>{t("visitors.device")}</SectionTitle>
+                <Field label={t("visitors.browser")}            value={data.browser_name as string} />
+                <Field label={t("visitors.device_type")}        value={data.device_type as string} />
+                <Field label={t("visitors.screen_resolution")}  value={data.screen_resolution as string} />
+                <Field label={t("visitors.language")}           value={data.client_locale as string} />
+                <Field label={t("visitors.timezone")}           value={data.client_timezone as string} />
               </TwoCol>
 
               {/* Localisation */}
               <TwoCol>
-                <SectionTitle>Localisation</SectionTitle>
-                <Field label="Pays"                value={data.country as string} />
-                <Field label="Ville"               value={data.city as string} />
-                <Field label="Adresse IP"          value={data.ip_address as string} />
+                <SectionTitle>{t("visitors.location")}</SectionTitle>
+                <Field label={t("visitors.country")}     value={data.country as string} />
+                <Field label={t("visitors.city")}        value={data.city as string} />
+                <Field label={t("visitors.ip_address")}  value={data.ip_address as string} />
               </TwoCol>
 
               {/* Carte interactive Leaflet */}
               {coords && (
                 <div className="mt-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Localisation approximative — {coords.city}{coords.country ? `, ${coords.country}` : ""}
+                    {t("visitors.approx_location", { location: [coords.city, coords.country].filter(Boolean).join(", ") })}
                   </p>
                   <OpenStreetMap
                     lat={coords.lat}
@@ -427,7 +430,7 @@ export default function ExposVisitorDetail() {
                     rel="noopener noreferrer"
                     className="mt-1 inline-block text-xs text-muted-foreground hover:underline"
                   >
-                    Ouvrir dans OpenStreetMap ↗
+                    {t("visitors.open_in_osm")}
                   </a>
                 </div>
               )}
@@ -436,29 +439,29 @@ export default function ExposVisitorDetail() {
           ) : (
             <>
               <TwoCol>
-                <Field label="Prénom"           value={data.first_name as string} />
-                <Field label="Nom"              value={data.last_name as string} />
-                <Field label="Pseudo"           value={data.username as string} />
-                <Field label="Téléphone"        value={data.phone as string} />
-                <Field label="Année naissance"  value={data.birth_year != null ? String(data.birth_year) : null} />
-                <Field label="Organisation"     value={data.agency_name as string} />
-                <Field label="Rôle (ID)"        value={data.role_id != null ? String(data.role_id) : null} />
+                <Field label={t("visitors.firstname")}    value={data.first_name as string} />
+                <Field label={t("visitors.lastname")}     value={data.last_name as string} />
+                <Field label={t("visitors.col_pseudo")}   value={data.username as string} />
+                <Field label={t("visitors.phone")}        value={data.phone as string} />
+                <Field label={t("visitors.birth_year")}   value={data.birth_year != null ? String(data.birth_year) : null} />
+                <Field label={t("visitors.organisation")} value={data.agency_name as string} />
+                <Field label={t("visitors.role_id")}      value={data.role_id != null ? String(data.role_id) : null} />
               </TwoCol>
 
               {/* Dernière visite connue — toujours affiché */}
               <TwoCol>
-                <SectionTitle>Dernière visite connue</SectionTitle>
+                <SectionTitle>{t("visitors.last_visit")}</SectionTitle>
               </TwoCol>
               {data.has_visit_data ? (
                 <TwoCol>
-                  <Field label="Adresse IP"     value={data.ip_address as string} />
-                  <Field label="Langue"         value={data.client_locale as string} />
-                  <Field label="Fuseau horaire" value={data.client_timezone as string} />
-                  <Field label="Date"           value={formatDate(data.last_seen_at as string)} />
+                  <Field label={t("visitors.ip_address")}  value={data.ip_address as string} />
+                  <Field label={t("visitors.language")}    value={data.client_locale as string} />
+                  <Field label={t("visitors.timezone")}    value={data.client_timezone as string} />
+                  <Field label={t("visitors.date")}        value={formatDate(data.last_seen_at as string)} />
                 </TwoCol>
               ) : (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Aucune visite tracée avec ce compte.
+                  {t("visitors.no_visit_tracked")}
                 </p>
               )}
 
@@ -466,7 +469,7 @@ export default function ExposVisitorDetail() {
               {coords && (
                 <div className="mt-4">
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Localisation approximative — {coords.city}{coords.country ? `, ${coords.country}` : ""}
+                    {t("visitors.approx_location", { location: [coords.city, coords.country].filter(Boolean).join(", ") })}
                   </p>
                   <OpenStreetMap
                     lat={coords.lat}
@@ -481,7 +484,7 @@ export default function ExposVisitorDetail() {
                     rel="noopener noreferrer"
                     className="mt-1 inline-block text-xs text-muted-foreground hover:underline"
                   >
-                    Ouvrir dans OpenStreetMap ↗
+                    {t("visitors.open_in_osm")}
                   </a>
                 </div>
               )}
@@ -494,22 +497,22 @@ export default function ExposVisitorDetail() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Feedbacks — {feedbacks.length} enregistrement{feedbacks.length !== 1 ? "s" : ""}
+            {t("visitors.feedbacks_count", { count: feedbacks.length })}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {feedbacks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun feedback enregistré pour ce visiteur.</p>
+            <p className="text-sm text-muted-foreground">{t("visitors.no_feedback")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
-                  <th className="px-2 py-1">Date</th>
-                  <th className="px-2 py-1">Œuvre</th>
-                  <th className="px-2 py-1">Exposition</th>
-                  <th className="px-2 py-1">Émotion</th>
+                  <th className="px-2 py-1">{t("visitors.date")}</th>
+                  <th className="px-2 py-1">{t("visitors.col_artwork")}</th>
+                  <th className="px-2 py-1">{t("visitors.col_expo")}</th>
+                  <th className="px-2 py-1">{t("visitors.col_emotion")}</th>
                   <th className="px-2 py-1 text-center">♥</th>
-                  <th className="px-2 py-1">Commentaire</th>
+                  <th className="px-2 py-1">{t("visitors.col_comment")}</th>
                 </tr>
               </thead>
               <tbody>

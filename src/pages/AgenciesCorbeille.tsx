@@ -74,12 +74,12 @@ export default function AgenciesCorbeille() {
     <div className="container py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-serif font-bold">Corbeille — Organisations</h2>
-          <p className="text-muted-foreground">Restaurez une fiche archivée par erreur.</p>
+          <h2 className="text-3xl font-serif font-bold">{t("title_agencies")}</h2>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button variant="outline" className="gap-2" asChild>
           <Link to="/agencies">
-            <ArrowLeft className="h-4 w-4" /> Retour
+            <ArrowLeft className="h-4 w-4" /> {t("back")}
           </Link>
         </Button>
       </div>
@@ -88,7 +88,7 @@ export default function AgenciesCorbeille() {
       <RetentionSettingCard tableNames={["agencies"]} roleId={role_id} />
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("loading")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("empty_state")}</p>
       ) : (
@@ -99,7 +99,7 @@ export default function AgenciesCorbeille() {
                 <div className="min-w-0 space-y-1">
                   <p className="font-semibold truncate">{row.name_agency?.trim() || row.id}</p>
                   <p className="text-xs text-muted-foreground">
-                    Archivé le {row.deleted_at ? new Date(row.deleted_at).toLocaleString("fr-FR") : "—"}
+                    {t("archived_on", { date: row.deleted_at ? new Date(row.deleted_at).toLocaleString("fr-FR") : "—" })}
                   </p>
                   <RetentionBadge
                     deleted_at={row.deleted_at}

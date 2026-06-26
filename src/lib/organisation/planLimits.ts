@@ -1,3 +1,5 @@
+import i18n from "@/i18n/instance";
+
 export function isEtincellePlanCode(planCode: string | null | undefined): boolean {
   const code = (planCode ?? "").trim().toUpperCase();
   return code === "ETINCELLE" || code.includes("ETINCELLE") || code.includes("ÉTINCELLE");
@@ -24,14 +26,25 @@ export const ETINCELLE_LIMITS = {
   maxVisitors: 100,
 } as const;
 
+/**
+ * Libellés UI du plan Étincelle, résolus à la lecture via i18n (getters).
+ * Les getters évitent de casser les accès `.trialLabel` existants tout en
+ * suivant la langue active. Namespace `dashboard` (chargé sur tout le backoffice).
+ */
 export const ETINCELLE_UI = {
-  trialLabel: "Essai gratuit · 1 mois",
-  optionalLangBlocked:
-    'Votre abonnement gratuit "Etincelle" ne permet pas plus d\'une langue de médiation',
-  audioBlocked: 'Votre abonnement gratuit "Etincelle" ne permet pas la génération de l\'audio',
-  expoLimitBlocked:
-    'Votre abonnement gratuit "Etincelle" ne permet pas de créer une autre exposition (1 exposition incluse).',
-} as const;
+  get trialLabel(): string {
+    return i18n.t("etincelle.trial_label", { ns: "dashboard" });
+  },
+  get optionalLangBlocked(): string {
+    return i18n.t("etincelle.optional_lang_blocked", { ns: "dashboard" });
+  },
+  get audioBlocked(): string {
+    return i18n.t("etincelle.audio_blocked", { ns: "dashboard" });
+  },
+  get expoLimitBlocked(): string {
+    return i18n.t("etincelle.expo_limit_blocked", { ns: "dashboard" });
+  },
+};
 
 export function subscriptionIsEtincellePlan(input: {
   plan_code?: string | null;

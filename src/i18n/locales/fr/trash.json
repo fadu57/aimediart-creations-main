@@ -7,5 +7,21 @@
   "success_restore": "Élément restauré.",
   "success_delete": "Élément supprimé définitivement.",
   "error_restore": "Impossible de restaurer cet élément.",
-  "error_delete": "Impossible de supprimer définitivement cet élément."
+  "error_delete": "Impossible de supprimer définitivement cet élément.",
+  "back": "Retour",
+  "loading": "Chargement…",
+  "archived_on": "Archivé le {{date}}",
+  "access_restricted": "Accès réservé aux niveaux 1 à 3.",
+  "subtitle": "Restaurez une fiche archivée par erreur.",
+  "subtitle_visitors": "Restaurez un visiteur archivé par erreur.",
+  "title_catalogue": "Corbeille — Œuvres",
+  "title_artists": "Corbeille — Artistes",
+  "title_expos": "Corbeille — Expositions",
+  "title_agencies": "Corbeille — Organisations",
+  "title_users": "Corbeille — Utilisateurs",
+  "title_visitors": "Corbeille — Visiteurs",
+  "restore_no_rows": "Restauration envoyée mais aucune ligne modifiée (vérifier les permissions RLS).",
+  "visitor_anonymous_label": "Visiteur anonyme",
+  "visitor_registered_label": "Visiteur inscrit",
+  "anonymous": "Anonyme"
 }

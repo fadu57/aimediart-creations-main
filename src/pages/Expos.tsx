@@ -725,16 +725,18 @@ const Expos = () => {
         </div>
         </div>
         <BackofficeStickyAgencyLogoSlot />
-        {canCreateExpo && (
+        {canCreateExpoByRole && (
           <div className="grid w-full min-w-0 max-w-full grid-cols-3 gap-2 md:ml-auto md:w-[540px]">
-            <Button
-              type="button"
-              className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={openCreate}
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              {t("page.create")}
-            </Button>
+            {canCreateExpo && (
+              <Button
+                type="button"
+                className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                onClick={openCreate}
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                {t("page.create")}
+              </Button>
+            )}
             <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
               <Link to="/expos/expos2">{t("page.tableau")}</Link>
             </Button>

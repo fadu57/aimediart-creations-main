@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Lightbulb, QrCode, Zap } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
 
@@ -36,6 +37,7 @@ const CAMERA_AUTOSTART_KEY = "aimediart-camera-autostart";
 
 const WorkScanner = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("visitor");
   const [searchParams] = useSearchParams();
   const expoId = searchParams.get("expo_id")?.trim() || "";
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -85,8 +87,8 @@ const WorkScanner = () => {
         if (now - lastInvalidScanToastRef.current > 2800) {
           lastInvalidScanToastRef.current = now;
           reportQrInvalid(decodedText);
-          toast.message("QR non reconnu", {
-            description: "Utilisez le QR d’une œuvre (cartel ou catalogue), bien centré et éclairé.",
+          toast.message(t("scanner.qr_not_recognized_title"), {
+            description: t("scanner.qr_not_recognized_desc"),
           });
         }
         return;
@@ -109,7 +111,7 @@ const WorkScanner = () => {
         : `/artwork/${encodeURIComponent(scanTarget.artworkId)}`;
       navigate(target);
     },
-    [expoId, navigate],
+    [expoId, navigate, t],
   );
 
   const getOrCreateFileQrReader = useCallback(() => {
@@ -179,16 +181,16 @@ const WorkScanner = () => {
       }
       setCameraError(
         isInsecureContext
-          ? "Caméra bloquée: ouvrez cette page en HTTPS (ex: URL ngrok) puis réessayez."
+          ? t("scanner.camera_blocked_https")
           : /permission|denied|notallowed|not allowed/i.test(msg)
-            ? "Accès caméra refusé. Autorisez la caméra pour scanner les œuvres."
+            ? t("scanner.camera_denied")
             : /notfound|no camera|device not found|requested device not found/i.test(msg)
-              ? "Aucune caméra détectée sur cet appareil."
+              ? t("scanner.camera_not_found")
               : /notreadable|in use|busy|track start/i.test(msg)
-                ? "La webcam est utilisée par une autre application. Fermez-la puis réessayez."
+                ? t("scanner.camera_in_use")
                 : import.meta.env.DEV && msg.trim()
                   ? msg
-                  : "Caméra indisponible pour le moment. Réessayez dans un instant.",
+                  : t("scanner.camera_unavailable"),
       );
       reportQrCameraError(
         isInsecureContext
@@ -205,7 +207,7 @@ const WorkScanner = () => {
       startingCameraRef.current = false;
       setStartingCamera(false);
     }
-  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded]);
+  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded, t]);
 
   const handleQrImageFile = useCallback(
     async (file: File | undefined) => {
@@ -215,7 +217,7 @@ const WorkScanner = () => {
         qr = getOrCreateFileQrReader();
       } catch {
         reportQrScannerUnavailable();
-        toast.error("Scanner fichier indisponible.");
+        toast.error(t("scanner.file_unavailable"));
         return;
       }
       try {
@@ -223,10 +225,10 @@ const WorkScanner = () => {
         handleQrDecoded(text);
       } catch {
         reportQrUnreadableImage();
-        toast.error("QR illisible sur cette image. Essayez une photo plus nette ou plus proche.");
+        toast.error(t("scanner.qr_unreadable_image"));
       }
     },
-    [getOrCreateFileQrReader, handleQrDecoded],
+    [getOrCreateFileQrReader, handleQrDecoded, t],
   );
 
   useEffect(() => {
@@ -270,7 +272,7 @@ const WorkScanner = () => {
       if (ok) setTorchOn(nextTorchValue);
       else {
         reportQrTorchError();
-        setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+        setCameraError(t("scanner.torch_failed"));
       }
       return;
     }
@@ -282,7 +284,7 @@ const WorkScanner = () => {
       setTorchOn(nextTorchValue);
     } catch {
       reportQrTorchError();
-      setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+      setCameraError(t("scanner.torch_failed"));
     }
   };
 
@@ -323,8 +325,8 @@ const WorkScanner = () => {
                 className={`absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/25 backdrop-blur-sm transition ${
                   torchOn ? "bg-amber-400/85 text-black" : "bg-black/45 text-white"
                 }`}
-                aria-label={torchOn ? "Désactiver l'éclairage" : "Activer l'éclairage"}
-                title={torchOn ? "Éteindre l'éclair" : "Activer l'éclair"}
+                aria-label={torchOn ? t("scanner.torch_off_aria") : t("scanner.torch_on_aria")}
+                title={torchOn ? t("scanner.torch_off_title") : t("scanner.torch_on_title")}
               >
                 <Zap className="h-4 w-4" />
               </button>
@@ -357,7 +359,7 @@ const WorkScanner = () => {
               }}
               disabled={startingCamera}
             >
-              {startingCamera ? "Démarrage de la caméra..." : "Démarrer la caméra"}
+              {startingCamera ? t("scanner.start_camera_loading") : t("scanner.start_camera")}
             </Button>
           )}
 
@@ -380,32 +382,32 @@ const WorkScanner = () => {
               className="w-full border-border bg-white text-sm"
               onClick={() => qrImageInputRef.current?.click()}
             >
-              Importer une photo du QR
+              {t("scanner.import_qr_photo")}
             </Button>
           )}
 
           {cameraReady && isNativeQrScanSupported() && (
-            <p className="text-[10px] text-muted-foreground">Lecture QR native (comme l’app Caméra Windows)</p>
+            <p className="text-[10px] text-muted-foreground">{t("scanner.native_qr_note")}</p>
           )}
 
           <p className="max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-            <strong className="font-semibold text-foreground">Bravo ! Maintenant la visite démarre.</strong>
+            <strong className="font-semibold text-foreground">{t("scanner.start_visit_title")}</strong>
             <br />
-            Il suffit de scanner les QR-Code disposés à côté des œuvres exposées.
+            {t("scanner.start_visit_desc")}
           </p>
 
           <Button type="button" variant="outline" className="w-full border-border bg-white text-sm" onClick={() => void handleQuit()}>
-            Quitter la visite
+            {t("scanner.quit_visit")}
           </Button>
 
           {showAssistHint && !cameraError && (
             <div className="text-center text-xs text-muted-foreground leading-relaxed">
               <p className="inline-flex items-center justify-center gap-1 font-semibold">
                 <Lightbulb className="h-3.5 w-3.5" />
-                ASTUCE
+                {t("scanner.tip")}
               </p>
-              <p>Appprochez-vous du QR-Code</p>
-              <p>et/ou activez la lampe sur votre smartphone</p>
+              <p>{t("scanner.tip_line1")}</p>
+              <p>{t("scanner.tip_line2")}</p>
             </div>
           )}
         </div>

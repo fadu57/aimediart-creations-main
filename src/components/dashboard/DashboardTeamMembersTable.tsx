@@ -1,4 +1,5 @@
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +39,7 @@ type TeamMemberExposCellProps = {
 };
 
 function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }: TeamMemberExposCellProps) {
+  const { t } = useTranslation("dashboard");
   const labels = expoLabelsForMember(member, expoOptions);
 
   if (!canEdit) {
@@ -46,7 +48,7 @@ function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }:
   }
 
   if (expoOptions.length === 0) {
-    return <span className="text-sm text-muted-foreground">Aucune expo</span>;
+    return <span className="text-sm text-muted-foreground">{t("team_table.no_expo")}</span>;
   }
 
   const selected = new Set(member.expo_ids);
@@ -60,10 +62,10 @@ function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }:
 
   const summary =
     labels.length === 0
-      ? "Choisir…"
+      ? t("team_table.choose")
       : labels.length === 1
         ? labels[0]
-        : `${labels.length} expositions`;
+        : t("team_table.expo_count", { count: labels.length });
 
   return (
     <Popover>
@@ -76,7 +78,7 @@ function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }:
           disabled={saving}
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="truncate">{saving ? "Enregistrement…" : summary}</span>
+          <span className="truncate">{saving ? t("team_table.saving") : summary}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
         </Button>
       </PopoverTrigger>
@@ -86,7 +88,7 @@ function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }:
         onClick={(e) => e.stopPropagation()}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <p className="px-1 pb-2 text-xs font-medium text-muted-foreground">Expositions</p>
+        <p className="px-1 pb-2 text-xs font-medium text-muted-foreground">{t("team_table.expos_popover_title")}</p>
         <div className="max-h-52 space-y-0.5 overflow-y-auto">
           {expoOptions.map((expo) => {
             const checked = selected.has(expo.value) || selected.has(expo.id);
@@ -135,12 +137,13 @@ export function DashboardTeamMembersTable({
   onDeleteMember,
   onMemberExposChange,
 }: DashboardTeamMembersTableProps) {
+  const { t } = useTranslation("dashboard");
   const showActions = Boolean(onEditMember || onDeleteMember);
 
   if (members.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4 text-center">
-        Aucun membre rattaché à votre organisation.
+        {t("team_table.empty")}
       </p>
     );
   }
@@ -150,13 +153,13 @@ export function DashboardTeamMembersTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead>Nom</TableHead>
-            <TableHead>Prénom</TableHead>
-            <TableHead>Pseudo</TableHead>
-            <TableHead>Rôle métier</TableHead>
-            <TableHead className="hidden md:table-cell min-w-[10rem]">Exposition</TableHead>
-            <TableHead className="hidden sm:table-cell">Téléphone</TableHead>
-            {showActions && <TableHead className="w-[88px] text-right">Actions</TableHead>}
+            <TableHead>{t("team_table.col_lastname")}</TableHead>
+            <TableHead>{t("team_table.col_firstname")}</TableHead>
+            <TableHead>{t("team_table.col_username")}</TableHead>
+            <TableHead>{t("team_table.col_role")}</TableHead>
+            <TableHead className="hidden md:table-cell min-w-[10rem]">{t("team_table.col_expo")}</TableHead>
+            <TableHead className="hidden sm:table-cell">{t("team_table.col_phone")}</TableHead>
+            {showActions && <TableHead className="w-[88px] text-right">{t("team_table.col_actions")}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -207,8 +210,8 @@ export function DashboardTeamMembersTable({
                             size="icon"
                             className="h-8 w-8 shrink-0"
                             onClick={() => onEditMember?.(member)}
-                            aria-label="Modifier"
-                            title="Modifier"
+                            aria-label={t("common.edit")}
+                            title={t("common.edit")}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -223,8 +226,8 @@ export function DashboardTeamMembersTable({
                               e.stopPropagation();
                               onDeleteMember?.(member);
                             }}
-                            aria-label="Corbeille"
-                            title="Corbeille"
+                            aria-label={t("common.delete")}
+                            title={t("common.delete")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>

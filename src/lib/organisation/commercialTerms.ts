@@ -1,3 +1,5 @@
+import i18n from "@/i18n/instance";
+
 export type CommercialKind = "standard" | "partner_showcase" | "sponsoring" | "internal_test";
 
 export const COMMERCIAL_KIND_OPTIONS: { value: CommercialKind; label: string }[] = [
@@ -69,11 +71,11 @@ export function computeNetPriceEur(
 export function commercialKindLabel(kind: CommercialKind | null | undefined): string | null {
   switch (kind) {
     case "partner_showcase":
-      return "Partenaire vitrine";
+      return i18n.t("commercial_kind.partner_showcase", { ns: "dashboard" });
     case "sponsoring":
-      return "Sponsoring AIMediArt";
+      return i18n.t("commercial_kind.sponsoring", { ns: "dashboard" });
     case "internal_test":
-      return "Organisation test";
+      return i18n.t("commercial_kind.internal_test", { ns: "dashboard" });
     case "standard":
     default:
       return null;

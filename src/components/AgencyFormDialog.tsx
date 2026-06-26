@@ -68,6 +68,8 @@ import {
 } from "@/lib/organisation/commercialTerms";
 import { fetchPricingByPlanCode } from "@/lib/organisation/publicHomeData";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 type Mode = "create" | "edit";
 
@@ -93,23 +95,23 @@ function formatCommercialEur(value: number): string {
   }).format(value);
 }
 
-function validateCommercialValues(values: Record<string, string>): string | null {
+function validateCommercialValues(values: Record<string, string>, t: TFunction): string | null {
   const plan = (values.commercial_plan_code ?? "").trim().toUpperCase();
   if (!["ATELIER", "HORIZON", "RAYONNEMENT"].includes(plan)) {
-    return "Sélectionnez l'abonnement concerné (Atelier, Horizon ou Rayonnement).";
+    return t("form.validate_plan_required");
   }
   const pctRaw = (values.discount_percent ?? "").trim().replace(",", ".");
   if (pctRaw !== "") {
     const pct = Number(pctRaw);
     if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
-      return "La remise en % doit être comprise entre 0 et 100.";
+      return t("form.validate_percent_range");
     }
   }
   const eurRaw = (values.discount_amount_eur ?? "").trim().replace(",", ".");
   if (eurRaw !== "") {
     const eur = Number(eurRaw);
     if (!Number.isFinite(eur) || eur < 0) {
-      return "La remise en € doit être un montant positif ou nul.";
+      return t("form.validate_eur_positive");
     }
   }
   return null;
@@ -166,10 +168,10 @@ function getErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-async function uploadAgencyLogoToStorage(file: File, agencyId: string): Promise<string> {
+async function uploadAgencyLogoToStorage(file: File, agencyId: string, t: TFunction): Promise<string> {
   const prepared = await prepareImageForSupabaseUpload(file);
   const id = agencyId.trim();
-  if (!id) throw new Error("Identifiant organisation requis pour le logo.");
+  if (!id) throw new Error(t("form.logo_org_id_required"));
   try {
     return await uploadAgencyLogo(id, prepared, prepared.name);
   } catch (primaryErr) {
@@ -207,6 +209,7 @@ export function AgencyFormDialog({
   canEditCommercialTerms = false,
   onSuccess,
 }: AgencyFormDialogProps) {
+  const { t } = useTranslation("agencies");
   const [loadingRow, setLoadingRow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -316,7 +319,7 @@ export function AgencyFormDialog({
       if (error) throw error;
       const row = (data as Record<string, unknown> | null) ?? null;
       if (!row) {
-        toast.error("Agence introuvable.");
+        toast.error(t("form.agency_not_found"));
         onOpenChange(false);
         return;
       }
@@ -335,12 +338,12 @@ export function AgencyFormDialog({
       setValues(nextValues);
       setInitialValues(nextValues);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Impossible de charger l’agence."));
+      toast.error(getErrorMessage(e, t("form.agency_load_failed")));
       onOpenChange(false);
     } finally {
       setLoadingRow(false);
     }
-  }, [mode, agencyId, onOpenChange]);
+  }, [mode, agencyId, onOpenChange, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -385,7 +388,7 @@ export function AgencyFormDialog({
       return;
     }
     if (canEditCommercialTerms) {
-      const commercialError = validateCommercialValues(values);
+      const commercialError = validateCommercialValues(values, t);
       if (commercialError) {
         toast.error(commercialError);
         return;
@@ -399,7 +402,7 @@ export function AgencyFormDialog({
         mode === "edit" ? agencyId?.trim() || "" : String(mergedValues.id ?? "").trim() || crypto.randomUUID();
 
       if (isAgencyLogoField("logo_agency") && logoFileByKey.logo_agency) {
-        const url = await uploadAgencyLogoToStorage(logoFileByKey.logo_agency, targetAgencyId);
+        const url = await uploadAgencyLogoToStorage(logoFileByKey.logo_agency, targetAgencyId, t);
         mergedValues.logo_agency = url;
       }
 
@@ -422,7 +425,7 @@ export function AgencyFormDialog({
 
         const { error } = await supabase.from("agencies").insert(payload);
         if (error) throw error;
-        toast.success("Agence créée.");
+        toast.success(t("form.agency_created"));
       } else {
         if (!agencyId) return;
         const payload: Record<string, unknown> = {};
@@ -440,7 +443,7 @@ export function AgencyFormDialog({
         }
         const { error } = await supabase.from("agencies").update(payload).eq("id", agencyId);
         if (error) throw error;
-        toast.success("Agence mise à jour.");
+        toast.success(t("form.agency_updated"));
       }
       onSuccess();
       setValues(mergedValues);
@@ -448,7 +451,7 @@ export function AgencyFormDialog({
       setLogoFileByKey({});
       onOpenChange(false);
     } catch (e) {
-      toast.error(getErrorMessage(e, "Enregistrement impossible (vérifiez les droits RLS)."));
+      toast.error(getErrorMessage(e, t("form.save_failed_rls")));
     } finally {
       setSaving(false);
     }
@@ -483,11 +486,11 @@ export function AgencyFormDialog({
         className="max-h-[90vh] max-w-lg overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:max-w-xl"
         aria-describedby={undefined}
       >
-        <DialogTitle className="sr-only">{mode === "create" ? "Nouvelle agence" : "Fiche de l'organisation"}</DialogTitle>
+        <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
-              {mode === "create" ? "Nouvelle agence" : "Fiche de l'organisation"}
+              {mode === "create" ? t("form.title_create") : t("form.title_edit")}
             </h2>
             <div className="flex items-center gap-2">
               <Button
@@ -502,7 +505,7 @@ export function AgencyFormDialog({
                 onClick={() => void handleSave()}
                 disabled={saving || loadingRow || (mode === "edit" && !hasFormChanges)}
               >
-                {saving ? "Enregistrement…" : mode === "create" ? "Enregistrer" : "Enregistrer les modifications"}
+                {saving ? t("form.saving") : mode === "create" ? t("form.save") : t("form.save_changes")}
               </Button>
             </div>
           </div>
@@ -510,7 +513,7 @@ export function AgencyFormDialog({
 
         <div className="px-4 sm:px-5 pt-3 pb-4">
           {loadingRow ? (
-            <p className="text-sm text-muted-foreground py-6">Chargement…</p>
+            <p className="text-sm text-muted-foreground py-6">{t("form.loading")}</p>
           ) : (
             <div className="grid gap-3 py-1">
               {sortedKeys.map((key) => {
@@ -532,7 +535,7 @@ export function AgencyFormDialog({
                       {fieldLabel(key)}
                     </Label>
                     <p className="text-[11px] text-muted-foreground leading-snug">
-                      Téléversez une image : l’URL publique sera enregistrée dans le champ « logo_agency ».
+                      {t("form.logo_hint")}
                     </p>
                     {(previewUrl || showStoredLogo) && (
                       <div className="flex items-start gap-3">
@@ -557,7 +560,7 @@ export function AgencyFormDialog({
                         try {
                           assertImageFileAllowed(file);
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Fichier image invalide.");
+                          toast.error(err instanceof Error ? err.message : t("form.invalid_image_file"));
                           return;
                         }
                         setLogoFileByKey((prev) => ({ ...prev, [key]: file }));
@@ -586,7 +589,7 @@ export function AgencyFormDialog({
                           });
                         }}
                       >
-                        Retirer le logo
+                        {t("form.remove_logo")}
                       </Button>
                     )}
                   </div>
@@ -623,7 +626,7 @@ export function AgencyFormDialog({
               })}
 
               <div className="mt-2 space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4">
-                <p className="text-sm font-semibold text-foreground">Identité juridique</p>
+                <p className="text-sm font-semibold text-foreground">{t("form.legal_identity")}</p>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="agency-structure-category" className="text-xs font-medium">
@@ -642,7 +645,7 @@ export function AgencyFormDialog({
                     disabled={saving}
                   >
                     <SelectTrigger id="agency-structure-category" className="shadow-none">
-                      <SelectValue placeholder="Choisir une famille de structure" />
+                      <SelectValue placeholder={t("form.choose_structure_family")} />
                     </SelectTrigger>
                     <SelectContent>
                       {AGENCY_STRUCTURE_CATEGORIES.map((option) => (
@@ -674,7 +677,7 @@ export function AgencyFormDialog({
                     disabled={saving || !structureCategory}
                   >
                     <SelectTrigger id="agency-structure-type" className="shadow-none">
-                      <SelectValue placeholder="Choisir une forme juridique" />
+                      <SelectValue placeholder={t("form.choose_legal_form")} />
                     </SelectTrigger>
                     <SelectContent>
                       {identityStructureOptions.map((option) => (
@@ -706,7 +709,7 @@ export function AgencyFormDialog({
                       }))
                     }
                   />
-                  <p className="text-[11px] text-muted-foreground">14 chiffres — format XXX XXX XXX XXXXX</p>
+                  <p className="text-[11px] text-muted-foreground">{t("form.siret_hint")}</p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -754,7 +757,7 @@ export function AgencyFormDialog({
                     disabled={saving || !structureType}
                   >
                     <SelectTrigger id="agency-legal-rep-role" className="shadow-none">
-                      <SelectValue placeholder="Choisir la qualité du responsable légal" />
+                      <SelectValue placeholder={t("form.choose_legal_rep_role")} />
                     </SelectTrigger>
                     <SelectContent>
                       {identityRoleOptions.map((option) => (
@@ -769,7 +772,7 @@ export function AgencyFormDialog({
 
               {canEditCommercialTerms ? (
                 <div className="mt-2 space-y-3 rounded-lg border border-[#9d2525]/20 bg-[#fff9f7] p-4">
-                  <p className="text-sm font-semibold text-[#9d2525]">Conditions commerciales</p>
+                  <p className="text-sm font-semibold text-[#9d2525]">{t("form.commercial_terms")}</p>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="agency-commercial-kind" className="text-xs font-medium">
@@ -783,7 +786,7 @@ export function AgencyFormDialog({
                       disabled={saving}
                     >
                       <SelectTrigger id="agency-commercial-kind" className="shadow-none">
-                        <SelectValue placeholder="Choisir un profil" />
+                        <SelectValue placeholder={t("form.choose_profile")} />
                       </SelectTrigger>
                       <SelectContent>
                         {COMMERCIAL_KIND_OPTIONS.map((option) => (
@@ -811,7 +814,7 @@ export function AgencyFormDialog({
                       disabled={saving}
                     >
                       <SelectTrigger id="agency-commercial-plan" className="shadow-none">
-                        <SelectValue placeholder="Choisir un abonnement" />
+                        <SelectValue placeholder={t("form.choose_plan")} />
                       </SelectTrigger>
                       <SelectContent>
                         {COMMERCIAL_PLAN_OPTIONS.map((option) => (
@@ -874,7 +877,7 @@ export function AgencyFormDialog({
                         />
                       </div>
                       <div className="shrink-0 pb-2.5 text-right">
-                        <p className="text-[10px] font-medium text-muted-foreground">Remise annuelle</p>
+                        <p className="text-[10px] font-medium text-muted-foreground">{t("form.annual_discount")}</p>
                         <p className="text-sm font-semibold tabular-nums text-[#9d2525]">
                           {formatCommercialEur(
                             Math.round((parseCommercialDiscountInput(values.discount_amount_eur) ?? 0) * 12 * 100) /
@@ -896,7 +899,7 @@ export function AgencyFormDialog({
                       rows={3}
                       disabled={saving}
                       className="min-h-[72px] shadow-none"
-                      placeholder="Ex. Partenariat vitrine AIMediArt — org réelle, usage démo"
+                      placeholder={t("form.commercial_notes_placeholder")}
                       onChange={(e) =>
                         setValues((prev) => ({ ...prev, commercial_notes: e.target.value }))
                       }
@@ -911,13 +914,13 @@ export function AgencyFormDialog({
       <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la fermeture</AlertDialogTitle>
+            <AlertDialogTitle>{t("form.close_confirm_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Des modifications non enregistrées existent. Fermer la fiche ?
+              {t("form.close_confirm_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Non</AlertDialogCancel>
+            <AlertDialogCancel>{t("form.no")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               onClick={() => {
@@ -925,7 +928,7 @@ export function AgencyFormDialog({
                 onOpenChange(false);
               }}
             >
-              Oui
+              {t("form.yes")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import { Lightbulb, QrCode, Zap } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const CAMERA_AUTOSTART_KEY = "aimediart-camera-autostart";
 
 export default function ScanWork2() {
   const navigate = useNavigate();
+  const { t } = useTranslation("visitor");
   const [searchParams] = useSearchParams();
   const expoId = searchParams.get("expo_id")?.trim() || "";
   const artworkId = searchParams.get("artwork_id")?.trim() || "";
@@ -168,8 +170,8 @@ export default function ScanWork2() {
         if (now - lastInvalidScanToastRef.current > 2800) {
           lastInvalidScanToastRef.current = now;
           reportQrInvalid(decodedText);
-          toast.message("QR non reconnu", {
-            description: "Utilisez le QR d’une œuvre (cartel ou catalogue), bien centré et éclairé.",
+          toast.message(t("scanner.qr_not_recognized_title"), {
+            description: t("scanner.qr_not_recognized_desc"),
           });
         }
         return;
@@ -192,7 +194,7 @@ export default function ScanWork2() {
         : `/artwork/${encodeURIComponent(scanTarget.artworkId)}`;
       navigate(target);
     },
-    [expoId, navigate],
+    [expoId, navigate, t],
   );
 
   const getOrCreateFileQrReader = useCallback(() => {
@@ -262,16 +264,16 @@ export default function ScanWork2() {
       }
       setCameraError(
         isInsecureContext
-          ? "Caméra bloquée: ouvrez cette page en HTTPS (ex: URL ngrok) puis réessayez."
+          ? t("scanner.camera_blocked_https")
           : /permission|denied|notallowed|not allowed/i.test(msg)
-            ? "Accès caméra refusé. Autorisez la caméra pour scanner les œuvres."
+            ? t("scanner.camera_denied")
             : /notfound|no camera|device not found|requested device not found/i.test(msg)
-              ? "Aucune caméra détectée sur cet appareil."
+              ? t("scanner.camera_not_found")
               : /notreadable|in use|busy|track start/i.test(msg)
-                ? "La webcam est utilisée par une autre application. Fermez-la puis réessayez."
+                ? t("scanner.camera_in_use")
                 : import.meta.env.DEV && msg.trim()
                   ? msg
-                  : "Caméra indisponible pour le moment. Réessayez dans un instant.",
+                  : t("scanner.camera_unavailable"),
       );
       reportQrCameraError(
         isInsecureContext
@@ -288,7 +290,7 @@ export default function ScanWork2() {
       startingCameraRef.current = false;
       setStartingCamera(false);
     }
-  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded]);
+  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded, t]);
 
   const handleQrImageFile = useCallback(
     async (file: File | undefined) => {
@@ -298,7 +300,7 @@ export default function ScanWork2() {
         qr = getOrCreateFileQrReader();
       } catch {
         reportQrScannerUnavailable();
-        toast.error("Scanner fichier indisponible.");
+        toast.error(t("scanner.file_unavailable"));
         return;
       }
       try {
@@ -306,10 +308,10 @@ export default function ScanWork2() {
         handleQrDecoded(text);
       } catch {
         reportQrUnreadableImage();
-        toast.error("QR illisible sur cette image. Essayez une photo plus nette ou plus proche.");
+        toast.error(t("scanner.qr_unreadable_image"));
       }
     },
-    [getOrCreateFileQrReader, handleQrDecoded],
+    [getOrCreateFileQrReader, handleQrDecoded, t],
   );
 
   useEffect(() => {
@@ -353,7 +355,7 @@ export default function ScanWork2() {
       if (ok) setTorchOn(nextTorchValue);
       else {
         reportQrTorchError();
-        setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+        setCameraError(t("scanner.torch_failed"));
       }
       return;
     }
@@ -365,7 +367,7 @@ export default function ScanWork2() {
       setTorchOn(nextTorchValue);
     } catch {
       reportQrTorchError();
-      setCameraError("La lampe n'a pas pu être activée sur cet appareil.");
+      setCameraError(t("scanner.torch_failed"));
     }
   };
 
@@ -406,8 +408,8 @@ export default function ScanWork2() {
                 className={`absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/25 backdrop-blur-sm transition ${
                   torchOn ? "bg-amber-400/85 text-black" : "bg-black/45 text-white"
                 }`}
-                aria-label={torchOn ? "Désactiver l'éclairage" : "Activer l'éclairage"}
-                title={torchOn ? "Éteindre l'éclair" : "Activer l'éclair"}
+                aria-label={torchOn ? t("scanner.torch_off_aria") : t("scanner.torch_on_aria")}
+                title={torchOn ? t("scanner.torch_off_title") : t("scanner.torch_on_title")}
               >
                 <Zap className="h-4 w-4" />
               </button>
@@ -440,7 +442,7 @@ export default function ScanWork2() {
               }}
               disabled={startingCamera}
             >
-              {startingCamera ? "Démarrage de la caméra..." : "Démarrer la caméra"}
+              {startingCamera ? t("scanner.start_camera_loading") : t("scanner.start_camera")}
             </Button>
           )}
 
@@ -463,21 +465,21 @@ export default function ScanWork2() {
               className="w-full border-border bg-white text-sm"
               onClick={() => qrImageInputRef.current?.click()}
             >
-              Importer une photo du QR
+              {t("scanner.import_qr_photo")}
             </Button>
           )}
 
           <div className="text-center text-xs text-muted-foreground leading-relaxed">
             <p className="inline-flex items-center justify-center gap-1 font-semibold">
               <Lightbulb className="h-3.5 w-3.5" />
-              ASTUCE
+              {t("scanner.tip")}
             </p>
-            <p>Appprochez-vous du QR-Code</p>
-            <p>et/ou activez la lampe sur votre smartphone</p>
+            <p>{t("scanner.tip_line1")}</p>
+            <p>{t("scanner.tip_line2")}</p>
           </div>
 
           <Button type="button" variant="outline" className="w-full border-border bg-white text-sm" onClick={handleQuit}>
-            Quitter la visite
+            {t("scanner.quit_visit")}
           </Button>
         </div>
       </div>
@@ -493,36 +495,37 @@ export default function ScanWork2() {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Message de fin de visite"
+            aria-label={t("scanner.exit_dialog_aria")}
           >
             <div className="mb-3 flex items-start">
               <AimediartBrandLogoBlock size="sm" animateHeart />
             </div>
             <p className="text-sm font-semibold leading-relaxed">
-              Très bien
+              {t("scanner.exit_thanks_intro")}
               <br />
               {hasAgencyName ? (
-                <>
-                  <span className="text-accent">AIMEDIArt.com</span> et {agencyName} vous remercient
-                  <br />
-                  pour votre visite.
-                </>
+                <Trans
+                  t={t}
+                  i18nKey="scanner.exit_thanks_with_agency"
+                  values={{ agency: agencyName }}
+                  components={{ brand: <span className="text-accent" /> }}
+                />
               ) : (
-                <>
-                  <span className="text-accent">AIMEDIArt.com</span> vous remercie
-                  <br />
-                  pour votre visite.
-                </>
+                <Trans
+                  t={t}
+                  i18nKey="scanner.exit_thanks_no_agency"
+                  components={{ brand: <span className="text-accent" /> }}
+                />
               )}
               <br />
-              Nous espérons vous revoir très bientôt !
+              {t("scanner.exit_see_you")}
             </p>
             <div className="mt-4 flex flex-col gap-2">
               <Button type="button" className="w-full" onClick={() => navigate(exitTarget)}>
-                Quitter
+                {t("scanner.exit_quit")}
               </Button>
               <Button type="button" variant="outline" className="w-full" onClick={() => setIsExitPopupOpen(false)}>
-                Retour
+                {t("scanner.exit_back")}
               </Button>
             </div>
           </div>

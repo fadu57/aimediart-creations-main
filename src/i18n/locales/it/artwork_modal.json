@@ -130,5 +130,53 @@
     "fill_missing": "Completa voci mancanti",
     "all_voices_ready": "Tutte le voci sono state generate",
     "background_hint": "Puoi chiudere: la generazione continuerà in background."
+  },
+  "qr_warn_no_expo": "Nessuna mostra assegnata — il QR funzionerà ma senza contesto della mostra per il visitatore.",
+  "mediation_regenerate_hint_line3": "Puoi anche modificare / inserire tu stesso un testo di mediazione in qualsiasi momento. Ma è possibile solo 1 modifica per persona",
+  "mediation_lang_help_plan_range": "Generazione IA: fino a {{count}} lingue incluse nel tuo abbonamento. Scegli una lingua opzionale qui sopra per attivare la seconda lingua.",
+  "dialog_lang_audio_title": "Generare le voci in {{lang}}?",
+  "dialog_lang_audio_desc": "Esistono testi di mediazione in {{lang}} ma le audioguide (voce F e M) non sono ancora pronte. Vuoi avviare la generazione ora?",
+  "dialog_lang_audio_yes": "Sì, genera le voci",
+  "dialog_lang_audio_no": "Più tardi",
+  "audio_player": {
+    "loading": "Caricamento audio…",
+    "generating": "Audio in corso…",
+    "generate": "Genera l'audio",
+    "retry": "Riprova",
+    "error": "La generazione audio è fallita o è scaduta.",
+    "voice_f": "Voce F",
+    "voice_m": "Voce M",
+    "play_f": "Riproduci voce femminile",
+    "play_m": "Riproduci voce maschile",
+    "manage_voices": "Gestisci le voci"
+  },
+  "audio_voice_status": {
+    "label": "Voci generate",
+    "aria": "Stato delle audioguide per lingua",
+    "voice_f": "Voce femminile",
+    "voice_m": "Voce maschile",
+    "progress": "{{ready}}/{{total}}",
+    "progress_generating": "{{ready}}/{{total}} · {{active}} in corso",
+    "progress_errors": "{{ready}}/{{total}} · {{error}} errore/i",
+    "progress_errors_pending": "{{ready}}/{{total}} · {{error}} errore/i · {{pending}} in attesa",
+    "retry_lang": "Riavvia la generazione audio per questa lingua",
+    "cancel_lang": "Interrompi la generazione per questa lingua",
+    "continue_lang": "Continua la generazione audio per questa lingua",
+    "no_text": "Nessun testo di mediazione",
+    "no_persona_audio": "Persona non configurata per l'audio"
+  },
+  "text_edit": {
+    "cancel": "Annulla",
+    "save": "Salva",
+    "unsaved_title": "Modifiche non salvate",
+    "unsaved_desc": "Hai modificato il testo senza salvarlo. Vuoi davvero chiudere senza salvare?",
+    "continue_editing": "Continua a modificare",
+    "discard": "Chiudi senza salvare"
+  },
+  "photo_capture": {
+    "required": "Foto obbligatoria",
+    "import": "Importa",
+    "change": "Cambia foto",
+    "photograph": "Fotografa"
   }
 }

@@ -838,7 +838,6 @@
   }
 
   .ph-fold-card:hover {
-    transform: translateY(-8px);
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
     border-color: rgba(20, 20, 20, 0.1);
   }
@@ -852,6 +851,48 @@
 
   .ph-fold-card:hover::after {
     opacity: 1;
+  }
+
+  /* ── Corner ribbon doré (badge plan dans le coin haut-droit) ──────── */
+  .ph-corner-ribbon {
+    position: absolute;
+    top: 24px;
+    left: -40px;
+    width: 150px;
+    transform: rotate(-45deg);
+    padding: 5px 0;
+    text-align: center;
+    background: linear-gradient(180deg, #e6b24a 0%, #d49227 50%, #bd7f1d 100%);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.1;
+    white-space: nowrap;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
+    z-index: 20;
+    pointer-events: none;
+  }
+
+  .ph-corner-ribbon::before,
+  .ph-corner-ribbon::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    border: 5px solid transparent;
+  }
+
+  .ph-corner-ribbon::before {
+    left: 0;
+    border-left-color: #8a5a12;
+    border-top-color: #8a5a12;
+  }
+
+  .ph-corner-ribbon::after {
+    right: 0;
+    border-right-color: #8a5a12;
+    border-top-color: #8a5a12;
   }
 }
 
@@ -1109,4 +1150,131 @@
   height: 1.5rem !important;
   width: 1.5rem !important;
   font-size: 0.7rem !important;
+}
+
+/* ---- Carrousel tarifs (Swiper Coverflow) ---- */
+/* Clip horizontal pour l'effet peek-a-boo : les cartes voisines sont coupées
+   au bord du cadre et laissent juste deviner leur tranche. La marge verticale
+   (py-8) laisse respirer la carte centrale agrandie (scale 1.1). */
+.ph-pricing-swiper {
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.ph-pricing-swiper .ph-pricing-slide {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Wrapper interne : la profondeur/échelle 3D est gérée par l'effet Coverflow,
+   et l'opacité (estompage progressif des cartes en arrière-plan) est pilotée en JS
+   via applyPricingCoverflowDepth. Ici on ne gère que la transition et la mise en
+   avant (scale) de la carte centrale. */
+.ph-pricing-slide-inner {
+  position: relative;
+  width: 100%;
+  transition: transform 0.35s ease, opacity 0.35s ease;
+  will-change: transform, opacity;
+}
+
+/* Flash promo "Top 1/2/3" en sticker d'angle (starburst) */
+.ph-top-flash {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  padding: 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #9d2525;
+  background: radial-gradient(circle at 50% 40%, #ffe07a 0%, #f5c518 70%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transform: rotate(-14deg);
+  clip-path: polygon(
+    50% 0%, 63% 13%, 80% 8%, 82% 27%, 100% 35%, 87% 50%, 100% 65%,
+    82% 73%, 80% 92%, 63% 87%, 50% 100%, 37% 87%, 20% 92%, 18% 73%,
+    0% 65%, 13% 50%, 0% 35%, 18% 27%, 20% 8%, 37% 13%
+  );
+  animation: ph-top-flash-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ph-top-flash-pulse {
+  0%, 100% { transform: rotate(-14deg) scale(1); }
+  50% { transform: rotate(-14deg) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-top-flash {
+    animation: none;
+  }
+}
+
+.ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner {
+  transform: scale(1.1);
+  z-index: 3;
+}
+
+/* Ombre portée plus marquée sur la carte centrale */
+.ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner .ph-fold-card {
+  box-shadow: 0 26px 50px -12px rgba(157, 37, 37, 0.4) !important;
+}
+
+/* Flèches de navigation discrètes */
+.ph-pricing-swiper .swiper-button-prev,
+.ph-pricing-swiper .swiper-button-next {
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(157, 37, 37, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  color: #9d2525;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.ph-pricing-swiper .swiper-button-prev:hover,
+.ph-pricing-swiper .swiper-button-next:hover {
+  opacity: 1;
+  background: #ffffff;
+}
+
+.ph-pricing-swiper .swiper-button-prev::after,
+.ph-pricing-swiper .swiper-button-next::after {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ph-pricing-swiper .swiper-button-disabled {
+  opacity: 0.2;
+}
+
+/* Sur mobile : flèches encore plus discrètes, swipe au doigt privilégié */
+@media (max-width: 640px) {
+  .ph-pricing-swiper .swiper-button-prev,
+  .ph-pricing-swiper .swiper-button-next {
+    width: 28px;
+    height: 28px;
+    opacity: 0.32;
+  }
+  .ph-pricing-swiper .swiper-button-prev::after,
+  .ph-pricing-swiper .swiper-button-next::after {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-pricing-slide-inner {
+    transition: none;
+  }
 }

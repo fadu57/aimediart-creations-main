@@ -34,5 +34,18 @@
   "settings_submenu_trash_expos": "Esposizioni",
   "settings_submenu_trash_visitors": "Visitatori",
   "logout": "Disconnetti",
-  "login": "Accedi"
+  "login": "Accedi",
+  "standby_mode_badge": "Modalità standby attivata",
+  "standby_mode_active_title": "Piano standby richiesto",
+  "standby_mode_active_desc": "Il tuo spazio è in modalità standby: solo Home e il tuo profilo restano accessibili. I tuoi dati e il back-office sono conservati.",
+  "standby_mode_effective_at": "Decorre alla prossima scadenza: {{date}}.",
+  "standby_cancel_cta": "Annulla la richiesta di standby",
+  "standby_cancel_loading": "Annullamento…",
+  "standby_cancel_success": "Richiesta di piano standby annullata.",
+  "standby_cancel_error": "Impossibile annullare la richiesta di standby.",
+  "standby_cancel_closed": "Il termine di recesso di 24 h è scaduto o la nuova scadenza è iniziata.",
+  "not_found": {
+    "title": "Ops! Pagina non trovata",
+    "home": "Torna alla home"
+  }
 }

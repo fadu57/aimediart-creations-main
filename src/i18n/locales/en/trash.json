@@ -7,5 +7,21 @@
   "success_restore": "Item restored.",
   "success_delete": "Item permanently deleted.",
   "error_restore": "Could not restore this item.",
-  "error_delete": "Could not permanently delete this item."
+  "error_delete": "Could not permanently delete this item.",
+  "back": "Back",
+  "loading": "Loading…",
+  "archived_on": "Archived on {{date}}",
+  "access_restricted": "Restricted to levels 1 to 3.",
+  "subtitle": "Restore a record archived by mistake.",
+  "subtitle_visitors": "Restore a visitor archived by mistake.",
+  "title_catalogue": "Trash — Artworks",
+  "title_artists": "Trash — Artists",
+  "title_expos": "Trash — Exhibitions",
+  "title_agencies": "Trash — Organizations",
+  "title_users": "Trash — Users",
+  "title_visitors": "Trash — Visitors",
+  "restore_no_rows": "Restore sent but no row changed (check RLS permissions).",
+  "visitor_anonymous_label": "Anonymous visitor",
+  "visitor_registered_label": "Registered visitor",
+  "anonymous": "Anonymous"
 }

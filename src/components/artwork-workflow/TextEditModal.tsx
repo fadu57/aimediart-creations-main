@@ -80,7 +80,7 @@ export function TextEditModal({
   editorKind = "mediation",
   contentLang,
 }: TextEditModalProps) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation("artwork_modal");
   const textLocale = resolveTextLocale(contentLang ?? i18n.language);
   const enableSpellCheck = editorKind === "prose";
   const [draft, setDraft] = useState(value);
@@ -180,7 +180,7 @@ export function TextEditModal({
 
           <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border/60 px-4 py-3 sm:flex-row sm:justify-end sm:px-5">
             <Button type="button" variant="outline" onClick={requestClose}>
-              Annuler
+              {t("text_edit.cancel")}
             </Button>
             <Button
               type="button"
@@ -189,7 +189,7 @@ export function TextEditModal({
                 onOpenChange(false);
               }}
             >
-              Enregistrer
+              {t("text_edit.save")}
             </Button>
           </div>
         </DialogContent>
@@ -198,13 +198,13 @@ export function TextEditModal({
       <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Modifications non enregistrées</AlertDialogTitle>
+            <AlertDialogTitle>{t("text_edit.unsaved_title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Vous avez modifié le texte sans l&apos;enregistrer. Voulez-vous vraiment fermer sans sauvegarder ?
+              {t("text_edit.unsaved_desc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Poursuivre l&apos;édition</AlertDialogCancel>
+            <AlertDialogCancel>{t("text_edit.continue_editing")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               onClick={() => {
@@ -212,7 +212,7 @@ export function TextEditModal({
                 onOpenChange(false);
               }}
             >
-              Fermer sans enregistrer
+              {t("text_edit.discard")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

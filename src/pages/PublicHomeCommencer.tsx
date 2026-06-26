@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileText, LogIn, Mail, Sparkles } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { ConnectedExpoQuoteDialog } from "@/components/ConnectedExpoQuoteDialog";
@@ -101,7 +101,7 @@ export default function PublicHomeCommencer() {
               className="inline-flex items-center gap-2 justify-self-start text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-              Retour aux tarifs
+              {t("commencer.back_to_pricing")}
             </Link>
             {isDevis ? (
               <p
@@ -122,7 +122,7 @@ export default function PublicHomeCommencer() {
             <Link
               to="/organisation"
               className="inline-flex shrink-0 justify-self-end"
-              aria-label="AIMEDIArt — accueil vitrine"
+              aria-label={t("commencer.brand_home_aria")}
             >
               <AimediartBrandLogoBlock size="sm" />
             </Link>
@@ -130,24 +130,24 @@ export default function PublicHomeCommencer() {
         </header>
 
         <main className="mx-auto max-w-[640px] px-5 py-10 sm:px-6 sm:py-14">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">Étape suivante</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#E63946]">{t("commencer.next_step")}</p>
           <h1 className="mt-2 font-serif text-3xl font-semibold leading-tight tracking-tight sm:text-[2.1rem]">
             {isDevis ? (
               isZenithDevis ? (
                 <>
-                  Offre <span className="text-[#9d2525]">ZÉNITH</span>
+                  {t("commencer.offer_word")} <span className="text-[#9d2525]">ZÉNITH</span>
                   <br />
-                  Demande sur mesure
+                  {t("commencer.custom_request")}
                 </>
               ) : isRayonnementDevis ? (
                 <>
-                  Offre <span className="text-[#9d2525]">RAYONNEMENT</span>
+                  {t("commencer.offer_word")} <span className="text-[#9d2525]">RAYONNEMENT</span>
                   <br />
-                  Demande sur mesure
+                  {t("commencer.custom_request")}
                 </>
               ) : (
                 <>
-                  Demande sur mesure
+                  {t("commencer.custom_request")}
                   {plan ? (
                     <>
                       <br />
@@ -157,9 +157,9 @@ export default function PublicHomeCommencer() {
                 </>
               )
             ) : isVeille ? (
-              "Passer en plan veille"
+              t("commencer.title_veille")
             ) : (
-              "Accéder à votre espace"
+              t("commencer.title_access")
             )}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -170,13 +170,13 @@ export default function PublicHomeCommencer() {
                   ? t("commencer.rayonnement_intro")
                   : t("commencer.devis_intro")
               : isVeille
-                ? "Connectez-vous pour demander le passage en plan veille (Atelier ou Horizon, abonnement mensuel uniquement)."
-                : "Pour commander ou activer une offre, vous passez par l’espace sécurisé AIMEDIArt (connexion ou création de compte organisation)."}
+                ? t("commencer.intro_veille")
+                : t("commencer.intro_default")}
           </p>
 
           {!isDevis && plan ? (
             <p className="mt-4 rounded-2xl border border-neutral-200 bg-[#faf9f7] px-4 py-3 text-sm text-foreground/90">
-              <span className="font-semibold text-foreground">Offre concernée :</span> {plan}
+              <span className="font-semibold text-foreground">{t("commencer.offer_concerned")}</span> {plan}
             </p>
           ) : null}
 
@@ -187,8 +187,7 @@ export default function PublicHomeCommencer() {
                   <LogIn className="h-4 w-4 text-[#9d2525]" aria-hidden />
                 </span>
                 <span>
-                  <strong className="text-foreground">Déjà un compte ?</strong> Connectez-vous pour poursuivre la
-                  configuration, le catalogue ou le suivi d’exposition.
+                  <Trans i18nKey="commencer.bullet_has_account" ns="home" components={{ strong: <strong className="text-foreground" /> }} />
                 </span>
               </li>
             ) : null}
@@ -197,9 +196,7 @@ export default function PublicHomeCommencer() {
                 <Sparkles className="h-4 w-4 text-[#9d2525]" aria-hidden />
               </span>
               <span>
-                <strong className="text-foreground">Première fois ?</strong> Sur l’écran suivant, utilisez « Créer un
-                compte » avec votre e-mail professionnel ; vous compléterez les informations d’organisation selon votre
-                parcours.
+                <Trans i18nKey="commencer.bullet_first_time" ns="home" components={{ strong: <strong className="text-foreground" /> }} />
               </span>
             </li>
             <li className="flex gap-3">
@@ -207,8 +204,7 @@ export default function PublicHomeCommencer() {
                 <FileText className="h-4 w-4 text-[#9d2525]" aria-hidden />
               </span>
               <span>
-                <strong className="text-foreground">Grand public / visiteur ?</strong> L’inscription visiteur se fait
-                depuis le parcours scan sur place ; cette page sert surtout aux <em>équipes exposition</em>.
+                <Trans i18nKey="commencer.bullet_visitor" ns="home" components={{ strong: <strong className="text-foreground" />, em: <em /> }} />
               </span>
             </li>
           </ul>
@@ -247,7 +243,7 @@ export default function PublicHomeCommencer() {
                   <Button asChild variant="outline" className="rounded-xl border-neutral-300">
                     <Link to={loginBase}>
                       <Mail className="mr-2 h-4 w-4" aria-hidden />
-                      J’ai déjà un compte — connexion
+                      {t("commencer.login_already")}
                     </Link>
                   </Button>
                 ) : null}
@@ -259,12 +255,12 @@ export default function PublicHomeCommencer() {
                 <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
                   <Link to={loginBase}>
                     <LogIn className="mr-2 h-4 w-4" aria-hidden />
-                    {isVeille ? "Connexion pour activer la veille" : "Connexion ou créer un compte"}
+                    {isVeille ? t("commencer.login_veille") : t("commencer.login_or_create")}
                   </Link>
                 </Button>
               ) : (
                 <Button asChild className="rounded-xl bg-[#9d2525] text-white hover:bg-[#9d2525]/90">
-                  <Link to="/dashboard">Accéder à mon espace</Link>
+                    <Link to="/dashboard">{t("commencer.access_my_space")}</Link>
                 </Button>
               )}
             </div>

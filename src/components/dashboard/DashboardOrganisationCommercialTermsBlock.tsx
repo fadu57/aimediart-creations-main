@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   listMissingConventionAgencyFields,
@@ -44,6 +45,7 @@ export function DashboardOrganisationCommercialTermsBlock({
   subscriptionExpiresAt,
   subscribeButtons = [],
 }: DashboardOrganisationCommercialTermsBlockProps) {
+  const { t } = useTranslation("dashboard");
   const planCode = agency.commercial_plan_code?.trim() || null;
   const commercialNotes = agency.commercial_notes?.trim() || null;
   const primarySubscribeButton = subscribeButtons.find((button) => button.variant === "primary");
@@ -51,34 +53,34 @@ export function DashboardOrganisationCommercialTermsBlock({
 
   const subscriptionStart = subscriptionStartedAt?.trim()
     ? formatDateFr(subscriptionStartedAt)
-    : "À la souscription";
+    : t("org_terms.at_subscription");
   const subscriptionEnd = subscriptionExpiresAt?.trim()
     ? formatDateFr(subscriptionExpiresAt)
     : agency.sponsor_valid_until?.trim()
       ? formatDateFr(agency.sponsor_valid_until)
-      : "12 mois après la souscription";
+      : t("org_terms.twelve_months_after");
 
   return (
     <div className="rounded-lg border border-[#9d2525]/25 bg-[#fff9f7]/5 p-4 space-y-3">
       <div>
-        <p className="text-sm font-semibold text-foreground">Remises commerciales accordées</p>
+        <p className="text-sm font-semibold text-foreground">{t("org_terms.title")}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Les conditions commerciales suivantes vous ont été accordées :
+          {t("org_terms.intro")}
         </p>
       </div>
 
       <dl className="grid gap-2 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Abonnement</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("org_terms.field_plan")}</dt>
           <dd className="mt-0.5 font-medium text-foreground">{planCode ?? "—"}</dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Motif</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("org_terms.field_reason")}</dt>
           <dd className="mt-0.5 text-foreground">{commercialNotes ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Remise annuelle TTC
+            {t("org_terms.field_annual_discount")}
           </dt>
           <dd className="mt-0.5 font-medium text-foreground">
             {formatAnnualDiscountEur(agency.discount_amount_eur)}
@@ -90,13 +92,13 @@ export function DashboardOrganisationCommercialTermsBlock({
           </dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Durée</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("org_terms.field_duration")}</dt>
           <dd className="mt-0.5 space-y-1 text-foreground">
             <div>
-              Début · <span className="font-medium">{subscriptionStart}</span>
+              {t("org_terms.start")} · <span className="font-medium">{subscriptionStart}</span>
             </div>
             <div>
-              Fin · <span className="font-medium">{subscriptionEnd}</span>
+              {t("org_terms.end")} · <span className="font-medium">{subscriptionEnd}</span>
             </div>
           </dd>
         </div>
@@ -106,8 +108,7 @@ export function DashboardOrganisationCommercialTermsBlock({
         {missingFields.length > 0 ? (
           <>
             <p>
-              Si vous acceptez ces conditions commerciales, merci de compléter les champs manquants dans votre fiche
-              organisation suivants :
+              {t("org_terms.complete_missing")}
             </p>
             <ul className="list-disc space-y-1 pl-5 text-[#9d2525]">
               {missingFields.map((field) => (
@@ -115,14 +116,12 @@ export function DashboardOrganisationCommercialTermsBlock({
               ))}
             </ul>
             <p>
-              Une fois que vous avez complété ces informations manquantes, cliquez sur le bouton ci-dessous « Convention
-              de sponsoring avec AIMEDIArt », apposez votre tampon et votre signature et envoyez-nous ce document.
+              {t("org_terms.convention_instructions_after_fields")}
             </p>
           </>
         ) : (
           <p>
-            Si vous acceptez ces conditions commerciales, cliquez sur le bouton ci-dessous « Convention de sponsoring
-            avec AIMEDIArt », apposez votre tampon et votre signature et envoyez-nous ce document.
+            {t("org_terms.convention_instructions")}
           </p>
         )}
       </div>
