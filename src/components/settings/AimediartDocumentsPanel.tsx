@@ -177,63 +177,54 @@ export function AimediartDocumentsPanel() {
   const { t } = useTranslation("settings");
   const { can } = useNavigationMatrix();
 
-  const showLegal = can("page_aimediart_legal");
-  const showBp = can("page_aimediart_bp");
-  const showMarketing = can("page_aimediart_marketing");
-
-  if (!showLegal && !showBp && !showMarketing) return null;
+  // Accès commun « GED » : un seul contrôle pilote les 3 sections.
+  if (!can("page_group_ged")) return null;
 
   return (
     <Accordion type="single" collapsible className="w-full">
-      {showLegal && (
-        <AccordionItem value="aimediart-legal" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">{t("aimediart_docs.legal_title")}</span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="legal-inpi" className="border-border/50">
-                <AccordionTrigger className="px-1 hover:no-underline">
-                  <span className="text-sm font-semibold">{t("aimediart_docs.inpi_title")}</span>
-                </AccordionTrigger>
-                <AccordionContent className="px-1 pb-3">
-                  <DocumentManager category="legal_inpi" />
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="legal-societe" className="border-border/50">
-                <AccordionTrigger className="px-1 hover:no-underline">
-                  <span className="text-sm font-semibold">{t("aimediart_docs.societe_title")}</span>
-                </AccordionTrigger>
-                <AccordionContent className="px-1 pb-3">
-                  <DocumentManager category="legal_societe" />
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </AccordionContent>
-        </AccordionItem>
-      )}
+      <AccordionItem value="aimediart-legal" className="border-border/50">
+        <AccordionTrigger className="px-1 hover:no-underline">
+          <span className="font-serif text-base font-bold">{t("aimediart_docs.legal_title")}</span>
+        </AccordionTrigger>
+        <AccordionContent className="px-1 pb-3">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="legal-inpi" className="border-border/50">
+              <AccordionTrigger className="px-1 hover:no-underline">
+                <span className="text-sm font-semibold">{t("aimediart_docs.inpi_title")}</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-1 pb-3">
+                <DocumentManager category="legal_inpi" />
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="legal-societe" className="border-border/50">
+              <AccordionTrigger className="px-1 hover:no-underline">
+                <span className="text-sm font-semibold">{t("aimediart_docs.societe_title")}</span>
+              </AccordionTrigger>
+              <AccordionContent className="px-1 pb-3">
+                <DocumentManager category="legal_societe" />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </AccordionContent>
+      </AccordionItem>
 
-      {showBp && (
-        <AccordionItem value="aimediart-bp" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">{t("aimediart_docs.bp_title")}</span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <DocumentManager category="bp" />
-          </AccordionContent>
-        </AccordionItem>
-      )}
+      <AccordionItem value="aimediart-bp" className="border-border/50">
+        <AccordionTrigger className="px-1 hover:no-underline">
+          <span className="font-serif text-base font-bold">{t("aimediart_docs.bp_title")}</span>
+        </AccordionTrigger>
+        <AccordionContent className="px-1 pb-3">
+          <DocumentManager category="bp" />
+        </AccordionContent>
+      </AccordionItem>
 
-      {showMarketing && (
-        <AccordionItem value="aimediart-marketing" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">{t("aimediart_docs.marketing_title")}</span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <DocumentManager category="marketing" />
-          </AccordionContent>
-        </AccordionItem>
-      )}
+      <AccordionItem value="aimediart-marketing" className="border-border/50">
+        <AccordionTrigger className="px-1 hover:no-underline">
+          <span className="font-serif text-base font-bold">{t("aimediart_docs.marketing_title")}</span>
+        </AccordionTrigger>
+        <AccordionContent className="px-1 pb-3">
+          <DocumentManager category="marketing" />
+        </AccordionContent>
+      </AccordionItem>
     </Accordion>
   );
 }

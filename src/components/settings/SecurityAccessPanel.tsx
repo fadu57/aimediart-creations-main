@@ -27,31 +27,16 @@ const NAV_MATRIX_I18N_KEYS: Record<NavMatrixCible, string> = {
   menu_stats: "nav_entry_menu_stats",
   page_œuvre: "nav_entry_page_oeuvre",
   page_settings_couts: "nav_entry_page_couts",
-  page_suivi_temps: "nav_entry_page_suivi_temps",
-  page_suivi_supabase: "nav_entry_page_suivi_supabase",
-  page_suivi_tokens: "nav_entry_page_suivi_tokens",
-  page_suivi_erreurs_visiteurs: "nav_entry_page_erreurs_visiteurs",
-  page_suivi_erreurs_organisateurs: "nav_entry_page_erreurs_organisateurs",
   page_qui_en_ligne: "nav_entry_page_qui_en_ligne",
   page_presence_seuils: "nav_entry_page_presence_seuils",
-  page_artistes_corbeille: "nav_entry_page_artistes_corbeille",
-  page_catalogue_corbeille: "nav_entry_page_catalogue_corbeille",
-  page_agencies_corbeille: "nav_entry_page_agencies_corbeille",
-  page_users_corbeille: "nav_entry_page_users_corbeille",
-  page_expos_corbeille: "nav_entry_page_expos_corbeille",
-  page_visiteurs_corbeille: "nav_entry_page_visiteurs_corbeille",
-  page_expos_visitors: "nav_entry_page_expos_visitors",
-  page_expos_visitor_audio: "nav_entry_page_expos_visitor_audio",
-  page_expos_sponsors: "nav_entry_page_expos_sponsors",
-  page_artistes2: "nav_entry_page_artistes2",
-  page_catalogue2: "nav_entry_page_catalogue2",
-  page_agencies2: "nav_entry_page_agencies2",
-  page_expos2: "nav_entry_page_expos2",
   page_prompts: "nav_entry_page_prompts",
   page_controle_ia: "nav_entry_page_controle_ia",
-  page_aimediart_legal: "nav_entry_page_aimediart_legal",
-  page_aimediart_bp: "nav_entry_page_aimediart_bp",
-  page_aimediart_marketing: "nav_entry_page_aimediart_marketing",
+  // Groupes (accès commun) — réutilise les libellés de sous-groupe.
+  page_group_suivis: "sec_group_suivis",
+  page_group_erreurs: "sec_group_erreurs",
+  page_group_corbeilles: "sec_group_corbeilles",
+  page_group_expos_sousvues: "sec_group_expos",
+  page_group_ged: "sec_group_ged",
 };
 
 const ROLE_FB_I18N: Partial<Record<number, string>> = {
@@ -308,6 +293,30 @@ export function SecurityAccessPanel() {
   const roleLabel = (roleId: number, roleName: string) =>
     roleLabelsById[roleId] ?? (ROLE_FB_I18N[roleId] !== undefined ? t(ROLE_FB_I18N[roleId]!) : roleName);
 
+  const renderNavPageRow = (item: { key: NavMatrixCible; label: string }) => {
+    const pageTitle = t(NAV_MATRIX_I18N_KEYS[item.key]);
+    return (
+      <tr key={`nav-page-${item.key}`} className="align-middle">
+        <th colSpan={2} scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">{pageTitle}</th>
+        {navRows.map((roleRow) => {
+          const perms = navAccessMatrix[roleRow.roleId];
+          if (!perms) return null;
+          return (
+            <PermissionCell
+              key={`nav-page-${item.key}-r${roleRow.roleId}`}
+              checkboxId={`nav-page-r${roleRow.roleId}-${item.key}`}
+              checkboxName={`nav_page_${roleRow.roleId}_${item.key}`}
+              allowed={perms[item.key]}
+              disabled={busyNav}
+              ariaLabel={t("sec_aria_nav_page", { label: roleLabel(roleRow.roleId, roleRow.roleName), page: pageTitle })}
+              onCheckedChange={(c) => void applyNavMatrixPatch(roleRow.roleId, item.key, c)}
+            />
+          );
+        })}
+      </tr>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div className="space-y-3">
@@ -460,29 +469,7 @@ export function SecurityAccessPanel() {
                   {t("sec_group_pages")}
                 </td>
               </tr>
-              {NAV_MATRIX_PAGE_ROWS.map((item) => {
-                const pageTitle = t(NAV_MATRIX_I18N_KEYS[item.key]);
-                return (
-                  <tr key={`nav-page-${item.key}`} className="align-middle">
-                    <th colSpan={2} scope="row" className="border-b border-border/40 px-2 py-2 text-left font-medium">{pageTitle}</th>
-                    {navRows.map((roleRow) => {
-                      const perms = navAccessMatrix[roleRow.roleId];
-                      if (!perms) return null;
-                      return (
-                        <PermissionCell
-                          key={`nav-page-${item.key}-r${roleRow.roleId}`}
-                          checkboxId={`nav-page-r${roleRow.roleId}-${item.key}`}
-                          checkboxName={`nav_page_${roleRow.roleId}_${item.key}`}
-                          allowed={perms[item.key]}
-                          disabled={busyNav}
-                          ariaLabel={t("sec_aria_nav_page", { label: roleLabel(roleRow.roleId, roleRow.roleName), page: pageTitle })}
-                          onCheckedChange={(c) => void applyNavMatrixPatch(roleRow.roleId, item.key, c)}
-                        />
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+              {NAV_MATRIX_PAGE_ROWS.map((item) => renderNavPageRow(item))}
             </tbody>
           </table>
         </div>

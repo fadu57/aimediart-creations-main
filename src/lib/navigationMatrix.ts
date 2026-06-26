@@ -15,54 +15,63 @@ export const NAV_MATRIX_MENU_KEYS = [
 ] as const;
 
 /**
- * Sous-pages contrôlables (groupe « Pages »). Le chemin `to` sert au mapping
- * d’accès (voir `pathnameToNavCible`). `aliases` = autres chemins menant à la même page.
+ * Pages contrôlables (groupe « Pages »).
+ *
+ * - Pages **unitaires** : un contrôle = une page (un seul chemin).
+ * - **Groupes** (`page_group_*`) : un contrôle unique pilote l'accès à TOUS les
+ *   chemins listés (logique d'accès commune). Une seule ligne dans la matrice.
+ *
+ * Les vues alternatives « v2 » (artistes2, catalogue2, …) ne sont volontairement
+ * PAS listées : leur accès est hérité de leur menu parent (voir `pathnameToNavCible`).
+ *
+ * `paths` = chemins (et alias) qui résolvent vers cette cible. Vide = cible sans
+ * route dédiée, pilotée uniquement côté composant (ex. accordéons GED sur /settings).
  */
-export const NAV_MATRIX_SUBPAGE_DEFS = [
-  // Configuration
-  { key: "page_settings_couts", label: "Coûts", to: "/settings/couts" },
-  { key: "page_suivi_temps", label: "Suivi du temps", to: "/suivi_temps" },
-  { key: "page_suivi_supabase", label: "Suivi Supabase", to: "/suivi_supabase" },
-  { key: "page_suivi_tokens", label: "Suivi des tokens", to: "/suivi_tokens" },
-  { key: "page_suivi_erreurs_visiteurs", label: "Erreurs visiteurs", to: "/suivi_erreurs_visiteurs" },
-  { key: "page_suivi_erreurs_organisateurs", label: "Erreurs organisateurs", to: "/suivi_erreurs_organisateurs" },
-  { key: "page_qui_en_ligne", label: "Qui est en ligne", to: "/settings/qui-est-en-ligne" },
-  { key: "page_presence_seuils", label: "Seuils de présence", to: "/settings/presence-seuils" },
-  // Corbeilles
-  { key: "page_artistes_corbeille", label: "Corbeille artistes", to: "/artistes-corbeille" },
-  { key: "page_catalogue_corbeille", label: "Corbeille catalogue", to: "/catalogue-corbeille" },
-  { key: "page_agencies_corbeille", label: "Corbeille organisations", to: "/agencies-corbeille" },
+export const NAV_MATRIX_PAGE_DEFS = [
+  // Pages unitaires
+  { key: "page_settings_couts", label: "Coûts", paths: ["/settings/couts"] },
+  { key: "page_qui_en_ligne", label: "Qui est en ligne", paths: ["/settings/qui-est-en-ligne"] },
+  { key: "page_presence_seuils", label: "Seuils de présence", paths: ["/settings/presence-seuils"] },
+  { key: "page_prompts", label: "Prompts IA", paths: ["/prompts"] },
+  { key: "page_controle_ia", label: "Contrôle IA", paths: ["/settings/controle-ia"] },
+  // Groupes (accès commun à tous les membres)
   {
-    key: "page_users_corbeille",
-    label: "Corbeille utilisateurs",
-    to: "/utilisateurs-corbeille",
-    aliases: ["/user/users-corbeille", "/user/utilisateurs-corbeille"],
+    key: "page_group_suivis",
+    label: "Suivis",
+    paths: ["/suivi_temps", "/suivi_supabase", "/suivi_tokens"],
   },
-  { key: "page_expos_corbeille", label: "Corbeille expos", to: "/expos-corbeille" },
-  { key: "page_visiteurs_corbeille", label: "Corbeille visiteurs", to: "/visiteurs-corbeille" },
-  // Sous-vues Expos
-  { key: "page_expos_visitors", label: "Expos — Visiteurs", to: "/expos/visitors" },
-  { key: "page_expos_visitor_audio", label: "Expos — Audio visiteurs", to: "/expos/visitor-audio" },
-  { key: "page_expos_sponsors", label: "Expos — Sponsors", to: "/expos/sponsors" },
-  // Vues alternatives « v2 »
-  { key: "page_artistes2", label: "Artistes (v2)", to: "/artistes/artistes2" },
-  { key: "page_catalogue2", label: "Catalogue (v2)", to: "/catalogue/catalogue2" },
-  { key: "page_agencies2", label: "Organisations (v2)", to: "/agencies/agencies2" },
-  { key: "page_expos2", label: "Expos (v2)", to: "/expos/expos2" },
-  // Prompts IA
-  { key: "page_prompts", label: "Prompts IA", to: "/prompts" },
-  // Contrôle IA (sous-page /settings)
-  { key: "page_controle_ia", label: "Contrôle IA", to: "/settings/controle-ia" },
-  // Documents AIMEDIArt (accordéons de la page /settings)
-  { key: "page_aimediart_legal", label: "AIMEDIArt-Légal", to: "/settings/aimediart-legal" },
-  { key: "page_aimediart_bp", label: "AIMEDIArt-BP", to: "/settings/aimediart-bp" },
-  { key: "page_aimediart_marketing", label: "AIMEDIArt-Marketing", to: "/settings/aimediart-marketing" },
+  {
+    key: "page_group_erreurs",
+    label: "Erreurs",
+    paths: ["/suivi_erreurs_visiteurs", "/suivi_erreurs_organisateurs"],
+  },
+  {
+    key: "page_group_corbeilles",
+    label: "Corbeilles",
+    paths: [
+      "/artistes-corbeille",
+      "/catalogue-corbeille",
+      "/agencies-corbeille",
+      "/utilisateurs-corbeille",
+      "/user/users-corbeille",
+      "/user/utilisateurs-corbeille",
+      "/expos-corbeille",
+      "/visiteurs-corbeille",
+    ],
+  },
+  {
+    key: "page_group_expos_sousvues",
+    label: "Expos",
+    paths: ["/expos/visitors", "/expos/visitor-audio", "/expos/sponsors"],
+  },
+  // GED : accordéons sur /settings (pas de route dédiée) — gate via le panneau.
+  { key: "page_group_ged", label: "GED", paths: [] as string[] },
 ] as const;
 
-/** Clés des pages hors menu (Œuvre + sous-pages). */
+/** Clés des pages hors menu (Œuvre + pages/groupes). */
 export const NAV_MATRIX_PAGE_KEYS = [
   "page_œuvre",
-  ...NAV_MATRIX_SUBPAGE_DEFS.map((d) => d.key),
+  ...NAV_MATRIX_PAGE_DEFS.map((d) => d.key),
 ] as const;
 
 export const NAV_MATRIX_CIBLES = [
@@ -73,12 +82,12 @@ export const NAV_MATRIX_CIBLES = [
 export type NavMatrixCible = (typeof NAV_MATRIX_CIBLES)[number];
 
 const MENU_KEY_SET = new Set<string>(NAV_MATRIX_MENU_KEYS);
-const SUBPAGE_KEY_SET = new Set<string>(NAV_MATRIX_SUBPAGE_DEFS.map((d) => d.key));
+const SUBPAGE_KEY_SET = new Set<string>(NAV_MATRIX_PAGE_DEFS.map((d) => d.key));
 
-/** Pages hors menu (contrôle d’accès par chemin) — lignes du groupe « Pages ». */
+/** Pages hors menu (contrôle d’accès) — lignes du groupe « Pages ». */
 export const NAV_MATRIX_PAGE_ROWS: { key: NavMatrixCible; label: string }[] = [
   { key: "page_œuvre", label: "Œuvre" },
-  ...NAV_MATRIX_SUBPAGE_DEFS.map((d) => ({ key: d.key as NavMatrixCible, label: d.label })),
+  ...NAV_MATRIX_PAGE_DEFS.map((d) => ({ key: d.key as NavMatrixCible, label: d.label })),
 ];
 
 /** Barre principale : une seule définition (ordre = header = tableau Paramètres « Menus »). */
@@ -199,14 +208,11 @@ export function pathnameToNavCible(pathname: string): NavMatrixCible | null {
   // Profil : toujours accessible (page d'accueil backoffice), indépendamment de menu_home.
   if (p === "/dashboard") return null;
 
-  // Sous-pages (chemins spécifiques) : prioritaires sur les menus et sur la règle /settings.
-  for (const def of NAV_MATRIX_SUBPAGE_DEFS) {
-    if (pathMatches(p, def.to)) return def.key;
-    const aliases = (def as { aliases?: readonly string[] }).aliases;
-    if (aliases) {
-      for (const alias of aliases) {
-        if (pathMatches(p, alias)) return def.key;
-      }
+  // Pages/groupes (chemins spécifiques) : prioritaires sur les menus et sur la règle /settings.
+  // Les vues « v2 » ne sont pas listées ici : elles retombent sur leur menu parent ci-dessous.
+  for (const def of NAV_MATRIX_PAGE_DEFS) {
+    for (const pth of def.paths) {
+      if (pathMatches(p, pth)) return def.key;
     }
   }
 
