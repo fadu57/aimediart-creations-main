@@ -134,7 +134,7 @@ function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-[#121212]">
       {!hideGlobalHeader && <Header />}
-      <main className={`flex flex-1 flex-col bg-[#121212] ${hideGlobalHeader ? "" : "pt-[4.25rem]"}`}>
+      <main className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] ${hideGlobalHeader ? "" : "pt-[4.25rem]"}`}>
         <Outlet />
       </main>
     </div>
@@ -153,7 +153,7 @@ function VisitorShell() {
 
 function AdminShell() {
   return (
-    <div className="mx-auto w-full max-w-[1200px] text-[#F0F0F0]">
+    <div className="mx-auto w-full min-w-0 max-w-[1200px] overflow-x-hidden text-[#F0F0F0]">
       <StandbyModeNavGuard />
     </div>
   );
@@ -267,7 +267,6 @@ const AppRoutes = () => (
       <Route element={<RequireBackoffice />}>
         <Route element={<AdminShell />}>
           <Route path="dashboard" element={<Pages.Dashboard />} />
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="artistes" element={<Pages.Artists />} />
           <Route path="artistes/artistes2" element={<Pages.Artists2 />} />
           <Route path="artistes-corbeille" element={<Pages.ArtistsCorbeille />} />

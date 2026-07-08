@@ -295,7 +295,7 @@ const Agencies = () => {
   }, [agencyPopupId, rows, loading]);
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container min-w-0 max-w-full py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
         <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 md:max-w-[min(100%,42rem)] shrink-0">
         <div>
@@ -307,14 +307,14 @@ const Agencies = () => {
             <p className="text-xs text-muted-foreground mt-1">{t("page.scopeExpo", { expoId: scope.expoId })}</p>
           )}
         </div>
-        <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
+        <div className="relative w-full max-w-[210px]">
           <Input
             type="text"
             list="agencies-search-suggestions"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={t("page.search")}
-            className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
+            className="h-9 w-full bg-white pr-9"
           />
           {searchTerm.trim().length > 0 && (
             <button

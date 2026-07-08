@@ -33,6 +33,7 @@
     "dateRange": "From {{from}} to {{to}}",
     "permanentExpo": "Permanent exhibition",
     "agencyPrefix": "Organisation:",
+    "visitorTotal": "{{count}} visitor(s) in total",
     "viewAgencyTitle": "View agency profile",
     "qrConfirmTitle": "Regenerate the QR code?",
     "qrConfirmWarning": "Warning: a new QR code will permanently invalidate the existing one.",

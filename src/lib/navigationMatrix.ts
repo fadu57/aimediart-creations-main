@@ -165,7 +165,7 @@ export function defaultNavAccessForRole(roleId: number | null | undefined): NavA
  * Rôles métier agence/expo (4–6) : sans lignes dans `matrice_securite`, tous les menus header
  * (et sous-pages) sont ouverts. Sinon le défaut laisserait le header vide.
  */
-function navAccessWhenMatriceSecuriteEmptyForAgencyRole(roleId: number): NavAccessMap | null {
+export function navAccessWhenMatriceSecuriteEmptyForAgencyRole(roleId: number): NavAccessMap | null {
   if (roleId >= 4 && roleId <= 6) {
     return buildAccess({ menus: true, oeuvre: false, subpages: true });
   }

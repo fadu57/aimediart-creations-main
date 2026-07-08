@@ -181,7 +181,7 @@ function ResignSubscriptionButton({
         type="button"
         size="sm"
         onClick={() => handleOpenChange(true)}
-        className="h-[30px] w-full whitespace-nowrap rounded-lg border-0 bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-none hover:bg-red-700"
+        className="h-auto min-h-[30px] w-full whitespace-normal rounded-lg border-0 bg-red-600 px-3 py-2 text-xs font-semibold leading-snug text-white shadow-none hover:bg-red-700"
       >
         {t("plan_actions.resign_button")}
       </Button>
@@ -325,7 +325,7 @@ export function DashboardPlanActions({
             className="flex flex-col items-center justify-center gap-0.5 leading-tight"
           >
             <span className="text-xs font-normal">{t("plan_actions.upgrade_prefix")}</span>
-            <span className="w-[200px] text-sm font-semibold tracking-[-0.5px]">
+            <span className="max-w-full text-sm font-semibold tracking-[-0.5px]">
               {formatPlanSecondaryLine("RAYONNEMENT", monthlyByPlan.RAYONNEMENT, t, { quoteFallback: true })}
             </span>
           </Link>

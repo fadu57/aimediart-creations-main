@@ -478,12 +478,12 @@ const Dashboard = () => {
   }, [can, isStandbyNavRestricted, dashboardAgencyId, t]);
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container min-w-0 max-w-full py-6 space-y-6 sm:py-8 sm:space-y-8">
       {/* En-tête */}
       <div className="flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
-        <div className="min-w-0 shrink-0 md:flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h2 className="text-3xl font-serif font-bold text-white">
+            <h2 className="text-2xl font-serif font-bold text-white sm:text-3xl">
               {loading
                 ? t("header.my_space")
                 : t("header.greeting", { name: displayName.split(" ")[0] || displayName })}
@@ -506,7 +506,7 @@ const Dashboard = () => {
             </div>
           ) : null}
         </div>
-        <BackofficeStickyAgencyLogoSlot />
+        <BackofficeStickyAgencyLogoSlot className="flex-none lg:flex-1" />
       </div>
 
       {error && (
@@ -532,7 +532,7 @@ const Dashboard = () => {
             {/* Profil */}
             <Card className="glass-card">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-gold" />
                     {isViewingSelf ? t("profile.title_self") : t("profile.title_member")}
@@ -674,22 +674,22 @@ const Dashboard = () => {
             ) : (
             <Card className="glass-card">
               <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <CardTitle className="text-xl flex shrink-0 items-center gap-2">
                     <CreditCard className="h-5 w-5 text-gold" />
                     {t("subscription.title")}
                   </CardTitle>
                   {isEtincelleSubscription && subscriptionProgress != null ? (
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <Progress value={subscriptionProgress} className="h-2" />
+                    <div className="flex min-w-0 w-full items-center gap-2 sm:flex-1">
+                      <Progress value={subscriptionProgress} className="h-2 min-w-0 flex-1" />
                       <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
                         {subscriptionProgress}%
                       </span>
                     </div>
                   ) : (
-                    <div className="flex-1" aria-hidden />
+                    <div className="hidden flex-1 sm:block" aria-hidden />
                   )}
-                  <Badge variant={subscriptionBadgeVariant(subscription?.status)} className="shrink-0">
+                  <Badge variant={subscriptionBadgeVariant(subscription?.status)} className="w-fit shrink-0 self-start sm:self-auto">
                     {subscriptionStatusLabel(subscription?.status, t)}
                   </Badge>
                 </div>
@@ -1045,7 +1045,7 @@ const Dashboard = () => {
           </div>
 
           {(dashboardAgencyId || teamMembers.length > 0) && (
-            <Card id="dashboard-team-members" className="glass-card scroll-mt-24">
+            <Card id="dashboard-team-members" className="glass-card scroll-mt-24 min-w-0 overflow-hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <UsersIcon className="h-5 w-5 text-gold" />
@@ -1053,7 +1053,7 @@ const Dashboard = () => {
                   <span className="text-sm font-normal text-muted-foreground">({teamMembers.length})</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="min-w-0">
                 <DashboardTeamMembersTable
                   members={teamMembers}
                   expoOptions={agencyExpos}
@@ -1132,16 +1132,16 @@ const Dashboard = () => {
                   ) : (
                     <p className="text-sm text-muted-foreground">{t("team.no_members_scope")}</p>
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
                     <Button
                       type="button"
-                      className="gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                      className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2 leading-snug sm:w-auto gradient-gold gradient-gold-hover-bg text-primary-foreground"
                       onClick={() => setCreateUserOpen(true)}
                     >
-                      <UserPlus className="h-4 w-4 mr-2" />
+                      <UserPlus className="h-4 w-4 mr-2 shrink-0" />
                       {t("team.new_user")}
                     </Button>
-                    <Button asChild variant="outline">
+                    <Button asChild variant="outline" className="h-auto min-h-10 w-full min-w-0 whitespace-normal px-3 py-2 leading-snug sm:w-auto">
                       <Link
                         to={
                           dashboardAgencyId
@@ -1163,12 +1163,17 @@ const Dashboard = () => {
                   <CardTitle className="text-xl">{t("quick_links.title")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2 min-[480px]:grid-cols-2">
                     {quickLinks.map(({ to, label, icon: Icon }) => (
-                      <Button key={to} asChild variant="outline" className="justify-start h-auto py-3">
-                        <Link to={to}>
-                          <Icon className="h-4 w-4 mr-2 shrink-0" />
-                          {label}
+                      <Button
+                        key={to}
+                        asChild
+                        variant="outline"
+                        className="h-auto min-h-10 w-full min-w-0 justify-start whitespace-normal px-3 py-3 text-left leading-snug"
+                      >
+                        <Link to={to} className="inline-flex w-full min-w-0 items-center gap-2">
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span className="min-w-0">{label}</span>
                         </Link>
                       </Button>
                     ))}
@@ -1289,7 +1294,7 @@ function StatCard({
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         <Icon className="h-4 w-4 text-gold" />
       </div>
-      <p className={`font-serif font-bold ${isText ? "text-base truncate" : "text-3xl"}`}>{value}</p>
+      <p className={`font-serif font-bold ${isText ? "text-sm sm:text-base truncate" : "text-2xl sm:text-3xl"}`}>{value}</p>
       {clickable && !href && (
         <p className="text-xs text-muted-foreground mt-2">{t("stat_cards.click_detail")}</p>
       )}

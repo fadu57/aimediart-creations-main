@@ -19,6 +19,7 @@ import { ExpoFormDialog } from "@/components/ExpoFormDialog";
 import { SponsorDialog, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
 import { sortExpoFieldKeys } from "@/lib/expoFormUtils";
@@ -38,6 +39,15 @@ import { QR_CODE_STORAGE_OPTIONS, qrCodePrintOptions } from "@/lib/qrCodeScanFri
 import { formatExpoDate, formatExpoDatesLabel } from "@/lib/expoDates";
 
 const EXPO_QR_CACHE_KEY = "aimediart-expo-qr-cache-v1";
+
+/** Boutons barre d'outils /expos : libellés sur 2 lignes si besoin (responsive). */
+const EXPO_TOOLBAR_BTN =
+  "backoffice-toolbar-outline-btn h-auto min-h-10 w-full min-w-0 flex-wrap items-center justify-center whitespace-normal px-2 py-2 text-center text-[13px] leading-snug";
+const EXPO_TOOLBAR_BTN_GOLD =
+  "h-auto min-h-10 w-full min-w-0 flex-wrap items-center justify-center whitespace-normal gap-1.5 px-2 py-2 text-center text-[13px] leading-snug gradient-gold gradient-gold-hover-bg text-primary-foreground";
+/** Boutons d'action sur chaque carte expo. */
+const EXPO_CARD_BTN =
+  "h-auto min-h-9 w-full min-w-0 flex-wrap items-center justify-center whitespace-normal px-2 py-2 text-center text-xs leading-snug sm:text-sm";
 
 type ExpoRow = {
   id: string;
@@ -482,7 +492,7 @@ const Expos = () => {
   }, [rows, scope.expoId]);
 
   const canCreateExpoByRole =
-    (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
+    (typeof role_id === "number" && role_id >= 1 && role_id <= 4) || hasFullDataAccess(role_name);
   const canCreateExpo = canCreateExpoByRole && !orgPlanLimits?.isEtincelle;
 
   const canEditExpo = (ex: ExpoRow) => {
@@ -656,104 +666,102 @@ const Expos = () => {
 
   return (
     <div className="container py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-4 md:max-w-[min(100%,450px)] shrink-0">
-        <div>
-          <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
-          {agencyFilter && (
-            <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
-          )}
-          {!authLoading && scope.mode === "expo" && (
-            <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
-          )}
-        </div>
-        <div className="flex flex-row items-center gap-2">
-          {typeof role_id === "number" && role_id < 4 && (
-            <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-              <Input
-                type="text"
-                list="org-search-suggestions"
-                value={orgSearchTerm}
-                onChange={(e) => setOrgSearchTerm(e.target.value)}
-                placeholder={t("page.searchOrg")}
-                className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
-              />
-              {orgSearchTerm.trim().length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setOrgSearchTerm("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                  aria-label={t("page.clearSearchOrg")}
-                  title={t("page.clear")}
-                >
-                  <X className="h-3.5 w-3.5" aria-hidden />
-                </button>
+      <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm">
+        <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
+          <div className="flex w-full min-w-0 flex-col gap-3 md:max-w-[min(100%,450px)]">
+            <div>
+              <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+              {agencyFilter && (
+                <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
               )}
-              <datalist id="org-search-suggestions">
-                {Object.values(agencyNameById).map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
+              {!authLoading && scope.mode === "expo" && (
+                <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
+              )}
             </div>
-          )}
-          <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-            <Input
-              type="text"
-              list="expo-search-suggestions"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={t("page.search")}
-              className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
-            />
-            {searchTerm.trim().length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label={t("page.clearSearch")}
-                title={t("page.clear")}
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            )}
-            <datalist id="expo-search-suggestions">
-              {searchSuggestions.map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              {typeof role_id === "number" && role_id < 4 && (
+                <div className="relative w-full min-w-0 sm:w-[210px] sm:max-w-[210px]">
+                  <Input
+                    type="text"
+                    list="org-search-suggestions"
+                    value={orgSearchTerm}
+                    onChange={(e) => setOrgSearchTerm(e.target.value)}
+                    placeholder={t("page.searchOrg")}
+                    className="h-9 w-full min-w-0 bg-white pr-9 sm:!w-[210px]"
+                  />
+                  {orgSearchTerm.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOrgSearchTerm("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label={t("page.clearSearchOrg")}
+                      title={t("page.clear")}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  )}
+                  <datalist id="org-search-suggestions">
+                    {Object.values(agencyNameById).map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </div>
+              )}
+              <div className="relative w-full min-w-0 sm:w-[210px] sm:max-w-[210px]">
+                <Input
+                  type="text"
+                  list="expo-search-suggestions"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={t("page.search")}
+                  className="h-9 w-full min-w-0 bg-white pr-9 sm:!w-[210px]"
+                />
+                {searchTerm.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                    aria-label={t("page.clearSearch")}
+                    title={t("page.clear")}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                )}
+                <datalist id="expo-search-suggestions">
+                  {searchSuggestions.map((label) => (
+                    <option key={label} value={label} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
           </div>
-        </div>
-        </div>
-        <BackofficeStickyAgencyLogoSlot />
-        {canCreateExpoByRole && (
-          <div className="grid w-full min-w-0 max-w-full grid-cols-3 gap-2 md:ml-auto md:w-[540px]">
+
+          <BackofficeStickyAgencyLogoSlot className="flex-none lg:flex-1" />
+
+          <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:ml-auto lg:max-w-[540px]">
             {canCreateExpo && (
-              <Button
-                type="button"
-                className="h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight gradient-gold gradient-gold-hover-bg text-primary-foreground"
-                onClick={openCreate}
-              >
+              <Button type="button" className={EXPO_TOOLBAR_BTN_GOLD} onClick={openCreate}>
                 <Plus className="h-4 w-4 shrink-0" />
-                {t("page.create")}
+                <span>{t("page.create")}</span>
               </Button>
             )}
-            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className={EXPO_TOOLBAR_BTN} asChild>
               <Link to="/expos/expos2">{t("page.tableau")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className={EXPO_TOOLBAR_BTN} asChild>
               <Link to="/expos/visitors">{t("page.listVisitors")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
+            <Button type="button" variant="outline" className={EXPO_TOOLBAR_BTN} asChild>
               <Link to="/expos/visitor-audio">{t("audio_monitor.title")}</Link>
             </Button>
-            <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn h-auto min-h-10 w-full gap-1.5 px-2 text-center text-[13px] leading-tight" asChild>
-              <Link to="/expos/sponsors">
+            <Button type="button" variant="outline" className={cn(EXPO_TOOLBAR_BTN, "col-span-2 sm:col-span-1")} asChild>
+              <Link to="/expos/sponsors" className="inline-flex flex-wrap items-center justify-center gap-1.5">
                 <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-                {t("page.sponsorsList", "Liste des sponsors")}
+                <span>{t("page.sponsorsList", "Liste des sponsors")}</span>
               </Link>
             </Button>
           </div>
-        )}
+        </div>
       </div>
 
       {orgPlanLimits?.isEtincelle && typeof role_id === "number" && role_id >= 4 ? (
@@ -839,9 +847,9 @@ const Expos = () => {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                     <h3 className="font-serif font-bold text-lg min-w-0">{expoTitle(ex)}</h3>
-                    <p className="shrink-0 text-sm text-muted-foreground text-right">
+                    <p className="shrink-0 text-sm text-muted-foreground sm:text-right">
                       {formatExpoDatesLabel(ex.date_expo_du, ex.date_expo_au, i18n.language, t, {
                         range: "card.dateRange",
                         permanent: "card.permanentExpo",
@@ -866,7 +874,7 @@ const Expos = () => {
                       </Link>
                     </p>
                   )}
-                  <p className="mt-2 text-sm text-muted-foreground">
+                  <p className="mt-2 text-sm font-black text-muted-foreground">
                     {t("card.visitorTotal", { count: visitorCountByExpoId[ex.id] ?? 0 })}
                   </p>
                   {(() => {
@@ -906,11 +914,11 @@ const Expos = () => {
                     );
                   })()}
                 </div>
-                <div className="flex w-full flex-col gap-2 md:w-[190px] shrink-0">
+                <div className="flex w-full min-w-0 flex-col gap-2 md:w-[190px] md:shrink-0">
                   <Button
                     type="button"
                     size="sm"
-                    className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
                     asChild
                   >
                     <Link
@@ -924,7 +932,7 @@ const Expos = () => {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full justify-center"
+                    className={EXPO_CARD_BTN}
                     onClick={(e) => {
                       e.stopPropagation();
                       setPanelFormatExpo(ex);
@@ -936,7 +944,7 @@ const Expos = () => {
                     type="button"
                     variant="default"
                     size="sm"
-                    className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSponsorExpo({ id: ex.id, name: expoTitle(ex) });
@@ -944,7 +952,13 @@ const Expos = () => {
                   >
                     {t("card.sponsors", "Sponsors / Mécènes")}
                   </Button>
-                  <Button type="button" variant="default" size="sm" className="w-full justify-center gradient-gold gradient-gold-hover-bg text-primary-foreground" asChild>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
+                    asChild
+                  >
                     <Link to={`/catalogue?expo=${encodeURIComponent(ex.id)}`} onClick={(e) => e.stopPropagation()}>
                       {t("card.viewCatalogue")}
                     </Link>

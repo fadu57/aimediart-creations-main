@@ -7,18 +7,22 @@ import { pickLowestRoleId, parseNumericRoleId } from "@/lib/roleHierarchy";
 import {
   defaultNavAccessForRole,
   mergeNavAccessFromMatriceSecurite,
+  navAccessWhenMatriceSecuriteEmptyForAgencyRole,
   NAV_MATRIX_CIBLES,
   pathnameToNavCible,
   type NavMatrixCible,
 } from "@/lib/navigationMatrix";
 import { supabase } from "@/lib/supabase";
 import { NavigationMatrixContext, type NavigationMatrixContextValue } from "@/providers/navigationMatrixContext";
+import { useNavigationModeContext } from "@/providers/NavigationModeProvider";
 
 export function NavigationMatrixProvider({ children }: { children: ReactNode }) {
   // On utilise directement role_id resolu par useAuthUser (inclut deja le fallback JWT)
   // pour eviter une double requete qui peut echouer si la table users n'existe plus.
   const { session, loading: authLoading } = useAuthUser();
   const { role_id: effectiveRoleId } = useEffectiveAuth();
+  const navMode = useNavigationModeContext();
+  const modeReady = navMode?.modeReady ?? true;
   const sessionUserId = session?.user?.id ?? null;
 
   const [access, setAccess] = useState<NavigationMatrixContextValue["access"]>(() =>
@@ -28,8 +32,8 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
   const loadGenerationRef = useRef(0);
 
   const load = useCallback(async () => {
-    // Attendre que useAuthUser ait fini de charger
-    if (authLoading) return;
+    // Attendre auth + mode de navigation (évite un calcul matrice sur le mauvais rôle au F5).
+    if (authLoading || !modeReady) return;
 
     const generation = ++loadGenerationRef.current;
     const isStale = () => generation !== loadGenerationRef.current;
@@ -89,7 +93,9 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
 
       if (error) {
         if (import.meta.env.DEV) console.warn("[NavigationMatrix]", error.message);
-        setAccess(defaultNavAccessForRole(roleId));
+        setAccess(
+          navAccessWhenMatriceSecuriteEmptyForAgencyRole(roleId) ?? defaultNavAccessForRole(roleId),
+        );
       } else {
         setAccess(
           mergeNavAccessFromMatriceSecurite(
@@ -101,7 +107,7 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
     } finally {
       if (!isStale()) setLoading(false);
     }
-  }, [sessionUserId, effectiveRoleId, authLoading, session?.user]);
+  }, [sessionUserId, effectiveRoleId, authLoading, modeReady, session?.user]);
 
   useEffect(() => {
     void load();

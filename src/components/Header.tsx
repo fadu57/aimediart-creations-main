@@ -518,15 +518,6 @@ export default function Header() {
               {!standbyNavOnly && hasFullHeader && canSeeSettings && (
                 <SettingsMenuDropdown variant="fab" onNavigate={() => setIsFabOpen(false)} />
               )}
-              {showVitrineNavInHeader ? (
-                <div className="fab-item w-full max-w-[min(100vw-2rem,280px)] rounded-lg border border-neutral-200 bg-[#faf9f7] p-2">
-                  <VitrineAnchorNav
-                    vitrinePathPrefix={vitrineAnchorPrefix}
-                    variant="floating"
-                    onNavigate={() => setIsFabOpen(false)}
-                  />
-                </div>
-              ) : null}
               <div className="fab-item px-2" title={t("language_label")}>
                 <div className="fab-language-selector-wrap inline-flex w-full items-center gap-2 rounded-md border px-2">
                   <LanguageFlag lang={activeLanguage.value} />
@@ -585,6 +576,19 @@ export default function Header() {
         )}
         </div>
       </div>
+      {showVitrineNavInHeader && !isDesktopHeader ? (
+        <div className="border-t border-border/40 bg-white/80 px-2 py-1.5 backdrop-blur-md">
+          <div className="mx-auto w-full max-w-[1060px] overflow-x-auto">
+            <div className="w-max min-w-full rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
+              <VitrineAnchorNav
+                vitrinePathPrefix={vitrineAnchorPrefix}
+                variant="header"
+                align="center"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

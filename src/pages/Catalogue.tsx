@@ -133,7 +133,7 @@ function artworkMatchesExpoFilter(
 }
 
 /** Largeur commune des badges IA (image, médiations, voix) en bas de carte. */
-const CATALOG_IA_BADGE_WIDTH_CLASS = "w-[14.5rem]";
+const CATALOG_IA_BADGE_WIDTH_CLASS = "w-full sm:w-[14.5rem]";
 const catalogIaBadgeClass =
   "inline-flex w-full min-w-0 items-center rounded-full border px-3 py-0.5 text-left text-[11px] font-medium";
 
@@ -966,7 +966,7 @@ const Catalogue = () => {
   };
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container min-w-0 max-w-full py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 py-2 backdrop-blur-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
@@ -1152,7 +1152,7 @@ const Catalogue = () => {
           return (
             <Card key={aw.artwork_id} className="glass-card hover:shadow-lg transition-all duration-300 overflow-hidden">
               <CardContent
-                className="relative p-4 flex flex-row items-stretch gap-4 cursor-pointer"
+                className="relative p-4 flex flex-col sm:flex-row items-stretch gap-4 cursor-pointer"
                 role="button"
                 tabIndex={0}
                 onClick={() => openEditArtwork(aw.artwork_id)}
@@ -1163,7 +1163,7 @@ const Catalogue = () => {
                   }
                 }}
               >
-                <div className="flex w-[150px] min-w-[150px] shrink-0 flex-col items-center gap-2">
+                <div className="mx-auto flex w-full max-w-[150px] shrink-0 flex-col items-center gap-2 sm:mx-0 sm:w-[150px] sm:min-w-[150px]">
                   <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
                     <img
                       src={artworkImage}
@@ -1231,9 +1231,8 @@ const Catalogue = () => {
                   </div>
                 </div>
 
-                <div className="relative flex min-h-[156px] min-w-0 flex-1 flex-col self-stretch">
-                  {/* Titre + artiste — pleine largeur, superposés au-dessus de la colonne boutons */}
-                  <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex min-w-0 w-full flex-col">
+                <div className="relative flex min-w-0 flex-1 flex-col gap-3 sm:min-h-[156px] sm:gap-0">
+                  <div className="flex min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20">
                     <h3 className="min-w-0 w-full truncate font-serif font-bold text-lg">
                       {aw.artwork_title ?? t("artwork_untitled")}
                     </h3>
@@ -1258,8 +1257,8 @@ const Catalogue = () => {
                     </div>
                   </div>
 
-                  <div className="relative z-0 flex min-h-[156px] w-full min-w-0 flex-1 flex-col justify-start items-stretch gap-3 p-0">
-                    <div className="ml-auto flex w-[180px] max-w-full flex-col gap-2 pt-[35px]">
+                  <div className="relative z-0 flex w-full min-w-0 flex-col gap-3 sm:min-h-[156px] sm:flex-1 sm:gap-0">
+                    <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-[180px] sm:max-w-full sm:pt-[35px]">
                     <Button
                       type="button"
                       variant="outline"
@@ -1293,7 +1292,7 @@ const Catalogue = () => {
                     </div>
                     <div
                       className={cn(
-                        "ml-auto flex max-w-full shrink-0 flex-col items-stretch gap-2 pt-3 mt-auto",
+                        "flex w-full shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:mt-auto sm:pt-3",
                         CATALOG_IA_BADGE_WIDTH_CLASS,
                       )}
                     >

@@ -2038,7 +2038,7 @@ const Statistics = () => {
       : null;
 
   return (
-    <div className="container py-8 space-y-8">
+    <div className="container min-w-0 max-w-full py-8 space-y-8">
       {exportProgressOverlay}
       <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 max-w-full md:max-w-md shrink-0">
@@ -2371,18 +2371,18 @@ const Statistics = () => {
       </div>
 
       {/* Cross table */}
-      <Card className="glass-card">
+      <Card className="glass-card min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="text-lg">{t("cross.title")}</CardTitle>
           <p className="text-xs text-muted-foreground">{t("cross.subtitle")}</p>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0 overflow-x-auto">
           {crossError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{crossError}</p>
           ) : crossRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("cross.empty")}</p>
           ) : (
-            <table className="w-full text-xs leading-tight">
+            <table className="w-full min-w-[40rem] text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("cross.colArtwork")}</th>
@@ -2425,18 +2425,18 @@ const Statistics = () => {
       </Card>
 
       {/* Top artworks table */}
-      <Card className="glass-card">
+      <Card className="glass-card min-w-0 overflow-hidden">
         <CardHeader>
           <CardTitle className="text-lg">{t("top.title")}</CardTitle>
           <p className="text-xs text-muted-foreground">{t("top.subtitle")}</p>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0 overflow-x-auto">
           {topArtworksError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{topArtworksError}</p>
           ) : topArtworks.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("top.empty")}</p>
           ) : (
-            <table className="w-full text-xs leading-tight">
+            <table className="w-full min-w-[32rem] text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("top.colRank")}</th>

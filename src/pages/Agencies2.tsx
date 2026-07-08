@@ -120,7 +120,7 @@ export default function Agencies2() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] px-4 py-6 space-y-4">
+    <div className="mx-auto w-full min-w-0 max-w-[1000px] overflow-x-hidden px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/agencies")}>{t("tableau.back")}</Button>
         <Button type="button" variant="outline" asChild>
@@ -129,7 +129,7 @@ export default function Agencies2() {
           </Link>
         </Button>
       </div>
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <CardTitle>{t("tableau.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
@@ -142,14 +142,14 @@ export default function Agencies2() {
             <datalist id="agencies2-search-suggestions">{searchSuggestions.map((s) => <option key={s} value={s} />)}</datalist>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0 overflow-x-auto">
           {loading ? <p className="text-sm text-muted-foreground">{t("tableau.loading")}</p> : error ? <p className="text-sm text-destructive">{error}</p> : (
-            <table className="w-full table-fixed text-sm">
+            <table className="w-full min-w-[28rem] text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-64 px-2 py-1">{t("tableau.colOrganisation")} <SortButtons column="name" /></th>
-                  <th className="w-72 px-2 py-1">{t("tableau.colId")} <SortButtons column="id" /></th>
-                  <th className="w-10 px-2 py-1" />
+                  <th className="min-w-[10rem] px-2 py-1">{t("tableau.colOrganisation")} <SortButtons column="name" /></th>
+                  <th className="min-w-[12rem] px-2 py-1">{t("tableau.colId")} <SortButtons column="id" /></th>
+                  <th className="w-10 shrink-0 px-2 py-1" />
                 </tr>
               </thead>
               <tbody>

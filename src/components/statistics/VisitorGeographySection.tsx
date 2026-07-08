@@ -95,7 +95,7 @@ export function VisitorGeographySection({
   );
 
   return (
-    <Card id="statistics-geography" className="glass-card scroll-mt-24">
+    <Card id="statistics-geography" className="glass-card scroll-mt-24 min-w-0 overflow-hidden">
       <CardHeader>
         <CardTitle className="text-lg">{t("geography.title")}</CardTitle>
         <p className="text-xs leading-relaxed text-muted-foreground">{t("geography.disclaimer")}</p>
@@ -173,8 +173,8 @@ export function VisitorGeographySection({
                 ) : null}
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs leading-tight">
+            <div className="min-w-0 overflow-x-auto">
+              <table className="w-full min-w-[40rem] text-xs leading-tight">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">{t("geography.colVisitor")}</th>

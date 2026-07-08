@@ -149,8 +149,9 @@ export function DashboardTeamMembersTable({
   }
 
   return (
-    <div className="rounded-md border border-border/60 overflow-hidden">
-      <Table>
+    <div className="min-w-0 max-w-full overflow-hidden rounded-md border border-border/60">
+      <div className="overflow-x-auto">
+      <Table className="min-w-[36rem]">
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead>{t("team_table.col_lastname")}</TableHead>
@@ -243,6 +244,7 @@ export function DashboardTeamMembersTable({
           })}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

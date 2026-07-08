@@ -343,7 +343,7 @@ export function PublicVitrineShell({
   /** Connecté : un seul header (backoffice avec ancres vitrine), pas de FloatingNav en doublon. */
   const mergeVitrineIntoHeader = showBackofficeHeader;
   const mainTopPaddingClass = mergeVitrineIntoHeader
-    ? "pt-[5rem]"
+    ? "pt-[8rem] min-[1174px]:pt-[5rem]"
     : vitrinePathPrefix === "/organisation"
       ? "pt-[74px]"
       : undefined;

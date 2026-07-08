@@ -17,6 +17,8 @@ export type NavigationModeContextValue = {
   navigationMode: NavigationMode;
   setNavigationMode: (mode: NavigationMode) => void;
   canSwitchNavigationMode: boolean;
+  /** Mode lu depuis le stockage local (évite un flash « global » au F5). */
+  modeReady: boolean;
   globalRoleId: number | null;
   agencyRoleId: number | null;
   effectiveRoleId: number | null;
@@ -51,18 +53,25 @@ export function NavigationModeProvider({ children }: { children: ReactNode }) {
   );
 
   const [navigationMode, setNavigationModeState] = useState<NavigationMode>("global");
+  const [modeReady, setModeReady] = useState(false);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) {
+      setModeReady(false);
+      return;
+    }
     if (!userId) {
       setNavigationModeState("global");
+      setModeReady(true);
       return;
     }
     if (!canSwitch) {
       setNavigationModeState("global");
+      setModeReady(true);
       return;
     }
     setNavigationModeState(readNavigationMode(userId) ?? "global");
+    setModeReady(true);
   }, [loading, userId, canSwitch]);
 
   const setNavigationMode = useCallback(
@@ -90,6 +99,7 @@ export function NavigationModeProvider({ children }: { children: ReactNode }) {
       navigationMode,
       setNavigationMode,
       canSwitchNavigationMode: canSwitch,
+      modeReady,
       globalRoleId,
       agencyRoleId,
       effectiveRoleId: effective.role_id,
@@ -103,6 +113,7 @@ export function NavigationModeProvider({ children }: { children: ReactNode }) {
       navigationMode,
       setNavigationMode,
       canSwitch,
+      modeReady,
       globalRoleId,
       agencyRoleId,
       effective.role_id,
