@@ -16,7 +16,9 @@
     "scopeTitle": "Ambito vuoto",
     "scopeDesc": "Compila gli identificatori di agenzia / esposizione previsti per il tuo ruolo.",
     "filteredAgency": "Filtrato per agenzia {{agencyFilter}}.",
-    "scopedExpoOnly": "Solo esposizione {{label}}."
+    "scopedExpoOnly": "Solo esposizione {{label}}.",
+    "filteredArtworkCount_one": "{{count}} opera",
+    "filteredArtworkCount_other": "{{count}} opere"
   },
   "card": {
     "qrGenerate": "Genera QR",
@@ -39,7 +41,9 @@
     "qrConfirmDescription": "Qualsiasi codice QR già stampato o esposto per questa mostra dovrà essere sostituito affinché i visitatori possano accedere alle opere.",
     "qrConfirmAction": "Rigenera comunque",
     "qrConfirmCancel": "Annulla",
-    "cardVisitors": "Visitatori della mostra"
+    "cardVisitors": "Visitatori della mostra",
+    "costPrefix": "Costo totale:",
+    "costUnavailable": "Costo totale: dati non disponibili"
   },
   "panel": {
     "chooseFormat": "Scegli il formato del pannello da stampare",
@@ -70,6 +74,31 @@
     "saving": "Salvataggio…",
     "save": "Salva",
     "save_changes": "Salva le modifiche",
+    "close": "Chiudi",
+    "adjust_emotions": "Regola emozioni della mostra",
+    "emotions": {
+      "title": "Emozioni della mostra",
+      "max_active_hint": "Massimo {{count}} emozioni attivabili",
+      "max_active": "Massimo {{count}} emozioni attive.",
+      "summary_prefix": "{{count}} emozioni: ",
+      "summary_active": "attualmente {{count}}/{{max}} emozioni attivate",
+      "active_count": "{{count}} / {{max}} emozioni attive",
+      "loading": "Caricamento emozioni…",
+      "empty": "Nessuna emozione trovata.",
+      "load_error": "Impossibile caricare le emozioni.",
+      "save_success": "Emozioni salvate.",
+      "save_error": "Impossibile salvare le emozioni.",
+      "add_section_title": "Aggiungi un'emozione",
+      "add_icon_label": "Icona",
+      "add_name_label": "Etichetta",
+      "add_name_placeholder": "Es.: Sereno",
+      "add_active_label": "Attiva",
+      "add_button": "Aggiungi",
+      "add_validation_name": "L'etichetta è obbligatoria.",
+      "add_validation_icon": "L'icona è obbligatoria.",
+      "pending_badge": "Nuovo",
+      "remove_pending": "Rimuovi questa emozione"
+    },
     "loading": "Caricamento…",
     "agency_label": "Organizzazione",
     "no_agency": "— Nessuna organizzazione —",

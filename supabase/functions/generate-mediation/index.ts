@@ -196,6 +196,8 @@ type RequestBody = {
   styles?: MediationStyleInput[];
   /** Code langue BCP-47 court (fr, en, de, es, it). */
   lang?: string;
+  /** UUID œuvre — rattache la consommation dans ai_usage_logs. */
+  artwork_id?: string;
 };
 
 type MediationApiResponse = {
@@ -629,6 +631,7 @@ async function runGeminiMediationFallback(params: {
   expectedIds: string[];
   admin: ReturnType<typeof createClient>;
   reason: string;
+  artworkId: string | null;
 }): Promise<{ analyse: string; styles: Record<string, string>; model: string }> {
   console.warn(`[generate-mediation] Repli Gemini (${params.fallbackModel}) — ${params.reason}`);
   const ai = new GoogleGenAI({ apiKey: params.geminiApiKey });
@@ -652,7 +655,7 @@ async function runGeminiMediationFallback(params: {
     prompt_tokens: tok.prompt_tokens,
     completion_tokens: tok.completion_tokens,
     total_tokens: tok.total_tokens,
-    artwork_id: null,
+    artwork_id: params.artworkId,
   });
   return { ...parsed, model: params.fallbackModel };
 }
@@ -697,6 +700,8 @@ serve(async (req: Request) => {
   const sourceText = body.source_text?.trim() ?? "";
   const styles = body.styles ?? [];
   const langInstruction = buildLangInstruction(body.lang);
+  const artworkId =
+    typeof body.artwork_id === "string" && body.artwork_id.trim() ? body.artwork_id.trim() : null;
 
   if (!sourceText) {
     return jsonResponse(400, { error: "source_text est requis." });
@@ -931,7 +936,7 @@ serve(async (req: Request) => {
       prompt_tokens: tok.prompt_tokens,
       completion_tokens: tok.completion_tokens,
       total_tokens: tok.total_tokens,
-      artwork_id: null,
+      artwork_id: artworkId,
     });
   } else {
     const groqApiKey = Deno.env.get("GROQ_API_KEY")?.trim();
@@ -971,6 +976,7 @@ serve(async (req: Request) => {
             geminiMaxOutputTokens,
             expectedIds,
             admin,
+            artworkId,
             reason: isGroqJsonValidateFailedError(msg)
               ? "JSON Groq invalide (markdown dans les valeurs)"
               : "requête Groq trop volumineuse",
@@ -1018,6 +1024,7 @@ serve(async (req: Request) => {
             geminiMaxOutputTokens,
             expectedIds,
             admin,
+            artworkId,
             reason: "JSON Groq non extractible après réponse",
           });
           return jsonResponse(200, {
@@ -1060,6 +1067,7 @@ serve(async (req: Request) => {
             geminiMaxOutputTokens,
             expectedIds,
             admin,
+            artworkId,
             reason: "JSON Groq parsable mais structure invalide",
           });
           return jsonResponse(200, {
@@ -1087,7 +1095,7 @@ serve(async (req: Request) => {
       prompt_tokens: tok.prompt_tokens,
       completion_tokens: tok.completion_tokens,
       total_tokens: tok.total_tokens,
-      artwork_id: null,
+      artwork_id: artworkId,
     });
   }
 

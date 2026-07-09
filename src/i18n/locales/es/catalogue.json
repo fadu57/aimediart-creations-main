@@ -1,5 +1,9 @@
 {
   "page_title": "Obra",
+  "filtered_count_one": "{{count}} obra",
+  "filtered_count_other": "{{count}} obras",
+  "filter_label_artworks": "Obras",
+  "filter_label_expo": "Expos",
   "search_placeholder": "Buscar una obra...",
   "search_clear_aria": "Borrar búsqueda",
   "expo_filter_placeholder": "Filtrar por exposición",
@@ -96,6 +100,8 @@
   "badge_ia_voice_generating_partial": "Voces generadas: {{ready}}/{{expected}} · en curso ({{langs}})",
   "badge_ia_voice_open_aria": "Abrir seguimiento de voces generadas",
   "badge_ia_voice_generating_aria": "Generación de voces en curso — abrir seguimiento",
+  "badge_artwork_cost_prefix": "Coste total:",
+  "badge_artwork_cost_unavailable": "Coste total: datos no disponibles",
   "scope_agency_hint": "Exposiciones de la agencia {{agencyId}}.",
   "scope_expo_hint": "Solo exposición {{expoId}}.",
   "status_empty": "vacío",

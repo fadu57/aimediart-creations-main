@@ -1,5 +1,9 @@
 {
   "page_title": "Kunstwerk",
+  "filtered_count_one": "{{count}} Kunstwerk",
+  "filtered_count_other": "{{count}} Kunstwerke",
+  "filter_label_artworks": "Kunstwerke",
+  "filter_label_expo": "Expos",
   "search_placeholder": "Kunstwerk suchen...",
   "search_clear_aria": "Suche löschen",
   "expo_filter_placeholder": "Nach Ausstellung filtern",
@@ -96,6 +100,8 @@
   "badge_ia_voice_generating_partial": "Generierte Stimmen: {{ready}}/{{expected}} · in Bearbeitung ({{langs}})",
   "badge_ia_voice_open_aria": "Stimmengenerierung öffnen",
   "badge_ia_voice_generating_aria": "Stimmengenerierung läuft — Verfolgung öffnen",
+  "badge_artwork_cost_prefix": "Gesamtkosten:",
+  "badge_artwork_cost_unavailable": "Gesamtkosten: Daten nicht verfügbar",
   "scope_agency_hint": "Ausstellungen der Agentur {{agencyId}}.",
   "scope_expo_hint": "Nur Ausstellung {{expoId}}.",
   "status_empty": "leer",

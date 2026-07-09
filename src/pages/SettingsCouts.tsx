@@ -22,11 +22,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
-  getCostTimeSeries, getCostSelectOptions, getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
+  getCostTimeSeries, getCostSelectOptions, getCostEntityFilterOptions, getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
   effectiveCostEstimatedUsd,
   type CostEvent, type CostFilters, type CostSummary, type CostEventsTotals,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
+  type CostEntityFilterOptions,
   type CostSort, type CostSortColumn,
 } from "@/lib/costs";
 import {
@@ -279,6 +280,13 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const EMPTY_FILTERS: CostFilters = {
   dateFrom: "", dateTo: "", toolType: "", provider: "",
   apiName: "", modelName: "", operationName: "", status: "", currency: "",
+  artworkId: "", expoId: "", agencyId: "",
+};
+
+const EMPTY_ENTITY_FILTER_OPTIONS: CostEntityFilterOptions = {
+  artworks: [],
+  expos: [],
+  agencies: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -1306,6 +1314,9 @@ type CostsTableProps = {
   loadingTotals: boolean;
   usdEurRate: number | null;
   isAdmin?: boolean;
+  filters: CostFilters;
+  entityOptions: CostEntityFilterOptions;
+  onFiltersChange: (filters: CostFilters) => void;
   onAddCost?: () => void;
   onEditCost?: (event: CostEvent) => void;
   onAttachCost?: (event: CostEvent) => void;
@@ -1368,11 +1379,28 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
 
 function CostsTable({
   events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, currency,
-  totals, loadingTotals, usdEurRate, isAdmin = false, onAddCost, onEditCost, onAttachCost, onDeleted,
+  totals, loadingTotals, usdEurRate, isAdmin = false, filters, entityOptions, onFiltersChange,
+  onAddCost, onEditCost, onAttachCost, onDeleted,
 }: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const filterSelectClass = cn(BACKOFFICE_FORM_CONTROL_CLASS, "h-9 w-full min-w-0 text-xs");
+
+  const setEntityFilter = (key: "artworkId" | "expoId" | "agencyId", value: string) => {
+    const next: CostFilters = { ...filters, [key]: value };
+    if (key === "artworkId" && value) {
+      next.expoId = "";
+      next.agencyId = "";
+    } else if (key === "expoId" && value) {
+      next.artworkId = "";
+      next.agencyId = "";
+    } else if (key === "agencyId" && value) {
+      next.artworkId = "";
+      next.expoId = "";
+    }
+    onFiltersChange(next);
+  };
 
   const handleSort = (column: CostSortColumn) => {
     onSortChange(nextCostSort(column, sort));
@@ -1412,25 +1440,59 @@ function CostsTable({
     );
   }
 
-  if (!loading && events.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Euro className="h-10 w-10 text-muted-foreground/30 mb-3" aria-hidden />
-        <p className="font-medium text-muted-foreground">{t("couts.empty_title")}</p>
-        <p className="text-sm text-muted-foreground mt-1">{t("couts.empty_sub")}</p>
-        {isAdmin && onAddCost && (
-          <Button type="button" size="sm" onClick={onAddCost} className="mt-4 gap-2">
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            {t("couts.manual.btn_add")}
-          </Button>
-        )}
-      </div>
-    );
-  }
+  const isEmpty = !loading && events.length === 0;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex flex-col gap-3">
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_artwork")}
+            </label>
+            <select
+              value={filters.artworkId ?? ""}
+              onChange={(e) => setEntityFilter("artworkId", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {entityOptions.artworks.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_expo")}
+            </label>
+            <select
+              value={filters.expoId ?? ""}
+              onChange={(e) => setEntityFilter("expoId", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {entityOptions.expos.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_agency")}
+            </label>
+            <select
+              value={filters.agencyId ?? ""}
+              onChange={(e) => setEntityFilter("agencyId", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {entityOptions.agencies.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {total.toLocaleString("fr-FR")} {t("couts.events_count")}
         </p>
@@ -1446,8 +1508,17 @@ function CostsTable({
             {t("couts.btn_export_csv")}
           </Button>
         </div>
+        </div>
       </div>
 
+      {isEmpty ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-border/50 py-16 text-center">
+          <Euro className="h-10 w-10 text-muted-foreground/30 mb-3" aria-hidden />
+          <p className="font-medium text-muted-foreground">{t("couts.empty_title")}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("couts.empty_sub")}</p>
+        </div>
+      ) : (
+        <>
       <div className="overflow-x-auto rounded-xl border border-border/50">
         <table className="w-full min-w-[800px] table-fixed text-sm">
           <colgroup>
@@ -1626,6 +1697,8 @@ function CostsTable({
             Suiv. ›
           </Button>
         </div>
+      )}
+        </>
       )}
     </div>
   );
@@ -3079,6 +3152,7 @@ export default function SettingsCouts() {
   const [options,  setOptions]  = useState<CostSelectOptions>({
     toolTypes: [], providers: [], apiNames: [], modelNames: [], operationNames: [], statuses: [], currencies: [],
   });
+  const [entityFilterOptions, setEntityFilterOptions] = useState<CostEntityFilterOptions>(EMPTY_ENTITY_FILTER_OPTIONS);
   const [eventsTotals, setEventsTotals] = useState<CostEventsTotals | null>(null);
   const [loadingEventsTotals, setLoadingEventsTotals] = useState(true);
 
@@ -3096,6 +3170,7 @@ export default function SettingsCouts() {
   // ---- Chargement options filtres (une seule fois) ----
   useEffect(() => {
     getCostSelectOptions().then(setOptions).catch(() => {});
+    getCostEntityFilterOptions().then(setEntityFilterOptions).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -3423,6 +3498,9 @@ export default function SettingsCouts() {
             loadingTotals={loadingEventsTotals}
             usdEurRate={usdEurRate}
             isAdmin={isCostAdmin}
+            filters={filters}
+            entityOptions={entityFilterOptions}
+            onFiltersChange={handleFiltersChange}
             onAddCost={() => { setEditCostEvent(null); setManualCostOpen(true); }}
             onEditCost={(ev) => { setEditCostEvent(ev); setManualCostOpen(true); }}
             onAttachCost={(ev) => setAttachCostEvent(ev)}

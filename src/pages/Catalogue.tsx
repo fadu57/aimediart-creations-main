@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -23,18 +23,19 @@ import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Plus, Search, Loader2, X, RefreshCw, Undo2, ExternalLink } from "lucide-react";
+import { Plus, Search, Loader2, X, Undo2, ExternalLink, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import QRCode from "qrcode";
 import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
-import { QR_CODE_STORAGE_OPTIONS } from "@/lib/qrCodeScanFriendly";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { generateCartelPdf } from "@/lib/cartelPdfRenderer";
 import { cartelExplorationLines } from "@/lib/cartelExplorationText";
 import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
 import { CartelFormatDialog } from "@/components/CartelFormatDialog";
 import { cn } from "@/lib/utils";
+import { EntityCostLabel } from "@/components/EntityCostLabel";
+import { getCostTotalsByArtworkIds, resolveEntityCostDisplay } from "@/lib/costs";
+import { getUsdToEurRate } from "@/lib/fxRates";
 import {
   countMaxMediationStylesAcrossLangs,
   getMediationFilledUiLangs,
@@ -156,6 +157,8 @@ const Catalogue = () => {
     () => searchParams.get("expo")?.trim() || "all",
   );
   const [expoFilterInput, setExpoFilterInput] = useState<string>("");
+  const [artworkFilterOpen, setArtworkFilterOpen] = useState(false);
+  const [expoFilterOpen, setExpoFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [artworkModalOpen, setArtworkModalOpen] = useState(false);
@@ -164,8 +167,6 @@ const Catalogue = () => {
   const [œuvresNavigationType, setOeuvresNavigationType] = useState("single_scan_sequence");
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
-  const [bulkQrConfirmOpen, setBulkQrConfirmOpen] = useState(false);
-  const [bulkQrProgress, setBulkQrProgress] = useState<{ done: number; total: number } | null>(null);
   const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
   const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
@@ -183,6 +184,10 @@ const Catalogue = () => {
   const navigate = useNavigate();
   const isAdminFullAccess =
     (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
+  const isGlobalCostViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
+  const [costByArtworkId, setCostByArtworkId] = useState<Record<string, number>>({});
+  const [costsReady, setCostsReady] = useState(false);
+  const [usdToEurRate, setUsdToEurRate] = useState<number | null>(null);
 
   useEffect(() => {
     if (authLoading || defaultExpoFilterAppliedRef.current) return;
@@ -564,6 +569,37 @@ const Catalogue = () => {
     void loadCatalogue();
   }, [loadCatalogue]);
 
+  useEffect(() => {
+    if (!isGlobalCostViewer || artworks.length === 0) {
+      setCostByArtworkId({});
+      setCostsReady(false);
+      setUsdToEurRate(null);
+      return;
+    }
+    let cancelled = false;
+    setCostsReady(false);
+    void Promise.all([
+      getCostTotalsByArtworkIds(artworks.map((aw) => aw.artwork_id)),
+      getUsdToEurRate(),
+    ])
+      .then(([totals, rate]) => {
+        if (cancelled) return;
+        setCostByArtworkId(totals);
+        setUsdToEurRate(rate);
+        setCostsReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCostByArtworkId({});
+          setUsdToEurRate(null);
+          setCostsReady(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [artworks, isGlobalCostViewer]);
+
   /** Met à jour les badges voix pendant la génération audio (file client + polling). */
   useEffect(() => {
     const VOICE_POLL_MS = 2500;
@@ -702,6 +738,14 @@ const Catalogue = () => {
       ),
     [expoOptions],
   );
+  const filteredSearchSuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return searchSuggestions.filter((label) => !q || label.toLowerCase().includes(q));
+  }, [search, searchSuggestions]);
+  const filteredExpoSuggestions = useMemo(() => {
+    const q = expoFilterInput.trim().toLowerCase();
+    return expoFilterSuggestions.filter((label) => !q || label.toLowerCase().includes(q));
+  }, [expoFilterInput, expoFilterSuggestions]);
 
   useEffect(() => {
     if (selectedExpoFilter === "all") {
@@ -847,69 +891,6 @@ const Catalogue = () => {
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
-  const handleRegenerateAllQrCodes = useCallback(async () => {
-    if (role_id === 7) return;
-    const ids = artworks.map((a) => a.artwork_id?.trim()).filter(Boolean) as string[];
-    if (ids.length === 0) return;
-
-    const originOverride = await fetchQrPublicSiteOriginFromSettings();
-    setBulkQrProgress({ done: 0, total: ids.length });
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (let i = 0; i < ids.length; i++) {
-      const artworkId = ids[i];
-      try {
-        const row = artworks.find((a) => a.artwork_id === artworkId);
-        const expoForQr = ((row?.expo_id ?? row?.artwork_expo_id) ?? "").trim() || null;
-        const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
-        if (!targetUrl) { errorCount++; continue; }
-
-        const dataUrl = await QRCode.toDataURL(targetUrl, QR_CODE_STORAGE_OPTIONS);
-        const blob = await (await fetch(dataUrl)).blob();
-        const path = `qrcodes/${artworkId}.png`;
-
-        const { error: uploadError } = await supabase.storage.from("qrcode").upload(path, blob, {
-          contentType: "image/png",
-          cacheControl: "3600",
-          upsert: true,
-        });
-        if (uploadError) throw uploadError;
-
-        const { data: pub } = supabase.storage.from("qrcode").getPublicUrl(path);
-        const publicQrUrl = pub.publicUrl;
-
-        const { error: updateError } = await supabase
-          .from("artworks")
-          .update({ artwork_qr_code_url: publicQrUrl, artwork_qrcode_image: publicQrUrl })
-          .eq("artwork_id", artworkId);
-        if (updateError) throw updateError;
-
-        setArtworks((prev) =>
-          prev.map((row) =>
-            row.artwork_id === artworkId
-              ? { ...row, artwork_qr_code_url: publicQrUrl, artwork_qrcode_image: publicQrUrl }
-              : row,
-          ),
-        );
-        successCount++;
-      } catch {
-        errorCount++;
-      }
-      setBulkQrProgress({ done: i + 1, total: ids.length });
-      // Throttle pour ne pas saturer Supabase Storage
-      await new Promise((r) => setTimeout(r, 120));
-    }
-
-    setBulkQrProgress(null);
-    if (errorCount === 0) {
-      toast.success(t("qr_bulk_success", { count: successCount }));
-    } else {
-      toast.warning(t("qr_bulk_partial", { success: successCount, error: errorCount }));
-    }
-  }, [role_id, artworks]);
-
   const handleGeneratePDF = async (aw: ArtworkRow, formatId: CartelFormatId) => {
     const artworkId = aw.artwork_id?.trim();
     if (!artworkId) {
@@ -966,71 +947,208 @@ const Catalogue = () => {
   };
 
   return (
-    <div className="container min-w-0 max-w-full py-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 py-2 backdrop-blur-sm">
+    <div className="container min-w-0 max-w-full pt-[38px] pb-8 space-y-8">
+      <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 backdrop-blur-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
-          <div className="flex flex-wrap items-center gap-4">
-          <div>
+          <div className="flex w-full items-baseline justify-between gap-4">
             <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
-          </div>
-          <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              list="catalogue-search-suggestions"
-              placeholder={t("search_placeholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-9 h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white"
-            />
-            {search.trim().length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label={t("search_clear_aria")}
-                title="Effacer"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </button>
+            {!loading && (
+              <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">
+                {t("filtered_count", { count: filtered.length })}
+              </span>
             )}
-            <datalist id="catalogue-search-suggestions">
-              {searchSuggestions.map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
           </div>
-          <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              list="catalogue-expo-filter-suggestions"
-              placeholder={t("expo_filter_placeholder")}
-              value={expoFilterInput}
-              onChange={(e) => handleExpoFilterInputChange(e.target.value)}
-              className="pl-9 pr-9 h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white"
-            />
-            {(expoFilterInput.trim().length > 0 || selectedExpoFilter !== "all") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setExpoFilterInput("");
-                  setSelectedExpoFilter("all");
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
-                aria-label={t("expo_filter_clear_aria")}
-                title={t("expo_filter_clear_title")}
+          <div className="flex flex-wrap items-center gap-4">
+            <Popover
+              open={artworkFilterOpen}
+              onOpenChange={(open) => {
+                setArtworkFilterOpen(open);
+                if (open) setExpoFilterOpen(false);
+              }}
+            >
+              <PopoverAnchor asChild>
+                <div
+                  role="combobox"
+                  aria-expanded={artworkFilterOpen}
+                  aria-controls="catalogue-artwork-suggestions"
+                  className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                >
+                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  {!search.trim() ? (
+                    <span className="shrink-0 text-sm font-medium text-foreground">{t("filter_label_artworks")}</span>
+                  ) : null}
+                  <input
+                    id="catalogue-artwork-search"
+                    type="text"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setArtworkFilterOpen(true);
+                      setExpoFilterOpen(false);
+                    }}
+                    onFocus={() => {
+                      setArtworkFilterOpen(true);
+                      setExpoFilterOpen(false);
+                    }}
+                    aria-label={t("search_placeholder")}
+                    aria-autocomplete="list"
+                    aria-controls="catalogue-artwork-suggestions"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-transparent"
+                  />
+                  {search.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearch("");
+                      }}
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label={t("search_clear_aria")}
+                      title="Effacer"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-foreground"
+                    aria-label={t("search_placeholder")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setArtworkFilterOpen((open) => !open);
+                      setExpoFilterOpen(false);
+                    }}
+                  >
+                    <ChevronDown className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                  </button>
+                </div>
+              </PopoverAnchor>
+              <PopoverContent
+                id="catalogue-artwork-suggestions"
+                align="start"
+                side="bottom"
+                sideOffset={4}
+                className="w-[210px] p-0"
+                onOpenAutoFocus={(e) => e.preventDefault()}
               >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            )}
-            <datalist id="catalogue-expo-filter-suggestions">
-              {expoFilterSuggestions.map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
-          </div>
+                <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
+                  {filteredSearchSuggestions.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-muted-foreground">{t("empty_search")}</li>
+                  ) : (
+                    filteredSearchSuggestions.map((label) => (
+                      <li key={label} role="option" aria-selected={search === label}>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+                          onClick={() => {
+                            setSearch(label);
+                            setArtworkFilterOpen(false);
+                          }}
+                        >
+                          {label}
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </PopoverContent>
+            </Popover>
+            <Popover
+              open={expoFilterOpen}
+              onOpenChange={(open) => {
+                setExpoFilterOpen(open);
+                if (open) setArtworkFilterOpen(false);
+              }}
+            >
+              <PopoverAnchor asChild>
+                <div
+                  role="combobox"
+                  aria-expanded={expoFilterOpen}
+                  aria-controls="catalogue-expo-suggestions"
+                  className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                >
+                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  {!expoFilterInput.trim() && selectedExpoFilter === "all" ? (
+                    <span className="shrink-0 text-sm font-medium text-foreground">{t("filter_label_expo")}</span>
+                  ) : null}
+                  <input
+                    id="catalogue-expo-filter"
+                    type="text"
+                    value={expoFilterInput}
+                    onChange={(e) => {
+                      handleExpoFilterInputChange(e.target.value);
+                      setExpoFilterOpen(true);
+                      setArtworkFilterOpen(false);
+                    }}
+                    onFocus={() => {
+                      setExpoFilterOpen(true);
+                      setArtworkFilterOpen(false);
+                    }}
+                    aria-label={t("expo_filter_placeholder")}
+                    aria-autocomplete="list"
+                    aria-controls="catalogue-expo-suggestions"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-transparent"
+                  />
+                  {(expoFilterInput.trim().length > 0 || selectedExpoFilter !== "all") && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpoFilterInput("");
+                        setSelectedExpoFilter("all");
+                      }}
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                      aria-label={t("expo_filter_clear_aria")}
+                      title={t("expo_filter_clear_title")}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-foreground"
+                    aria-label={t("expo_filter_placeholder")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpoFilterOpen((open) => !open);
+                      setArtworkFilterOpen(false);
+                    }}
+                  >
+                    <ChevronDown className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+                  </button>
+                </div>
+              </PopoverAnchor>
+              <PopoverContent
+                id="catalogue-expo-suggestions"
+                align="start"
+                side="bottom"
+                sideOffset={4}
+                className="w-[210px] p-0"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
+                  {filteredExpoSuggestions.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-muted-foreground">{t("expo_selector_empty")}</li>
+                  ) : (
+                    filteredExpoSuggestions.map((label) => (
+                      <li key={label} role="option" aria-selected={expoFilterInput === label}>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+                          onClick={() => {
+                            handleExpoFilterInputChange(label);
+                            setExpoFilterOpen(false);
+                          }}
+                        >
+                          {label}
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </PopoverContent>
+            </Popover>
           </div>
           {!authLoading && scope.mode === "expo" && (
             <p className="text-xs text-muted-foreground">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
@@ -1038,28 +1156,6 @@ const Catalogue = () => {
         </div>
         <BackofficeStickyAgencyLogoSlot />
         <div className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 md:w-auto md:max-w-[576px] md:justify-end">
-          {isAdminFullAccess && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 border-amber-500/60 text-amber-700 hover:bg-amber-50 shrink-0"
-              onClick={() => setBulkQrConfirmOpen(true)}
-              disabled={Boolean(bulkQrProgress)}
-              title={t("qr_bulk_regenerate_title")}
-            >
-              {bulkQrProgress ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  {t("qr_bulk_progress", { done: bulkQrProgress.done, total: bulkQrProgress.total })}
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" aria-hidden />
-                  {t("qr_bulk_regenerate_btn")}
-                </>
-              )}
-            </Button>
-          )}
           <Button
             className="gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground shrink-0"
             onClick={() => openCreateArtwork()}
@@ -1396,6 +1492,24 @@ const Catalogue = () => {
                         </span>
                       ) : null}
                     </span>
+                    {isGlobalCostViewer ? (
+                      <span
+                        className={cn(
+                          catalogIaBadgeClass,
+                          "border-destructive/30 bg-destructive/5 tabular-nums",
+                        )}
+                      >
+                        <EntityCostLabel
+                          display={resolveEntityCostDisplay(
+                            costsReady ? costByArtworkId[aw.artwork_id] : undefined,
+                            costsReady,
+                            usdToEurRate,
+                          )}
+                          unavailableLabel={t("badge_artwork_cost_unavailable")}
+                          prefixLabel={t("badge_artwork_cost_prefix")}
+                        />
+                      </span>
+                    ) : null}
                     </div>
                   </div>
                 </div>
@@ -1439,46 +1553,6 @@ const Catalogue = () => {
               onClick={() => void confirmExpoMove()}
             >
               {t("expo_move_confirm_yes")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={bulkQrConfirmOpen} onOpenChange={(open) => !open && setBulkQrConfirmOpen(false)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("qr_bulk_confirm_title")}</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div>
-              <span className="block font-semibold text-destructive mb-2">
-                {t("qr_bulk_confirm_warning")}
-              </span>
-              {t("qr_bulk_confirm_description", { count: artworks.length })}
-              {(() => {
-                const noExpoCount = artworks.filter(
-                  (a) => !((a.expo_id ?? a.artwork_expo_id) as string | null | undefined)?.trim()
-                ).length;
-                return noExpoCount > 0 ? (
-                  <span className="mt-2 block rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    {t("qr_bulk_warn_no_expo", { count: noExpoCount })}
-                  </span>
-                ) : null;
-              })()}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setBulkQrConfirmOpen(false)}>
-              {t("qr_confirm_cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-amber-600 text-white hover:bg-amber-700"
-              onClick={() => {
-                setBulkQrConfirmOpen(false);
-                void handleRegenerateAllQrCodes();
-              }}
-            >
-              {t("qr_bulk_confirm_action")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

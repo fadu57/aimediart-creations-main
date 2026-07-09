@@ -33,7 +33,7 @@ export function UserProfileAddressFields({
   const postalPlaceholder = useMemo(() => postalPlaceholderForCountryLabel(country), [country]);
 
   return (
-    <div className="grid w-full gap-3 sm:grid-cols-10">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-10">
       <div className="sm:col-span-10">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
           <div className="order-2 min-w-0 flex-1 sm:order-1">
@@ -65,7 +65,7 @@ export function UserProfileAddressFields({
         </div>
       </div>
 
-      <div className="w-[100px] max-w-full justify-self-start space-y-[5px] sm:col-span-1">
+      <div className="w-full max-w-full space-y-[5px] sm:col-span-1 sm:w-[100px] sm:justify-self-start">
         <Label htmlFor={`${idPrefix}-country`}>Pays</Label>
         <Select
           value={country}
@@ -94,7 +94,7 @@ export function UserProfileAddressFields({
         </Select>
       </div>
 
-      <div className="w-[115px] max-w-full justify-self-start space-y-[5px] sm:col-span-2">
+      <div className="w-full max-w-full space-y-[5px] sm:col-span-2 sm:w-[115px] sm:justify-self-start">
         <Label htmlFor={`${idPrefix}-zip`}>Code postal</Label>
         <Input
           id={`${idPrefix}-zip`}

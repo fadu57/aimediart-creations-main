@@ -1993,22 +1993,31 @@ const Users = ({
       <Dialog open={DEBUG_FORCE_DIALOG_OPEN ? true : dialogOpen} onOpenChange={(nextOpen) => closeDialog(nextOpen)}>
         <DialogContent
           hideCloseButton
-          className="max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
+          className="w-[calc(100vw-2rem)] max-h-[min(92dvh,100%)] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-serif text-xl text-white sm:text-2xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="min-w-0 font-serif text-lg text-white sm:text-2xl">
                 {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => closeDialog(false)}
+                  disabled={saving || repairingAuth}
+                  className="h-9 w-full px-3 text-sm border border-white/70 bg-transparent text-white hover:bg-white/10 sm:w-auto"
+                >
+                  {t("form.close")}
+                </Button>
                 {mode === "edit" && canRepairAuthAccess && (
                   <Button
                     type="button"
                     onClick={() => void repairAuthAccess()}
                     disabled={saving || repairingAuth || !editing}
-                    className="h-9 px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822]"
+                    className="h-9 w-full px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822] sm:w-auto"
                   >
                     {repairingAuth ? t("form.repairing_auth") : t("form.repair_auth")}
                   </Button>
@@ -2019,8 +2028,8 @@ const Users = ({
                   disabled={saving || !editing || checkingControl || controlExists || (mode === "edit" && !hasUserChanges)}
                   className={
                     mode === "edit"
-                      ? "h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                      : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                      ? "h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] sm:w-auto"
+                      : "h-9 w-full px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
                   }
                 >
                   {saving ? t("form.saving") : mode === "create" ? t("form.save") : t("form.save_changes")}
@@ -2030,15 +2039,15 @@ const Users = ({
           </div>
 
           <div className="px-4 sm:px-5 pt-3 pb-4">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div className="h-[100px] w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20">
+            <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
+              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {agencyLogoUrl ? (
                   <img src={agencyLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}
               </div>
-              <div className="h-[100px] w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20">
+              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {expoLogoUrl ? (
                   <img src={expoLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
@@ -2062,8 +2071,8 @@ const Users = ({
                   {t("form.updating_data")}
                 </p>
               )}
-              <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
-                <div className="space-y-2">
+              <div className="grid min-w-0 gap-4 md:grid-cols-[200px_1fr] md:items-start">
+                <div className="min-w-0 space-y-2">
                   <UserPhotoField
                     avatarUrl={editing.avatar_url}
                     photoPreview={photoPreview}
@@ -2073,8 +2082,8 @@ const Users = ({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-prenom" className="w-[70px] shrink-0 text-xs">
                       {t("form.firstname")}
                     </Label>
@@ -2084,10 +2093,10 @@ const Users = ({
                       value={editing.first_name ?? ""}
                       onChange={(e) => setField("first_name", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-nom" className="w-[70px] shrink-0 text-xs">
                       {t("form.lastname")}
                     </Label>
@@ -2097,10 +2106,10 @@ const Users = ({
                       value={editing.last_name ?? ""}
                       onChange={(e) => setField("last_name", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-pseudo" className="w-[70px] shrink-0 text-xs">
                       {t("form.username")}
                     </Label>
@@ -2109,12 +2118,12 @@ const Users = ({
                       value={editing.username ?? ""}
                       onChange={(e) => setField("username", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-start gap-2">
+                  <div className="flex min-w-0 items-start gap-2">
                     <Label className="w-[70px] shrink-0 text-xs pt-2">{t("form.birth")}</Label>
-                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                    <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
                       <Select
                         value={editing.birth_month ?? ""}
                         onValueChange={(v) => setField("birth_month", v)}
@@ -2149,7 +2158,7 @@ const Users = ({
                       </Select>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-phone" className="w-[70px] shrink-0 text-xs">
                       {t("form.phone")}
                     </Label>
@@ -2395,22 +2404,31 @@ const Users = ({
       <Dialog open={DEBUG_FORCE_DIALOG_OPEN ? true : dialogOpen} onOpenChange={(nextOpen) => closeDialog(nextOpen)}>
         <DialogContent
           hideCloseButton
-          className="max-h-[90vh] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
+          className="w-[calc(100vw-2rem)] max-h-[min(92dvh,100%)] max-w-2xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
           aria-describedby={undefined}
         >
           <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-serif text-xl text-white sm:text-2xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="min-w-0 font-serif text-lg text-white sm:text-2xl">
                 {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => closeDialog(false)}
+                  disabled={saving || repairingAuth}
+                  className="h-9 w-full px-3 text-sm border border-white/70 bg-transparent text-white hover:bg-white/10 sm:w-auto"
+                >
+                  {t("form.close")}
+                </Button>
                 {mode === "edit" && canRepairAuthAccess && (
                   <Button
                     type="button"
                     onClick={() => void repairAuthAccess()}
                     disabled={saving || repairingAuth || !editing}
-                    className="h-9 px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822]"
+                    className="h-9 w-full px-3 text-sm border border-white/70 bg-[#7a1f2a] text-white font-semibold hover:bg-[#651822] sm:w-auto"
                   >
                     {repairingAuth ? t("form.repairing_auth") : t("form.repair_auth")}
                   </Button>
@@ -2421,8 +2439,8 @@ const Users = ({
                   disabled={saving || !editing || checkingControl || controlExists || (mode === "edit" && !hasUserChanges)}
                   className={
                     mode === "edit"
-                      ? "h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                      : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                      ? "h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] sm:w-auto"
+                      : "h-9 w-full px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
                   }
                 >
                   {saving ? t("form.saving") : mode === "create" ? t("form.save") : t("form.save_changes")}
@@ -2432,15 +2450,15 @@ const Users = ({
           </div>
 
           <div className="px-4 sm:px-5 pt-3 pb-4">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div className="h-[100px] w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20">
+            <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
+              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {agencyLogoUrl ? (
                   <img src={agencyLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}
               </div>
-              <div className="h-[100px] w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20">
+              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {expoLogoUrl ? (
                   <img src={expoLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
@@ -2458,8 +2476,8 @@ const Users = ({
               }}
               className="space-y-5 pt-2 px-4 sm:px-5 pb-4"
             >
-              <div className="grid gap-4 md:grid-cols-[200px_1fr] md:items-start">
-                <div className="space-y-2">
+              <div className="grid min-w-0 gap-4 md:grid-cols-[200px_1fr] md:items-start">
+                <div className="min-w-0 space-y-2">
                   <UserPhotoField
                     avatarUrl={editing.avatar_url}
                     photoPreview={photoPreview}
@@ -2469,8 +2487,8 @@ const Users = ({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-prenom-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.firstname")}
                     </Label>
@@ -2480,10 +2498,10 @@ const Users = ({
                       value={editing.first_name ?? ""}
                       onChange={(e) => setField("first_name", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-nom-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.lastname")}
                     </Label>
@@ -2493,10 +2511,10 @@ const Users = ({
                       value={editing.last_name ?? ""}
                       onChange={(e) => setField("last_name", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-pseudo-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.username")}
                     </Label>
@@ -2505,12 +2523,12 @@ const Users = ({
                       value={editing.username ?? ""}
                       onChange={(e) => setField("username", e.target.value)}
                       disabled={saving}
-                      className="h-9 flex-1"
+                      className="h-9 min-w-0 flex-1"
                     />
                   </div>
-                  <div className="flex items-start gap-2">
+                  <div className="flex min-w-0 items-start gap-2">
                     <Label className="w-[70px] shrink-0 text-xs pt-2">{t("form.birth")}</Label>
-                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                    <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row">
                       <Select
                         value={editing.birth_month ?? ""}
                         onValueChange={(v) => setField("birth_month", v)}
@@ -2545,7 +2563,7 @@ const Users = ({
                       </Select>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-phone-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.phone")}
                     </Label>

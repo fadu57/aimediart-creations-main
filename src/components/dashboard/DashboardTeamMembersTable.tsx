@@ -35,10 +35,11 @@ type TeamMemberExposCellProps = {
   expoOptions: DashboardAgencyExpoOption[];
   canEdit: boolean;
   saving: boolean;
+  compact?: boolean;
   onChange?: (member: DashboardTeamMember, expoIds: string[]) => void;
 };
 
-function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }: TeamMemberExposCellProps) {
+function TeamMemberExposCell({ member, expoOptions, canEdit, saving, compact = false, onChange }: TeamMemberExposCellProps) {
   const { t } = useTranslation("dashboard");
   const labels = expoLabelsForMember(member, expoOptions);
 
@@ -74,7 +75,10 @@ function TeamMemberExposCell({ member, expoOptions, canEdit, saving, onChange }:
           type="button"
           variant="outline"
           size="sm"
-          className="h-8 min-w-[9rem] max-w-[14rem] justify-between gap-1 font-normal"
+          className={cn(
+            "h-8 justify-between gap-1 font-normal",
+            compact ? "w-full max-w-full" : "min-w-[9rem] max-w-[14rem]",
+          )}
           disabled={saving}
           onClick={(e) => e.stopPropagation()}
         >
@@ -125,6 +129,63 @@ type DashboardTeamMembersTableProps = {
   onMemberExposChange?: (member: DashboardTeamMember, expoIds: string[]) => void;
 };
 
+function TeamMemberActions({
+  member,
+  editable,
+  deletable,
+  onEditMember,
+  onDeleteMember,
+}: {
+  member: DashboardTeamMember;
+  editable: boolean;
+  deletable: boolean;
+  onEditMember?: (member: DashboardTeamMember) => void;
+  onDeleteMember?: (member: DashboardTeamMember) => void;
+}) {
+  const { t } = useTranslation("dashboard");
+
+  if (!editable && !deletable) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  return (
+    <div className="flex shrink-0 items-center justify-end gap-1">
+      {editable && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditMember?.(member);
+          }}
+          aria-label={t("common.edit")}
+          title={t("common.edit")}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      {deletable && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteMember?.(member);
+          }}
+          aria-label={t("common.delete")}
+          title={t("common.delete")}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function DashboardTeamMembersTable({
   members,
   expoOptions = [],
@@ -149,103 +210,145 @@ export function DashboardTeamMembersTable({
   }
 
   return (
-    <div className="min-w-0 max-w-full overflow-hidden rounded-md border border-border/60">
-      <div className="overflow-x-auto">
-      <Table className="min-w-[36rem]">
-        <TableHeader>
-          <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead>{t("team_table.col_lastname")}</TableHead>
-            <TableHead>{t("team_table.col_firstname")}</TableHead>
-            <TableHead>{t("team_table.col_username")}</TableHead>
-            <TableHead>{t("team_table.col_role")}</TableHead>
-            <TableHead className="hidden md:table-cell min-w-[10rem]">{t("team_table.col_expo")}</TableHead>
-            <TableHead className="hidden sm:table-cell">{t("team_table.col_phone")}</TableHead>
-            {showActions && <TableHead className="w-[88px] text-right">{t("team_table.col_actions")}</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {members.map((member) => {
-            const isSelf = currentUserId && member.user_id === currentUserId;
-            const isRole4 = member.agency_role_id === 4;
-            const editable = canEditMember?.(member) ?? false;
-            const deletable = canDeleteMember?.(member) ?? false;
-            const expoEditable = canEditMemberExpos?.(member) ?? false;
-            const rowBold = isRole4 ? "font-bold" : undefined;
+    <>
+      <div className="space-y-3 md:hidden">
+        {members.map((member) => {
+          const isSelf = currentUserId && member.user_id === currentUserId;
+          const isRole4 = member.agency_role_id === 4;
+          const editable = canEditMember?.(member) ?? false;
+          const deletable = canDeleteMember?.(member) ?? false;
+          const expoEditable = canEditMemberExpos?.(member) ?? false;
+          const rowBold = isRole4 ? "font-bold" : undefined;
 
-            return (
-              <TableRow
-                key={member.user_id}
-                className={cn(
-                  isSelf && "bg-primary/5",
-                  editable && "cursor-pointer hover:bg-muted/30",
-                )}
-                onClick={() => {
-                  if (editable) onEditMember?.(member);
-                }}
-              >
-                <TableCell className={cn("font-medium", rowBold)}>{textOrDash(member.last_name)}</TableCell>
-                <TableCell className={rowBold}>{textOrDash(member.first_name)}</TableCell>
-                <TableCell className={rowBold}>{member.username ? `@${member.username}` : "—"}</TableCell>
-                <TableCell className={rowBold}>{textOrDash(member.agency_role_label)}</TableCell>
-                <TableCell
-                  className="hidden md:table-cell"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <TeamMemberExposCell
+          return (
+            <div
+              key={member.user_id}
+              className={cn(
+                "min-w-0 rounded-lg border border-border/60 p-3 space-y-2",
+                isSelf && "bg-primary/5",
+                editable && "cursor-pointer hover:bg-muted/30",
+              )}
+              role={editable ? "button" : undefined}
+              tabIndex={editable ? 0 : undefined}
+              onClick={() => {
+                if (editable) onEditMember?.(member);
+              }}
+              onKeyDown={(e) => {
+                if (!editable) return;
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onEditMember?.(member);
+                }
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate font-medium", rowBold)}>{memberFullName(member)}</p>
+                  {member.username ? (
+                    <p className={cn("truncate text-xs text-muted-foreground", rowBold)}>
+                      @{member.username}
+                    </p>
+                  ) : null}
+                </div>
+                {showActions ? (
+                  <TeamMemberActions
                     member={member}
-                    expoOptions={expoOptions}
-                    canEdit={expoEditable}
-                    saving={savingExpoUserId === member.user_id}
-                    onChange={onMemberExposChange}
+                    editable={editable}
+                    deletable={deletable}
+                    onEditMember={onEditMember}
+                    onDeleteMember={onDeleteMember}
                   />
-                </TableCell>
-                <TableCell className={cn("hidden sm:table-cell", rowBold)}>{textOrDash(member.phone)}</TableCell>
-                {showActions && (
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    {editable || deletable ? (
-                      <div className="flex items-center justify-end gap-1">
-                        {editable && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 shrink-0"
-                            onClick={() => onEditMember?.(member)}
-                            aria-label={t("common.edit")}
-                            title={t("common.edit")}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        {deletable && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteMember?.(member);
-                            }}
-                            aria-label={t("common.delete")}
-                            title={t("common.delete")}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                ) : null}
+              </div>
+              <p className={cn("text-sm", rowBold)}>{textOrDash(member.agency_role_label)}</p>
+              {member.phone?.trim() ? (
+                <p className={cn("text-sm text-muted-foreground", rowBold)}>{member.phone.trim()}</p>
+              ) : null}
+              <div
+                className="space-y-1"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <p className="text-xs font-medium text-muted-foreground">{t("team_table.col_expo")}</p>
+                <TeamMemberExposCell
+                  member={member}
+                  expoOptions={expoOptions}
+                  canEdit={expoEditable}
+                  saving={savingExpoUserId === member.user_id}
+                  compact
+                  onChange={onMemberExposChange}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
+
+      <div className="hidden min-w-0 max-w-full overflow-hidden rounded-md border border-border/60 md:block">
+        <Table className="min-w-[48rem]">
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="px-3 py-2">{t("team_table.col_lastname")}</TableHead>
+              <TableHead className="px-3 py-2">{t("team_table.col_firstname")}</TableHead>
+              <TableHead className="px-3 py-2">{t("team_table.col_username")}</TableHead>
+              <TableHead className="px-3 py-2">{t("team_table.col_role")}</TableHead>
+              <TableHead className="min-w-[10rem] px-3 py-2">{t("team_table.col_expo")}</TableHead>
+              <TableHead className="hidden lg:table-cell px-3 py-2">{t("team_table.col_phone")}</TableHead>
+              {showActions && <TableHead className="w-[88px] px-3 py-2 text-right">{t("team_table.col_actions")}</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {members.map((member) => {
+              const isSelf = currentUserId && member.user_id === currentUserId;
+              const isRole4 = member.agency_role_id === 4;
+              const editable = canEditMember?.(member) ?? false;
+              const deletable = canDeleteMember?.(member) ?? false;
+              const expoEditable = canEditMemberExpos?.(member) ?? false;
+              const rowBold = isRole4 ? "font-bold" : undefined;
+
+              return (
+                <TableRow
+                  key={member.user_id}
+                  className={cn(
+                    isSelf && "bg-primary/5",
+                    editable && "cursor-pointer hover:bg-muted/30",
+                  )}
+                  onClick={() => {
+                    if (editable) onEditMember?.(member);
+                  }}
+                >
+                  <TableCell className={cn("px-3 py-2 font-medium", rowBold)}>{textOrDash(member.last_name)}</TableCell>
+                  <TableCell className={cn("px-3 py-2", rowBold)}>{textOrDash(member.first_name)}</TableCell>
+                  <TableCell className={cn("px-3 py-2", rowBold)}>{member.username ? `@${member.username}` : "—"}</TableCell>
+                  <TableCell className={cn("px-3 py-2", rowBold)}>{textOrDash(member.agency_role_label)}</TableCell>
+                  <TableCell className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <TeamMemberExposCell
+                      member={member}
+                      expoOptions={expoOptions}
+                      canEdit={expoEditable}
+                      saving={savingExpoUserId === member.user_id}
+                      onChange={onMemberExposChange}
+                    />
+                  </TableCell>
+                  <TableCell className={cn("hidden lg:table-cell px-3 py-2", rowBold)}>{textOrDash(member.phone)}</TableCell>
+                  {showActions && (
+                    <TableCell className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      <TeamMemberActions
+                        member={member}
+                        editable={editable}
+                        deletable={deletable}
+                        onEditMember={onEditMember}
+                        onDeleteMember={onDeleteMember}
+                      />
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }
 

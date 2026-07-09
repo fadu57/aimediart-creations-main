@@ -10,8 +10,9 @@ async function fetchBatch(
   sourceText: string,
   styles: MediationStyleRequest[],
   lang: MediationUiLang,
+  artworkId?: string,
 ): Promise<MediationBatchResult> {
-  const generated = await generateMediation({ sourceText, styles, lang });
+  const generated = await generateMediation({ sourceText, styles, lang, artworkId });
   const stylesById: Record<string, string> = {};
   for (const s of styles) {
     stylesById[s.id] = (generated.stylesById[s.id] ?? "").trim();
@@ -31,15 +32,16 @@ export async function generatePersonasBatchWithRetry(
   sourceText: string,
   styles: MediationStyleRequest[],
   lang: MediationUiLang,
+  artworkId?: string,
 ): Promise<MediationBatchResult> {
   if (styles.length === 0) {
     return { stylesById: {}, analyseGlobale: "" };
   }
 
   if (styles.length === 1) {
-    const single = await fetchBatch(sourceText, styles, lang);
+    const single = await fetchBatch(sourceText, styles, lang, artworkId);
     if (emptyStyleIds(styles, single.stylesById).length === 0) return single;
-    const retry = await fetchBatch(sourceText, styles, lang);
+    const retry = await fetchBatch(sourceText, styles, lang, artworkId);
     return {
       stylesById: {
         [styles[0].id]: retry.stylesById[styles[0].id] || single.stylesById[styles[0].id],
@@ -48,11 +50,11 @@ export async function generatePersonasBatchWithRetry(
     };
   }
 
-  let { stylesById, analyseGlobale } = await fetchBatch(sourceText, styles, lang);
+  let { stylesById, analyseGlobale } = await fetchBatch(sourceText, styles, lang, artworkId);
   let missing = emptyStyleIds(styles, stylesById);
 
   if (missing.length > 0) {
-    const retry = await fetchBatch(sourceText, styles, lang);
+    const retry = await fetchBatch(sourceText, styles, lang, artworkId);
     if (retry.analyseGlobale) analyseGlobale = retry.analyseGlobale;
     for (const s of styles) {
       const retried = retry.stylesById[s.id];
@@ -64,7 +66,7 @@ export async function generatePersonasBatchWithRetry(
   for (const id of missing) {
     const style = styles.find((s) => s.id === id);
     if (!style) continue;
-    const single = await fetchBatch(sourceText, [style], lang);
+    const single = await fetchBatch(sourceText, [style], lang, artworkId);
     if (single.stylesById[id]) stylesById[id] = single.stylesById[id];
     if (!analyseGlobale && single.analyseGlobale) analyseGlobale = single.analyseGlobale;
   }

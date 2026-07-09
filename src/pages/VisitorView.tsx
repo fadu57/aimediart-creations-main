@@ -114,6 +114,7 @@ type EmotionRow = {
   name_emotion_de?: string | null;
   name_emotion_es?: string | null;
   name_emotion_it?: string | null;
+  is_active?: boolean | null;
 };
 
 type PromptStyleRow = PromptStyleLabelFields & {
@@ -545,7 +546,7 @@ const VisitorViewCore = () => {
       const validRows = rows.filter((row) => {
         const icon = (row.icone_emotion ?? "").trim();
         const name = (row.name_emotion ?? "").trim();
-        return icon.length > 0 && name.length > 0;
+        return icon.length > 0 && name.length > 0 && Boolean(row.is_active);
       });
       setEmotionsDb(validRows);
       if (rows.length > 0 && validRows.length === 0) {

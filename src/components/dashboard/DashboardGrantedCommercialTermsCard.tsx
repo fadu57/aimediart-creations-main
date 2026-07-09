@@ -78,14 +78,14 @@ export function DashboardGrantedCommercialTermsCard() {
   }, []);
 
   return (
-    <Card className="glass-card">
-      <CardHeader className="pb-3">
+    <Card className="glass-card min-w-0 overflow-hidden">
+      <CardHeader className="pb-3 p-4 sm:p-6">
         <CardTitle className="text-xl flex items-center gap-2">
           <Percent className="h-5 w-5 text-gold" />
           {t("granted_terms.title")}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
         {loading ? (
           <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -98,8 +98,8 @@ export function DashboardGrantedCommercialTermsCard() {
             {t("granted_terms.empty")}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-[#9d2525]/20">
-            <Table>
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-[#9d2525]/20">
+            <Table className="min-w-[32rem]">
               <TableHeader>
                 <TableRow className="bg-[#fff9f7]/80 hover:bg-[#fff9f7]/80 dark:bg-[#fff9f7]/10">
                   <TableHead className="h-8 min-w-[180px] max-w-[240px] px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#9d2525]">

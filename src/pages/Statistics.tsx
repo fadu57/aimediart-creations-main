@@ -2040,9 +2040,9 @@ const Statistics = () => {
   return (
     <div className="container min-w-0 max-w-full py-8 space-y-8">
       {exportProgressOverlay}
-      <div className="sticky top-16 z-30 flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 max-w-full md:max-w-md shrink-0">
-          <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+      <div className="sticky top-16 z-30 flex min-w-0 flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 max-w-full shrink-0 md:max-w-md">
+          <h2 className="text-2xl font-serif font-bold text-white sm:text-3xl">{t("page.title")}</h2>
           <p className="text-muted-foreground">{t("page.subtitle")}</p>
           <Button
             type="button"
@@ -2076,7 +2076,7 @@ const Statistics = () => {
             <BackofficeStickyAgencyLogoSlot />
           )}
         </div>
-        <div className="flex flex-col gap-2 text-sm min-w-[220px] shrink-0 md:ml-auto">
+        <div className="flex w-full min-w-0 flex-col gap-2 text-sm md:ml-auto md:min-w-[220px] md:shrink-0">
           {showOrganizationFilter && (
             <div>
               <label htmlFor="statistics-scope-org" className="text-xs text-muted-foreground font-medium">
@@ -2147,7 +2147,7 @@ const Statistics = () => {
               <label className="text-xs text-muted-foreground font-medium">
                 {t("filter.expoPeriod")}
               </label>
-              <div className="flex flex-row gap-2 mt-1">
+              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                 <input
                   type="date"
                   value={manualPreviewDateFrom}
@@ -2208,13 +2208,13 @@ const Statistics = () => {
       )}
 
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid min-w-0 grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
         {miniKpis.map((k) => (
-          <Card key={k.id} className="glass-card">
-            <CardContent className="p-5 text-center">
+          <Card key={k.id} className="glass-card min-w-0 overflow-hidden">
+            <CardContent className="p-4 text-center sm:p-5">
               <k.icon className="h-6 w-6 text-primary mx-auto mb-2" />
               <p className="text-xs text-muted-foreground font-medium">{k.label}</p>
-              <p className="text-2xl font-serif font-bold mt-1">
+              <p className="mt-1 text-xl font-serif font-bold sm:text-2xl">
                 {k.id === "dominantEmotion" && k.value !== "—"
                   ? t(`emotions.names.${normalizeEmotionKey(String(k.value))}`, { defaultValue: String(k.value) })
                   : k.value}
@@ -2225,14 +2225,14 @@ const Statistics = () => {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
         {/* Emotion distribution */}
-        <Card className="glass-card">
-          <CardHeader>
+        <Card className="glass-card min-w-0 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg">{t("emotions.title")}</CardTitle>
             <p className="text-xs text-muted-foreground">{t("emotions.subtitle")}</p>
           </CardHeader>
-          <CardContent className="space-y-1.5">
+          <CardContent className="min-w-0 space-y-1.5 p-4 pt-0 sm:p-6 sm:pt-0">
             {emotionCatalog.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
                 {emotionCatalogError || "Impossible d'afficher les émotions de la table emotions."}
@@ -2241,9 +2241,9 @@ const Statistics = () => {
               <p className="text-sm text-muted-foreground text-center py-8">{t("emotions.empty")}</p>
             ) : (
               emotionSeries.map((emo) => (
-                <div key={emo.id} className="flex items-center gap-2 py-0.5">
-                  <span className="text-sm w-24 shrink-0 leading-tight">{t(`emotions.names.${normalizeEmotionKey(emo.name)}`, { defaultValue: emo.name })}</span>
-                  <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                <div key={emo.id} className="flex min-w-0 items-center gap-2 py-0.5">
+                  <span className="w-[5.5rem] shrink-0 truncate text-sm leading-tight sm:w-24">{t(`emotions.names.${normalizeEmotionKey(emo.name)}`, { defaultValue: emo.name })}</span>
+                  <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full" style={{ width: `${emo.percentage}%`, backgroundColor: emo.color }} />
                   </div>
                   <span className="text-sm font-bold w-10 text-right leading-tight">{emo.percentage}%</span>
@@ -2255,9 +2255,9 @@ const Statistics = () => {
         </Card>
 
         {/* Timeline chart */}
-        <Card className="glass-card">
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
+        <Card className="glass-card min-w-0 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <CardTitle className="text-lg">{t("timeline.title")}</CardTitle>
               {!expoDateRange ? (
                 <div className="flex items-center gap-2">
@@ -2290,7 +2290,7 @@ const Statistics = () => {
                 : t("timeline.subtitle")}
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
             {temporalSeries.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
@@ -2339,12 +2339,12 @@ const Statistics = () => {
         </Card>
 
         {/* Hourly attendance chart */}
-        <Card className="glass-card">
-          <CardHeader>
+        <Card className="glass-card min-w-0 overflow-hidden">
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg">{t("hourly.title")}</CardTitle>
             <p className="text-xs text-muted-foreground">{t("hourly.subtitle")}</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
             {hourlySeries.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-12">{t("common.chartNoData")}</p>
             ) : (
@@ -2372,16 +2372,44 @@ const Statistics = () => {
 
       {/* Cross table */}
       <Card className="glass-card min-w-0 overflow-hidden">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg">{t("cross.title")}</CardTitle>
           <p className="text-xs text-muted-foreground">{t("cross.subtitle")}</p>
         </CardHeader>
-        <CardContent className="min-w-0 overflow-x-auto">
+        <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
           {crossError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{crossError}</p>
           ) : crossRows.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("cross.empty")}</p>
           ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {sortedCrossRows.map((row) => (
+                  <div key={row.artworkId} className="rounded-lg border border-border/60 p-3 space-y-2">
+                    <p className="font-medium leading-snug">{row.name}</p>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs min-[360px]:grid-cols-2">
+                      {crossEmotionColumns.map((emotion) => {
+                        const count = row.counts[emotion.id] ?? 0;
+                        const label = t(`emotions.names.${normalizeEmotionKey(emotion.name)}`, {
+                          defaultValue: emotion.name,
+                        });
+                        const icon =
+                          emotion.name.toLowerCase().includes("troublé") ? "😵‍💫" : (emotion.icon || "");
+                        return (
+                          <div key={`${row.artworkId}-${emotion.id}-mobile`} className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 truncate text-muted-foreground">
+                              <span aria-hidden="true">{icon} </span>
+                              {label}
+                            </span>
+                            <span className="shrink-0 font-medium tabular-nums">{count > 0 ? count : "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden min-w-0 overflow-x-auto md:block">
             <table className="w-full min-w-[40rem] text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
@@ -2420,22 +2448,68 @@ const Statistics = () => {
                 ))}
               </tbody>
             </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
 
       {/* Top artworks table */}
       <Card className="glass-card min-w-0 overflow-hidden">
-        <CardHeader>
+        <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg">{t("top.title")}</CardTitle>
           <p className="text-xs text-muted-foreground">{t("top.subtitle")}</p>
         </CardHeader>
-        <CardContent className="min-w-0 overflow-x-auto">
+        <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
           {topArtworksError ? (
             <p className="text-sm text-muted-foreground text-center py-8">{topArtworksError}</p>
           ) : topArtworks.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">{t("top.empty")}</p>
           ) : (
+            <>
+              <div className="space-y-3 md:hidden">
+                {sortedTopArtworks.map((row, index) => (
+                  <div key={row.artworkId} className="flex gap-3 rounded-lg border border-border/60 p-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold">
+                      {index + 1}
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md">
+                          {row.imageUrl ? (
+                            <ImageWithSkeleton
+                              src={row.imageUrl}
+                              alt={row.title}
+                              className="h-12 w-12 shrink-0 rounded-md object-cover"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 rounded-md bg-muted" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{row.title}</p>
+                          <p className="truncate text-xs text-muted-foreground">{row.artist}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        <span className="tabular-nums">
+                          {formatFrNumber(row.visits)} {t("top.colVisits").toLowerCase()}
+                        </span>
+                        <span className="tabular-nums">
+                          {t("top.colAvgHearts")}:{" "}
+                          {row.avgHearts == null
+                            ? "—"
+                            : formatFrNumber(row.avgHearts, {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 1,
+                              })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden min-w-0 overflow-x-auto md:block">
             <table className="w-full min-w-[32rem] text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
@@ -2508,6 +2582,8 @@ const Statistics = () => {
                 ))}
               </tbody>
             </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -2525,7 +2601,7 @@ const Statistics = () => {
       <Dialog open={printPreviewOpen} onOpenChange={handlePrintPreviewOpenChange}>
         <DialogContent
           aria-describedby={undefined}
-          className="max-w-5xl gap-0 border-border bg-white p-0 text-neutral-900 sm:max-w-5xl max-h-[92vh] overflow-hidden print:!left-0 print:!top-0 print:!max-h-none print:!h-auto print:!w-full print:!max-w-none print:!translate-x-0 print:!translate-y-0 print:!overflow-visible print:border-0 print:!shadow-none"
+          className="w-[calc(100vw-2rem)] max-w-5xl gap-0 overflow-hidden border-border bg-white p-0 text-neutral-900 max-h-[min(92dvh,100%)] sm:max-w-5xl print:!left-0 print:!top-0 print:!max-h-none print:!h-auto print:!w-full print:!max-w-none print:!translate-x-0 print:!translate-y-0 print:!overflow-visible print:border-0 print:!shadow-none"
           onInteractOutside={(event) => {
             if (printExportBusy) event.preventDefault();
           }}
@@ -2533,7 +2609,7 @@ const Statistics = () => {
             if (printExportBusy) event.preventDefault();
           }}
         >
-          <DialogHeader className="border-b border-neutral-200 bg-white px-6 py-4 text-left print:hidden">
+          <DialogHeader className="border-b border-neutral-200 bg-white px-4 py-3 text-left sm:px-6 sm:py-4 print:hidden">
             <DialogTitle className="font-serif text-xl font-bold text-neutral-900">{t("preview.title")}</DialogTitle>
           </DialogHeader>
           <div
@@ -2541,15 +2617,15 @@ const Statistics = () => {
             ref={statisticsPrintAreaRef}
             data-expected-chart-surfaces={expectedChartSurfaces}
             data-statistics-artist-report={reportViewProps.previewArtistCoverLetter ? "true" : undefined}
-            className="bg-white px-5 py-6 text-neutral-900 max-h-[min(68vh,720px)] overflow-y-auto print:max-h-none print:!overflow-visible print:px-6 print:py-4 data-[statistics-artist-report=true]:rounded-xl data-[statistics-artist-report=true]:border-2 data-[statistics-artist-report=true]:border-neutral-200 data-[statistics-artist-report=true]:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+            className="min-w-0 max-h-[min(60dvh,520px)] overflow-auto bg-white px-4 py-4 text-neutral-900 sm:max-h-[min(68vh,720px)] sm:px-5 sm:py-6 print:max-h-none print:!overflow-visible print:px-6 print:py-4 data-[statistics-artist-report=true]:rounded-xl data-[statistics-artist-report=true]:border-2 data-[statistics-artist-report=true]:border-neutral-200 data-[statistics-artist-report=true]:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
           >
             <StatisticsReportView {...reportViewProps} />
           </div>
-          <DialogFooter className="flex-row items-center gap-3 border-t border-neutral-200 bg-neutral-50/80 px-6 py-4 print:hidden sm:justify-between">
+          <DialogFooter className="flex flex-col gap-3 border-t border-neutral-200 bg-neutral-50/80 px-4 py-3 print:hidden sm:flex-row sm:items-center sm:gap-3 sm:px-6 sm:py-4 sm:justify-between">
             <Button
               type="button"
               variant="outline"
-              className="shrink-0"
+              className="w-full shrink-0 sm:w-auto"
               disabled={printExportBusy}
               onClick={() => handlePrintPreviewOpenChange(false)}
             >
@@ -2569,7 +2645,7 @@ const Statistics = () => {
             </div>
             <Button
               type="button"
-              className="inline-flex shrink-0 items-center justify-center bg-[#E63946] hover:bg-[#c62f3a] disabled:opacity-70"
+              className="inline-flex w-full shrink-0 items-center justify-center bg-[#E63946] hover:bg-[#c62f3a] disabled:opacity-70 sm:w-auto"
               disabled={printExportBusy}
               onClick={() => setPaperFormatDialogOpen(true)}
             >
@@ -2587,7 +2663,7 @@ const Statistics = () => {
       </Dialog>
 
       <Dialog open={paperFormatDialogOpen} onOpenChange={setPaperFormatDialogOpen}>
-        <DialogContent className="max-w-md border-border bg-white text-neutral-900 sm:max-w-md">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md border-border bg-white p-4 text-neutral-900 sm:max-w-md sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-serif text-lg">{t("preview.paperFormatTitle")}</DialogTitle>
             <DialogDescription className="text-sm text-neutral-600">
@@ -2644,15 +2720,15 @@ const Statistics = () => {
       </Dialog>
 
       <Dialog open={previewDateDialogOpen} onOpenChange={setPreviewDateDialogOpen}>
-        <DialogContent className="max-w-sm border-border bg-white text-neutral-900">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm border-border bg-white p-4 text-neutral-900 sm:p-6">
           <DialogHeader>
             <DialogTitle className="font-serif text-lg">{t("preview.dateRangeTitle")}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">
               {t("preview.dateRangeDesc")}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-row gap-4 py-2">
-            <div className="flex flex-col gap-1.5 w-[152px]">
+          <div className="flex flex-col gap-4 py-2 sm:flex-row">
+            <div className="flex w-full min-w-0 flex-col gap-1.5">
               <label htmlFor="preview-date-from" className="text-xs font-medium text-neutral-700">
                 {t("preview.dateFrom")}
               </label>
@@ -2666,10 +2742,10 @@ const Statistics = () => {
                   setDialogDateFrom(v);
                   if (dialogDateTo && v > dialogDateTo) setDialogDateTo("");
                 }}
-                className="rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-[150px]"
+                className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
-            <div className="flex flex-col gap-1.5 w-[152px]">
+            <div className="flex w-full min-w-0 flex-col gap-1.5">
               <label htmlFor="preview-date-to" className="text-xs font-medium text-neutral-700">
                 {t("preview.dateTo")}
               </label>
@@ -2680,11 +2756,11 @@ const Statistics = () => {
                 min={dialogDateFrom || undefined}
                 max={todayYmd}
                 onChange={(e) => setDialogDateTo(e.target.value)}
-                className="rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 w-[150px]"
+                className="w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               />
             </div>
           </div>
-          <DialogFooter className="flex gap-2 sm:flex-row">
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => setPreviewDateDialogOpen(false)}>
               {t("preview.close")}
             </Button>

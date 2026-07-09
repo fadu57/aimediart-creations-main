@@ -16,7 +16,9 @@
     "scopeTitle": "Ámbito vacío",
     "scopeDesc": "Complete los identificadores de agencia / exposición esperados para su rol.",
     "filteredAgency": "Filtrado por agencia {{agencyFilter}}.",
-    "scopedExpoOnly": "Solo exposición {{label}}."
+    "scopedExpoOnly": "Solo exposición {{label}}.",
+    "filteredArtworkCount_one": "{{count}} obra",
+    "filteredArtworkCount_other": "{{count}} obras"
   },
   "card": {
     "qrGenerate": "Generar QR",
@@ -39,7 +41,9 @@
     "qrConfirmDescription": "Cualquier código QR ya impreso o exhibido para esta exposición deberá ser reemplazado para que los visitantes puedan acceder a las obras.",
     "qrConfirmAction": "Regenerar de todas formas",
     "qrConfirmCancel": "Cancelar",
-    "cardVisitors": "Visitantes de la expo"
+    "cardVisitors": "Visitantes de la expo",
+    "costPrefix": "Coste total:",
+    "costUnavailable": "Coste total: datos no disponibles"
   },
   "panel": {
     "chooseFormat": "Elija el formato del panel a imprimir",
@@ -70,6 +74,31 @@
     "saving": "Guardando…",
     "save": "Guardar",
     "save_changes": "Guardar los cambios",
+    "close": "Cerrar",
+    "adjust_emotions": "Ajustar emociones de la expo",
+    "emotions": {
+      "title": "Emociones de la exposición",
+      "max_active_hint": "Máximo {{count}} emociones pueden activarse",
+      "max_active": "Máximo {{count}} emociones activas.",
+      "summary_prefix": "{{count}} emociones: ",
+      "summary_active": "actualmente {{count}}/{{max}} emociones activadas",
+      "active_count": "{{count}} / {{max}} emociones activas",
+      "loading": "Cargando emociones…",
+      "empty": "Ninguna emoción encontrada.",
+      "load_error": "No se pueden cargar las emociones.",
+      "save_success": "Emociones guardadas.",
+      "save_error": "No se pueden guardar las emociones.",
+      "add_section_title": "Añadir una emoción",
+      "add_icon_label": "Icono",
+      "add_name_label": "Etiqueta",
+      "add_name_placeholder": "Ej.: Sereno",
+      "add_active_label": "Activar",
+      "add_button": "Añadir",
+      "add_validation_name": "La etiqueta es obligatoria.",
+      "add_validation_icon": "El icono es obligatorio.",
+      "pending_badge": "Nuevo",
+      "remove_pending": "Quitar esta emoción"
+    },
     "loading": "Cargando…",
     "agency_label": "Organización",
     "no_agency": "— Ninguna organización —",

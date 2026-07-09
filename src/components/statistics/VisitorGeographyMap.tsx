@@ -114,7 +114,7 @@ type Props = {
   height?: number;
 };
 
-export function VisitorGeographyMap({ rows, scopeKey, height = 420 }: Props) {
+export function VisitorGeographyMap({ rows, scopeKey, height }: Props) {
   const icons = useMemo(
     () => ({
       visitor: createParticipantIcon("visitor"),
@@ -156,7 +156,7 @@ export function VisitorGeographyMap({ rows, scopeKey, height = 420 }: Props) {
       key={scopeKey}
       center={defaultCenter}
       zoom={6}
-      style={{ height, width: "100%", borderRadius: "0.5rem" }}
+      style={{ height: height ?? "100%", width: "100%", borderRadius: "0.5rem" }}
       scrollWheelZoom
       zoomControl
     >

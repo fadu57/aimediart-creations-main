@@ -134,7 +134,7 @@ function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-[#121212]">
       {!hideGlobalHeader && <Header />}
-      <main className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] ${hideGlobalHeader ? "" : "pt-[4.25rem]"}`}>
+      <main className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] ${hideGlobalHeader ? "" : "pt-[10px]"}`}>
         <Outlet />
       </main>
     </div>

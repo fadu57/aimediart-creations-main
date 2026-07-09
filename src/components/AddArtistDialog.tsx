@@ -1250,7 +1250,7 @@ export function AddArtistDialog({
         onInteractOutside={handleDialogDismissAttempt}
         onEscapeKeyDown={handleDialogDismissAttempt}
         className={cn(
-          "left-1/2 top-[calc(4.25rem+1rem)] max-h-[calc(100vh-5.5rem)] w-[96vw] max-w-3xl -translate-x-1/2 translate-y-0",
+          "left-1/2 top-[calc(4.25rem+0.5rem)] max-h-[min(calc(100dvh-5rem),100%)] w-[calc(100vw-2rem)] max-w-3xl -translate-x-1/2 translate-y-0",
           "overflow-x-hidden overflow-y-auto border-border bg-background p-0 shadow-xl",
           "data-[state=open]:slide-in-from-top-4 data-[state=closed]:slide-out-to-top-4",
           "data-[state=open]:slide-in-from-left-1/2 data-[state=closed]:slide-out-to-left-1/2",
@@ -1265,20 +1265,20 @@ export function AddArtistDialog({
         </DialogTitle>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 sm:px-5 pb-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="min-w-0">
             <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
               <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <h2 className="min-w-0 shrink font-serif text-xl text-white sm:text-2xl sm:pr-2">
+                <h2 className="min-w-0 shrink font-serif text-lg text-white sm:text-2xl sm:pr-2">
                   {editingArtistId
                     ? t("dialog_title_edit", { name: artistTitleName || t("dialog_title_artist_fallback") })
                     : t("dialog_title_create")}
                 </h2>
 
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
                   {editingArtistId && (
                     <a
                       href={`mailto:${AIMEDIART_CONTACT_EMAIL}?subject=${encodeURIComponent(t("btn_report_error_email_subject"))}&body=${encodeURIComponent(`Artiste : ${artistTitleName || "inconnu"}\nArtist ID : ${editingArtistId}\n\nDécrivez l'information erronée :`)}`}
-                      className="inline-flex h-9 w-[150px] items-center justify-center gap-1.5 rounded-md border border-white/60 bg-[#FDFDFC] px-3 text-[11px] font-black text-[#D99726]/80 text-center hover:border-white hover:text-white transition-colors"
+                      className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-white/60 bg-[#FDFDFC] px-3 text-[11px] font-black text-[#D99726]/80 text-center transition-colors hover:border-white hover:bg-transparent hover:text-white sm:w-[150px]"
                       title={t("btn_report_error_title")}
                     >
                       ⚠️ {t("btn_report_error")}
@@ -1287,7 +1287,7 @@ export function AddArtistDialog({
                   {editingArtistId && ficheReadOnly && (
                     <Button
                       type="button"
-                      className="h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                      className="h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] sm:w-auto"
                       onClick={() => setFicheReadOnly(false)}
                     >
                       {t("btn_modify")}
@@ -1297,7 +1297,7 @@ export function AddArtistDialog({
                   <Button
                     type="button"
                     variant="default"
-                    className="h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                    className="h-9 w-full px-3 text-sm border border-white/70 bg-transparent text-white hover:bg-white/10 sm:w-auto"
                     onClick={() => attemptClose()}
                   >
                     {t("btn_cancel")}
@@ -1309,8 +1309,8 @@ export function AddArtistDialog({
                       disabled={!canSave || isSubmitting || processingPhoto}
                       className={
                         editingArtistId
-                          ? "h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] disabled:opacity-50"
-                          : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground disabled:opacity-50"
+                          ? "h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] disabled:opacity-50 sm:w-auto"
+                          : "h-9 w-full px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground disabled:opacity-50 sm:w-auto"
                       }
                     >
                       {isSubmitting
@@ -1324,7 +1324,7 @@ export function AddArtistDialog({
               </div>
             </div>
 
-            <div className="space-y-4 w-full">
+            <div className="min-w-0 space-y-4 w-full px-4 sm:px-5 pt-3 pb-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 {!ficheReadOnly && (
                   <p className="col-span-full text-xs leading-tight text-destructive">
@@ -1459,7 +1459,7 @@ export function AddArtistDialog({
                   />
                 </div>
 
-                <div className="flex w-fit shrink-0 flex-col gap-3">
+                <div className="flex w-full shrink-0 flex-col gap-3 sm:w-fit">
                   <FormField
                     control={form.control}
                     name="birth_date"
@@ -1476,7 +1476,7 @@ export function AddArtistDialog({
                                 variant="outline"
                                 disabled={ficheReadOnly}
                                 className={cn(
-                                  "h-10 w-[180px] max-w-full pl-3 pr-2 text-left text-sm font-normal",
+                                  "h-10 w-full pl-3 pr-2 text-left text-sm font-normal sm:w-[180px]",
                                   !birthDisplay && "text-muted-foreground",
                                 )}
                               >
@@ -1535,7 +1535,7 @@ export function AddArtistDialog({
                                   variant="outline"
                                   disabled={ficheReadOnly}
                                   className={cn(
-                                    "h-10 w-[180px] max-w-full pl-3 pr-2 text-left text-sm font-normal",
+                                    "h-10 w-full pl-3 pr-2 text-left text-sm font-normal sm:w-[180px]",
                                     !deathDisplay && "text-muted-foreground",
                                   )}
                                 >
@@ -1628,144 +1628,8 @@ export function AddArtistDialog({
                 </div>
               </div>
 
-              <div className="relative flex h-[170px] flex-col gap-4 min-[726px]:flex-row min-[726px]:flex-nowrap min-[726px]:items-start">
-                <div className="absolute left-[180px] flex h-full min-h-0 min-w-0 w-full max-w-[550px] flex-col gap-2 sm:w-[550px] sm:max-w-none sm:shrink-0">
-                {biosLoading && bioArtistId ? (
-                  <>
-                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
-                      {canShowGenerateBio && (
-                        <Button
-                          type="button"
-                          variant="default"
-                          className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                          onClick={() => void handleGenerateBio()}
-                          disabled={generatingBio || !hasTripleRequired}
-                        >
-                          {generatingBio ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              {t("btn_generating_bio")}
-                            </>
-                          ) : (
-                            t("btn_generate_bio")
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                    <div className="flex min-h-0 flex-1 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/20 text-sm text-muted-foreground">
-                      <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
-                      <span>{t("loading_bio_tabs", "Chargement des biographies…")}</span>
-                    </div>
-                  </>
-                ) : (
-                  <Tabs
-                    value={activeLanguage}
-                    onValueChange={(v) => setActiveLanguage(v as Language)}
-                    className="flex h-full min-h-0 flex-col"
-                  >
-                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
-                      {canShowGenerateBio && (
-                        <>
-                          {artistBios[activeLanguage]?.trim() ? (
-                            <>
-                              {/* Bio existante : 3 actions */}
-                              <Button
-                                type="button"
-                                variant="default"
-                                className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                                onClick={() => void handleGenerateBio()}
-                                disabled={generatingBio || !hasTripleRequired}
-                                title={t("btn_report_error_title", "Regénérer la biographie via l'IA")}
-                              >
-                                {generatingBio ? (
-                                  <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    {t("btn_generating_bio")}
-                                  </>
-                                ) : (
-                                  t("bio_regen")
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="default"
-                                className="h-8 shrink-0 gap-1.5 border border-amber-500 bg-white px-2.5 text-xs font-semibold text-amber-600 shadow-none hover:bg-amber-50"
-                                onClick={() => {
-                                  setArtistBios((prev) => ({ ...prev, [activeLanguage]: "" }));
-                                }}
-                              >
-                                {t("bio_new")}
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="default"
-                              className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
-                              onClick={() => void handleGenerateBio()}
-                              disabled={generatingBio || !hasTripleRequired}
-                            >
-                              {generatingBio ? (
-                                <>
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  {t("btn_generating_bio")}
-                                </>
-                              ) : (
-                                t("btn_generate_bio")
-                              )}
-                            </Button>
-                          )}
-                        </>
-                      )}
-                      <TabsList className="flex h-auto min-h-9 w-auto shrink-0 flex-wrap justify-start gap-1">
-                        {ARTIST_BIO_LANGUAGES.map((lang) => (
-                          <TabsTrigger
-                            key={lang}
-                            value={lang}
-                            type="button"
-                            className="shrink-0 gap-1.5 px-2.5 text-xs sm:text-sm"
-                          >
-                            {lang.toUpperCase()}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-                      <AudioVoiceLangStatus
-                        languages={ARTIST_BIO_LANGUAGES}
-                        text_type="bio"
-                        targetsByLang={bioAudioTargetsByLang}
-                        refreshKey={audioStatusRefreshKey}
-                        className="min-w-0 flex-1 justify-end"
-                      />
-                    </div>
-
-                    <div className="mt-2 h-[115px] w-[540px] shrink-0">
-                      {ARTIST_BIO_LANGUAGES.map((lang) => (
-                        <TabsContent
-                          key={lang}
-                          value={lang}
-                          className="mt-0 h-full data-[state=inactive]:hidden"
-                        >
-                          <Textarea
-                            value={artistBios[lang] ?? ""}
-                            onChange={(e) => {
-                              setArtistBios((prev) => ({ ...prev, [lang]: e.target.value }));
-                            }}
-                            placeholder={t("bio_placeholder_lang", { lang: lang.toUpperCase() })}
-                            disabled={ficheReadOnly}
-                            spellCheck
-                            lang={lang}
-                            className="h-[115px] min-h-[115px] w-[540px] min-w-[540px] resize-none overflow-y-auto p-2 text-xs leading-snug shadow-none"
-                          />
-                        </TabsContent>
-                      ))}
-                    </div>
-                  </Tabs>
-                )}
-                </div>
-
-                <div className="group relative h-40 w-40 shrink-0 self-start overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <div className="group relative mx-auto h-40 w-40 shrink-0 self-start overflow-hidden rounded-xl border border-border/60 bg-muted/30 lg:mx-0">
                   {previewSrc ? (
                     <img src={previewSrc} alt={t("photo_alt_preview")} className="h-full w-full object-cover" />
                   ) : (
@@ -1833,6 +1697,159 @@ export function AddArtistDialog({
                     }}
                   />
                 </div>
+
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                {biosLoading && bioArtistId ? (
+                  <>
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
+                      {canShowGenerateBio && (
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                          onClick={() => void handleGenerateBio()}
+                          disabled={generatingBio || !hasTripleRequired}
+                        >
+                          {generatingBio ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              {t("btn_generating_bio")}
+                            </>
+                          ) : (
+                            t("btn_generate_bio")
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex min-h-0 flex-1 items-center justify-center gap-2 rounded-md border border-border/60 bg-muted/20 text-sm text-muted-foreground">
+                      <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden />
+                      <span>{t("loading_bio_tabs", "Chargement des biographies…")}</span>
+                    </div>
+                  </>
+                ) : (
+                  <Tabs
+                    value={activeLanguage}
+                    onValueChange={(v) => setActiveLanguage(v as Language)}
+                    className="flex h-full min-h-0 flex-col gap-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-medium leading-none">{t("bio_label")}</span>
+                      {canShowGenerateBio && (
+                        <>
+                          {artistBios[activeLanguage]?.trim() ? (
+                            <>
+                              {/* Bio existante : 3 actions */}
+                              <Button
+                                type="button"
+                                variant="default"
+                                className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                                onClick={() => void handleGenerateBio()}
+                                disabled={generatingBio || !hasTripleRequired}
+                                title={t("btn_report_error_title", "Regénérer la biographie via l'IA")}
+                              >
+                                {generatingBio ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    {t("btn_generating_bio")}
+                                  </>
+                                ) : (
+                                  t("bio_regen")
+                                )}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="default"
+                                className="h-8 shrink-0 gap-1.5 border border-amber-500 bg-white px-2.5 text-xs font-semibold text-amber-600 shadow-none hover:bg-amber-50"
+                                onClick={() => {
+                                  setArtistBios((prev) => ({ ...prev, [activeLanguage]: "" }));
+                                }}
+                              >
+                                {t("bio_new")}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="default"
+                              className="h-8 shrink-0 gap-1.5 border border-[#E63946] bg-white px-2.5 text-xs font-semibold text-[#E63946] shadow-none hover:bg-[#ffecef] hover:text-[#c92f3b]"
+                              onClick={() => void handleGenerateBio()}
+                              disabled={generatingBio || !hasTripleRequired}
+                            >
+                              {generatingBio ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  {t("btn_generating_bio")}
+                                </>
+                              ) : (
+                                t("btn_generate_bio")
+                              )}
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="min-h-[115px] w-full">
+                      {ARTIST_BIO_LANGUAGES.map((lang) => (
+                        <TabsContent
+                          key={lang}
+                          value={lang}
+                          className="mt-0 h-full data-[state=inactive]:hidden"
+                        >
+                          <Textarea
+                            value={artistBios[lang] ?? ""}
+                            onChange={(e) => {
+                              setArtistBios((prev) => ({ ...prev, [lang]: e.target.value }));
+                            }}
+                            placeholder={t("bio_placeholder_lang", { lang: lang.toUpperCase() })}
+                            disabled={ficheReadOnly}
+                            spellCheck
+                            lang={lang}
+                            className="h-[115px] min-h-[115px] w-full min-w-0 resize-none overflow-y-auto p-2 text-xs leading-snug shadow-none"
+                          />
+                        </TabsContent>
+                      ))}
+                    </div>
+
+                    <div className="flex w-full min-w-0 flex-col gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground/80">
+                        {t("bio_audio_generated_label")}
+                      </span>
+                      <TabsList className="flex h-auto min-h-9 w-full shrink-0 flex-row flex-wrap justify-start gap-1 p-1 sm:w-max">
+                        {ARTIST_BIO_LANGUAGES.map((lang) => (
+                          <TabsTrigger
+                            key={lang}
+                            value={lang}
+                            type="button"
+                            className="h-7 min-h-7 w-auto shrink-0 justify-center gap-1.5 px-2.5 text-xs sm:w-[5.5rem] sm:px-1 sm:text-sm"
+                          >
+                            {lang.toUpperCase()}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      <AudioVoiceLangStatus
+                        languages={ARTIST_BIO_LANGUAGES}
+                        text_type="bio"
+                        targetsByLang={bioAudioTargetsByLang}
+                        refreshKey={audioStatusRefreshKey}
+                        layout="chips"
+                        hideHeader
+                        hideLangLabel
+                        className="w-full min-w-0 justify-start gap-1 pl-1 sm:hidden"
+                      />
+                      <AudioVoiceLangStatus
+                        languages={ARTIST_BIO_LANGUAGES}
+                        text_type="bio"
+                        targetsByLang={bioAudioTargetsByLang}
+                        refreshKey={audioStatusRefreshKey}
+                        hideHeader
+                        className="hidden w-max min-w-0 items-start justify-start gap-1 pl-1 sm:flex"
+                      />
+                    </div>
+                  </Tabs>
+                )}
+                </div>
               </div>
 
               {checkingDuplicate && (
@@ -1887,11 +1904,13 @@ export function AddArtistDialog({
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-3 sm:contents">
+                <div className="grid grid-cols-[100px_115px] gap-3 sm:contents">
                 <FormField
                   control={form.control}
                   name="country"
                   render={({ field }) => (
-                    <FormItem className="w-[100px] max-w-full justify-self-start space-y-[5px] sm:col-span-1">
+                    <FormItem className="w-full justify-self-start space-y-[5px] sm:col-span-1 sm:w-[100px]">
                       <FormLabel>{t("form_country_label")}</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={ficheReadOnly}>
                         <FormControl>
@@ -1919,7 +1938,7 @@ export function AddArtistDialog({
                   control={form.control}
                   name="postalCode"
                   render={({ field }) => (
-                    <FormItem className="w-[115px] max-w-full justify-self-start space-y-[5px] sm:col-span-2">
+                    <FormItem className="w-full justify-self-start space-y-[5px] sm:col-span-2 sm:w-[115px]">
                       <FormLabel>{t("form_zipcode_label")}</FormLabel>
                       <FormControl>
                         <Input placeholder={postalPlaceholder} {...field} disabled={ficheReadOnly} />
@@ -1928,6 +1947,7 @@ export function AddArtistDialog({
                     </FormItem>
                   )}
                 />
+                </div>
 
                 <FormField
                   control={form.control}
@@ -1942,6 +1962,7 @@ export function AddArtistDialog({
                     </FormItem>
                   )}
                 />
+                </div>
               </div>
               )}
 

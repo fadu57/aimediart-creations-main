@@ -1,5 +1,7 @@
 {
   "page_title": "Künstler",
+  "card_artworks_count_one": "{{count}} registriertes Kunstwerk",
+  "card_artworks_count_other": "{{count}} registrierte Kunstwerke",
   "search_placeholder": "Künstler suchen...",
   "search_clear_aria": "Suche löschen",
   "search_clear_title": "Löschen",
@@ -22,6 +24,7 @@
   "btn_save_changes": "Änderungen speichern",
   "btn_save": "Speichern",
   "bio_label": "Biografie",
+  "bio_audio_generated_label": "SPRACHEN und GENERIERTE AUDIO-STIMMEN",
   "bio_placeholder": "Bearbeitbarer Text nach Generierung oder manueller Eingabe.",
   "required_fields_note": "Pflichtfelder",
   "duplicate_title": "Duplikat erkannt",

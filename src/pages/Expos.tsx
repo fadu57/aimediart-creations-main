@@ -37,6 +37,9 @@ import { jsPDF } from "jspdf";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { QR_CODE_STORAGE_OPTIONS, qrCodePrintOptions } from "@/lib/qrCodeScanFriendly";
 import { formatExpoDate, formatExpoDatesLabel } from "@/lib/expoDates";
+import { EntityCostLabel } from "@/components/EntityCostLabel";
+import { getCostTotalsByExpoIds, resolveEntityCostDisplay } from "@/lib/costs";
+import { getUsdToEurRate } from "@/lib/fxRates";
 
 const EXPO_QR_CACHE_KEY = "aimediart-expo-qr-cache-v1";
 
@@ -239,8 +242,12 @@ const Expos = () => {
   const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [visitorCountByExpoId, setVisitorCountByExpoId] = useState<Record<string, number>>({});
+  const [costByExpoId, setCostByExpoId] = useState<Record<string, number>>({});
+  const [costsReady, setCostsReady] = useState(false);
+  const [usdToEurRate, setUsdToEurRate] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [orgSearchTerm, setOrgSearchTerm] = useState("");
+  const [filteredArtworkCount, setFilteredArtworkCount] = useState<number | null>(null);
   const [descriptionPopup, setDescriptionPopup] = useState<{
     text: string;
     name: string;
@@ -249,6 +256,7 @@ const Expos = () => {
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
   const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useEffectiveAuth();
+  const isGlobalCostViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
   const orgAgencyId =
     userAgencyId?.trim() ||
     (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId?.trim() : "") ||
@@ -337,6 +345,35 @@ const Expos = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!isGlobalCostViewer || rows.length === 0) {
+      setCostByExpoId({});
+      setCostsReady(false);
+      setUsdToEurRate(null);
+      return;
+    }
+    let cancelled = false;
+    setCostsReady(false);
+    void Promise.all([getCostTotalsByExpoIds(rows.map((row) => row.id)), getUsdToEurRate()])
+      .then(([totals, rate]) => {
+        if (!cancelled) {
+          setCostByExpoId(totals);
+          setUsdToEurRate(rate);
+          setCostsReady(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCostByExpoId({});
+          setUsdToEurRate(null);
+          setCostsReady(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rows, isGlobalCostViewer]);
 
   useEffect(() => {
     try {
@@ -480,6 +517,38 @@ const Expos = () => {
     }
     return result;
   }, [sorted, searchTerm, orgSearchTerm, agencyNameById]);
+
+  const filteredExpoRefs = useMemo(() => {
+    const refs = new Set<string>();
+    for (const ex of filteredExpos) {
+      const id = ex.id?.trim();
+      if (id) refs.add(id);
+      const legacy = ex.expo_id?.trim();
+      if (legacy) refs.add(legacy);
+    }
+    return [...refs];
+  }, [filteredExpos]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (filteredExpoRefs.length === 0) {
+        setFilteredArtworkCount(0);
+        return;
+      }
+      const { count, error: countErr } = await supabase
+        .from("artworks")
+        .select("artwork_id", { count: "exact", head: true })
+        .in("artwork_expo_id", filteredExpoRefs)
+        .is("artwork_deleted_at", null);
+      if (cancelled) return;
+      setFilteredArtworkCount(countErr ? 0 : count ?? 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredExpoRefs]);
+
   const scopedExpoLabel = useMemo(() => {
     const scopedId = scope.expoId?.trim() || "";
     if (!scopedId) return "";
@@ -670,7 +739,14 @@ const Expos = () => {
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
           <div className="flex w-full min-w-0 flex-col gap-3 md:max-w-[min(100%,450px)]">
             <div>
-              <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+                {!loading && filteredArtworkCount != null && (
+                  <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                    {t("page.filteredArtworkCount", { count: filteredArtworkCount })}
+                  </span>
+                )}
+              </div>
               {agencyFilter && (
                 <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
               )}
@@ -877,6 +953,19 @@ const Expos = () => {
                   <p className="mt-2 text-sm font-black text-muted-foreground">
                     {t("card.visitorTotal", { count: visitorCountByExpoId[ex.id] ?? 0 })}
                   </p>
+                  {isGlobalCostViewer ? (
+                    <p className="mt-1 text-sm tabular-nums">
+                      <EntityCostLabel
+                        display={resolveEntityCostDisplay(
+                          costsReady ? costByExpoId[ex.id] : undefined,
+                          costsReady,
+                          usdToEurRate,
+                        )}
+                        unavailableLabel={t("card.costUnavailable")}
+                        prefixLabel={t("card.costPrefix")}
+                      />
+                    </p>
+                  ) : null}
                   {(() => {
                     const raw = ex.expo_descript_i18n;
                     if (!raw) return null;

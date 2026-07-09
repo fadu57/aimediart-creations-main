@@ -16,7 +16,9 @@
     "scopeTitle": "Leerer Bereich",
     "scopeDesc": "Geben Sie die für Ihre Rolle erwarteten Agentur-/Ausstellungskennungen ein.",
     "filteredAgency": "Gefiltert nach Agentur {{agencyFilter}}.",
-    "scopedExpoOnly": "Nur Ausstellung {{label}}."
+    "scopedExpoOnly": "Nur Ausstellung {{label}}.",
+    "filteredArtworkCount_one": "{{count}} Kunstwerk",
+    "filteredArtworkCount_other": "{{count}} Kunstwerke"
   },
   "card": {
     "qrGenerate": "QR generieren",
@@ -39,7 +41,9 @@
     "qrConfirmDescription": "Jeder bereits gedruckte oder ausgestellte QR-Code für diese Ausstellung muss ersetzt werden, damit Besucher auf die Kunstwerke zugreifen können.",
     "qrConfirmAction": "Trotzdem neu generieren",
     "qrConfirmCancel": "Abbrechen",
-    "cardVisitors": "Ausstellungsbesucher"
+    "cardVisitors": "Ausstellungsbesucher",
+    "costPrefix": "Gesamtkosten:",
+    "costUnavailable": "Gesamtkosten: Daten nicht verfügbar"
   },
   "panel": {
     "chooseFormat": "Wählen Sie das zu druckende Tabellenformat",
@@ -70,6 +74,31 @@
     "saving": "Speichern…",
     "save": "Speichern",
     "save_changes": "Änderungen speichern",
+    "close": "Schließen",
+    "adjust_emotions": "Expo-Emotionen anpassen",
+    "emotions": {
+      "title": "Emotionen der Ausstellung",
+      "max_active_hint": "Maximal {{count}} Emotionen aktivieren",
+      "max_active": "Maximal {{count}} aktive Emotionen.",
+      "summary_prefix": "{{count}} Emotionen: ",
+      "summary_active": "derzeit {{count}}/{{max}} Emotionen aktiviert",
+      "active_count": "{{count}} / {{max}} aktive Emotionen",
+      "loading": "Emotionen werden geladen…",
+      "empty": "Keine Emotion gefunden.",
+      "load_error": "Emotionen konnten nicht geladen werden.",
+      "save_success": "Emotionen gespeichert.",
+      "save_error": "Speichern der Emotionen fehlgeschlagen.",
+      "add_section_title": "Emotion hinzufügen",
+      "add_icon_label": "Symbol",
+      "add_name_label": "Bezeichnung",
+      "add_name_placeholder": "z. B. Gelassen",
+      "add_active_label": "Aktivieren",
+      "add_button": "Hinzufügen",
+      "add_validation_name": "Bezeichnung ist erforderlich.",
+      "add_validation_icon": "Symbol ist erforderlich.",
+      "pending_badge": "Neu",
+      "remove_pending": "Diese Emotion entfernen"
+    },
     "loading": "Laden…",
     "agency_label": "Organisation",
     "no_agency": "— Keine Organisation —",

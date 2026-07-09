@@ -313,39 +313,140 @@ export default function ExposVisitors() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
+    <div className="mx-auto w-full min-w-0 max-w-[1200px] px-3 py-4 sm:px-4 sm:py-6 space-y-4">
       <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn" onClick={() => navigate("/expos")}>
+        <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn w-full sm:w-auto" onClick={() => navigate("/expos")}>
           {t("visitors.back_to_expos")}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle>
+      <Card className="min-w-0 overflow-hidden">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="min-w-0 text-base leading-snug sm:text-lg">
             {filterExpoId
               ? t("visitors.title_for_expo", { name: expoById.get(filterExpoId) ?? filterExpoId })
               : t("visitors.title_registered")}
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="backoffice-toolbar-outline-btn h-7 gap-1 text-xs" asChild>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+            <Button type="button" variant="outline" size="sm" className="backoffice-toolbar-outline-btn h-8 gap-1 text-xs sm:h-7" asChild>
               <Link to="/visiteurs-corbeille">
                 <ArchiveRestore className="h-3.5 w-3.5" />
                 {t("visitors.trash")}
               </Link>
             </Button>
-            <span className="text-sm text-muted-foreground whitespace-nowrap">
+            <span className="text-sm text-muted-foreground">
               {t("visitors.count", { count: sortedRows.length })}
             </span>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0 p-0 sm:p-6">
           {loading ? (
-            <p className="text-sm text-muted-foreground">{t("visitors.loading")}</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground sm:px-0">{t("visitors.loading")}</p>
           ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="px-4 py-3 text-sm text-destructive sm:px-0">{error}</p>
           ) : (
-            <table className="w-full table-fixed text-sm">
+            <>
+              <div className="space-y-3 border-b border-border p-4 md:hidden">
+                <Input
+                  type="text"
+                  value={filterName}
+                  onChange={(e) => setFilterName(e.target.value)}
+                  placeholder={`${t("visitors.col_name")} — ${t("visitors.filter_placeholder")}`}
+                  className="h-9 text-sm"
+                />
+                <Input
+                  type="text"
+                  value={filterPseudo}
+                  onChange={(e) => setFilterPseudo(e.target.value)}
+                  placeholder={`${t("visitors.col_pseudo")} — ${t("visitors.filter_placeholder")}`}
+                  className="h-9 text-sm"
+                />
+                <select
+                  value={filterExpoFilter}
+                  onChange={(e) => setFilterExpoFilter(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">{t("visitors.all_f")}</option>
+                  {expos.map((e) => (
+                    <option key={e.id} value={e.id}>{e.expo_name ?? e.id}</option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    onClick={openDatePickerOnClick}
+                    title={t("visitors.date_from")}
+                    className="h-9 min-w-0 flex-1 cursor-pointer text-sm [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                  <Input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    onClick={openDatePickerOnClick}
+                    title={t("visitors.date_to")}
+                    className="h-9 min-w-0 flex-1 cursor-pointer text-sm [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4 md:hidden">
+                {sortedRows.map((row) => {
+                  const name   = `${row.first_name || ""} ${row.last_name || ""}`.trim() || "—";
+                  const pseudo = row.pseudo?.trim() || "—";
+                  const expo   = (row.expo_id && expoById.get(row.expo_id)) || "—";
+                  const goDetail = () => navigate(`/expos/visitors/${row.id}?source=${row.source}`);
+                  return (
+                    <div
+                      key={row.id}
+                      className="min-w-0 cursor-pointer space-y-2 rounded-lg border border-border/60 p-3 hover:bg-muted/30"
+                      onClick={goDetail}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium leading-snug" title={name}>{name}</p>
+                          {pseudo !== "—" ? (
+                            <p className="truncate text-xs text-muted-foreground" title={pseudo}>@{pseudo}</p>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            title={t("visitors.col_name")}
+                            onClick={goDetail}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted"
+                          >
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          <button
+                            type="button"
+                            title={t("visitors.delete")}
+                            onClick={() => setDeleteConfirmRow(row)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
+                        <dt className="text-xs text-muted-foreground">{t("visitors.col_email")}</dt>
+                        <dd className="min-w-0 truncate" title={row.email || ""}>{row.email || "—"}</dd>
+                        <dt className="text-xs text-muted-foreground">{t("visitors.col_expo")}</dt>
+                        <dd className="min-w-0 truncate" title={expo}>{expo}</dd>
+                        <dt className="text-xs text-muted-foreground">{t("visitors.col_registration")}</dt>
+                        <dd className="text-xs sm:text-sm">{formatDate(row.created_at)}</dd>
+                      </dl>
+                    </div>
+                  );
+                })}
+                {sortedRows.length === 0 && (
+                  <p className="py-2 text-sm text-muted-foreground">{t("visitors.none")}</p>
+                )}
+              </div>
+
+              <div className="hidden min-w-0 overflow-x-auto md:block">
+            <table className="w-full min-w-[52rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
                   <th className="w-8 px-1 py-1" />
@@ -460,6 +561,8 @@ export default function ExposVisitors() {
                 )}
               </tbody>
             </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

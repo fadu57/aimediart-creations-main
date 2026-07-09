@@ -287,6 +287,12 @@
     "filter_date": "Date",
     "filter_date_mode_day": "Day",
     "filter_date_mode_interval": "Range",
+    "filter_all": "All",
+    "filter_artwork": "Artwork",
+    "filter_expo": "Exhibition",
+    "filter_agency": "Agency",
+    "col_units_in": "Input tokens",
+    "col_units_out": "Output tokens",
     "table_totals_label": "Totals (filters)",
     "manual": {
       "btn_add": "Add a cost",

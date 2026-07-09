@@ -33,10 +33,14 @@ type AudioVoiceLangStatusProps = {
   promptStyleLabels?: Record<string, string>;
   onRetryLang?: (lang: string) => void;
   onCancelLang?: (lang: string) => void | Promise<void>;
-  /** chips = compact en ligne (bios) ; list = une ligne par langue sous le lecteur audio */
-  layout?: "chips" | "list";
+  /** chips = compact en ligne (bios) ; list = une ligne par langue sous le lecteur audio ; rows = une ligne par langue empilée */
+  layout?: "chips" | "list" | "rows";
   /** Affiche toutes les langues passées, y compris sans cible audio (état « — »). */
   showAllLanguages?: boolean;
+  /** Masque le libellé « Voix générées » en tête du bloc. */
+  hideHeader?: boolean;
+  /** Masque le code langue dans chaque puce (utile quand l'onglet est affiché à côté). */
+  hideLangLabel?: boolean;
   className?: string;
 };
 
@@ -151,7 +155,7 @@ function progressLabel(
 
 type LangRowProps = {
   lang: string;
-  layout: "chips" | "list";
+  layout: "chips" | "list" | "rows";
   hasTarget: boolean;
   st: LangVoiceAggregate;
   progress: LangVoiceAggregate["progress"];
@@ -161,6 +165,7 @@ type LangRowProps = {
   canRetry: boolean;
   showBar: boolean;
   percent: number;
+  hideLangLabel?: boolean;
   t: (key: string, opts?: Record<string, unknown>) => string;
   onRetryLang?: (lang: string) => void;
   onCancelLang?: (lang: string) => void | Promise<void>;
@@ -178,11 +183,13 @@ function LangStatusRow({
   canRetry,
   showBar,
   percent,
+  hideLangLabel = false,
   t,
   onRetryLang,
   onCancelLang,
 }: LangRowProps) {
   const langKey = normLang(lang);
+  const compactChip = layout === "chips" && hideLangLabel && !showBar;
 
   const actionButtons = (
     <>
@@ -279,11 +286,38 @@ function LangStatusRow({
   return (
     <span
       key={lang}
-      className="inline-flex min-w-[5.5rem] shrink-0 flex-col gap-0.5 rounded border border-border/50 bg-background/80 px-1.5 py-1"
+      className={cn(
+        "inline-flex shrink-0 gap-0.5 rounded border border-border/50 bg-background/80 px-1.5 py-1",
+        layout === "rows"
+          ? showBar
+            ? "w-full min-w-0 flex-col"
+            : "h-7 min-h-7 w-[130px] shrink-0 items-center"
+          : compactChip
+            ? "w-[35px] flex-col items-center px-1 py-0.5"
+            : "w-[5.5rem] flex-col items-center",
+      )}
     >
+      {compactChip ? (
+        <>
+          <span className={cn("font-medium text-[9px] leading-none", statusClass(st.F))} title={t("audio_voice_status.voice_f")}>
+            F{statusSymbol(st.F)}
+          </span>
+          <span className={cn("font-medium text-[9px] leading-none", statusClass(st.M))} title={t("audio_voice_status.voice_m")}>
+            M{statusSymbol(st.M)}
+          </span>
+          {isWorking ? (
+            <Loader2 className="h-2.5 w-2.5 shrink-0 animate-spin text-amber-600" aria-hidden />
+          ) : null}
+          {actionButtons}
+        </>
+      ) : (
       <span className="inline-flex items-center gap-0.5">
-        <span className="font-semibold text-foreground/90">{lang.toUpperCase()}</span>
-        <span className="text-muted-foreground/50">:</span>
+        {!hideLangLabel ? (
+          <>
+            <span className="font-semibold text-foreground/90">{lang.toUpperCase()}</span>
+            <span className="text-muted-foreground/50">:</span>
+          </>
+        ) : null}
         <span className={cn("font-medium", statusClass(st.F))} title={t("audio_voice_status.voice_f")}>
           F{statusSymbol(st.F)}
         </span>
@@ -295,6 +329,7 @@ function LangStatusRow({
         ) : null}
         {actionButtons}
       </span>
+      )}
       {showBar ? (
         <>
           <Progress
@@ -332,6 +367,8 @@ export function AudioVoiceLangStatus({
   onCancelLang,
   layout = "chips",
   showAllLanguages = false,
+  hideHeader = false,
+  hideLangLabel = false,
   className,
 }: AudioVoiceLangStatusProps) {
   const { t } = useTranslation("artwork_modal");
@@ -403,20 +440,28 @@ export function AudioVoiceLangStatus({
       className={cn(
         layout === "list"
           ? "flex w-full flex-col gap-2"
-          : "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-[10px] leading-tight text-muted-foreground",
+          : layout === "rows"
+            ? "flex min-w-0 flex-1 flex-col gap-1 text-[10px] leading-tight text-muted-foreground"
+            : "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-[10px] leading-tight text-muted-foreground",
         className,
       )}
       aria-label={t("audio_voice_status.aria")}
     >
-      {layout === "list" ? (
+      {!hideHeader && layout === "list" ? (
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">
           {t("audio_voice_status.label")}
         </p>
-      ) : (
-        <span className="shrink-0 font-semibold uppercase tracking-wide text-foreground/80">
+      ) : null}
+      {!hideHeader && layout !== "list" ? (
+        <span
+          className={cn(
+            "shrink-0 font-semibold uppercase tracking-wide text-foreground/80",
+            layout === "rows" && "sr-only",
+          )}
+        >
           {t("audio_voice_status.label")}
         </span>
-      )}
+      ) : null}
 
       {loading && !Object.keys(statusMap).length ? (
         <Loader2
@@ -473,6 +518,7 @@ export function AudioVoiceLangStatus({
             canRetry={!!canRetry}
             showBar={showBar}
             percent={percent}
+            hideLangLabel={hideLangLabel}
             t={t}
             onRetryLang={onRetryLang}
             onCancelLang={onCancelLang}

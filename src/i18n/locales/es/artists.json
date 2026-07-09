@@ -1,5 +1,7 @@
 {
   "page_title": "Artistas",
+  "card_artworks_count_one": "{{count}} obra registrada",
+  "card_artworks_count_other": "{{count}} obras registradas",
   "search_placeholder": "Buscar un artista...",
   "search_clear_aria": "Borrar búsqueda",
   "search_clear_title": "Borrar",
@@ -22,6 +24,7 @@
   "btn_save_changes": "Guardar cambios",
   "btn_save": "Guardar",
   "bio_label": "Biografía",
+  "bio_audio_generated_label": "IDIOMAS y VOCES DE AUDIO GENERADAS",
   "bio_placeholder": "Texto editable después de la generación o entrada manual.",
   "required_fields_note": "Campos obligatorios",
   "duplicate_title": "Duplicado detectado",

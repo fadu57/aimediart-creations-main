@@ -61,6 +61,7 @@ import {
   HORAIRES_VIDE,
   parseExpoHoraires,
 } from "@/components/ExpoHorairesEditor";
+import { ExpoEmotionsDialog } from "@/components/ExpoEmotionsDialog";
 
 type Mode = "create" | "edit";
 
@@ -151,6 +152,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
   const [loadingRow, setLoadingRow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showEmotionsDialog, setShowEmotionsDialog] = useState(false);
   const [showSponsorDialog, setShowSponsorDialog] = useState(false);
   const [agencies, setAgencies] = useState<AgencyOption[]>([]);
   const [agencyOpen, setAgencyOpen] = useState(false);
@@ -593,42 +595,64 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
       }}
     >
       <DialogContent
-        className="max-h-[92vh] w-[96vw] max-w-5xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
+        className="w-[calc(100vw-2rem)] max-h-[min(92dvh,100%)] max-w-5xl overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb]"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
         <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-serif text-xl text-white sm:text-2xl">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="min-w-0 font-serif text-lg text-white sm:text-2xl">
               {mode === "create" ? t("form.title_create") : t("form.title_edit")}
             </h2>
-            <Button
-              type="button"
-              variant="default"
-              className={mode === "edit"
-                ? `h-9 px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] ${
-                    !hasFormChanges ? "invisible pointer-events-none" : ""
-                  }`
-                : "h-9 px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground"}
-              onClick={() => {
-                void handleSave();
-              }}
-              disabled={saving || loadingRow || (mode === "edit" && !hasFormChanges)}
-            >
-              {saving
-                ? t("form.saving")
-                : mode === "create"
-                  ? t("form.save")
-                  : t("form.save_changes")}
-            </Button>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+              {mode === "edit" && expoId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEmotionsDialog(true)}
+                  disabled={saving || loadingRow}
+                  className="h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] sm:w-auto"
+                >
+                  {t("form.adjust_emotions")}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={requestClose}
+                disabled={saving || loadingRow}
+                className="h-9 w-full px-3 text-sm border border-white/70 bg-transparent text-white hover:bg-white/10 sm:w-auto"
+              >
+                {t("form.close")}
+              </Button>
+              <Button
+                type="button"
+                variant="default"
+                className={mode === "edit"
+                  ? `h-9 w-full px-3 text-sm border border-white bg-white text-[#E63946] font-semibold hover:bg-[#ffecef] hover:text-[#c92f3b] sm:w-auto ${
+                      !hasFormChanges ? "invisible pointer-events-none" : ""
+                    }`
+                  : "h-9 w-full px-3 text-sm gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"}
+                onClick={() => {
+                  void handleSave();
+                }}
+                disabled={saving || loadingRow || (mode === "edit" && !hasFormChanges)}
+              >
+                {saving
+                  ? t("form.saving")
+                  : mode === "create"
+                    ? t("form.save")
+                    : t("form.save_changes")}
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="px-4 sm:px-5 pt-3 pb-4">
+        <div className="min-w-0 px-4 sm:px-5 pt-3 pb-4">
           {loadingRow ? (
             <p className="text-sm text-muted-foreground py-6">{t("form.loading")}</p>
           ) : (
-            <div className="grid gap-3 py-1">
+            <div className="grid min-w-0 gap-3 py-1">
 
               {/* Sélecteur d'agence — admins globaux uniquement (role_id < 4) */}
               {canPickAgency && (
@@ -768,8 +792,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 const nameV = values["expo_name"] ?? "";
                 const dateKeys = ["date_expo_du", "date_expo_au"] as const;
                 return (
-                  <div key="name-dates" className="flex gap-3 items-end">
-                    <div className="space-y-1.5 flex-1 min-w-0">
+                  <div key="name-dates" className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1 space-y-1.5">
                       <Label htmlFor="expo-field-expo_name" className="text-xs font-medium">
                         {fieldLabel("expo_name")}
                       </Label>
@@ -788,7 +812,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       const dHidden = mode === "create" && skipKeyOnInsert(dk);
                       if (dHidden) return null;
                       return (
-                        <div key={dk} className="space-y-1.5 w-[130px] shrink-0">
+                        <div key={dk} className="w-full min-w-0 space-y-1.5 sm:w-[130px] sm:shrink-0">
                           <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
                             {fieldLabel(dk)}
                           </Label>
@@ -798,7 +822,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             type="date"
                             value={dv ? dv.slice(0, 10) : ""}
                             readOnly={dReadonly || !canEditFields}
-                            className={cn("shadow-none w-[130px] px-0", dReadonly ? "bg-muted/50" : "")}
+                            className={cn("w-full shadow-none sm:w-[130px] sm:px-0", dReadonly ? "bg-muted/50" : "")}
                             onChange={(e) => setValues((prev) => ({ ...prev, [dk]: e.target.value }))}
                           />
                         </div>
@@ -812,14 +836,14 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               if (key === "date_expo_du" && sortedKeys.includes("date_expo_au")) {
                 const dateKeys = ["date_expo_du", "date_expo_au"] as const;
                 return (
-                  <div key="date-range" className="flex gap-3 items-end">
+                  <div key="date-range" className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     {dateKeys.map((dk) => {
                       const dv = values[dk] ?? "";
                       const dReadonly = isReadonlyExpoKey(dk, mode);
                       const dHidden = mode === "create" && skipKeyOnInsert(dk);
                       if (dHidden) return null;
                       return (
-                        <div key={dk} className="space-y-1.5 w-[130px]">
+                        <div key={dk} className="w-full min-w-0 space-y-1.5 sm:w-[130px]">
                           <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
                             {fieldLabel(dk)}
                           </Label>
@@ -829,7 +853,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             type="date"
                             value={dv ? dv.slice(0, 10) : ""}
                             readOnly={dReadonly || !canEditFields}
-                            className={cn("shadow-none w-[130px] px-0", dReadonly ? "bg-muted/50" : "")}
+                            className={cn("w-full shadow-none sm:w-[130px] sm:px-0", dReadonly ? "bg-muted/50" : "")}
                             onChange={(e) => setValues((prev) => ({ ...prev, [dk]: e.target.value }))}
                           />
                         </div>
@@ -849,8 +873,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 const zipRo = isReadonlyExpoKey("zip_expo", mode);
                 const cityRo = isReadonlyExpoKey("city_expo", mode);
                 return (
-                  <div key="zip-city" className="flex gap-3 items-end">
-                    <div className="space-y-1.5 w-[150px] shrink-0">
+                  <div key="zip-city" className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="w-full min-w-0 space-y-1.5 sm:w-[150px] sm:shrink-0">
                       <Label htmlFor="expo-field-zip_expo" className="text-xs font-medium">
                         {fieldLabel("zip_expo")}
                       </Label>
@@ -890,7 +914,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 const refRo = isReadonlyExpoKey("ref_expo", mode);
                 const telRo = isReadonlyExpoKey("tel_ref_expo", mode);
                 return (
-                  <div key="ref-tel" className="flex gap-3 items-end">
+                  <div key="ref-tel" className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <Label htmlFor="expo-field-ref_expo" className="text-xs font-medium">
                         {fieldLabel("ref_expo")}
@@ -934,7 +958,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   .join("/");
                 return (
                   <div key={key} className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <Label htmlFor="expo-field-expo_descript_i18n" className="text-xs font-medium">
                         {fieldLabel(key)}
                         <span className="ml-1.5 text-[10px] font-normal uppercase text-muted-foreground">
@@ -1013,8 +1037,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                     <Label htmlFor={`expo-field-${key}`} className="text-xs font-medium">
                       {fieldLabel(key)}
                     </Label>
-                    <div className="flex items-start gap-4">
-                      <div className="w-[150px] shrink-0 space-y-2">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                      <div className="mx-auto w-full max-w-[150px] shrink-0 space-y-2 lg:mx-0">
                         {(previewUrl || showStoredLogo) && (
                           <img
                             src={logoSrc}
@@ -1049,8 +1073,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                         />
                       </div>
                       {/* Navigation + lieu — à droite du logo, côte à côte */}
-                      <div className="flex min-w-0 flex-1 items-start gap-6">
-                        <div className="shrink-0 space-y-2 w-[270px]">
+                      <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
+                        <div className="w-full min-w-0 shrink-0 space-y-2 lg:w-[270px]">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             {t("form.navTypeLabel")}
                           </p>
@@ -1081,7 +1105,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                             </label>
                           </div>
                         </div>
-                        <div className="shrink-0 space-y-2 w-[350px]">
+                        <div className="w-full min-w-0 shrink-0 space-y-2 lg:w-[350px]">
                           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                             {t("form.venueTypeLabel")}
                           </p>
@@ -1120,7 +1144,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               }
 
               return (
-                <div key={key} className={cn("space-y-1.5", isDatePicker && "w-[150px]")}>
+                <div key={key} className={cn("min-w-0 space-y-1.5", isDatePicker && "w-full sm:w-[150px]")}>
                   <Label htmlFor={`expo-field-${key}`} className="text-xs font-medium">
                     {fieldLabel(key)}
                     {key === "id" && mode === "create" && (
@@ -1168,8 +1192,8 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
 
           {/* Horaires d'ouverture + Sponsors côte-à-côte */}
           {!loadingRow && (
-            <div className="pt-3 border-t border-border mt-1 flex items-start gap-6">
-              <div className="space-y-1.5 w-[350px] shrink-0">
+            <div className="mt-1 flex flex-col gap-4 border-t border-border pt-3 lg:flex-row lg:items-start lg:gap-6">
+              <div className="w-full min-w-0 space-y-1.5 lg:w-[350px] lg:shrink-0">
                 <Label className="text-xs font-medium">{t("form.opening_hours")}</Label>
                 <ExpoHorairesEditor
                   value={horaires}
@@ -1267,6 +1291,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ExpoEmotionsDialog open={showEmotionsDialog} onOpenChange={setShowEmotionsDialog} />
     </Dialog>
   );
 }

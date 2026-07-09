@@ -78,7 +78,7 @@ export function VisitorGeographySection({
   const showMap = mappableCount > 0;
   const mapScopeWithFilters = `${mapScopeKey}|v:${showVisitors ? 1 : 0}|o:${showOrganizers ? 1 : 0}`;
   const mapFallback = (
-    <div className="flex h-[420px] items-center justify-center rounded-lg bg-muted/40 text-sm text-muted-foreground">
+    <div className="flex h-[min(52vw,280px)] min-h-[220px] items-center justify-center rounded-lg bg-muted/40 text-sm text-muted-foreground sm:h-[420px]">
       {loading || geocoding ? (
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -96,11 +96,11 @@ export function VisitorGeographySection({
 
   return (
     <Card id="statistics-geography" className="glass-card scroll-mt-24 min-w-0 overflow-hidden">
-      <CardHeader>
+      <CardHeader className="p-4 sm:p-6">
         <CardTitle className="text-lg">{t("geography.title")}</CardTitle>
         <p className="text-xs leading-relaxed text-muted-foreground">{t("geography.disclaimer")}</p>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="min-w-0 space-y-5 p-4 pt-0 sm:p-6 sm:pt-0">
         {error ? (
           <p className="py-6 text-center text-sm text-muted-foreground">{error}</p>
         ) : loading ? (
@@ -112,7 +112,7 @@ export function VisitorGeographySection({
           <p className="py-6 text-center text-sm text-muted-foreground">{t("geography.empty")}</p>
         ) : (
           <>
-            <div className="relative overflow-hidden rounded-lg border border-border/60">
+            <div className="relative h-[280px] overflow-hidden rounded-lg border border-border/60 sm:h-[420px]">
               <MapErrorBoundary resetKey={mapScopeKey} fallback={mapFallback}>
                 <ClientOnly fallback={mapFallback}>
                   <Suspense fallback={mapFallback}>
@@ -173,7 +173,55 @@ export function VisitorGeographySection({
                 ) : null}
               </div>
             </div>
-            <div className="min-w-0 overflow-x-auto">
+            <div className="min-w-0 overflow-x-auto md:hidden">
+              <div className="space-y-3">
+                {visibleRows.map((row) => (
+                  <div key={`${row.visitorKey}-mobile`} className="rounded-lg border border-border/60 p-3 space-y-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-1">
+                        {row.avatarUrl ? (
+                          <ImageWithSkeleton
+                            src={row.avatarUrl}
+                            alt={row.pseudo || row.label}
+                            className="h-8 w-8 shrink-0 rounded-full object-cover"
+                          />
+                        ) : !row.selfieUrl ? (
+                          <div className="h-8 w-8 shrink-0 rounded-full bg-muted" aria-hidden />
+                        ) : null}
+                        {row.selfieUrl && row.selfieUrl !== row.avatarUrl ? (
+                          <ImageWithSkeleton
+                            src={row.selfieUrl}
+                            alt={`${row.pseudo || row.label} — selfie`}
+                            className="h-8 w-8 shrink-0 rounded-md object-cover"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{row.label}</p>
+                        {row.pseudo ? (
+                          <p className="truncate text-xs text-muted-foreground">{row.pseudo}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <dl className="grid grid-cols-1 gap-1 text-xs min-[360px]:grid-cols-2">
+                      <div>
+                        <dt className="text-muted-foreground">{t("geography.colCity")}</dt>
+                        <dd>{row.city || "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">{t("geography.colCountry")}</dt>
+                        <dd>{row.country || "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">{t("geography.colRegion")}</dt>
+                        <dd>{row.region || "—"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="hidden min-w-0 overflow-x-auto md:block">
               <table className="w-full min-w-[40rem] text-xs leading-tight">
                 <thead>
                   <tr className="border-b border-border">
@@ -182,7 +230,6 @@ export function VisitorGeographySection({
                     <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">{t("geography.colCity")}</th>
                     <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">{t("geography.colCountry")}</th>
                     <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">{t("geography.colRegion")}</th>
-                    <th className="px-1.5 py-1 text-left font-medium text-muted-foreground">{t("geography.colSource")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -215,9 +262,6 @@ export function VisitorGeographySection({
                       <td className="px-1.5 py-1">{row.city || "—"}</td>
                       <td className="px-1.5 py-1">{row.country || "—"}</td>
                       <td className="px-1.5 py-1">{row.region || "—"}</td>
-                      <td className="px-1.5 py-1 text-muted-foreground">
-                        {t(`geography.sources.${row.source}`)}
-                      </td>
                     </tr>
                   ))}
                 </tbody>

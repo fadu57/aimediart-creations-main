@@ -23,6 +23,8 @@ export type GenerateMediationParams = {
   styles: MediationStyleRequest[];
   /** Langue cible des textes générés. Si omis, utilise la langue active de l'interface. */
   lang?: string;
+  /** UUID œuvre — pour lier la consommation IA dans ai_usage_logs. */
+  artworkId?: string;
 };
 
 export type AiJobType = "generate_fiche" | "translate_fiche";
@@ -170,6 +172,7 @@ export async function generateMediation(params: GenerateMediationParams): Promis
     source_text: params.sourceText,
     styles: params.styles,
     lang: params.lang ?? i18n.language ?? "fr",
+    ...(params.artworkId?.trim() ? { artwork_id: params.artworkId.trim() } : {}),
   };
 
   const { data, error } = await supabase.functions.invoke("generate-mediation", {

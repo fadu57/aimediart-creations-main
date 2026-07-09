@@ -1937,7 +1937,7 @@ export function ArtworkModal({
       };
 
       const { stylesById, analyseGlobale } = await runWithMediationSubProgress(
-        () => generatePersonasBatchWithRetry(sourceText, stylesToRun, lang),
+        () => generatePersonasBatchWithRetry(sourceText, stylesToRun, lang, persistedArtworkId || undefined),
         updateStepProgress,
       );
       if (lang === mediationPrimaryLang && analyseGlobale) {
@@ -2073,7 +2073,7 @@ export function ArtworkModal({
         };
 
         const { stylesById, analyseGlobale } = await runWithMediationSubProgress(
-          () => generatePersonasBatchWithRetry(sourceText, stylesPayload, lang),
+          () => generatePersonasBatchWithRetry(sourceText, stylesPayload, lang, persistedArtworkId || undefined),
           updateStepProgress,
         );
         if (lang === mediationPrimaryLang && analyseGlobale) {
@@ -2207,6 +2207,7 @@ export function ArtworkModal({
               sourceText,
               styles: stylesPayload,
               lang,
+              artworkId: persistedArtworkId || undefined,
             }),
           updateLangProgress,
         );

@@ -1,5 +1,9 @@
 {
   "page_title": "Artwork",
+  "filtered_count_one": "{{count}} artwork",
+  "filtered_count_other": "{{count}} artworks",
+  "filter_label_artworks": "Artworks",
+  "filter_label_expo": "Expos",
   "search_placeholder": "Search for an artwork...",
   "search_clear_aria": "Clear search",
   "expo_filter_placeholder": "Filter by exhibition",
@@ -96,6 +100,8 @@
   "badge_ia_voice_generating_partial": "Generated voices: {{ready}}/{{expected}} · in progress ({{langs}})",
   "badge_ia_voice_open_aria": "Open generated voices tracking",
   "badge_ia_voice_generating_aria": "Voice generation in progress — open tracking",
+  "badge_artwork_cost_prefix": "Total cost:",
+  "badge_artwork_cost_unavailable": "Total cost: data unavailable",
   "scope_agency_hint": "Agency {{agencyId}} exhibitions.",
   "scope_expo_hint": "Exhibition {{expoId}} only.",
   "status_empty": "empty",

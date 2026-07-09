@@ -528,10 +528,10 @@ const Dashboard = () => {
       {!loading && (
         <>
           {/* Grille principale : profil + abonnement */}
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2">
             {/* Profil */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3">
+            <Card className="glass-card min-w-0 overflow-hidden">
+              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-gold" />
@@ -551,7 +551,7 @@ const Dashboard = () => {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-5">
+              <CardContent className="space-y-5 p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="flex items-start gap-4">
                   {profileUserId ? (
                     <div className="relative flex h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-border bg-muted/30">
@@ -672,8 +672,8 @@ const Dashboard = () => {
             {showGlobalCommercialTermsCard ? (
               <DashboardGrantedCommercialTermsCard />
             ) : (
-            <Card className="glass-card">
-              <CardHeader className="pb-3">
+            <Card className="glass-card min-w-0 overflow-hidden">
+              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <CardTitle className="text-xl flex shrink-0 items-center gap-2">
                     <CreditCard className="h-5 w-5 text-gold" />
@@ -694,7 +694,7 @@ const Dashboard = () => {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="min-w-0 space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
                 {!profileAgencyId && isGlobalAdmin && isViewingSelf ? (
                   <p className="text-sm text-muted-foreground py-4">
                     {t("subscription.global_admin_no_sub")}
@@ -847,9 +847,9 @@ const Dashboard = () => {
                           ) : null}
                           <dl className="grid gap-2 pt-2">
                             <div className="flex flex-col gap-0.5">
-                              <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">{t("subscription.artworks_created")}</dt>
-                                <dd className="font-medium text-right">
+                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                <dt className="min-w-0 text-muted-foreground">{t("subscription.artworks_created")}</dt>
+                                <dd className="font-medium sm:text-right">
                                   {formatUsageRatio(
                                     teamStats.artworks_count,
                                     subscription?.max_oeuvres,
@@ -867,9 +867,9 @@ const Dashboard = () => {
                               ) : null}
                             </div>
                             <div className="flex flex-col gap-0.5">
-                              <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">{t("subscription.visitors_this_month")}</dt>
-                                <dd className="font-medium text-right">
+                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                <dt className="min-w-0 text-muted-foreground">{t("subscription.visitors_this_month")}</dt>
+                                <dd className="font-medium sm:text-right">
                                   {formatUsageRatio(
                                     teamStats.visitors_this_month,
                                     subscription?.max_visitors,
@@ -886,9 +886,9 @@ const Dashboard = () => {
                                 </p>
                               ) : null}
                             </div>
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">{t("subscription.mediation_langs")}</dt>
-                              <dd className="font-medium text-right">
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <dt className="min-w-0 text-muted-foreground">{t("subscription.mediation_langs")}</dt>
+                              <dd className="font-medium sm:text-right">
                                 {formatLangRange(
                                   subscription?.included_mediation_langs_min,
                                   subscription?.included_mediation_langs_max,
@@ -896,25 +896,25 @@ const Dashboard = () => {
                                 )}
                               </dd>
                             </div>
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-muted-foreground">{t("subscription.audio_langs")}</dt>
-                              <dd className="font-medium text-right">
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                              <dt className="min-w-0 text-muted-foreground">{t("subscription.audio_langs")}</dt>
+                              <dd className="font-medium sm:text-right">
                                 {subscription?.included_audio_langs ?? "—"}
                               </dd>
                             </div>
                             {subscription?.standby_monthly_price_eur != null ? (
-                              <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">{t("subscription.standby_price")}</dt>
-                                <dd className="font-medium text-right">
+                              <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                <dt className="min-w-0 text-muted-foreground">{t("subscription.standby_price")}</dt>
+                                <dd className="font-medium sm:text-right">
                                   {formatEur(subscription.standby_monthly_price_eur, t)}{t("subscription.per_month_suffix")}
                                 </dd>
                               </div>
                             ) : null}
                             {subscription?.source === "organisation" ? (
                               <>
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <dt className="text-muted-foreground">{t("subscription.standby_mode")}</dt>
-                                  <dd className="flex flex-wrap items-center justify-end gap-2 font-medium text-right">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+                                  <dt className="min-w-0 text-muted-foreground">{t("subscription.standby_mode")}</dt>
+                                  <dd className="flex flex-wrap items-center justify-start gap-2 font-medium sm:justify-end sm:text-right">
                                     <span>{standbyStatusLabel(subscription.standby_status, t)}</span>
                                     {standbyState.can_request_standby &&
                                     standbyPlanCode &&
@@ -936,25 +936,25 @@ const Dashboard = () => {
                                   </dd>
                                 </div>
                                 {subscription.standby_requested_at ? (
-                                  <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">{t("subscription.standby_request")}</dt>
-                                    <dd className="font-medium text-right">
+                                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                    <dt className="min-w-0 text-muted-foreground">{t("subscription.standby_request")}</dt>
+                                    <dd className="font-medium sm:text-right">
                                       {formatDateFr(subscription.standby_requested_at)}
                                     </dd>
                                   </div>
                                 ) : null}
                                 {subscription.standby_cancel_deadline_at ? (
-                                  <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">{t("subscription.standby_cancel_until")}</dt>
-                                    <dd className="font-medium text-right">
+                                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                    <dt className="min-w-0 text-muted-foreground">{t("subscription.standby_cancel_until")}</dt>
+                                    <dd className="font-medium sm:text-right">
                                       {formatDateFr(subscription.standby_cancel_deadline_at)}
                                     </dd>
                                   </div>
                                 ) : null}
                                 {subscription.standby_started_at ? (
-                                  <div className="flex justify-between gap-3">
-                                    <dt className="text-muted-foreground">{t("subscription.standby_effective_since")}</dt>
-                                    <dd className="font-medium text-right">
+                                  <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                    <dt className="min-w-0 text-muted-foreground">{t("subscription.standby_effective_since")}</dt>
+                                    <dd className="font-medium sm:text-right">
                                       {formatDateFr(subscription.standby_started_at)}
                                     </dd>
                                   </div>
@@ -983,17 +983,17 @@ const Dashboard = () => {
                     {!isEtincelleSubscription && (subscription?.next_renewal_at || subscription?.expires_at) && (
                       <div className="space-y-2">
                         {subscription.next_renewal_at ? (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">{t("subscription.next_due")}</span>
-                            <span className="font-medium">{formatDateFr(subscription.next_renewal_at)}</span>
+                          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <span className="min-w-0 text-muted-foreground">{t("subscription.next_due")}</span>
+                            <span className="font-medium sm:text-right">{formatDateFr(subscription.next_renewal_at)}</span>
                           </div>
                         ) : null}
                         {subscription.expires_at ? (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">
+                          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <span className="min-w-0 text-muted-foreground">
                               {subscription.is_trial ? t("subscription.trial_end") : t("subscription.period_end")}
                             </span>
-                            <span className="font-medium">{formatDateFr(subscription.expires_at)}</span>
+                            <span className="font-medium sm:text-right">{formatDateFr(subscription.expires_at)}</span>
                           </div>
                         ) : null}
                         {subscription.days_remaining != null && (
@@ -1022,7 +1022,7 @@ const Dashboard = () => {
           </div>
 
           {/* Stats équipe + actions rapides */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label={t("stat_cards.team_members")}
               value={teamMembersCount}
@@ -1053,7 +1053,7 @@ const Dashboard = () => {
                   <span className="text-sm font-normal text-muted-foreground">({teamMembers.length})</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="min-w-0">
+              <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
                 <DashboardTeamMembersTable
                   members={teamMembers}
                   expoOptions={agencyExpos}
@@ -1073,9 +1073,9 @@ const Dashboard = () => {
           )}
 
           {/* Création utilisateur + liens rapides */}
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-2">
             {showCreateUser && (
-              <Card className="glass-card">
+              <Card className="glass-card min-w-0 overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserPlus className="h-5 w-5 text-gold" />
@@ -1158,7 +1158,7 @@ const Dashboard = () => {
             )}
 
             {quickLinks.length > 0 && (
-              <Card className="glass-card">
+              <Card className="glass-card min-w-0 overflow-hidden">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-xl">{t("quick_links.title")}</CardTitle>
                 </CardHeader>
@@ -1304,15 +1304,15 @@ function StatCard({
 
   if (href) {
     return (
-      <Link to={href} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <Card className="glass-card cursor-pointer hover:shadow-lg transition-shadow h-full">{inner}</Card>
+      <Link to={href} className="block min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Card className="glass-card h-full min-w-0 cursor-pointer overflow-hidden transition-shadow hover:shadow-lg">{inner}</Card>
       </Link>
     );
   }
 
   return (
     <Card
-      className={`glass-card ${clickable ? "cursor-pointer hover:shadow-lg transition-shadow" : ""}`}
+      className={`glass-card min-w-0 overflow-hidden ${clickable ? "cursor-pointer hover:shadow-lg transition-shadow" : ""}`}
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       onClick={clickable ? onClick : undefined}

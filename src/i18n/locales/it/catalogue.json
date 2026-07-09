@@ -1,5 +1,9 @@
 {
   "page_title": "Opera",
+  "filtered_count_one": "{{count}} opera",
+  "filtered_count_other": "{{count}} opere",
+  "filter_label_artworks": "Opere",
+  "filter_label_expo": "Expos",
   "search_placeholder": "Cerca un'opera...",
   "search_clear_aria": "Cancella ricerca",
   "expo_filter_placeholder": "Filtra per esposizione",
@@ -96,6 +100,8 @@
   "badge_ia_voice_generating_partial": "Voci generate: {{ready}}/{{expected}} · in corso ({{langs}})",
   "badge_ia_voice_open_aria": "Apri monitoraggio voci generate",
   "badge_ia_voice_generating_aria": "Generazione voci in corso — apri monitoraggio",
+  "badge_artwork_cost_prefix": "Costo totale:",
+  "badge_artwork_cost_unavailable": "Costo totale: dati non disponibili",
   "scope_agency_hint": "Esposizioni dell'agenzia {{agencyId}}.",
   "scope_expo_hint": "Solo esposizione {{expoId}}.",
   "status_empty": "vuoto",

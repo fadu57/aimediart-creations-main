@@ -34,6 +34,7 @@ type EmotionRow = {
   emotion_name?: string | null;
   label?: string | null;
   libelle?: string | null;
+  is_active?: boolean | null;
 };
 
 type ArtistRow = {
@@ -282,7 +283,8 @@ const Oeuvre = () => {
       if (error) {
         setEmotions([]);
       } else {
-        setEmotions((data as EmotionRow[]) ?? []);
+        const rows = (data as EmotionRow[]) ?? [];
+        setEmotions(rows.filter((row) => Boolean(row.is_active)));
       }
       setEmotionsLoading(false);
     };

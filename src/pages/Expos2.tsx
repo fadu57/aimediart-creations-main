@@ -201,26 +201,26 @@ export default function Expos2() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 py-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" onClick={() => navigate("/expos")}>
+    <div className="mx-auto w-full min-w-0 max-w-[1200px] px-3 py-4 sm:px-4 sm:py-6 space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => navigate("/expos")}>
           {t("tableau.back")}
         </Button>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" asChild>
-            <Link to="/expos/visitors" className="inline-flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link to="/expos/visitors" className="inline-flex items-center justify-center gap-2">
               Visiteurs inscrits
             </Link>
           </Button>
-          <Button type="button" variant="outline" asChild>
-            <Link to="/expos-corbeille" className="inline-flex items-center gap-2">
+          <Button type="button" variant="outline" className="w-full sm:w-auto" asChild>
+            <Link to="/expos-corbeille" className="inline-flex items-center justify-center gap-2">
               <ArchiveRestore className="h-4 w-4" /> {t("tableau.corbeille")}
             </Link>
           </Button>
         </div>
       </div>
 
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <CardTitle>{t("tableau.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
@@ -250,13 +250,63 @@ export default function Expos2() {
             </datalist>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0 p-0 sm:p-6">
           {loading ? (
-            <p className="text-sm text-muted-foreground">{t("tableau.loading")}</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground sm:px-0">{t("tableau.loading")}</p>
           ) : error ? (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="px-4 py-3 text-sm text-destructive sm:px-0">{error}</p>
           ) : (
-            <table className="w-full table-fixed text-sm">
+            <>
+              <div className="space-y-3 p-4 md:hidden">
+                {sortedRows.map((row) => {
+                  const agency = (row.agency_id && agencyById.get(row.agency_id)) || "—";
+                  const curatorFirstname = row.curator_fistname || row.curator_firstname || "";
+                  const curator = `${curatorFirstname} ${row.curator_name || ""}`.trim() || "—";
+                  return (
+                    <div
+                      key={row.id}
+                      className="min-w-0 cursor-pointer space-y-2 rounded-lg border border-border/60 p-3 hover:bg-muted/30"
+                      onClick={() => navigate(`/expos?expo=${encodeURIComponent(row.id)}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 font-medium leading-snug" title={row.expo_name || row.id}>
+                          {row.expo_name || row.id}
+                        </p>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8 shrink-0 text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setArchiveTarget(row);
+                          }}
+                          aria-label={t("tableau.archiveAriaLabel")}
+                          title={t("tableau.archiveTitle")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
+                        <dt className="text-xs text-muted-foreground">{t("tableau.colOrganisation")}</dt>
+                        <dd className="min-w-0 truncate" title={agency}>{agency}</dd>
+                        <dt className="text-xs text-muted-foreground">{t("tableau.colCommissaire")}</dt>
+                        <dd className="min-w-0 truncate" title={curator}>{curator}</dd>
+                        <dt className="text-xs text-muted-foreground">{t("tableau.colDu")}</dt>
+                        <dd>{formatDate(row.date_expo_du)}</dd>
+                        <dt className="text-xs text-muted-foreground">{t("tableau.colAu")}</dt>
+                        <dd>{formatDate(row.date_expo_au)}</dd>
+                      </dl>
+                    </div>
+                  );
+                })}
+                {sortedRows.length === 0 && (
+                  <p className="py-2 text-sm text-muted-foreground">{t("tableau.empty")}</p>
+                )}
+              </div>
+
+              <div className="hidden min-w-0 overflow-x-auto md:block">
+            <table className="w-full min-w-[48rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
                   <th className="w-64 px-2 py-1">{t("tableau.colExposition")} <SortButtons column="expo_name" /></th>
@@ -311,6 +361,8 @@ export default function Expos2() {
                 )}
               </tbody>
             </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

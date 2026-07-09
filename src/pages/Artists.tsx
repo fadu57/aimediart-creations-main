@@ -55,6 +55,7 @@ const Artists = () => {
   const canAddArtist = !authLoading && canCreateArtist(role_name);
 
   const [artists, setArtists] = useState<ArtistRow[] | null>([]);
+  const [artworkCountByArtist, setArtworkCountByArtist] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -97,8 +98,25 @@ const Artists = () => {
       if (fetchError) {
         setError(fetchError.message);
         setArtists([]);
+        setArtworkCountByArtist({});
       } else {
         setArtists((data as ArtistRow[] | null) ?? []);
+
+        const { data: artworkRows, error: artworkCountError } = await supabase
+          .from("artworks")
+          .select("artwork_artist_id")
+          .is("deleted_at", null);
+
+        if (artworkCountError) {
+          setArtworkCountByArtist({});
+        } else {
+          const counts: Record<string, number> = {};
+          for (const row of artworkRows ?? []) {
+            const artistId = (row as { artwork_artist_id?: string | null }).artwork_artist_id;
+            if (artistId) counts[artistId] = (counts[artistId] ?? 0) + 1;
+          }
+          setArtworkCountByArtist(counts);
+        }
       }
       setLoading(false);
     } catch (e) {
@@ -299,6 +317,9 @@ const Artists = () => {
                     {typLine ? (
                       <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{typLine}</p>
                     ) : null}
+                    <p className="text-sm text-muted-foreground mt-0.5 leading-snug tabular-nums">
+                      {t("card_artworks_count", { count: artworkCountByArtist[artist.artist_id] ?? 0 })}
+                    </p>
                   </div>
                 </Link>
                 {artist.artist_vivant !== false && missingFields.length > 0 ? (
