@@ -258,7 +258,8 @@ const Expos = () => {
   } | null>(null);
   const popupOpenedRef = useRef(false);
   const { scope, loading: authLoading } = useDataScope();
-  const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name } = useEffectiveAuth();
+  const { role_id, agency_id: userAgencyId, expo_id: userExpoId, role_name, hasGlobalStaffRole } =
+    useEffectiveAuth();
   const isGlobalCostViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
   const orgAgencyId =
     userAgencyId?.trim() ||
@@ -616,14 +617,16 @@ const Expos = () => {
   const canCreateExpo = canCreateExpoByRole && !orgPlanLimits?.isEtincelle;
 
   const canEditExpo = (ex: ExpoRow) => {
-    if ((typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name)) return true;
+    if (hasGlobalStaffRole || hasFullDataAccess(role_name)) return true;
+    if (typeof role_id === "number" && role_id >= 1 && role_id <= 3) return true;
     const linked = ex.agency_id ?? null;
     if (userAgencyId && linked === userAgencyId && role_id === 4) return true;
     if (userExpoId && userExpoId === ex.id && (role_id === 5 || role_id === 6)) return true;
     return false;
   };
 
-  const canOpenDiaryPicker = role_id === 1;
+  /** Carnet visiteur : staff global (toutes expos) ou rôles métier sur leur périmètre. */
+  const canViewExpoTravelDiary = (ex: ExpoRow) => canEditExpo(ex);
 
   const openCreate = () => {
     setFormMode("create");
@@ -1069,7 +1072,7 @@ const Expos = () => {
                   })()}
                 </div>
                 <div className="flex w-full min-w-0 flex-col gap-2 md:w-[190px] md:shrink-0">
-                  {canOpenDiaryPicker ? (
+                  {canViewExpoTravelDiary(ex) ? (
                     <Button
                       type="button"
                       variant="outline"

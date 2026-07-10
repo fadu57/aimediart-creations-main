@@ -26,8 +26,8 @@ export default function Summary() {
   const [diary, setDiary] = useState<TravelDiaryPackage | null>(null);
   const [profileNames, setProfileNames] = useState<{ first: string; last: string }>({ first: "", last: "" });
 
-  const isGlobalAdmin = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
-  const canAccessAsAdmin = isAdminPreview && isGlobalAdmin && Boolean(visitorIdParam);
+  const isBackofficeDiaryViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 6;
+  const canAccessAsAdmin = isAdminPreview && isBackofficeDiaryViewer && Boolean(visitorIdParam);
 
   const visitorAllowed = useMemo(() => isDiaryUnlocked(expoId), [expoId]);
 
