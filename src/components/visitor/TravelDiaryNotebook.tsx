@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, createContext, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -92,8 +92,53 @@ function CrossTable({
   );
 }
 
+type DiaryNavContextValue = {
+  activeIndex: number;
+  slideCount: number;
+  onPrev: () => void;
+  onNext: () => void;
+};
+
+const DiaryNavContext = createContext<DiaryNavContextValue | null>(null);
+
 function DiaryPageFooter() {
-  return <p className="shrink-0 pt-2 text-center text-[10px] text-neutral-400">AIMEDIArt.com</p>;
+  const { t } = useTranslation("visitor");
+  const nav = useContext(DiaryNavContext);
+
+  return (
+    <div className="shrink-0 pt-2">
+      {nav && nav.slideCount > 1 ? (
+        <div className="mb-1 flex items-center justify-center gap-2" aria-live="polite">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
+            onClick={nav.onPrev}
+            disabled={nav.activeIndex <= 0}
+            aria-label={t("diary.prev_page")}
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <span className="min-w-[3rem] text-center text-[11px] tabular-nums text-neutral-600">
+            {nav.activeIndex + 1} / {nav.slideCount}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
+            onClick={nav.onNext}
+            disabled={nav.activeIndex >= nav.slideCount - 1}
+            aria-label={t("diary.next_page")}
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : null}
+      <p className="text-center text-[10px] text-neutral-400">AIMEDIArt.com</p>
+    </div>
+  );
 }
 
 function CoverSponsorLogos({ logos }: { logos: string[] }) {
@@ -162,6 +207,7 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
       </div>
 
       <CoverSponsorLogos logos={cover.sponsorLogoUrls} />
+      <DiaryPageFooter />
     </div>
   );
 }
@@ -294,21 +340,20 @@ function buildDiarySlideDescriptors(diary: TravelDiaryPackage): DiarySlideDescri
 
 function SectionDividerPage({ title }: { title: string }) {
   return (
-    <div className="travel-diary-page-inner flex h-full items-center justify-center bg-white px-6">
-      <h2 className="text-center font-serif text-2xl font-bold text-neutral-900">{title}</h2>
+    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-6">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-white">
+        <h2 className="text-center font-serif text-2xl font-bold text-neutral-900">{title}</h2>
+      </div>
+      <DiaryPageFooter />
     </div>
   );
 }
 
 function ArtistPage({
   page,
-  pageIndex,
-  pageTotal,
   partIndex,
 }: {
   page: TravelDiaryPackage["artistPages"][number];
-  pageIndex: number;
-  pageTotal: number;
   partIndex: number;
 }) {
   const { t } = useTranslation("visitor");
@@ -317,11 +362,7 @@ function ArtistPage({
 
   return (
     <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-3">
-      <p className="shrink-0 text-center text-[10px] text-neutral-400">
-        {t("diary.page_counter", { current: pageIndex + 1, total: pageTotal })}
-      </p>
-
-      <div className="mt-4 flex min-h-0 flex-1 flex-col items-center overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden">
         {pageView.showPortrait ? (
           <>
             {page.photoUrl ? (
@@ -368,13 +409,9 @@ function ArtworkImageWatermark() {
 
 function ArtworkPage({
   page,
-  pageIndex,
-  pageTotal,
   partIndex,
 }: {
   page: TravelDiaryPackage["artworkPages"][number];
-  pageIndex: number;
-  pageTotal: number;
   partIndex: number;
 }) {
   const { t } = useTranslation("visitor");
@@ -382,10 +419,6 @@ function ArtworkPage({
 
   return (
     <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-3">
-      <p className="shrink-0 text-center text-[10px] text-neutral-400">
-        {t("diary.page_counter", { current: pageIndex + 1, total: pageTotal })}
-      </p>
-
       {view.showImage ? (
         page.artworkImageUrl ? (
           <div className="travel-diary-artwork-frame relative mt-2 w-full overflow-hidden rounded-lg border border-neutral-200/80 shadow-sm">
@@ -430,10 +463,10 @@ function ArtworkPage({
             <VisitorMediationMarkdown
               text={view.mediationText}
               paperTone
-              className="line-clamp-[7] leading-[27px] [&_p]:leading-[27px]"
+              className="line-clamp-[7]"
             />
           ) : (
-            <p className="text-[9px] italic leading-[27px] text-neutral-500">{t("mediation_text_missing")}</p>
+            <p className="text-[9px] italic leading-[12px] text-neutral-500">{t("mediation_text_missing")}</p>
           )}
         </div>
 
@@ -514,6 +547,26 @@ export function TravelDiaryNotebook({
   const [exportingPdf, setExportingPdf] = useState(false);
   const flipBookRef = useRef<FlipBookHandle | null>(null);
   const bookHostRef = useRef<HTMLDivElement | null>(null);
+  const [bookDims, setBookDims] = useState({ width: FLIPBOOK_WIDTH, height: FLIPBOOK_HEIGHT });
+
+  useLayoutEffect(() => {
+    const host = bookHostRef.current;
+    if (!host) return;
+
+    const syncDims = () => {
+      const height = Math.round(host.clientHeight);
+      const width = Math.round(host.clientWidth);
+      if (height < 320 || width < 200) return;
+      setBookDims((prev) =>
+        prev.width === width && prev.height === height ? prev : { width, height },
+      );
+    };
+
+    syncDims();
+    const observer = new ResizeObserver(syncDims);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
 
   const slideDescriptors = buildDiarySlideDescriptors(diary);
   const statsPageConfigs = useMemo(() => buildStatsPageConfigs(diary.stats), [diary.stats]);
@@ -613,8 +666,6 @@ export function TravelDiaryNotebook({
         return (
           <ArtistPage
             page={diary.artistPages[slide.index]}
-            pageIndex={index}
-            pageTotal={slideCount}
             partIndex={slide.partIndex}
           />
         );
@@ -622,8 +673,6 @@ export function TravelDiaryNotebook({
         return (
           <ArtworkPage
             page={diary.artworkPages[slide.index]}
-            pageIndex={index}
-            pageTotal={slideCount}
             partIndex={slide.partIndex}
           />
         );
@@ -632,21 +681,38 @@ export function TravelDiaryNotebook({
     }
   };
 
+  const diaryNav = useMemo<DiaryNavContextValue>(
+    () => ({
+      activeIndex,
+      slideCount,
+      onPrev: () => flipBookRef.current?.pageFlip().flipPrev(),
+      onNext: () => flipBookRef.current?.pageFlip().flipNext(),
+    }),
+    [activeIndex, slideCount],
+  );
+
   return (
-    <div className={cn("travel-diary-root flex flex-col gap-4", className)}>
+    <DiaryNavContext.Provider value={diaryNav}>
+    <div
+      className={cn(
+        "travel-diary-root flex flex-col gap-4",
+        showToolbar && "travel-diary-root--with-toolbar",
+        className,
+      )}
+    >
       <div className="travel-diary-notebook relative mx-auto w-full max-w-[416px]">
         <div className="travel-diary-spiral" aria-hidden />
         <div ref={bookHostRef} className="travel-diary-page travel-diary-flipbook-host overflow-hidden rounded-r-2xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
           <HTMLFlipBook
             ref={flipBookRef}
             className="travel-diary-flipbook"
-            width={FLIPBOOK_WIDTH}
-            height={FLIPBOOK_HEIGHT}
+            width={bookDims.width}
+            height={bookDims.height}
             size="stretch"
-            minWidth={280}
-            maxWidth={416}
-            minHeight={560}
-            maxHeight={840}
+            minWidth={bookDims.width}
+            maxWidth={bookDims.width}
+            minHeight={bookDims.height}
+            maxHeight={bookDims.height}
             showCover
             mobileScrollSupport
             drawShadow
@@ -667,50 +733,22 @@ export function TravelDiaryNotebook({
         </div>
       </div>
 
-      {slideCount > 1 ? (
-        <div className="flex items-center justify-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 border-white/20 bg-transparent text-white hover:bg-white/10"
-            onClick={() => flipBookRef.current?.pageFlip().flipPrev()}
-            disabled={activeIndex <= 0}
-            aria-label={t("diary.prev_page")}
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <span className="min-w-[4rem] text-center text-sm tabular-nums text-[#F0F0F0]/80">
-            {activeIndex + 1} / {slideCount}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 border-white/20 bg-transparent text-white hover:bg-white/10"
-            onClick={() => flipBookRef.current?.pageFlip().flipNext()}
-            disabled={activeIndex >= slideCount - 1}
-            aria-label={t("diary.next_page")}
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
-      ) : null}
-
       {showToolbar ? (
-      <div className="mx-auto flex w-full max-w-[416px] gap-2">
+      <div className="mx-auto flex w-full max-w-[416px] items-stretch gap-2">
         <Button
           type="button"
           variant="outline"
-          className="h-10 min-w-0 flex-1 gap-1 px-2 border-white/20 bg-transparent text-[#F0F0F0] hover:bg-white/10"
+          className="h-auto min-h-10 min-w-0 flex-1 flex-col gap-0.5 px-1 py-1.5 whitespace-normal border-white/20 bg-transparent text-[#F0F0F0] hover:bg-white/10"
           onClick={() => void handleCopyShareUrl()}
         >
           <Share2 className="h-4 w-4 shrink-0" />
-          <span className="truncate text-xs sm:text-sm">{t("diary.toolbar_share")}</span>
+          <span className="w-full text-center text-[10px] leading-[1.2] line-clamp-2 sm:text-xs">
+            {t("diary.toolbar_share")}
+          </span>
         </Button>
         <Button
           type="button"
-          className="h-10 min-w-0 flex-1 gap-1 px-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+          className="h-auto min-h-10 min-w-0 flex-1 flex-col gap-0.5 px-1 py-1.5 whitespace-normal gradient-gold gradient-gold-hover-bg text-primary-foreground"
           onClick={() => void handleDownloadPdf()}
           disabled={exportingPdf}
         >
@@ -719,11 +757,14 @@ export function TravelDiaryNotebook({
           ) : (
             <Download className="h-4 w-4 shrink-0" />
           )}
-          <span className="truncate text-xs sm:text-sm">{t("diary.toolbar_download_pdf")}</span>
+          <span className="w-full text-center text-[10px] leading-[1.2] whitespace-pre-line line-clamp-2 sm:text-xs">
+            {t("diary.toolbar_download_pdf")}
+          </span>
         </Button>
         {secondaryAction}
       </div>
       ) : null}
     </div>
+    </DiaryNavContext.Provider>
   );
 }

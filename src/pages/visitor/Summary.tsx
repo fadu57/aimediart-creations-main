@@ -154,8 +154,16 @@ export default function Summary() {
           diary={diary}
           secondaryAction={
             canAccessAsAdmin ? (
-              <Button type="button" variant="outline" className="h-10 min-w-0 flex-1 px-2 text-xs sm:text-sm" asChild>
-                <Link to="/expos" className="truncate">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto min-h-10 min-w-0 flex-1 flex-col gap-0.5 px-1 py-1.5 text-[10px] whitespace-normal sm:text-xs"
+                asChild
+              >
+                <Link
+                  to="/expos"
+                  className="w-full text-center leading-[1.2] whitespace-pre-line line-clamp-2"
+                >
                   {t("diary.back_to_expos")}
                 </Link>
               </Button>

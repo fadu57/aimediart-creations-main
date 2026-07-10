@@ -1281,12 +1281,27 @@
 
 /* Carnet de voyage visiteur — reliure spirale */
 .travel-diary-root--preview {
-  --diary-h: min(840px, calc(100dvh - 11rem));
+  --diary-h: min(840px, calc(100dvh - 9rem));
 }
 
 .travel-diary-root {
-  /* 64px header + pagination + 2 rangées de boutons sous le carnet */
-  --diary-h: min(840px, calc(100dvh - 17.5rem));
+  /* header 64px + pagination + marge */
+  --diary-h: min(840px, calc(100dvh - 11rem));
+}
+
+.travel-diary-root.travel-diary-root--with-toolbar {
+  /* barre outils compacte (icône + 2 lignes max) sous le carnet */
+  --diary-h: min(840px, calc(100dvh - 9rem));
+}
+
+@media (max-width: 420px) {
+  .travel-diary-root {
+    --diary-h: min(840px, calc(100dvh - 9.5rem));
+  }
+
+  .travel-diary-root.travel-diary-root--with-toolbar {
+    --diary-h: min(840px, calc(100dvh - 6rem));
+  }
 }
 
 .travel-diary-notebook {
@@ -1357,9 +1372,15 @@
 }
 
 .travel-diary-flipbook,
-.travel-diary-flipbook .stf__parent {
+.travel-diary-flipbook .stf__parent,
+.travel-diary-flipbook .stf__wrapper,
+.travel-diary-flipbook .stf__block {
   width: 100%;
   height: var(--diary-h);
+}
+
+.travel-diary-flipbook .stf__item {
+  height: 100% !important;
 }
 
 .travel-diary-flip-page {
@@ -1395,7 +1416,8 @@
 
 .travel-diary-cover-title-box {
   min-height: calc(var(--diary-h) * 90 / 840);
-  width: 299px;
+  width: min(299px, 100%);
+  max-width: 100%;
 }
 
 .travel-diary-page-inner {
