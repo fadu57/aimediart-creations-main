@@ -32,11 +32,14 @@
     "cardVisitors": "Visiteurs de l'expo",
     "printPanel": "Print panneau expo",
     "viewCatalogue": "Catalogue des œuvres",
+    "travelDiary": "Carnet visiteur",
     "curatorLabel": "Commissaire : {{name}}",
     "dateRange": "Du {{from}} au {{to}}",
     "permanentExpo": "Exposition permanente",
     "agencyPrefix": "Organisation :",
     "visitorTotal": "{{count}} visiteur(s) au total",
+    "artworkTotal_one": "{{count}} œuvre au total",
+    "artworkTotal_other": "{{count}} œuvres au total",
     "costPrefix": "Coût total :",
     "costUnavailable": "Coût total : données indisponibles",
     "viewAgencyTitle": "Voir la fiche de l'agence",
@@ -48,7 +51,15 @@
   },
   "panel": {
     "chooseFormat": "Choisissez le format du panneau à imprimer",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "welcome": "vous souhaite la bienvenue.",
+    "welcomeWithTitle": "{{title}} vous souhaite la bienvenue.",
+    "taglineLine1": "En scannant de QR-Code,",
+    "taglineLine2": "votre smartphone devient",
+    "taglineLine3Prefix": "votre ",
+    "taglineLine3Bold": "carnet de voyage émotionnel.",
+    "guideLine1": "Choisissez votre guide : êtes-vous plutôt Poète, Enfant, Conteur, Hip-hopeur, … ?",
+    "guideLine2": "8 types de guide vont vous accompagner."
   },
   "form": {
     "navTypeLabel": "Pour le visiteur, type de navigation",
@@ -239,5 +250,16 @@
     "col_artwork": "Œuvre",
     "col_emotion": "Émotion",
     "col_comment": "Commentaire"
+  },
+  "diary_picker": {
+    "title": "Carnet de voyage visiteur",
+    "description": "Sélectionnez un visiteur de l'exposition « {{expo}} » pour afficher son carnet.",
+    "search_placeholder": "Rechercher un visiteur…",
+    "loading": "Chargement des visiteurs…",
+    "error": "Impossible de charger la liste des visiteurs.",
+    "empty": "Aucun visiteur avec feedback pour cette exposition.",
+    "anonymous": "Anonyme",
+    "registered": "Inscrit",
+    "close": "Fermer"
   }
 }

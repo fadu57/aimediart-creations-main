@@ -31,11 +31,14 @@
     "testQr": "Test QR code",
     "printPanel": "Print expo panel",
     "viewCatalogue": "Artwork catalogue",
+    "travelDiary": "Visitor diary",
     "curatorLabel": "Curator: {{name}}",
     "dateRange": "From {{from}} to {{to}}",
     "permanentExpo": "Permanent exhibition",
     "agencyPrefix": "Organisation:",
     "visitorTotal": "{{count}} visitor(s) in total",
+    "artworkTotal_one": "{{count}} artwork in total",
+    "artworkTotal_other": "{{count}} artworks in total",
     "costPrefix": "Total cost:",
     "costUnavailable": "Total cost: data unavailable",
     "viewAgencyTitle": "View agency profile",
@@ -48,7 +51,15 @@
   },
   "panel": {
     "chooseFormat": "Choose the panel format to print",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "welcome": "welcomes you.",
+    "welcomeWithTitle": "{{title}} welcomes you.",
+    "taglineLine1": "By scanning this QR code,",
+    "taglineLine2": "your smartphone becomes",
+    "taglineLine3Prefix": "your ",
+    "taglineLine3Bold": "emotional travel diary.",
+    "guideLine1": "Choose your guide: are you more of a Poet, Child, Storyteller, Hip-hopper, …?",
+    "guideLine2": "8 types of guide will accompany you."
   },
   "form": {
     "navTypeLabel": "For the visitor, navigation type",
@@ -239,5 +250,16 @@
     "col_artwork": "Artwork",
     "col_emotion": "Emotion",
     "col_comment": "Comment"
+  },
+  "diary_picker": {
+    "title": "Visitor travel diary",
+    "description": "Select a visitor from exhibition « {{expo}} » to view their diary.",
+    "search_placeholder": "Search a visitor…",
+    "loading": "Loading visitors…",
+    "error": "Unable to load visitor list.",
+    "empty": "No visitor feedback for this exhibition.",
+    "anonymous": "Anonymous",
+    "registered": "Registered",
+    "close": "Close"
   }
 }

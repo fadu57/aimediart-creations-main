@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Lightbulb, QrCode, Zap } from "lucide-react";
@@ -20,7 +20,7 @@ import {
   startNativeCameraQrScanner,
   type NativeCameraQrSession,
 } from "@/lib/qrNativeCameraScanner";
-import { supabase } from "@/lib/supabase";
+import { useVisitorExitDiaryFlow } from "@/hooks/useVisitorExitDiaryFlow";
 import {
   reportQrCameraError,
   reportQrInvalid,
@@ -57,15 +57,7 @@ const WorkScanner = () => {
   const qrImageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
 
-  const exitTarget = useMemo(
-    () => (expoId ? `/scan?expo_id=${encodeURIComponent(expoId)}` : "/scan"),
-    [expoId],
-  );
-
-  const handleQuit = async () => {
-    await supabase.auth.signOut({ scope: "local" });
-    navigate("/organisation");
-  };
+  const { requestExitVisit, exitDiaryDialogs } = useVisitorExitDiaryFlow({ expoId });
 
   const handleQrDecoded = useCallback(
     (decodedText: string) => {
@@ -396,7 +388,12 @@ const WorkScanner = () => {
             {t("scanner.start_visit_desc")}
           </p>
 
-          <Button type="button" variant="outline" className="w-full border-border bg-white text-sm" onClick={() => void handleQuit()}>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-border bg-white text-sm"
+            onClick={requestExitVisit}
+          >
             {t("scanner.quit_visit")}
           </Button>
 
@@ -412,6 +409,8 @@ const WorkScanner = () => {
           )}
         </div>
       </div>
+
+      {exitDiaryDialogs}
 
       <style>{`
         #${QR_READER_ELEMENT_ID}, #${QR_READER_ELEMENT_ID} > div {

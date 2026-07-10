@@ -34,6 +34,8 @@
     "field_phone": "Telefon",
     "field_location": "Standort",
     "field_member_since": "Mitglied seit",
+    "field_last_sign_in": "Letzte Anmeldung",
+    "never_signed_in": "Noch nie angemeldet",
     "scope": "Bereich",
     "expos": "Ausstellungen",
     "expo_single": "Ausstellung: {{name}}",

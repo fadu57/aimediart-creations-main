@@ -974,9 +974,9 @@ const Catalogue = () => {
                   aria-controls="catalogue-artwork-suggestions"
                   className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
                 >
-                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                   {!search.trim() ? (
-                    <span className="shrink-0 text-sm font-medium text-foreground">{t("filter_label_artworks")}</span>
+                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t("filter_label_artworks")}</span>
                   ) : null}
                   <input
                     id="catalogue-artwork-search"
@@ -994,7 +994,7 @@ const Catalogue = () => {
                     aria-label={t("search_placeholder")}
                     aria-autocomplete="list"
                     aria-controls="catalogue-artwork-suggestions"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-transparent"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
                   />
                   {search.trim().length > 0 && (
                     <button
@@ -1003,7 +1003,7 @@ const Catalogue = () => {
                         e.stopPropagation();
                         setSearch("");
                       }}
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-neutral-500 hover:text-neutral-900"
                       aria-label={t("search_clear_aria")}
                       title="Effacer"
                     >
@@ -1012,7 +1012,7 @@ const Catalogue = () => {
                   )}
                   <button
                     type="button"
-                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-foreground"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-neutral-700"
                     aria-label={t("search_placeholder")}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1068,9 +1068,9 @@ const Catalogue = () => {
                   aria-controls="catalogue-expo-suggestions"
                   className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
                 >
-                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                   {!expoFilterInput.trim() && selectedExpoFilter === "all" ? (
-                    <span className="shrink-0 text-sm font-medium text-foreground">{t("filter_label_expo")}</span>
+                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t("filter_label_expo")}</span>
                   ) : null}
                   <input
                     id="catalogue-expo-filter"
@@ -1088,7 +1088,7 @@ const Catalogue = () => {
                     aria-label={t("expo_filter_placeholder")}
                     aria-autocomplete="list"
                     aria-controls="catalogue-expo-suggestions"
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-transparent"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
                   />
                   {(expoFilterInput.trim().length > 0 || selectedExpoFilter !== "all") && (
                     <button
@@ -1098,7 +1098,7 @@ const Catalogue = () => {
                         setExpoFilterInput("");
                         setSelectedExpoFilter("all");
                       }}
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-neutral-500 hover:text-neutral-900"
                       aria-label={t("expo_filter_clear_aria")}
                       title={t("expo_filter_clear_title")}
                     >
@@ -1107,7 +1107,7 @@ const Catalogue = () => {
                   )}
                   <button
                     type="button"
-                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-foreground"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-neutral-700"
                     aria-label={t("expo_filter_placeholder")}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1364,7 +1364,6 @@ const Catalogue = () => {
                         e.stopPropagation();
                         openCartelFormatDialog(aw);
                       }}
-                      disabled={!aw.artwork_qrcode_image && !aw.artwork_qr_code_url}
                     >
                       {t("btn_print_cartel")}
                     </Button>

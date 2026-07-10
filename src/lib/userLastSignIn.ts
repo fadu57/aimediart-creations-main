@@ -1,3 +1,5 @@
+import { formatConnectionDuration } from "@/lib/clientErrorLogs";
+
 /** Date + heure courtes (fuseau local), ex. 11/06/2026 · 14:32 */
 export function formatFrenchDateTime(
   iso: string | null | undefined,
@@ -16,6 +18,11 @@ export function formatFrenchDateTime(
 export function formatUserLastSignIn(
   iso: string | null | undefined,
   neverLabel = "Jamais connecté",
+  withSessionDuration = false,
 ): string {
-  return formatFrenchDateTime(iso, neverLabel);
+  if (!iso?.trim()) return neverLabel;
+  const base = formatFrenchDateTime(iso);
+  if (!withSessionDuration) return base;
+  const duration = formatConnectionDuration(iso, new Date().toISOString());
+  return duration ? `${base} (${duration})` : base;
 }

@@ -12,7 +12,9 @@ import {
 } from "@/lib/statisticsBrowserPdfTables";
 
 const READY_ATTR = "data-statistics-export-ready";
+const MAP_READY_ATTR = "data-statistics-map-ready";
 const READY_TIMEOUT_MS = 35_000;
+const MAP_READY_TIMEOUT_MS = 12_000;
 const EXPORT_ATTR = "data-statistics-pdf-export";
 const IMAGE_PLACEHOLDER =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
@@ -147,6 +149,48 @@ function waitForStatisticsReportReady(root: HTMLElement, timeoutMs = READY_TIMEO
     };
     tick();
   });
+}
+
+async function waitForGeographyMapReady(
+  root: HTMLElement,
+  timeoutMs = MAP_READY_TIMEOUT_MS,
+): Promise<HTMLElement | null> {
+  const mapHost =
+    root.querySelector<HTMLElement>("[data-statistics-geography-map-host]") ??
+    root.querySelector<HTMLElement>(".statistics-report-geography-map");
+  if (!mapHost) return null;
+
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (mapHost.getAttribute(MAP_READY_ATTR) === "true") return mapHost;
+    await new Promise<void>((r) => window.setTimeout(r, 120));
+  }
+  return mapHost;
+}
+
+async function captureGeographyMapImage(
+  root: HTMLElement,
+): Promise<StatisticsPdfExportTables["geography"]["mapImage"]> {
+  const mapHost = await waitForGeographyMapReady(root);
+  if (!mapHost) return null;
+
+  const leafletMap = mapHost.querySelector<HTMLElement>(".leaflet-container");
+  if (!leafletMap || leafletMap.clientHeight < 40) return null;
+
+  await nextPaint(250);
+  try {
+    const mapCanvas = await captureElement(mapHost, 2);
+    if (mapCanvas.width < 8 || mapCanvas.height < 8) return null;
+    const { dataUrl, format } = canvasToDataUrl(mapCanvas);
+    return {
+      dataUrl,
+      format,
+      widthPx: mapCanvas.width,
+      heightPx: mapCanvas.height,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function shouldCaptureNode(node: HTMLElement): boolean {
@@ -290,6 +334,9 @@ export async function generateStatisticsBrowserPdf(
   report({ percent: 8, phase: "capture_header" });
   const brandCanvas = brandEl ? await captureElement(brandEl, 2) : null;
 
+  report({ percent: 11, phase: "capture_tables" });
+  const geographyMapImage = await captureGeographyMapImage(root);
+
   root.style.maxHeight = "none";
   root.style.overflow = "visible";
   root.style.width = `${root.scrollWidth}px`;
@@ -408,7 +455,14 @@ export async function generateStatisticsBrowserPdf(
         brandFormat: brandImage?.format ?? "JPEG",
         brandHeightMm,
       };
-      await appendVectorTablesToPdf(pdf, tableLayout, tables);
+      const tablesWithMap: StatisticsPdfExportTables = {
+        ...tables,
+        geography: {
+          ...tables.geography,
+          mapImage: geographyMapImage ?? tables.geography.mapImage ?? null,
+        },
+      };
+      await appendVectorTablesToPdf(pdf, tableLayout, tablesWithMap);
       report({ percent: 88, phase: "capture_tables" });
     }
 

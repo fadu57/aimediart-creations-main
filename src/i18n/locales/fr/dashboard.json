@@ -34,6 +34,8 @@
     "field_phone": "Téléphone",
     "field_location": "Localisation",
     "field_member_since": "Membre depuis",
+    "field_last_sign_in": "Dernière connexion",
+    "never_signed_in": "Jamais connecté",
     "scope": "Périmètre",
     "expos": "Expositions",
     "expo_single": "Exposition : {{name}}",

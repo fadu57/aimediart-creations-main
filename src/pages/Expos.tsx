@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Building2, Images, Plus, X } from "lucide-react";
+import { Building2, BookOpen, Images, Plus, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ExpoFormDialog } from "@/components/ExpoFormDialog";
+import { ExpoTravelDiaryPickerDialog } from "@/components/backoffice/ExpoTravelDiaryPickerDialog";
 import { SponsorDialog, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
@@ -36,7 +37,7 @@ import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { QR_CODE_STORAGE_OPTIONS, qrCodePrintOptions } from "@/lib/qrCodeScanFriendly";
-import { formatExpoDate, formatExpoDatesLabel } from "@/lib/expoDates";
+import { formatExpoDatesLabel } from "@/lib/expoDates";
 import { EntityCostLabel } from "@/components/EntityCostLabel";
 import { getCostTotalsByExpoIds, resolveEntityCostDisplay } from "@/lib/costs";
 import { getUsdToEurRate } from "@/lib/fxRates";
@@ -240,8 +241,10 @@ const Expos = () => {
   const [qrConfirmExpoKey, setQrConfirmExpoKey] = useState<string | null>(null);
   const [panelFormatExpo, setPanelFormatExpo] = useState<ExpoRow | null>(null);
   const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
+  const [diaryPickerExpo, setDiaryPickerExpo] = useState<{ id: string; name: string } | null>(null);
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [visitorCountByExpoId, setVisitorCountByExpoId] = useState<Record<string, number>>({});
+  const [artworkCountByExpoId, setArtworkCountByExpoId] = useState<Record<string, number>>({});
   const [costByExpoId, setCostByExpoId] = useState<Record<string, number>>({});
   const [costsReady, setCostsReady] = useState(false);
   const [usdToEurRate, setUsdToEurRate] = useState<number | null>(null);
@@ -472,9 +475,57 @@ const Expos = () => {
     setVisitorCountByExpoId(counts);
   }, [rows]);
 
+  const loadArtworkCounts = useCallback(async () => {
+    if (!rows.length) {
+      setArtworkCountByExpoId({});
+      return;
+    }
+    const refs = new Set<string>();
+    for (const ex of rows) {
+      if (ex.id?.trim()) refs.add(ex.id.trim());
+      if (ex.expo_id?.trim()) refs.add(ex.expo_id.trim());
+    }
+    if (refs.size === 0) {
+      setArtworkCountByExpoId({});
+      return;
+    }
+    const { data, error: countErr } = await supabase
+      .from("artworks")
+      .select("artwork_expo_id")
+      .in("artwork_expo_id", [...refs])
+      .is("artwork_deleted_at", null);
+    if (countErr) {
+      if (import.meta.env.DEV) {
+        console.warn("[Expos] artworks count:", countErr.message);
+      }
+      setArtworkCountByExpoId({});
+      return;
+    }
+    const countsByRef: Record<string, number> = {};
+    for (const row of (data as Array<{ artwork_expo_id?: string | null }> | null) ?? []) {
+      const expoRef = row.artwork_expo_id?.trim();
+      if (!expoRef) continue;
+      countsByRef[expoRef] = (countsByRef[expoRef] ?? 0) + 1;
+    }
+    const counts: Record<string, number> = {};
+    for (const ex of rows) {
+      const keys = new Set<string>();
+      if (ex.id?.trim()) keys.add(ex.id.trim());
+      if (ex.expo_id?.trim()) keys.add(ex.expo_id.trim());
+      let total = 0;
+      for (const key of keys) total += countsByRef[key] ?? 0;
+      if (ex.id) counts[ex.id] = total;
+    }
+    setArtworkCountByExpoId(counts);
+  }, [rows]);
+
   useEffect(() => {
     void loadVisitorCounts();
   }, [loadVisitorCounts]);
+
+  useEffect(() => {
+    void loadArtworkCounts();
+  }, [loadArtworkCounts]);
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
@@ -572,6 +623,7 @@ const Expos = () => {
     return false;
   };
 
+  const canOpenDiaryPicker = role_id === 1;
 
   const openCreate = () => {
     setFormMode("create");
@@ -638,100 +690,107 @@ const Expos = () => {
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     const title = expoTitle(expo);
-    const subtitle = "Scannez le QR-Code pour découvrir l'exposition";
     const logoRaw = expoLogoRawFromRow(expo as Record<string, unknown>);
     const logoSrc = logoRaw ? resolveExpoLogoImgSrc(logoRaw) : "";
-    const expoRecord = expo as Record<string, unknown>;
-    const dateDuRaw =
-      (typeof expo.date_expo_du === "string" ? expo.date_expo_du : "") ||
-      (typeof expoRecord.date_expo_du === "string" ? expoRecord.date_expo_du : "") ||
-      (typeof expoRecord.date_expo_debut === "string" ? expoRecord.date_expo_debut : "") ||
-      (typeof expoRecord.date_du === "string" ? expoRecord.date_du : "");
-    const dateAuRaw =
-      (typeof expo.date_expo_au === "string" ? expo.date_expo_au : "") ||
-      (typeof expoRecord.date_expo_au === "string" ? expoRecord.date_expo_au : "") ||
-      (typeof expoRecord.date_expo_fin === "string" ? expoRecord.date_expo_fin : "") ||
-      (typeof expoRecord.date_au === "string" ? expoRecord.date_au : "");
-    const dateDu = formatExpoDate(dateDuRaw);
-    const dateAu = formatExpoDate(dateAuRaw);
-    const dateLine =
-      dateDu && dateAu
-        ? `Exposition du ${dateDu} au ${dateAu}`
-        : dateDu
-          ? `Exposition du ${dateDu}`
-          : dateAu
-            ? `Exposition jusqu'au ${dateAu}`
-            : "";
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, pageHeight, "F");
 
-    // Base A3: on applique les mêmes proportions pour A4 (réduction simple).
-    const scale = format === "a3" ? 1 : 0.707; // ~210/297
+    // Base A3 ; A4 = mêmes proportions réduites (~210/297).
+    const scale = format === "a3" ? 1 : 0.707;
     const margin = 14 * scale;
     const contentWidth = pageWidth - margin * 2;
+
+    // Bloc AIMEDIArt en bas à droite.
     const headerLogo = await createAimediaHeaderLogoBlockPng();
     const aimediaImg = await loadImage(headerLogo.dataUrl);
-    const aimediaW = Math.min(pageWidth * 0.505, contentWidth); // même proportion qu'en A3
+    const aimediaW = pageWidth * 0.29;
     const aimediaH = (aimediaW * headerLogo.heightPx) / headerLogo.widthPx;
-    pdf.addImage(aimediaImg, "PNG", margin, 10 * scale, aimediaW, aimediaH, undefined, "NONE");
+    const aimediaY = pageHeight - aimediaH - 8 * scale;
+    const aimediaX = pageWidth - margin - aimediaW;
 
-    let y = 10 * scale + aimediaH + 14 * scale;
+    let y = 12 * scale;
 
-    pdf.setTextColor(70, 70, 70);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(30 * scale);
-    pdf.text("Bienvenue à l'exposition", pageWidth / 2, y, { align: "center" });
-    y += 12 * scale;
-
+    let logoLoaded = false;
     if (logoSrc) {
       try {
         const expoLogoImg = await loadImage(logoSrc);
-        const maxLogoW = pageWidth * (2 / 3); // logo expo = 2/3 de la largeur de page
-        const maxLogoH = 65 * scale;
+        const maxLogoW = pageWidth * 0.55;
+        const maxLogoH = 95 * scale;
         const ratio = Math.min(maxLogoW / expoLogoImg.width, maxLogoH / expoLogoImg.height);
         const logoW = expoLogoImg.width * ratio;
         const logoH = expoLogoImg.height * ratio;
         pdf.addImage(expoLogoImg, "PNG", (pageWidth - logoW) / 2, y, logoW, logoH, undefined, "NONE");
-        y += logoH + 14 * scale;
+        y += logoH + 9 * scale;
+        logoLoaded = true;
       } catch {
         // ignore expo logo loading error
       }
     }
 
-    pdf.setTextColor(25, 25, 25);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(24 * scale);
-    pdf.text(subtitle, pageWidth / 2, y, { align: "center" });
-    y += 12 * scale;
+    // « vous souhaite la bienvenue. » — le logo porte le nom de l'expo ; sans logo on préfixe le titre.
+    pdf.setTextColor(60, 60, 60);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(22 * scale);
+    const welcomeLine = logoLoaded ? t("panel.welcome") : t("panel.welcomeWithTitle", { title });
+    const welcomeLines = pdf.splitTextToSize(welcomeLine, contentWidth) as string[];
+    pdf.text(welcomeLines, pageWidth / 2, y, { align: "center" });
+    y += welcomeLines.length * 9 * scale + 8 * scale;
+
+    // Hauteurs réservées sous le QR : 3 lignes rouges + 2 lignes guide + logo bas.
+    const redFontSize = 28 * scale;
+    const redLineSpacing = 13 * scale;
+    const guideFontSize = 12.5 * scale;
+    const guideLineSpacing = 6.5 * scale;
+    const gapQrToRed = 16 * scale;
+    const gapRedToGuide = 9 * scale;
+    const redBlockMm = 3 * redLineSpacing;
+    const guideBlockMm = 2 * guideLineSpacing;
+    const reservedBottomMm =
+      gapQrToRed + redBlockMm + gapRedToGuide + guideBlockMm + (pageHeight - aimediaY) + 6 * scale;
 
     const qrImg = await loadImage(qrDataUrl);
-    // QR = 3/4 de la largeur page, mais on garde de la place pour la ligne de dates.
-    const qrSize = Math.min(pageWidth * 0.75, pageHeight - y - 26 * scale);
-    const qrX = (pageWidth - qrSize) / 2; // centré horizontalement
-    const qrY = y;
-    pdf.addImage(qrImg, "PNG", qrX, qrY, qrSize, qrSize, undefined, "NONE");
-    y = qrY + qrSize + 12 * scale;
+    const qrSize = Math.min(pageWidth * 0.49, Math.max(50 * scale, pageHeight - y - reservedBottomMm));
+    const qrX = (pageWidth - qrSize) / 2;
+    pdf.addImage(qrImg, "PNG", qrX, y, qrSize, qrSize, undefined, "NONE");
+    y += qrSize + gapQrToRed;
 
-    if (dateLine) {
-      pdf.setTextColor(60, 60, 60);
-      pdf.setFont("helvetica", "bold");
-      const targetWidth = pageWidth * 0.9;
-      const minDateFontSize = 16 * scale;
-      const maxDateFontSize = 38 * scale;
-      pdf.setFontSize(minDateFontSize);
-      const rawWidth = Math.max(pdf.getTextWidth(dateLine), 1);
-      const adjustedDateFontSize = Math.min(
-        maxDateFontSize,
-        Math.max(minDateFontSize, minDateFontSize * (targetWidth / rawWidth)),
-      );
-      pdf.setFontSize(adjustedDateFontSize);
-      const dateY = Math.min(y, pageHeight - 14 * scale);
-      pdf.text(dateLine, pageWidth / 2, dateY, { align: "center", maxWidth: targetWidth });
+    // Slogan rouge sur 3 lignes ; « carnet de voyage émotionnel. » en gras.
+    pdf.setTextColor(230, 57, 70);
+    pdf.setFontSize(redFontSize);
+    pdf.setFont("helvetica", "italic");
+    pdf.text(t("panel.taglineLine1"), pageWidth / 2, y, { align: "center" });
+    y += redLineSpacing;
+    pdf.text(t("panel.taglineLine2"), pageWidth / 2, y, { align: "center" });
+    y += redLineSpacing;
+
+    const line3Prefix = t("panel.taglineLine3Prefix");
+    const line3Bold = t("panel.taglineLine3Bold");
+    pdf.setFont("helvetica", "italic");
+    const prefixW = line3Prefix ? pdf.getTextWidth(line3Prefix) : 0;
+    pdf.setFont("helvetica", "bolditalic");
+    const boldW = pdf.getTextWidth(line3Bold);
+    const line3X = (pageWidth - (prefixW + boldW)) / 2;
+    if (line3Prefix) {
+      pdf.setFont("helvetica", "italic");
+      pdf.text(line3Prefix, line3X, y);
     }
+    pdf.setFont("helvetica", "bolditalic");
+    pdf.text(line3Bold, line3X + prefixW, y);
+    y += gapRedToGuide;
+
+    // Texte guide en noir, gras italique, plus petit.
+    pdf.setTextColor(20, 20, 20);
+    pdf.setFont("helvetica", "bolditalic");
+    pdf.setFontSize(guideFontSize);
+    pdf.text(t("panel.guideLine1"), pageWidth / 2, y, { align: "center", maxWidth: contentWidth });
+    y += guideLineSpacing;
+    pdf.text(t("panel.guideLine2"), pageWidth / 2, y, { align: "center", maxWidth: contentWidth });
+
+    pdf.addImage(aimediaImg, "PNG", aimediaX, aimediaY, aimediaW, aimediaH, undefined, "NONE");
 
     const blobUrl = pdf.output("bloburl");
     window.open(blobUrl, "_blank");
-  }, []);
+  }, [t]);
 
   return (
     <div className="container py-8 space-y-8">
@@ -739,20 +798,25 @@ const Expos = () => {
         <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between lg:gap-4">
           <div className="flex w-full min-w-0 flex-col gap-3 md:max-w-[min(100%,450px)]">
             <div>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
-                {!loading && filteredArtworkCount != null && (
-                  <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                    {t("page.filteredArtworkCount", { count: filteredArtworkCount })}
-                  </span>
-                )}
+              <div className="flex min-w-0 items-start gap-3">
+                <BackofficeStickyAgencyLogoSlot align="start" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <h2 className="text-3xl font-serif font-bold text-white">{t("page.title")}</h2>
+                    {!loading && filteredArtworkCount != null && (
+                      <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                        {t("page.filteredArtworkCount", { count: filteredArtworkCount })}
+                      </span>
+                    )}
+                  </div>
+                  {agencyFilter && (
+                    <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
+                  )}
+                  {!authLoading && scope.mode === "expo" && (
+                    <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
+                  )}
+                </div>
               </div>
-              {agencyFilter && (
-                <p className="text-xs text-muted-foreground mt-1">{t("page.filteredAgency", { agencyFilter })}</p>
-              )}
-              {!authLoading && scope.mode === "expo" && (
-                <p className="text-xs text-muted-foreground mt-1">{t("page.scopedExpoOnly", { label: scopedExpoLabel })}</p>
-              )}
             </div>
             <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               {typeof role_id === "number" && role_id < 4 && (
@@ -811,8 +875,6 @@ const Expos = () => {
               </div>
             </div>
           </div>
-
-          <BackofficeStickyAgencyLogoSlot className="flex-none lg:flex-1" />
 
           <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:ml-auto lg:max-w-[540px]">
             {canCreateExpo && (
@@ -953,6 +1015,9 @@ const Expos = () => {
                   <p className="mt-2 text-sm font-black text-muted-foreground">
                     {t("card.visitorTotal", { count: visitorCountByExpoId[ex.id] ?? 0 })}
                   </p>
+                  <p className="mt-1 text-sm font-black text-muted-foreground">
+                    {t("card.artworkTotal", { count: artworkCountByExpoId[ex.id] ?? 0 })}
+                  </p>
                   {isGlobalCostViewer ? (
                     <p className="mt-1 text-sm tabular-nums">
                       <EntityCostLabel
@@ -1004,6 +1069,21 @@ const Expos = () => {
                   })()}
                 </div>
                 <div className="flex w-full min-w-0 flex-col gap-2 md:w-[190px] md:shrink-0">
+                  {canOpenDiaryPicker ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={cn(EXPO_CARD_BTN, "gap-1 border-primary/40 text-xs")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDiaryPickerExpo({ id: ex.id, name: expoTitle(ex) });
+                      }}
+                    >
+                      <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {t("card.travelDiary")}
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"
@@ -1058,6 +1138,17 @@ const Expos = () => {
           );
         })}
       </div>
+
+      {diaryPickerExpo !== null && (
+        <ExpoTravelDiaryPickerDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setDiaryPickerExpo(null);
+          }}
+          expoId={diaryPickerExpo.id}
+          expoName={diaryPickerExpo.name}
+        />
+      )}
 
       {sponsorExpo !== null && (
         <SponsorDialog

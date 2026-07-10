@@ -61,9 +61,9 @@
     "exposition": "Exposición",
     "expoPeriod": "Fechas",
     "expoDateRange": "del {{from}} al {{to}}",
-    "allExpos": "Todas las exposiciones del ámbito",
+    "allExpos": "Todas",
     "artist": "Artista",
-    "allArtists": "Todos los artistas de la exposición"
+    "allArtists": "Todos"
   },
   "artistCoverLetter": {
     "greeting": "Hola {{firstName}} {{lastName}},",
@@ -113,7 +113,8 @@
     "prevWeek": "Semana anterior",
     "nextWeek": "Semana siguiente",
     "totalVisitsExpo": "Total acumulado de la exposición: {{count}} visita(s)",
-    "totalVisitsFiltered": "Total acumulado del período filtrado: {{count}} visita(s)"
+    "totalVisitsFiltered": "Total acumulado del período filtrado: {{count}} visita(s)",
+    "totalVisitsWeek": "Total de la semana mostrada: {{count}} visita(s)"
   },
   "hourly": {
     "title": "Asistencia por horas",

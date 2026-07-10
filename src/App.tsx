@@ -129,7 +129,8 @@ function AppShell() {
     normalizedPathname.startsWith("/scan/") ||
     normalizedPathname === "/scan-work1" ||
     normalizedPathname === "/scan-work2" ||
-    normalizedPathname === "/scan-work-first";
+    normalizedPathname === "/scan-work-first" ||
+    normalizedPathname === "/summary";
 
   return (
     <div className="flex min-h-screen flex-col bg-[#121212]">

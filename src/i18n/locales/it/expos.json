@@ -42,12 +42,23 @@
     "qrConfirmAction": "Rigenera comunque",
     "qrConfirmCancel": "Annulla",
     "cardVisitors": "Visitatori della mostra",
+    "visitorTotal": "{{count}} visitatore/i in totale",
+    "artworkTotal_one": "{{count}} opera in totale",
+    "artworkTotal_other": "{{count}} opere in totale",
     "costPrefix": "Costo totale:",
     "costUnavailable": "Costo totale: dati non disponibili"
   },
   "panel": {
     "chooseFormat": "Scegli il formato del pannello da stampare",
-    "cancel": "Annulla"
+    "cancel": "Annulla",
+    "welcome": "vi dà il benvenuto.",
+    "welcomeWithTitle": "{{title}} vi dà il benvenuto.",
+    "taglineLine1": "Scansionando questo QR code,",
+    "taglineLine2": "il vostro smartphone diventa il vostro",
+    "taglineLine3Prefix": "",
+    "taglineLine3Bold": "diario di viaggio emotivo.",
+    "guideLine1": "Scegliete la vostra guida: siete più Poeta, Bambino, Narratore, Hip-hopper, …?",
+    "guideLine2": "8 tipi di guida vi accompagneranno."
   },
   "form": {
     "navTypeLabel": "Per il visitatore, tipo di navigazione",

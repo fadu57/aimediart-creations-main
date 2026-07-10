@@ -264,7 +264,7 @@ const Agencies = () => {
     (typeof role_id === "number" && role_id >= 1 && role_id <= 4) || hasFullDataAccess(role_name);
 
   const canEditCommercialTerms =
-    (typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name);
+    typeof role_id === "number" && role_id >= 1 && role_id <= 3;
 
   const canEditAgency = (agId: string) => {
     if ((typeof role_id === "number" && role_id >= 1 && role_id <= 3) || hasFullDataAccess(role_name)) return true;

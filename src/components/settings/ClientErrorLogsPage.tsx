@@ -612,8 +612,6 @@ export function ClientErrorLogsPage({ audience }: ClientErrorLogsPageProps) {
 
           <span className="shrink-0">{t(`${ns}.page_title`)}</span>
 
-          <span className="text-sm font-normal text-muted-foreground">{t(`${ns}.page_sub`)}</span>
-
         </h1>
 
         {canDeleteLogs && (

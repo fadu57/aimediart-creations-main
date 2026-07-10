@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { Lightbulb, QrCode, Zap } from "lucide-react";
 import type { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/qrNativeCameraScanner";
 import { AGENCY_NAME_MISSING, resolveAgencyName } from "@/lib/resolveAgencyName";
 import { supabase } from "@/lib/supabase";
+import { useVisitorExitDiaryFlow } from "@/hooks/useVisitorExitDiaryFlow";
 import {
   reportQrCameraError,
   reportQrInvalid,
@@ -50,10 +51,13 @@ export default function ScanWork2() {
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [showAssistHint, setShowAssistHint] = useState(false);
-  const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
   const [agencyName, setAgencyName] = useState(AGENCY_NAME_MISSING);
   const hasAgencyName =
     agencyName.trim().length > 0 && agencyName.trim().toUpperCase() !== AGENCY_NAME_MISSING;
+  const { requestExitVisit, exitDiaryDialogs } = useVisitorExitDiaryFlow({
+    expoId,
+    agencyThanksName: hasAgencyName ? agencyName : null,
+  });
   const hasScannedRef = useRef(false);
   const qrRef = useRef<Html5Qrcode | null>(null);
   const assistTimeoutRef = useRef<number | null>(null);
@@ -63,14 +67,6 @@ export default function ScanWork2() {
   const cameraSessionRef = useRef<NativeCameraQrSession | null>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
-  const exitTarget = expoId ? `/scan?expo_id=${encodeURIComponent(expoId)}` : "/scan";
-
-  const handleQuit = () => {
-    void (async () => {
-      await supabase.auth.signOut({ scope: "local" });
-      navigate("/organisation");
-    })();
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -478,59 +474,18 @@ export default function ScanWork2() {
             <p>{t("scanner.tip_line2")}</p>
           </div>
 
-          <Button type="button" variant="outline" className="w-full border-border bg-white text-sm" onClick={handleQuit}>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-border bg-white text-sm"
+            onClick={requestExitVisit}
+          >
             {t("scanner.quit_visit")}
           </Button>
         </div>
       </div>
 
-      {isExitPopupOpen && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setIsExitPopupOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="w-full max-w-[320px] rounded-lg bg-white p-4 text-center"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("scanner.exit_dialog_aria")}
-          >
-            <div className="mb-3 flex items-start">
-              <AimediartBrandLogoBlock size="sm" animateHeart />
-            </div>
-            <p className="text-sm font-semibold leading-relaxed">
-              {t("scanner.exit_thanks_intro")}
-              <br />
-              {hasAgencyName ? (
-                <Trans
-                  t={t}
-                  i18nKey="scanner.exit_thanks_with_agency"
-                  values={{ agency: agencyName }}
-                  components={{ brand: <span className="text-accent" /> }}
-                />
-              ) : (
-                <Trans
-                  t={t}
-                  i18nKey="scanner.exit_thanks_no_agency"
-                  components={{ brand: <span className="text-accent" /> }}
-                />
-              )}
-              <br />
-              {t("scanner.exit_see_you")}
-            </p>
-            <div className="mt-4 flex flex-col gap-2">
-              <Button type="button" className="w-full" onClick={() => navigate(exitTarget)}>
-                {t("scanner.exit_quit")}
-              </Button>
-              <Button type="button" variant="outline" className="w-full" onClick={() => setIsExitPopupOpen(false)}>
-                {t("scanner.exit_back")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {exitDiaryDialogs}
 
       <style>{`
         #${QR_READER_ELEMENT_ID}, #${QR_READER_ELEMENT_ID} > div {

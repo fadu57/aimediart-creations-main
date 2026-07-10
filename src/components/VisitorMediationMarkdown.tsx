@@ -8,6 +8,8 @@ type VisitorMediationMarkdownProps = {
   text: string;
   /** Poète / vers : chaque retour ligne devient un saut (remark-breaks), en plus du Markdown standard. */
   verseMode?: boolean;
+  /** Texte sombre sur fond papier (carnet de voyage). */
+  paperTone?: boolean;
   className?: string;
 };
 
@@ -15,7 +17,7 @@ type VisitorMediationMarkdownProps = {
  * Affichage Markdown léger pour les textes de médiation (page visiteur).
  * Respecte les sauts « double espace + retour ligne » et les lignes vides entre strophes.
  */
-export function VisitorMediationMarkdown({ text, verseMode = false, className }: VisitorMediationMarkdownProps) {
+export function VisitorMediationMarkdown({ text, verseMode = false, paperTone = false, className }: VisitorMediationMarkdownProps) {
   const source = useMemo(() => normalizeMediationMarkdownSource(text), [text]);
 
   const remarkPlugins = useMemo(() => (verseMode ? [remarkBreaks] : []), [verseMode]);
@@ -25,8 +27,10 @@ export function VisitorMediationMarkdown({ text, verseMode = false, className }:
   return (
     <div
       className={cn(
-        "visitor-mediation-markdown text-sm leading-5 text-[#F0F0F0]/90",
-        "[&_p]:mb-3 [&_p:last-child]:mb-0",
+        "visitor-mediation-markdown",
+        paperTone
+          ? "text-[9px] leading-[12px] text-neutral-900/90 [&_p]:mb-[3px] [&_p:last-child]:mb-0"
+          : "text-sm leading-5 text-[#F0F0F0]/90 [&_p]:mb-3 [&_p:last-child]:mb-0",
         "[&_strong]:font-semibold [&_em]:italic",
         className,
       )}
@@ -36,7 +40,15 @@ export function VisitorMediationMarkdown({ text, verseMode = false, className }:
         components={{
           pre: () => null,
           p: ({ children }) => (
-            <p className="text-sm leading-5 text-[#F0F0F0]/90" style={{ letterSpacing: "-0.3px" }}>{children}</p>
+            <p
+              className={cn(
+                paperTone
+                  ? "text-[9px] leading-[12px] text-neutral-900/90"
+                  : "text-sm leading-5 text-[#F0F0F0]/90 tracking-[-0.3px]",
+              )}
+            >
+              {children}
+            </p>
           ),
           code: ({ children }) => <span className="font-normal">{children}</span>,
           a: ({ href, children }) => (

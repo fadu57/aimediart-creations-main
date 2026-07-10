@@ -38,10 +38,17 @@ export function skipKeyOnInsert(key: string): boolean {
   return READONLY_KEYS_INSERT.has(key);
 }
 
+function capitalizeLabelFirstWord(label: string): string {
+  const trimmed = label.trim();
+  if (!trimmed) return trimmed;
+  return trimmed.charAt(0).toLocaleUpperCase("fr") + trimmed.slice(1);
+}
+
 export function fieldLabel(key: string): string {
   const map: Record<string, string> = {
     id: "Identifiant (UUID)",
-    name_agency: "Nom de l’agence",
+    name_agency: "Nom",
+    acronyme_expo: "Acronyme",
     created_at: "Créé le",
     updated_at: "Modifié le",
     email: "E-mail",
@@ -49,7 +56,16 @@ export function fieldLabel(key: string): string {
     address: "Adresse",
     website: "Site web",
     description: "Description",
-    logo_agency: "Logo de l’agence",
+    logo_agency: "Logo",
+    adresse_agency: "Adresse",
+    compl_adresse_agency: "Adresse complémentaire",
+    zip_agency: "Code postal",
+    city_agency: "Ville",
+    cedex_agency: "Cedex",
+    phone_agency: "Téléphone",
+    mail_agency: "E-mail",
+    web_agency: "Site web",
+    agency_pays: "Pays",
     commercial_kind: "Profil commercial",
     commercial_plan_code: "Abonnement concerné",
     discount_percent: "Remise (%)",
@@ -62,7 +78,12 @@ export function fieldLabel(key: string): string {
     legal_rep_lastname: "Nom du responsable légal",
     legal_rep_role: "Qualité du responsable légal",
   };
-  return map[key] ?? key.replace(/_/g, " ");
+  const fallback = key
+    .replace(/_/g, " ")
+    .replace(/\bagency\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return capitalizeLabelFirstWord(map[key] ?? fallback);
 }
 
 /** Champ logo : upload → URL stockée dans `logo_agency`. */
@@ -70,24 +91,71 @@ export function isAgencyLogoField(key: string): boolean {
   return key === "logo_agency";
 }
 
+/** Champ pays : libellé `COUNTRY_OPTIONS` (comme artists.artist_pays). */
+export function isAgencyCountryField(key: string): boolean {
+  return key === "agency_pays";
+}
+
 /** Ne pas afficher dans le formulaire (UUID généré à la création ou bloc dédié). */
 export function isHiddenAgencyFormKey(key: string): boolean {
   return (
     key === "id" ||
+    key === "deleted_at" ||
+    key === "logo2_agency" ||
     isCommercialAgencyFormKey(key) ||
     isAgencyIdentityFormKey(key) ||
     key === "sponsor_valid_until"
   );
 }
 
-/** Ordre d’affichage : id, nom métier, puis le reste, timestamps en fin. */
+const AGENCY_TIMESTAMP_DISPLAY_KEYS = ["created_at", "updated_at"] as const;
+
+export function isAgencyTimestampDisplayKey(key: string): boolean {
+  return (AGENCY_TIMESTAMP_DISPLAY_KEYS as readonly string[]).includes(key);
+}
+
+/** Cedex, pays, code postal et ville — affichés sur une seule ligne. */
+export const AGENCY_ADDRESS_INLINE_KEYS = [
+  "cedex_agency",
+  "agency_pays",
+  "zip_agency",
+  "city_agency",
+] as const;
+
+const AGENCY_ADDRESS_FIELD_ORDER = [
+  "adresse_agency",
+  "compl_adresse_agency",
+  ...AGENCY_ADDRESS_INLINE_KEYS,
+] as const;
+
+export function isAgencyAddressInlineKey(key: string): boolean {
+  return (AGENCY_ADDRESS_INLINE_KEYS as readonly string[]).includes(key);
+}
+
+/** E-mail, téléphone et site web — affichés sur une seule ligne. */
+export const AGENCY_CONTACT_INLINE_KEYS = ["mail_agency", "phone_agency", "web_agency"] as const;
+
+export function isAgencyContactInlineKey(key: string): boolean {
+  return (AGENCY_CONTACT_INLINE_KEYS as readonly string[]).includes(key);
+}
+
+/** Ordre d’affichage : id, nom métier, adresse structurée, contact, puis le reste, timestamps en fin. */
 export function sortAgencyFieldKeys(keys: string[]): string[] {
   const ts = keys.filter((k) => k.endsWith("_at")).sort();
   const rest = keys.filter((k) => !k.endsWith("_at"));
   const priority = ["id", "name_agency", "logo_agency"];
   const head = priority.filter((k) => rest.includes(k));
-  const mid = rest.filter((k) => !priority.includes(k)).sort((a, b) => a.localeCompare(b, "fr"));
-  return [...head, ...mid, ...ts];
+  const addressOrdered = AGENCY_ADDRESS_FIELD_ORDER.filter(
+    (k) => rest.includes(k) && !priority.includes(k),
+  );
+  const contactOrdered = AGENCY_CONTACT_INLINE_KEYS.filter(
+    (k) => rest.includes(k) && !priority.includes(k),
+  );
+  const orderedSet = new Set<string>([...AGENCY_ADDRESS_FIELD_ORDER, ...AGENCY_CONTACT_INLINE_KEYS]);
+  const mid = rest
+    .filter((k) => !priority.includes(k) && !orderedSet.has(k))
+    .sort((a, b) => a.localeCompare(b, "fr"));
+  return [...head, ...addressOrdered, ...contactOrdered, ...mid, ...ts];
 }
 
 export function valueToInputString(v: unknown): string {

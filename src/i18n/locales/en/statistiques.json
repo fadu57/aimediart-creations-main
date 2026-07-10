@@ -61,9 +61,9 @@
     "exposition": "Exhibition",
     "expoPeriod": "Dates",
     "expoDateRange": "{{from}} – {{to}}",
-    "allExpos": "All exhibitions in scope",
+    "allExpos": "All",
     "artist": "Artist",
-    "allArtists": "All artists in the exhibition"
+    "allArtists": "All"
   },
   "artistCoverLetter": {
     "greeting": "Hello {{firstName}} {{lastName}},",
@@ -113,7 +113,8 @@
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
     "totalVisitsExpo": "Exhibition cumulative total: {{count}} visit(s)",
-    "totalVisitsFiltered": "Cumulative total for filtered period: {{count}} visit(s)"
+    "totalVisitsFiltered": "Cumulative total for filtered period: {{count}} visit(s)",
+    "totalVisitsWeek": "Total for displayed week: {{count}} visit(s)"
   },
   "hourly": {
     "title": "Hourly attendance",

@@ -32,9 +32,31 @@ export type StatisticsPdfTopTableData = {
   }>;
 };
 
+export type StatisticsPdfGeographyTableData = {
+  title: string;
+  disclaimer: string;
+  mapHint: string;
+  errorText: string | null;
+  emptyText: string;
+  visitorHeader: string;
+  pseudoHeader: string;
+  cityHeader: string;
+  countryHeader: string;
+  regionHeader: string;
+  mapImage: { dataUrl: string; format: "JPEG" | "PNG"; widthPx: number; heightPx: number } | null;
+  rows: Array<{
+    label: string;
+    pseudo: string;
+    city: string;
+    country: string;
+    region: string;
+  }>;
+};
+
 export type StatisticsPdfExportTables = {
   cross: StatisticsPdfCrossTableData;
   top: StatisticsPdfTopTableData;
+  geography: StatisticsPdfGeographyTableData;
 };
 
 export type PdfTableLayout = {
@@ -373,6 +395,109 @@ function renderTopTable(
   });
 }
 
+function renderGeographyTable(
+  pdf: jsPDF,
+  layout: PdfTableLayout,
+  data: StatisticsPdfGeographyTableData,
+): void {
+  startTableSectionPage(pdf, layout);
+  let startY = drawSectionIntro(pdf, layout, data.title, "");
+
+  if (data.disclaimer.trim()) {
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(100, 100, 100);
+    const disclaimerLines = pdf.splitTextToSize(data.disclaimer, layout.contentWidthMm) as string[];
+    pdf.text(disclaimerLines, layout.marginMm, startY);
+    startY += disclaimerLines.length * 3.2 + 2;
+  }
+
+  if (data.mapImage && data.mapImage.widthPx > 0 && data.mapImage.heightPx > 0) {
+    const mapDrawHeightMm = Math.min(
+      80,
+      (data.mapImage.heightPx * layout.contentWidthMm) / data.mapImage.widthPx,
+    );
+    pdf.addImage(
+      data.mapImage.dataUrl,
+      data.mapImage.format,
+      layout.marginMm,
+      startY,
+      layout.contentWidthMm,
+      mapDrawHeightMm,
+    );
+    startY += mapDrawHeightMm + 4;
+  }
+
+  if (data.mapHint.trim()) {
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(82, 82, 82);
+    pdf.text(data.mapHint, layout.marginMm, startY);
+    startY += 5;
+  }
+
+  if (data.errorText) {
+    drawPlainMessage(pdf, layout, data.errorText, startY);
+    return;
+  }
+  if (data.rows.length === 0) {
+    drawPlainMessage(pdf, layout, data.emptyText, startY);
+    return;
+  }
+
+  const head = [[
+    data.visitorHeader,
+    data.pseudoHeader,
+    data.cityHeader,
+    data.countryHeader,
+    data.regionHeader,
+  ]];
+  const body = data.rows.map((row) => [
+    row.label,
+    row.pseudo,
+    row.city,
+    row.country,
+    row.region,
+  ]);
+
+  const visitorWidth = layout.contentWidthMm * 0.22;
+  const pseudoWidth = layout.contentWidthMm * 0.18;
+  const cityWidth = layout.contentWidthMm * 0.22;
+  const countryWidth = layout.contentWidthMm * 0.18;
+  const regionWidth = layout.contentWidthMm - visitorWidth - pseudoWidth - cityWidth - countryWidth;
+
+  autoTable(pdf, {
+    head,
+    body,
+    startY,
+    tableWidth: layout.contentWidthMm,
+    margin: {
+      top: layout.marginMm + layout.headerBlockMm,
+      right: layout.marginMm,
+      bottom: layout.marginMm + layout.footerBlockMm,
+      left: layout.marginMm,
+    },
+    showHead: "everyPage",
+    styles: {
+      ...TABLE_STYLES,
+      overflow: "linebreak",
+      cellWidth: "wrap",
+    },
+    headStyles: HEAD_STYLES,
+    columnStyles: {
+      0: { halign: "left", cellWidth: visitorWidth },
+      1: { halign: "left", cellWidth: pseudoWidth },
+      2: { halign: "left", cellWidth: cityWidth },
+      3: { halign: "left", cellWidth: countryWidth },
+      4: { halign: "left", cellWidth: regionWidth },
+    },
+    alternateRowStyles: { fillColor: [255, 255, 255] },
+    didDrawPage: () => {
+      drawBrandHeader(pdf, layout);
+    },
+  });
+}
+
 export async function appendVectorTablesToPdf(
   pdf: jsPDF,
   layout: PdfTableLayout,
@@ -383,4 +508,5 @@ export async function appendVectorTablesToPdf(
 
   renderCrossTable(pdf, layout, tables.cross, emojiCache);
   renderTopTable(pdf, layout, tables.top, imageCache);
+  renderGeographyTable(pdf, layout, tables.geography);
 }

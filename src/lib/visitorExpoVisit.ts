@@ -26,6 +26,52 @@ export function getVisitorExpoVisitStorageKey(expoId: string): string {
   return `${VISIT_STORAGE_PREFIX}${expoId.trim()}`;
 }
 
+/** Expo(s) avec une visite encore active en sessionStorage (avant clôture). */
+export function resolveStoredVisitorExpoIdsFromSession(): string[] {
+  const ids: string[] = [];
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith(VISIT_STORAGE_PREFIX)) continue;
+      const expoId = key.slice(VISIT_STORAGE_PREFIX.length).trim();
+      if (expoId && sessionStorage.getItem(key)?.trim()) ids.push(expoId);
+    }
+  } catch {
+    /* mode privé / quota */
+  }
+  return ids;
+}
+
+/**
+ * Résout l'expo pour le carnet : URL → session visite → dernier feedback.
+ * À appeler avant endVisitorExpoVisit (qui efface la session).
+ */
+export async function resolveVisitorExpoIdForDiary(options: {
+  hint?: string | null;
+  visitorId?: string | null;
+}): Promise<string> {
+  const hint = options.hint?.trim();
+  if (hint) return hint;
+
+  const fromSession = resolveStoredVisitorExpoIdsFromSession();
+  if (fromSession.length > 0) return fromSession[fromSession.length - 1];
+
+  const visitorId = options.visitorId?.trim();
+  if (!visitorId) return "";
+
+  const { data } = await supabase
+    .from("visitor_feedback")
+    .select("expo_id")
+    .eq("visitor_id", visitorId)
+    .not("expo_id", "is", null)
+    .order("submitted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const row = data as { expo_id?: string | null } | null;
+  return row?.expo_id?.trim() || "";
+}
+
 export function getStoredVisitorExpoVisitId(expoId: string): string | null {
   const key = expoId.trim();
   if (!key) return null;

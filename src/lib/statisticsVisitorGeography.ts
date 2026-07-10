@@ -941,8 +941,9 @@ async function loadParticipantsClientSide(params: {
   targetAgencyId: string | null;
   targetExpoId: string | null;
   expoDateRange: { start: Date; end: Date } | null;
+  artistArtworkIds: Set<string> | null;
 }): Promise<VisitorRecord[]> {
-  const feedbackKeys = await loadFeedbackParticipantKeys(params, null);
+  const feedbackKeys = await loadFeedbackParticipantKeys(params, params.artistArtworkIds);
   const profileIds = await collectProfileIdsForScope(params, feedbackKeys);
   const profilesById = await loadProfilesByIds(profileIds);
   const profileRecords = await enrichProfilesWithVisitorData(
@@ -969,10 +970,26 @@ async function loadAllParticipants(params: {
 
   const [rpcRows, clientRows] = await Promise.all([
     loadParticipantsViaRpc(scope),
-    loadParticipantsClientSide(scope),
+    loadParticipantsClientSide({ ...scope, artistArtworkIds: params.artistArtworkIds }),
   ]);
 
-  const merged = mergeParticipantRecords([...(rpcRows ?? []), ...clientRows]);
+  let merged = mergeParticipantRecords([...(rpcRows ?? []), ...clientRows]);
+
+  if (params.artistArtworkIds) {
+    const allowedKeys = new Set(await loadFeedbackParticipantKeys(scope, params.artistArtworkIds));
+    if (allowedKeys.size === 0) return [];
+    merged = merged.filter((record) => {
+      const candidates = [
+        asTrimmed(record.id),
+        asTrimmed(record.auth_user_id),
+        asTrimmed(record.visitor_client_id),
+        asTrimmed(record.visitor_db_id),
+        visitorKeyFromRecord(record),
+      ].filter(Boolean);
+      return candidates.some((key) => allowedKeys.has(key));
+    });
+  }
+
   return merged.filter(shouldIncludeVisitorRecord);
 }
 
@@ -1173,7 +1190,7 @@ export async function fetchVisitorGeographyForStatistics(params: {
     targetAgencyId: params.targetAgencyId,
     targetExpoId: params.targetExpoId,
     expoDateRange: params.expoDateRange,
-    artistArtworkIds: null,
+    artistArtworkIds: params.artistArtworkIds ?? null,
   });
   const rows = visitorRecords
     .map((record) => recordToRow(record))

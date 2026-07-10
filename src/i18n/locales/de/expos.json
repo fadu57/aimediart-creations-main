@@ -42,12 +42,23 @@
     "qrConfirmAction": "Trotzdem neu generieren",
     "qrConfirmCancel": "Abbrechen",
     "cardVisitors": "Ausstellungsbesucher",
+    "visitorTotal": "{{count}} Besucher insgesamt",
+    "artworkTotal_one": "{{count}} Kunstwerk insgesamt",
+    "artworkTotal_other": "{{count}} Kunstwerke insgesamt",
     "costPrefix": "Gesamtkosten:",
     "costUnavailable": "Gesamtkosten: Daten nicht verfügbar"
   },
   "panel": {
     "chooseFormat": "Wählen Sie das zu druckende Tabellenformat",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "welcome": "heißt Sie willkommen.",
+    "welcomeWithTitle": "{{title}} heißt Sie willkommen.",
+    "taglineLine1": "Wenn Sie diesen QR-Code scannen,",
+    "taglineLine2": "wird Ihr Smartphone zu Ihrem",
+    "taglineLine3Prefix": "",
+    "taglineLine3Bold": "emotionalen Reisetagebuch.",
+    "guideLine1": "Wählen Sie Ihren Guide: sind Sie eher Poet, Kind, Erzähler, Hip-Hopper, …?",
+    "guideLine2": "8 Guide-Typen begleiten Sie."
   },
   "form": {
     "navTypeLabel": "Für den Besucher, Navigationstyp",

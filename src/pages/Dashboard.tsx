@@ -10,8 +10,8 @@ import {
   CreditCard,
   ImageIcon,
   Loader2,
+  LogIn,
   Mail,
-  MapPin,
   Pencil,
   Phone,
   UserPlus,
@@ -73,6 +73,7 @@ import {
 } from "@/lib/roleHierarchy";
 import { resolveExpoStorageIds } from "@/lib/expoStorageIds";
 import { supabase } from "@/lib/supabase";
+import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 import { softDeleteUserProfile } from "@/lib/userSoftDelete";
 import type { StandbyPlanCode } from "@/components/organisation/StandbyPlanModal";
 import Users from "@/pages/Users";
@@ -604,14 +605,15 @@ const Dashboard = () => {
                   <ProfileField icon={Mail} label={t("profile.field_email")} value={isViewingSelf ? textOrDash(email) : "—"} />
                   <ProfileField icon={Phone} label={t("profile.field_phone")} value={textOrDash(mergedProfile.phone)} />
                   <ProfileField
-                    icon={MapPin}
-                    label={t("profile.field_location")}
-                    value={
-                      [mergedProfile.city, mergedProfile.zipCode, profile?.country_code].filter(Boolean).join(", ") ||
-                      "—"
-                    }
+                    icon={Calendar}
+                    label={t("profile.field_member_since")}
+                    value={formatDateFr(profile?.created_at)}
                   />
-                  <ProfileField icon={Calendar} label={t("profile.field_member_since")} value={formatDateFr(profile?.created_at)} />
+                  <ProfileField
+                    icon={LogIn}
+                    label={t("profile.field_last_sign_in")}
+                    value={formatUserLastSignIn(profile?.last_sign_in_at, t("profile.never_signed_in"), true)}
+                  />
                 </dl>
 
                 {showSponsoringConventionButton && profileAgencyId ? (
@@ -634,7 +636,12 @@ const Dashboard = () => {
                       {agency && (
                         <p className="text-sm">
                           <Building2 className="inline h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                          {agency.name_agency || agency.id}
+                          <Link
+                            to={`/agencies?agency=${encodeURIComponent(agency.id)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {agency.name_agency || agency.id}
+                          </Link>
                         </p>
                       )}
                     </div>
@@ -644,13 +651,25 @@ const Dashboard = () => {
                           <p className="text-xs text-muted-foreground">{t("profile.expos")}</p>
                           <ul className="space-y-0.5 text-sm text-muted-foreground">
                             {agencyExpos.map((item) => (
-                              <li key={item.id}>{item.label}</li>
+                              <li key={item.id}>
+                                <Link
+                                  to={`/expos?expo=${encodeURIComponent(item.id)}`}
+                                  className="text-primary hover:underline"
+                                >
+                                  {item.label}
+                                </Link>
+                              </li>
                             ))}
                           </ul>
                         </div>
                       ) : expo ? (
                         <p className="text-sm text-muted-foreground">
-                          {t("profile.expo_single", { name: expo.expo_name || expo.id })}
+                          <Link
+                            to={`/expos?expo=${encodeURIComponent(expo.id)}`}
+                            className="text-primary hover:underline"
+                          >
+                            {t("profile.expo_single", { name: expo.expo_name || expo.id })}
+                          </Link>
                         </p>
                       ) : null}
                       {isEtincelleSubscription ? (

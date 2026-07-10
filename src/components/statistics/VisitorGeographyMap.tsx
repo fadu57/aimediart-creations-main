@@ -88,10 +88,21 @@ function FitMapToMarkers({ markers }: { markers: Array<{ lat: number; lon: numbe
     };
 
     const scheduleFit = () => {
+      const host =
+        map.getContainer().closest<HTMLElement>("[data-statistics-geography-map-host]") ??
+        map.getContainer().parentElement;
+      host?.removeAttribute("data-statistics-map-ready");
+
       applyFit();
       for (const delay of [80, 250, 600]) {
         timers.push(window.setTimeout(applyFit, delay));
       }
+      timers.push(
+        window.setTimeout(() => {
+          applyFit();
+          host?.setAttribute("data-statistics-map-ready", "true");
+        }, 700),
+      );
     };
 
     scheduleFit();
@@ -163,6 +174,7 @@ export function VisitorGeographyMap({ rows, scopeKey, height }: Props) {
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        crossOrigin="anonymous"
       />
       <FitMapToMarkers markers={fitPoints} />
       {markers.map((marker) => (

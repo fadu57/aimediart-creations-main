@@ -9,9 +9,7 @@ export type CartelFormatId =
   | "a7-landscape"
   | "square-105"
   | "square-85"
-  | "square-65"
-  | "square-60"
-  | "square-50";
+  | "square-65";
 
 export type CartelFormatGroup = "rectangular" | "square";
 
@@ -94,24 +92,6 @@ export const CARTEL_FORMATS: CartelFormatDef[] = [
     cardsPerPage: 1,
     labelKey: "pdf_format_square_65",
     dimensionsLabel: "65 × 65 mm",
-  },
-  {
-    id: "square-60",
-    group: "square",
-    pageWidthMm: 60,
-    pageHeightMm: 60,
-    cardsPerPage: 1,
-    labelKey: "pdf_format_square_60",
-    dimensionsLabel: "60 × 60 mm",
-  },
-  {
-    id: "square-50",
-    group: "square",
-    pageWidthMm: 50,
-    pageHeightMm: 50,
-    cardsPerPage: 1,
-    labelKey: "pdf_format_square_50",
-    dimensionsLabel: "50 × 50 mm",
   },
 ];
 

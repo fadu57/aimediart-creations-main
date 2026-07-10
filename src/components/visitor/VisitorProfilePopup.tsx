@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ type Props = {
   onClose: () => void;
   onLogout?: () => void;
   onSignup?: () => void;
+  onOpenDiary?: () => void;
 };
 
 export function VisitorProfilePopup({
@@ -25,6 +26,7 @@ export function VisitorProfilePopup({
   onClose,
   onLogout,
   onSignup,
+  onOpenDiary,
 }: Props) {
   const { t } = useTranslation("visitor");
 
@@ -102,6 +104,20 @@ export function VisitorProfilePopup({
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
+          {onOpenDiary ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 border-[#E63946]/50 bg-transparent text-[#F0F0F0] hover:bg-[#E63946]/15"
+              onClick={() => {
+                onClose();
+                onOpenDiary();
+              }}
+            >
+              <BookOpen className="h-4 w-4" aria-hidden />
+              {t("diary.btn_open_diary")}
+            </Button>
+          ) : null}
           {!profile.isAuthenticated && onSignup ? (
             <Button
               type="button"

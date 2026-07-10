@@ -78,7 +78,7 @@ export function AimediartBrandLogoBlock({
           AIMEDIArt.com
         </span>
         <span
-          className={cn("block w-full font-sans font-bold italic leading-snug", tokens.subtitle)}
+          className={cn("block whitespace-nowrap font-sans font-bold italic leading-snug", tokens.subtitle)}
           style={{ color: AIMEDIART_LOGO_RED }}
         >
           Art-mediation with AI

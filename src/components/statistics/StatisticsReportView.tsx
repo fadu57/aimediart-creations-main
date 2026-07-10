@@ -1,13 +1,20 @@
 /**
  * Rapport statistiques dédié à l’impression / export PDF (layout A4, pas le tableau de bord interactif).
  */
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { LucideIcon } from "lucide-react";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatBarVisitLabel, sumChartVisits } from "@/lib/statisticsCharts";
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
+import type { VisitorGeoTableRow } from "@/lib/statisticsVisitorGeography";
+
+const VisitorGeographyMap = lazy(() =>
+  import("@/components/statistics/VisitorGeographyMap").then((module) => ({
+    default: module.VisitorGeographyMap,
+  })),
+);
 
 export type StatisticsMiniKpi = {
   id: "uniqueVisitors" | "avgHearts" | "dominantEmotion" | "activeArtworks";
@@ -92,6 +99,9 @@ export type StatisticsReportViewProps = {
   crossError: string | null;
   sortedTopArtworks: StatisticsTopArtworkRow[];
   topArtworksError: string | null;
+  visitorGeoRows: VisitorGeoTableRow[];
+  visitorGeoError: string | null;
+  visitorGeoMapScopeKey: string;
   formatFrNumber: (n: number, opts?: Intl.NumberFormatOptions) => string;
 };
 
@@ -275,11 +285,18 @@ export function StatisticsReportView({
   crossError,
   sortedTopArtworks,
   topArtworksError,
+  visitorGeoRows = [],
+  visitorGeoError = null,
+  visitorGeoMapScopeKey = "",
   formatFrNumber,
 }: StatisticsReportViewProps) {
   const { t, i18n } = useTranslation("statistiques");
   const filteredVisitsTotal = useMemo(() => sumChartVisits(hourlySeries), [hourlySeries]);
   const artistReportLayout = previewArtistCoverLetter != null;
+  const geographyMappableCount = useMemo(
+    () => visitorGeoRows.filter((row) => row.latitude != null && row.longitude != null).length,
+    [visitorGeoRows],
+  );
 
   return (
     <div
@@ -544,7 +561,7 @@ export function StatisticsReportView({
       </section>
 
       {/* Page 6 — œuvres les plus consultées */}
-      <section className="statistics-report-page statistics-report-page--last statistics-report-page--tables">
+      <section className="statistics-report-page statistics-report-page--tables">
         <StatisticsReportBrand previewAgencyLogoMeta={previewAgencyLogoMeta} />
         <div className={`${sectionShell} statistics-report-table-panel min-h-0`}>
           <div className="statistics-report-table-intro">
@@ -607,6 +624,69 @@ export function StatisticsReportView({
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Page 7 — origine des visiteurs */}
+      <section className="statistics-report-page statistics-report-page--last statistics-report-page--tables">
+        <StatisticsReportBrand previewAgencyLogoMeta={previewAgencyLogoMeta} />
+        <div className={`${sectionShell} statistics-report-table-panel min-h-0`}>
+          <div className="statistics-report-table-intro">
+            <h3 className={headingClass}>{t("geography.title")}</h3>
+            <p className={`mb-3 ${subheadingClass}`}>{t("geography.disclaimer")}</p>
+          </div>
+          {visitorGeoError ? (
+            <p className="text-sm text-red-700">{visitorGeoError}</p>
+          ) : visitorGeoRows.length === 0 ? (
+            <p className="text-sm text-neutral-600">{t("geography.empty")}</p>
+          ) : (
+            <div className="space-y-4">
+              {geographyMappableCount > 0 ? (
+                <div
+                  className="statistics-report-geography-map h-[280px] overflow-hidden rounded-lg border border-neutral-200 sm:h-[320px]"
+                  data-statistics-geography-map-host
+                >
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full items-center justify-center text-sm text-neutral-600">
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin text-[#E63946]" aria-hidden />
+                        {t("geography.loading")}
+                      </div>
+                    }
+                  >
+                    <VisitorGeographyMap rows={visitorGeoRows} scopeKey={`${visitorGeoMapScopeKey}|report`} height={320} />
+                  </Suspense>
+                </div>
+              ) : null}
+              <p className="text-xs text-neutral-600">
+                {t("geography.mapHint", { mapped: geographyMappableCount, total: visitorGeoRows.length })}
+              </p>
+              <div className="overflow-x-auto rounded-lg border border-neutral-200">
+                <table className="statistics-report-data-table w-full min-w-[40rem] text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-200 bg-neutral-100">
+                      <th className="px-2 py-2 text-left font-semibold text-neutral-900">{t("geography.colVisitor")}</th>
+                      <th className="px-2 py-2 text-left font-semibold text-neutral-900">{t("geography.colPseudo")}</th>
+                      <th className="px-2 py-2 text-left font-semibold text-neutral-900">{t("geography.colCity")}</th>
+                      <th className="px-2 py-2 text-left font-semibold text-neutral-900">{t("geography.colCountry")}</th>
+                      <th className="px-2 py-2 text-left font-semibold text-neutral-900">{t("geography.colRegion")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visitorGeoRows.map((row) => (
+                      <tr key={row.visitorKey} className="border-b border-neutral-100">
+                        <td className="px-2 py-2 font-medium text-neutral-900">{row.label || "—"}</td>
+                        <td className="px-2 py-2 text-neutral-800">{row.pseudo || "—"}</td>
+                        <td className="px-2 py-2 text-neutral-800">{row.city || "—"}</td>
+                        <td className="px-2 py-2 text-neutral-800">{row.country || "—"}</td>
+                        <td className="px-2 py-2 text-neutral-800">{row.region || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

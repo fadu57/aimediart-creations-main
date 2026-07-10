@@ -32,8 +32,12 @@ import {
   COMMERCIAL_AGENCY_KEYS,
   defaultCommercialAgencyValues,
   fieldLabel,
+  isAgencyAddressInlineKey,
+  isAgencyContactInlineKey,
+  isAgencyCountryField,
   isAgencyLogoField,
   isHiddenAgencyFormKey,
+  isAgencyTimestampDisplayKey,
   isReadonlyAgencyKey,
   parseInputForKey,
   skipKeyOnInsert,
@@ -53,23 +57,28 @@ import {
   validateAgencyIdentityValues,
 } from "@/lib/agencyIdentity";
 import {
+  COMMERCIAL_KIND_ADD_OPTION,
   COMMERCIAL_KIND_OPTIONS,
   COMMERCIAL_PLAN_OPTIONS,
   computeDiscountEurFromPercent,
   computeDiscountPercentFromEur,
   formatCommercialDiscountInput,
   formatCommercialDiscountEurInput,
+  isPresetCommercialKind,
+  normalizeCommercialKindForSave,
   parseCommercialDiscountInput,
   resolveCommercialDiscountForSave,
   syncCommercialDiscountDisplayValues,
   type CommercialDiscountDriver,
-  type CommercialKind,
   type CommercialPlanCode,
 } from "@/lib/organisation/commercialTerms";
 import { fetchPricingByPlanCode } from "@/lib/organisation/publicHomeData";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { useAuthUser } from "@/hooks/useAuthUser";
+import { COUNTRY_OPTIONS } from "@/lib/countries";
+import { CountryFlagIcon } from "@/components/CountryFlagIcon";
 
 type Mode = "create" | "edit";
 
@@ -77,7 +86,7 @@ export type AgencyFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: Mode;
-  /** En édition : id de l’agence ; en création : ignoré */
+  /** En édition : id de l'agence ; en création : ignoré */
   agencyId: string | null;
   /** Colonnes connues (issues d’un `select * limit 1` ou repli minimal). */
   fieldKeys: string[];
@@ -95,10 +104,18 @@ function formatCommercialEur(value: number): string {
   }).format(value);
 }
 
-function validateCommercialValues(values: Record<string, string>, t: TFunction): string | null {
+function validateCommercialValues(
+  values: Record<string, string>,
+  t: TFunction,
+  commercialKindInputMode: "preset" | "custom",
+): string | null {
   const plan = (values.commercial_plan_code ?? "").trim().toUpperCase();
   if (!["ATELIER", "HORIZON", "RAYONNEMENT"].includes(plan)) {
     return t("form.validate_plan_required");
+  }
+  const kind = (values.commercial_kind ?? "").trim();
+  if (commercialKindInputMode === "custom" && !kind) {
+    return t("form.validate_commercial_kind_required");
   }
   const pctRaw = (values.discount_percent ?? "").trim().replace(",", ".");
   if (pctRaw !== "") {
@@ -139,7 +156,7 @@ function appendCommercialPayload(
       continue;
     }
     if (key === "commercial_kind") {
-      payload[key] = (raw.trim() || "standard") as CommercialKind;
+      payload[key] = normalizeCommercialKindForSave(raw);
       continue;
     }
     if (key === "commercial_plan_code") {
@@ -166,6 +183,13 @@ function getErrorMessage(e: unknown, fallback: string): string {
     if (typeof m === "string" && m.trim()) return m;
   }
   return fallback;
+}
+
+function resolveAgencyCountryValue(raw: string): string {
+  const paysRaw = raw.trim();
+  if (!paysRaw) return "";
+  if (COUNTRY_OPTIONS.some((c) => c.label === paysRaw)) return paysRaw;
+  return "Autres";
 }
 
 async function uploadAgencyLogoToStorage(file: File, agencyId: string, t: TFunction): Promise<string> {
@@ -210,6 +234,12 @@ export function AgencyFormDialog({
   onSuccess,
 }: AgencyFormDialogProps) {
   const { t } = useTranslation("agencies");
+  const { role_id } = useAuthUser();
+  const showCommercialTermsBlock =
+    canEditCommercialTerms &&
+    typeof role_id === "number" &&
+    role_id >= 1 &&
+    role_id <= 3;
   const [loadingRow, setLoadingRow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -219,6 +249,8 @@ export function AgencyFormDialog({
   const [logoPreviewByKey, setLogoPreviewByKey] = useState<Record<string, string>>({});
   const [listPriceEur, setListPriceEur] = useState<number | null>(null);
   const discountDriverRef = useRef<CommercialDiscountDriver | null>(null);
+  const [commercialKindInputMode, setCommercialKindInputMode] = useState<"preset" | "custom">("preset");
+  const [savedCustomCommercialKinds, setSavedCustomCommercialKinds] = useState<string[]>([]);
   /** Colonnes affichées : élargies après un chargement `select *` en édition. */
   const [activeKeys, setActiveKeys] = useState<string[]>(fieldKeys.length ? fieldKeys : ["id", "name_agency", "logo_agency"]);
 
@@ -273,7 +305,7 @@ export function AgencyFormDialog({
   );
 
   useEffect(() => {
-    if (!open || !canEditCommercialTerms) {
+    if (!open || !showCommercialTermsBlock) {
       setListPriceEur(null);
       return;
     }
@@ -290,10 +322,10 @@ export function AgencyFormDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, canEditCommercialTerms, values.commercial_plan_code]);
+  }, [open, showCommercialTermsBlock, values.commercial_plan_code]);
 
   useEffect(() => {
-    if (!open || !canEditCommercialTerms || listPriceEur == null || listPriceEur <= 0) return;
+    if (!open || !showCommercialTermsBlock || listPriceEur == null || listPriceEur <= 0) return;
     const driver = discountDriverRef.current;
     if (driver === "percent") {
       setValues((prev) => applyDiscountSync(prev, "percent", prev.discount_percent ?? "0"));
@@ -304,7 +336,33 @@ export function AgencyFormDialog({
       return;
     }
     setValues((prev) => syncCommercialDiscountDisplayValues(prev, listPriceEur));
-  }, [open, canEditCommercialTerms, listPriceEur, values.commercial_plan_code, applyDiscountSync]);
+  }, [open, showCommercialTermsBlock, listPriceEur, values.commercial_plan_code, applyDiscountSync]);
+
+  const syncCommercialKindInputMode = useCallback((kind: string | null | undefined) => {
+    setCommercialKindInputMode(isPresetCommercialKind(kind) ? "preset" : "custom");
+  }, []);
+
+  useEffect(() => {
+    if (!open || !showCommercialTermsBlock) return;
+    let cancelled = false;
+    void supabase
+      .from("agencies")
+      .select("commercial_kind")
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        const customs = [
+          ...new Set(
+            (data ?? [])
+              .map((row) => (row.commercial_kind ?? "").trim())
+              .filter((kind) => kind && !isPresetCommercialKind(kind)),
+          ),
+        ].sort((a, b) => a.localeCompare(b, "fr"));
+        setSavedCustomCommercialKinds(customs);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, showCommercialTermsBlock]);
 
   const loadRow = useCallback(async () => {
     if (mode !== "edit" || !agencyId) return;
@@ -334,16 +392,20 @@ export function AgencyFormDialog({
       if (nextValues.siret?.trim()) {
         nextValues.siret = formatSiretDisplay(nextValues.siret);
       }
+      if ("agency_pays" in nextValues) {
+        nextValues.agency_pays = resolveAgencyCountryValue(nextValues.agency_pays ?? "");
+      }
       discountDriverRef.current = null;
       setValues(nextValues);
       setInitialValues(nextValues);
+      syncCommercialKindInputMode(nextValues.commercial_kind);
     } catch (e) {
       toast.error(getErrorMessage(e, t("form.agency_load_failed")));
       onOpenChange(false);
     } finally {
       setLoadingRow(false);
     }
-  }, [mode, agencyId, onOpenChange, t]);
+  }, [mode, agencyId, onOpenChange, t, syncCommercialKindInputMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -360,17 +422,21 @@ export function AgencyFormDialog({
         if (skipKeyOnInsert(k)) continue;
         next[k] = "";
       }
-      if (canEditCommercialTerms) {
+      if (showCommercialTermsBlock) {
         Object.assign(next, defaultCommercialAgencyValues());
       }
       Object.assign(next, defaultAgencyIdentityValues());
+      if (keys.includes("agency_pays")) {
+        next.agency_pays = "France";
+      }
       discountDriverRef.current = null;
       setValues(next);
       setInitialValues(next);
+      setCommercialKindInputMode("preset");
       return;
     }
     void loadRow();
-  }, [open, mode, agencyId, fieldKeys, loadRow, canEditCommercialTerms]);
+  }, [open, mode, agencyId, fieldKeys, loadRow, showCommercialTermsBlock]);
 
   useEffect(() => {
     if (open) return;
@@ -387,8 +453,8 @@ export function AgencyFormDialog({
       toast.error(identityError);
       return;
     }
-    if (canEditCommercialTerms) {
-      const commercialError = validateCommercialValues(values, t);
+    if (showCommercialTermsBlock) {
+      const commercialError = validateCommercialValues(values, t, commercialKindInputMode);
       if (commercialError) {
         toast.error(commercialError);
         return;
@@ -397,7 +463,7 @@ export function AgencyFormDialog({
 
     setSaving(true);
     try {
-      const mergedValues = canEditCommercialTerms ? mergeAgencyFormDefaults(values) : { ...defaultAgencyIdentityValues(), ...values };
+      const mergedValues = showCommercialTermsBlock ? mergeAgencyFormDefaults(values) : { ...defaultAgencyIdentityValues(), ...values };
       const targetAgencyId =
         mode === "edit" ? agencyId?.trim() || "" : String(mergedValues.id ?? "").trim() || crypto.randomUUID();
 
@@ -419,7 +485,7 @@ export function AgencyFormDialog({
           if (parsed !== null && parsed !== "") payload[k] = parsed;
         }
         appendAgencyIdentityPayload(payload, mergedValues);
-        if (canEditCommercialTerms) {
+        if (showCommercialTermsBlock) {
           appendCommercialPayload(payload, mergedValues, discountDriverRef.current);
         }
 
@@ -431,14 +497,14 @@ export function AgencyFormDialog({
         const payload: Record<string, unknown> = {};
         for (const k of Object.keys(mergedValues)) {
           if (k === "id" || k === "created_at" || k === "updated_at") continue;
-          if (canEditCommercialTerms && (COMMERCIAL_AGENCY_KEYS as readonly string[]).includes(k)) continue;
+          if (showCommercialTermsBlock && (COMMERCIAL_AGENCY_KEYS as readonly string[]).includes(k)) continue;
           if (isAgencyIdentityFormKey(k)) continue;
           const raw = mergedValues[k] ?? "";
           const t = raw.trim();
           payload[k] = t === "" ? null : parseInputForKey(k, raw);
         }
         appendAgencyIdentityPayload(payload, mergedValues);
-        if (canEditCommercialTerms) {
+        if (showCommercialTermsBlock) {
           appendCommercialPayload(payload, mergedValues, discountDriverRef.current);
         }
         const { error } = await supabase.from("agencies").update(payload).eq("id", agencyId);
@@ -483,11 +549,11 @@ export function AgencyFormDialog({
       }}
     >
       <DialogContent
-        className="max-h-[90vh] max-w-lg overflow-y-auto overflow-x-hidden border-border bg-background p-0 gap-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:max-w-xl"
+        className="flex w-full max-h-[90vh] max-w-[800px] flex-col gap-0 overflow-hidden rounded-lg border-border bg-background p-0 shadow-xl bg-gradient-to-b from-[#f8f8f8] via-white to-[#f6f2eb] sm:p-0"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
-        <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
+        <div className="w-full shrink-0 rounded-t-lg border-b border-[#c92f3b] bg-[#E63946] px-4 py-3 shadow-sm sm:px-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-xl text-white sm:text-2xl">
               {mode === "create" ? t("form.title_create") : t("form.title_edit")}
@@ -511,13 +577,159 @@ export function AgencyFormDialog({
           </div>
         </div>
 
-        <div className="px-4 sm:px-5 pt-3 pb-4">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4 pt-3 sm:px-5">
           {loadingRow ? (
             <p className="text-sm text-muted-foreground py-6">{t("form.loading")}</p>
           ) : (
             <div className="grid gap-3 py-1">
+              {(() => {
+                const logoKey = "logo_agency";
+                const nameKey = "name_agency";
+                const acronymeKey = "acronyme_expo";
+
+                const isHeaderKeyVisible = (key: string) =>
+                  sortedKeys.includes(key) &&
+                  !isHiddenAgencyFormKey(key) &&
+                  !(mode === "create" && skipKeyOnInsert(key));
+
+                const showLogo = isHeaderKeyVisible(logoKey);
+                const showName = isHeaderKeyVisible(nameKey);
+                const showAcronyme = isHeaderKeyVisible(acronymeKey);
+                if (!showLogo && !showName && !showAcronyme) return null;
+
+                const logoValue = values[logoKey] ?? "";
+                const logoReadonly = isReadonlyAgencyKey(logoKey, mode);
+                const previewUrl = logoPreviewByKey[logoKey];
+                const showStoredLogo = logoValue.trim() && !previewUrl;
+
+                return (
+                  <div className="space-y-3">
+                    {showLogo ? (
+                      <div className="space-y-2">
+                        <Label htmlFor={`agency-field-${logoKey}`} className="text-xs font-medium">
+                          {fieldLabel(logoKey)}
+                        </Label>
+                        <div className="flex items-start gap-3">
+                          {previewUrl || showStoredLogo ? (
+                            <img
+                              src={previewUrl || logoValue.trim()}
+                              alt=""
+                              className="h-20 w-[200px] shrink-0 rounded-md border border-border object-contain bg-muted/30"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-20 w-[200px] shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted/20 text-[11px] text-muted-foreground"
+                              aria-hidden
+                            >
+                              —
+                            </div>
+                          )}
+                          <div className="flex min-w-0 flex-1 flex-col gap-2">
+                            <Input
+                              id={`agency-field-${logoKey}`}
+                              name={`agency_${logoKey}`}
+                              type="file"
+                              accept="image/*"
+                              disabled={logoReadonly || saving}
+                              className="w-[130px] cursor-pointer shadow-none file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] ?? null;
+                                e.target.value = "";
+                                if (!file) return;
+                                try {
+                                  assertImageFileAllowed(file);
+                                } catch (err) {
+                                  toast.error(
+                                    err instanceof Error ? err.message : t("form.invalid_image_file"),
+                                  );
+                                  return;
+                                }
+                                setLogoFileByKey((prev) => ({ ...prev, [logoKey]: file }));
+                                setLogoPreviewByKey((prev) => {
+                                  const old = prev[logoKey];
+                                  if (old) URL.revokeObjectURL(old);
+                                  return { ...prev, [logoKey]: URL.createObjectURL(file) };
+                                });
+                              }}
+                            />
+                            {!logoReadonly && (logoValue.trim() || logoFileByKey[logoKey]) ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-[130px] border border-black px-2 text-xs"
+                                disabled={saving}
+                                onClick={() => {
+                                  setValues((prev) => ({ ...prev, [logoKey]: "" }));
+                                  setLogoFileByKey((prev) => ({ ...prev, [logoKey]: null }));
+                                  setLogoPreviewByKey((prev) => {
+                                    const u = prev[logoKey];
+                                    if (u) URL.revokeObjectURL(u);
+                                    const { [logoKey]: _, ...rest } = prev;
+                                    return rest;
+                                  });
+                                }}
+                              >
+                                {t("form.remove_logo")}
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {(showName || showAcronyme) ? (
+                      <div className="flex flex-row flex-nowrap items-start gap-3">
+                        {showName ? (
+                          <div className="w-[390px] shrink-0 space-y-1.5">
+                            <Label htmlFor={`agency-field-${nameKey}`} className="text-xs font-medium">
+                              {fieldLabel(nameKey)}
+                            </Label>
+                            <Input
+                              id={`agency-field-${nameKey}`}
+                              name={`agency_${nameKey}`}
+                              value={values[nameKey] ?? ""}
+                              readOnly={isReadonlyAgencyKey(nameKey, mode)}
+                              className={
+                                isReadonlyAgencyKey(nameKey, mode)
+                                  ? "grid bg-muted/50"
+                                  : "grid shadow-none"
+                              }
+                              onChange={(e) =>
+                                setValues((prev) => ({ ...prev, [nameKey]: e.target.value }))
+                              }
+                            />
+                          </div>
+                        ) : null}
+                        {showAcronyme ? (
+                          <div className="w-[150px] shrink-0 space-y-1.5">
+                            <Label htmlFor={`agency-field-${acronymeKey}`} className="text-xs font-medium">
+                              {fieldLabel(acronymeKey)}
+                            </Label>
+                            <Input
+                              id={`agency-field-${acronymeKey}`}
+                              name={`agency_${acronymeKey}`}
+                              value={values[acronymeKey] ?? ""}
+                              readOnly={isReadonlyAgencyKey(acronymeKey, mode)}
+                              className={
+                                isReadonlyAgencyKey(acronymeKey, mode) ? "bg-muted/50" : "shadow-none"
+                              }
+                              onChange={(e) =>
+                                setValues((prev) => ({ ...prev, [acronymeKey]: e.target.value }))
+                              }
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
               {sortedKeys.map((key) => {
               if (isHiddenAgencyFormKey(key)) return null;
+              if (key === "name_agency" || key === "logo_agency" || key === "acronyme_expo") return null;
+              if (isAgencyTimestampDisplayKey(key)) return null;
 
               const readonly = isReadonlyAgencyKey(key, mode);
               const hiddenOnCreate = mode === "create" && skipKeyOnInsert(key);
@@ -527,71 +739,219 @@ export function AgencyFormDialog({
               const multiline = shouldUseTextarea(key);
 
               if (isAgencyLogoField(key)) {
-                const previewUrl = logoPreviewByKey[key];
-                const showStoredLogo = v.trim() && !previewUrl;
+                return null;
+              }
+
+              if (isAgencyAddressInlineKey(key)) {
+                if (key !== "cedex_agency") return null;
+
+                const cedexKey = "cedex_agency";
+                const paysKey = "agency_pays";
+                const zipKey = "zip_agency";
+                const cityKey = "city_agency";
+
+                const isInlineFieldVisible = (fieldKey: string) =>
+                  sortedKeys.includes(fieldKey) &&
+                  !isHiddenAgencyFormKey(fieldKey) &&
+                  !(mode === "create" && skipKeyOnInsert(fieldKey));
+
+                const showCedex = isInlineFieldVisible(cedexKey);
+                const showPays = isInlineFieldVisible(paysKey);
+                const showZip = isInlineFieldVisible(zipKey);
+                const showCity = isInlineFieldVisible(cityKey);
+                if (!showCedex && !showPays && !showZip && !showCity) return null;
+
+                const cedexReadonly = isReadonlyAgencyKey(cedexKey, mode);
+                const paysReadonly = isReadonlyAgencyKey(paysKey, mode);
+                const zipReadonly = isReadonlyAgencyKey(zipKey, mode);
+                const cityReadonly = isReadonlyAgencyKey(cityKey, mode);
+                const countryValue = resolveAgencyCountryValue(values[paysKey] ?? "");
+
                 return (
-                  <div key={key} className="space-y-2">
+                  <div key="agency-address-inline" className="flex flex-row flex-nowrap items-start gap-3">
+                    {showCedex ? (
+                      <div className="w-[150px] shrink-0 space-y-1.5">
+                        <Label htmlFor={`agency-field-${cedexKey}`} className="text-xs font-medium">
+                          {fieldLabel(cedexKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${cedexKey}`}
+                          name={`agency_${cedexKey}`}
+                          value={values[cedexKey] ?? ""}
+                          readOnly={cedexReadonly}
+                          className={cedexReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [cedexKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                    {showPays ? (
+                      <div className="w-[50px] shrink-0 space-y-1.5">
+                        <Label htmlFor={`agency-field-${paysKey}`} className="text-xs font-medium">
+                          {fieldLabel(paysKey)}
+                        </Label>
+                        <Select
+                          value={countryValue || undefined}
+                          onValueChange={(value) =>
+                            setValues((prev) => ({ ...prev, [paysKey]: value }))
+                          }
+                          disabled={paysReadonly || saving}
+                        >
+                          <SelectTrigger id={`agency-field-${paysKey}`} className="shadow-none">
+                            <SelectValue placeholder={t("form.choose_country")} />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            {COUNTRY_OPTIONS.map((c) => (
+                              <SelectItem key={c.label} value={c.label}>
+                                <span className="flex items-center gap-2">
+                                  <CountryFlagIcon iso={c.iso} />
+                                  <span>{c.label}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    {showZip ? (
+                      <div className="w-[80px] shrink-0 space-y-1.5">
+                        <Label htmlFor={`agency-field-${zipKey}`} className="text-xs font-medium">
+                          {fieldLabel(zipKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${zipKey}`}
+                          name={`agency_${zipKey}`}
+                          value={values[zipKey] ?? ""}
+                          readOnly={zipReadonly}
+                          className={zipReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [zipKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                    {showCity ? (
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Label htmlFor={`agency-field-${cityKey}`} className="text-xs font-medium">
+                          {fieldLabel(cityKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${cityKey}`}
+                          name={`agency_${cityKey}`}
+                          value={values[cityKey] ?? ""}
+                          readOnly={cityReadonly}
+                          className={cityReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [cityKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              if (isAgencyContactInlineKey(key)) {
+                if (key !== "mail_agency") return null;
+
+                const mailKey = "mail_agency";
+                const phoneKey = "phone_agency";
+                const webKey = "web_agency";
+
+                const isInlineFieldVisible = (fieldKey: string) =>
+                  sortedKeys.includes(fieldKey) &&
+                  !isHiddenAgencyFormKey(fieldKey) &&
+                  !(mode === "create" && skipKeyOnInsert(fieldKey));
+
+                const showMail = isInlineFieldVisible(mailKey);
+                const showPhone = isInlineFieldVisible(phoneKey);
+                const showWeb = isInlineFieldVisible(webKey);
+                if (!showMail && !showPhone && !showWeb) return null;
+
+                const mailReadonly = isReadonlyAgencyKey(mailKey, mode);
+                const phoneReadonly = isReadonlyAgencyKey(phoneKey, mode);
+                const webReadonly = isReadonlyAgencyKey(webKey, mode);
+
+                return (
+                  <div key="agency-contact-inline" className="flex flex-row flex-nowrap items-start gap-3">
+                    {showMail ? (
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Label htmlFor={`agency-field-${mailKey}`} className="text-xs font-medium">
+                          {fieldLabel(mailKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${mailKey}`}
+                          name={`agency_${mailKey}`}
+                          type="email"
+                          autoComplete="email"
+                          value={values[mailKey] ?? ""}
+                          readOnly={mailReadonly}
+                          className={mailReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [mailKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                    {showPhone ? (
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Label htmlFor={`agency-field-${phoneKey}`} className="text-xs font-medium">
+                          {fieldLabel(phoneKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${phoneKey}`}
+                          name={`agency_${phoneKey}`}
+                          type="tel"
+                          autoComplete="tel"
+                          value={values[phoneKey] ?? ""}
+                          readOnly={phoneReadonly}
+                          className={phoneReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [phoneKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                    {showWeb ? (
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Label htmlFor={`agency-field-${webKey}`} className="text-xs font-medium">
+                          {fieldLabel(webKey)}
+                        </Label>
+                        <Input
+                          id={`agency-field-${webKey}`}
+                          name={`agency_${webKey}`}
+                          type="url"
+                          autoComplete="url"
+                          value={values[webKey] ?? ""}
+                          readOnly={webReadonly}
+                          className={webReadonly ? "bg-muted/50" : "shadow-none"}
+                          onChange={(e) => setValues((prev) => ({ ...prev, [webKey]: e.target.value }))}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              }
+
+              if (isAgencyCountryField(key)) {
+                const countryValue = resolveAgencyCountryValue(v);
+                return (
+                  <div key={key} className="w-[50px] shrink-0 space-y-1.5">
                     <Label htmlFor={`agency-field-${key}`} className="text-xs font-medium">
                       {fieldLabel(key)}
                     </Label>
-                    <p className="text-[11px] text-muted-foreground leading-snug">
-                      {t("form.logo_hint")}
-                    </p>
-                    {(previewUrl || showStoredLogo) && (
-                      <div className="flex items-start gap-3">
-                        <img
-                          src={previewUrl || v.trim()}
-                          alt=""
-                          className="h-20 max-w-[200px] rounded-md border border-border object-contain bg-muted/30"
-                        />
-                      </div>
-                    )}
-                    <Input
-                      id={`agency-field-${key}`}
-                      name={`agency_${key}`}
-                      type="file"
-                      accept="image/*"
+                    <Select
+                      value={countryValue || undefined}
+                      onValueChange={(value) =>
+                        setValues((prev) => ({ ...prev, [key]: value }))
+                      }
                       disabled={readonly || saving}
-                      className="cursor-pointer shadow-none file:mr-2 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        if (!file) return;
-                        try {
-                          assertImageFileAllowed(file);
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : t("form.invalid_image_file"));
-                          return;
-                        }
-                        setLogoFileByKey((prev) => ({ ...prev, [key]: file }));
-                        setLogoPreviewByKey((prev) => {
-                          const old = prev[key];
-                          if (old) URL.revokeObjectURL(old);
-                          return { ...prev, [key]: URL.createObjectURL(file) };
-                        });
-                      }}
-                    />
-                    {!readonly && (v.trim() || logoFileByKey[key]) && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-xs"
-                        disabled={saving}
-                        onClick={() => {
-                          setValues((prev) => ({ ...prev, [key]: "" }));
-                          setLogoFileByKey((prev) => ({ ...prev, [key]: null }));
-                          setLogoPreviewByKey((prev) => {
-                            const u = prev[key];
-                            if (u) URL.revokeObjectURL(u);
-                            const { [key]: _, ...rest } = prev;
-                            return rest;
-                          });
-                        }}
-                      >
-                        {t("form.remove_logo")}
-                      </Button>
-                    )}
+                    >
+                      <SelectTrigger id={`agency-field-${key}`} className="shadow-none">
+                        <SelectValue placeholder={t("form.choose_country")} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {COUNTRY_OPTIONS.map((c) => (
+                          <SelectItem key={c.label} value={c.label}>
+                            <span className="flex items-center gap-2">
+                              <CountryFlagIcon iso={c.iso} />
+                              <span>{c.label}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 );
               }
@@ -628,92 +988,94 @@ export function AgencyFormDialog({
               <div className="mt-2 space-y-3 rounded-lg border border-border/60 bg-muted/20 p-4">
                 <p className="text-sm font-semibold text-foreground">{t("form.legal_identity")}</p>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="agency-structure-category" className="text-xs font-medium">
-                    {fieldLabel("structure_category")}
-                  </Label>
-                  <Select
-                    value={structureCategory || undefined}
-                    onValueChange={(value) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        structure_category: value,
-                        structure_type: "",
-                        legal_rep_role: "",
-                      }))
-                    }
-                    disabled={saving}
-                  >
-                    <SelectTrigger id="agency-structure-category" className="shadow-none">
-                      <SelectValue placeholder={t("form.choose_structure_family")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {AGENCY_STRUCTURE_CATEGORIES.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-row flex-nowrap items-start gap-3">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="agency-structure-category" className="text-xs font-medium">
+                      {fieldLabel("structure_category")}
+                    </Label>
+                    <Select
+                      value={structureCategory || undefined}
+                      onValueChange={(value) =>
+                        setValues((prev) => ({
+                          ...prev,
+                          structure_category: value,
+                          structure_type: "",
+                          legal_rep_role: "",
+                        }))
+                      }
+                      disabled={saving}
+                    >
+                      <SelectTrigger id="agency-structure-category" className="shadow-none">
+                        <SelectValue placeholder={t("form.choose_structure_family")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AGENCY_STRUCTURE_CATEGORIES.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="agency-structure-type" className="text-xs font-medium">
+                      {fieldLabel("structure_type")}
+                    </Label>
+                    <Select
+                      value={structureType || undefined}
+                      onValueChange={(value) =>
+                        setValues((prev) => ({
+                          ...prev,
+                          structure_type: value,
+                          legal_rep_role: legalRepRolesForStructureType(value).includes(
+                            prev.legal_rep_role as (typeof AGENCY_LEGAL_REP_ROLES)[number]["value"],
+                          )
+                            ? prev.legal_rep_role
+                            : "",
+                        }))
+                      }
+                      disabled={saving || !structureCategory}
+                    >
+                      <SelectTrigger id="agency-structure-type" className="shadow-none">
+                        <SelectValue placeholder={t("form.choose_legal_form")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {identityStructureOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="w-[180px] shrink-0 space-y-1.5">
+                    <Label htmlFor="agency-siret" className="text-xs font-medium">
+                      {fieldLabel("siret")}
+                    </Label>
+                    <Input
+                      id="agency-siret"
+                      name="agency_siret"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="XXX XXX XXX XXXXX"
+                      value={values.siret ?? ""}
+                      disabled={saving}
+                      className="shadow-none font-mono tracking-wide"
+                      onChange={(e) =>
+                        setValues((prev) => ({
+                          ...prev,
+                          siret: formatSiretDisplay(e.target.value),
+                        }))
+                      }
+                    />
+                    <p className="text-[11px] text-muted-foreground">{t("form.siret_hint")}</p>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="agency-structure-type" className="text-xs font-medium">
-                    {fieldLabel("structure_type")}
-                  </Label>
-                  <Select
-                    value={structureType || undefined}
-                    onValueChange={(value) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        structure_type: value,
-                        legal_rep_role: legalRepRolesForStructureType(value).includes(
-                          prev.legal_rep_role as (typeof AGENCY_LEGAL_REP_ROLES)[number]["value"],
-                        )
-                          ? prev.legal_rep_role
-                          : "",
-                      }))
-                    }
-                    disabled={saving || !structureCategory}
-                  >
-                    <SelectTrigger id="agency-structure-type" className="shadow-none">
-                      <SelectValue placeholder={t("form.choose_legal_form")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {identityStructureOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="agency-siret" className="text-xs font-medium">
-                    {fieldLabel("siret")}
-                  </Label>
-                  <Input
-                    id="agency-siret"
-                    name="agency_siret"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    placeholder="XXX XXX XXX XXXXX"
-                    value={values.siret ?? ""}
-                    disabled={saving}
-                    className="shadow-none font-mono tracking-wide"
-                    onChange={(e) =>
-                      setValues((prev) => ({
-                        ...prev,
-                        siret: formatSiretDisplay(e.target.value),
-                      }))
-                    }
-                  />
-                  <p className="text-[11px] text-muted-foreground">{t("form.siret_hint")}</p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+                <div className="flex flex-row flex-nowrap items-start gap-3">
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-legal-rep-firstname" className="text-xs font-medium">
                       {fieldLabel("legal_rep_firstname")}
                     </Label>
@@ -728,7 +1090,7 @@ export function AgencyFormDialog({
                       }
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-legal-rep-lastname" className="text-xs font-medium">
                       {fieldLabel("legal_rep_lastname")}
                     </Label>
@@ -743,91 +1105,136 @@ export function AgencyFormDialog({
                       }
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="agency-legal-rep-role" className="text-xs font-medium">
-                    {fieldLabel("legal_rep_role")}
-                  </Label>
-                  <Select
-                    value={(values.legal_rep_role?.trim() || undefined) as string | undefined}
-                    onValueChange={(value) =>
-                      setValues((prev) => ({ ...prev, legal_rep_role: value }))
-                    }
-                    disabled={saving || !structureType}
-                  >
-                    <SelectTrigger id="agency-legal-rep-role" className="shadow-none">
-                      <SelectValue placeholder={t("form.choose_legal_rep_role")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {identityRoleOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="agency-legal-rep-role" className="text-xs font-medium">
+                      {fieldLabel("legal_rep_role")}
+                    </Label>
+                    <Select
+                      value={(values.legal_rep_role?.trim() || undefined) as string | undefined}
+                      onValueChange={(value) =>
+                        setValues((prev) => ({ ...prev, legal_rep_role: value }))
+                      }
+                      disabled={saving || !structureType}
+                    >
+                      <SelectTrigger id="agency-legal-rep-role" className="shadow-none">
+                        <SelectValue placeholder={t("form.choose_legal_rep_role")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {identityRoleOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
-              {canEditCommercialTerms ? (
-                <div className="mt-2 space-y-3 rounded-lg border border-[#9d2525]/20 bg-[#fff9f7] p-4">
+              {showCommercialTermsBlock ? (
+                <div className="space-y-3 rounded-lg border border-[#9d2525]/20 bg-[#fff9f7] p-4">
                   <p className="text-sm font-semibold text-[#9d2525]">{t("form.commercial_terms")}</p>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="agency-commercial-kind" className="text-xs font-medium">
-                      {fieldLabel("commercial_kind")}
-                    </Label>
-                    <Select
-                      value={(values.commercial_kind?.trim() || "standard") as CommercialKind}
-                      onValueChange={(value) =>
-                        setValues((prev) => ({ ...prev, commercial_kind: value }))
-                      }
-                      disabled={saving}
-                    >
-                      <SelectTrigger id="agency-commercial-kind" className="shadow-none">
-                        <SelectValue placeholder={t("form.choose_profile")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMERCIAL_KIND_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <div className="flex flex-row flex-nowrap items-start gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Label htmlFor="agency-commercial-kind" className="text-xs font-medium">
+                        {fieldLabel("commercial_kind")}
+                      </Label>
+                      {commercialKindInputMode === "custom" ? (
+                        <div className="space-y-1.5">
+                          <Input
+                            id="agency-commercial-kind"
+                            name="agency_commercial_kind"
+                            value={
+                              isPresetCommercialKind(values.commercial_kind)
+                                ? ""
+                                : (values.commercial_kind ?? "")
+                            }
+                            disabled={saving}
+                            className="shadow-none"
+                            placeholder={t("form.commercial_kind_custom_placeholder")}
+                            onChange={(e) =>
+                              setValues((prev) => ({ ...prev, commercial_kind: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="text-[11px] text-primary underline-offset-2 hover:underline"
+                            disabled={saving}
+                            onClick={() => {
+                              setCommercialKindInputMode("preset");
+                              setValues((prev) => ({ ...prev, commercial_kind: "standard" }));
+                            }}
+                          >
+                            {t("form.commercial_kind_choose_preset")}
+                          </button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={values.commercial_kind?.trim() || "standard"}
+                          onValueChange={(value) => {
+                            if (value === COMMERCIAL_KIND_ADD_OPTION) {
+                              setCommercialKindInputMode("custom");
+                              setValues((prev) => ({ ...prev, commercial_kind: "" }));
+                              return;
+                            }
+                            setValues((prev) => ({ ...prev, commercial_kind: value }));
+                          }}
+                          disabled={saving}
+                        >
+                          <SelectTrigger id="agency-commercial-kind" className="shadow-none">
+                            <SelectValue placeholder={t("form.choose_profile")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COMMERCIAL_KIND_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                            {savedCustomCommercialKinds.map((kind) => (
+                              <SelectItem key={kind} value={kind}>
+                                {kind}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value={COMMERCIAL_KIND_ADD_OPTION}>
+                              {t("form.add_commercial_kind")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="agency-commercial-plan" className="text-xs font-medium">
-                      {fieldLabel("commercial_plan_code")}
-                    </Label>
-                    <Select
-                      value={
-                        values.commercial_plan_code?.trim()
-                          ? (values.commercial_plan_code.trim().toUpperCase() as CommercialPlanCode)
-                          : undefined
-                      }
-                      onValueChange={(value) =>
-                        setValues((prev) => ({ ...prev, commercial_plan_code: value }))
-                      }
-                      disabled={saving}
-                    >
-                      <SelectTrigger id="agency-commercial-plan" className="shadow-none">
-                        <SelectValue placeholder={t("form.choose_plan")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMERCIAL_PLAN_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Label htmlFor="agency-commercial-plan" className="text-xs font-medium">
+                        {fieldLabel("commercial_plan_code")}
+                      </Label>
+                      <Select
+                        value={
+                          values.commercial_plan_code?.trim()
+                            ? (values.commercial_plan_code.trim().toUpperCase() as CommercialPlanCode)
+                            : undefined
+                        }
+                        onValueChange={(value) =>
+                          setValues((prev) => ({ ...prev, commercial_plan_code: value }))
+                        }
+                        disabled={saving}
+                      >
+                        <SelectTrigger id="agency-commercial-plan" className="shadow-none">
+                          <SelectValue placeholder={t("form.choose_plan")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMMERCIAL_PLAN_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-end gap-3">
-                    <div className="w-[85px] shrink-0 space-y-1.5">
+                    <div className="w-[70px] shrink-0 space-y-1.5">
                       <Label htmlFor="agency-discount-percent" className="text-xs font-medium">
                         {fieldLabel("discount_percent")}
                       </Label>
@@ -840,7 +1247,7 @@ export function AgencyFormDialog({
                         step="0.01"
                         value={values.discount_percent ?? "0"}
                         disabled={saving}
-                        className="w-[80px] items-center justify-center text-center shadow-none"
+                        className="w-[70px] items-center justify-center text-center shadow-none"
                         onChange={(e) =>
                           setValues((prev) => applyDiscountSync(prev, "percent", e.target.value))
                         }
@@ -885,25 +1292,24 @@ export function AgencyFormDialog({
                           )}
                         </p>
                       </div>
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <Label htmlFor="agency-commercial-notes" className="text-xs font-medium">
+                          {fieldLabel("commercial_notes")}
+                        </Label>
+                        <Textarea
+                          id="agency-commercial-notes"
+                          name="agency_commercial_notes"
+                          value={values.commercial_notes ?? ""}
+                          rows={2}
+                          disabled={saving}
+                          className="min-h-[62px] shadow-none"
+                          placeholder={t("form.commercial_notes_placeholder")}
+                          onChange={(e) =>
+                            setValues((prev) => ({ ...prev, commercial_notes: e.target.value }))
+                          }
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="agency-commercial-notes" className="text-xs font-medium">
-                      {fieldLabel("commercial_notes")}
-                    </Label>
-                    <Textarea
-                      id="agency-commercial-notes"
-                      name="agency_commercial_notes"
-                      value={values.commercial_notes ?? ""}
-                      rows={3}
-                      disabled={saving}
-                      className="min-h-[72px] shadow-none"
-                      placeholder={t("form.commercial_notes_placeholder")}
-                      onChange={(e) =>
-                        setValues((prev) => ({ ...prev, commercial_notes: e.target.value }))
-                      }
-                    />
                   </div>
                 </div>
               ) : null}

@@ -42,12 +42,23 @@
     "qrConfirmAction": "Regenerar de todas formas",
     "qrConfirmCancel": "Cancelar",
     "cardVisitors": "Visitantes de la expo",
+    "visitorTotal": "{{count}} visitante(s) en total",
+    "artworkTotal_one": "{{count}} obra en total",
+    "artworkTotal_other": "{{count}} obras en total",
     "costPrefix": "Coste total:",
     "costUnavailable": "Coste total: datos no disponibles"
   },
   "panel": {
     "chooseFormat": "Elija el formato del panel a imprimir",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "welcome": "le da la bienvenida.",
+    "welcomeWithTitle": "{{title}} le da la bienvenida.",
+    "taglineLine1": "Al escanear este código QR,",
+    "taglineLine2": "su smartphone se convierte en su",
+    "taglineLine3Prefix": "",
+    "taglineLine3Bold": "diario de viaje emocional.",
+    "guideLine1": "Elija su guía: ¿es usted más Poeta, Niño, Narrador, Hip-hopero, …?",
+    "guideLine2": "8 tipos de guía le acompañarán."
   },
   "form": {
     "navTypeLabel": "Para el visitante, tipo de navegación",

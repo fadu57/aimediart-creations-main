@@ -11,6 +11,7 @@ function coerceLogoString(v: unknown): string | null {
 export function expoLogoRawFromRow(row: Record<string, unknown>): string | null {
   const priority = [
     "logo_expo",
+    "logo2_expo",
     "expo_logo",
     "logo_url",
     "expo_logo_url",

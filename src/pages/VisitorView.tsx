@@ -7,6 +7,7 @@ import {
   VisitorProfilePopup,
   type VisitorProfilePopupData,
 } from "@/components/visitor/VisitorProfilePopup";
+import { EmotionCommunityInsight } from "@/components/visitor/EmotionCommunityInsight";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +63,12 @@ import { useTranslation } from "react-i18next";
 import { useUiLanguage, type UiLanguage } from "@/providers/UiLanguageProvider";
 import { LanguageFlag } from "@/components/LanguageFlag";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
+import { VisitorDiaryRegistrationDialog } from "@/components/visitor/VisitorDiaryRegistrationDialog";
+import { isDiaryProfileComplete, markDiaryUnlocked } from "@/lib/visitorDiaryAccess";
+import {
+  fetchArtworkEmotionCommunityInsight,
+  type EmotionCommunityInsight as EmotionCommunityInsightData,
+} from "@/lib/visitorTravelDiary";
 
 type QuickFeedbackHint = "both" | "emotion" | "heart";
 
@@ -249,7 +256,12 @@ const VisitorViewCore = () => {
   const [isArtworkZooming, setIsArtworkZooming] = useState(false);
   const [artworkZoomOrigin, setArtworkZoomOrigin] = useState("50% 50%");
   const [isValidationPopupOpen, setIsValidationPopupOpen] = useState(false);
+  const [communityInsight, setCommunityInsight] = useState<EmotionCommunityInsightData | null>(null);
+  const [communityInsightLoading, setCommunityInsightLoading] = useState(false);
   const [isExitPopupOpen, setIsExitPopupOpen] = useState(false);
+  const [isDiaryRegistrationOpen, setIsDiaryRegistrationOpen] = useState(false);
+  const [diaryProfileZip, setDiaryProfileZip] = useState("");
+  const [diaryProfileCity, setDiaryProfileCity] = useState("");
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [pendingCommentText, setPendingCommentText] = useState("");
@@ -1123,11 +1135,17 @@ const VisitorViewCore = () => {
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
     triggerHeartConfetti();
-    if (isSameArtistNavigation) {
-      window.parent?.postMessage({ type: "artworks-artist-next" }, window.location.origin);
-      return;
-    }
+    setCommunityInsight(null);
+    setCommunityInsightLoading(true);
     setIsValidationPopupOpen(true);
+    void fetchArtworkEmotionCommunityInsight(
+      resolvedArtworkId,
+      emotionId,
+      visitorId,
+      language,
+    )
+      .then((insight) => setCommunityInsight(insight))
+      .finally(() => setCommunityInsightLoading(false));
   };
 
   const handleResetFeedbackSelection = () => {
@@ -1159,6 +1177,12 @@ const VisitorViewCore = () => {
 
   /** Après validation du ressenti (popup merci) — pas de re-contrôle. */
   const handleScanAnotherArtwork = () => {
+    setIsValidationPopupOpen(false);
+    handleResetFeedbackSelection();
+    if (isEmbedded && isSameArtistNavigation) {
+      window.parent?.postMessage({ type: "artworks-artist-next" }, window.location.origin);
+      return;
+    }
     navigateToScanAnotherArtwork();
   };
 
@@ -1169,6 +1193,59 @@ const VisitorViewCore = () => {
       void endVisitorExpoVisit({ expoId: expo });
     }
     setIsExitPopupOpen(true);
+  };
+
+  const navigateToTravelDiary = () => {
+    setIsValidationPopupOpen(false);
+    setIsExitPopupOpen(false);
+    setIsDiaryRegistrationOpen(false);
+    const expo = (effectiveExpoId || expoId).trim();
+    const query = expo ? `?expo_id=${encodeURIComponent(expo)}` : "";
+    navigate(`/summary${query}`);
+  };
+
+  const handleDiaryOfferYes = async () => {
+    const expo = (effectiveExpoId || expoId).trim();
+    const authUserId = session?.user?.id?.trim() || null;
+    const email = session?.user?.email?.trim() || "";
+
+    if (authUserId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, zip_code, city")
+        .eq("id", authUserId)
+        .maybeSingle();
+      const row = profile as {
+        first_name?: string | null;
+        last_name?: string | null;
+        zip_code?: string | null;
+        city?: string | null;
+      } | null;
+      setDiaryProfileZip(row?.zip_code?.trim() || "");
+      setDiaryProfileCity(row?.city?.trim() || "");
+      if (isDiaryProfileComplete(row, email)) {
+        markDiaryUnlocked(expo);
+        navigateToTravelDiary();
+        return;
+      }
+      setIsExitPopupOpen(false);
+      setIsDiaryRegistrationOpen(true);
+      return;
+    }
+
+    setIsExitPopupOpen(false);
+    setIsDiaryRegistrationOpen(true);
+  };
+
+  const handleDiaryRegistrationSuccess = () => {
+    const expo = (effectiveExpoId || expoId).trim();
+    markDiaryUnlocked(expo);
+    navigateToTravelDiary();
+  };
+
+  const handleDiaryOfferNo = () => {
+    setIsExitPopupOpen(false);
+    window.location.assign("https://www.aimediart.com");
   };
 
   const navigateSameArtistArtwork = (direction: -1 | 1) => {
@@ -2059,6 +2136,15 @@ const VisitorViewCore = () => {
             <p className="text-sm font-semibold leading-relaxed text-gray-900" style={{ whiteSpace: "pre-line" }}>
               {t("validation_thanks", { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) })}
             </p>
+            {communityInsightLoading ? (
+              <div className="mt-4 flex justify-center py-2" aria-busy="true">
+                <Loader2 className="h-5 w-5 animate-spin text-[#E63946]" aria-hidden />
+              </div>
+            ) : communityInsight ? (
+              <div className="mt-4">
+                <EmotionCommunityInsight insight={communityInsight} />
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-col gap-2">
               <Button
                 type="button"
@@ -2100,20 +2186,39 @@ const VisitorViewCore = () => {
               <br />
               {t("exit_message")}
             </p>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-700">{t("diary.exit_offer")}</p>
             <Button
               type="button"
-              className="mt-4 w-full transition-colors duration-150 hover:bg-primary/90"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                window.location.assign("https://www.aimediart.com");
-              }}
+              className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={() => void handleDiaryOfferYes()}
             >
-              {t("btn_close")}
+              <BookOpen className="h-4 w-4" aria-hidden />
+              {t("diary.exit_offer_yes")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 w-full border-gray-300 text-gray-900"
+              onClick={handleDiaryOfferNo}
+            >
+              {t("diary.exit_offer_no")}
             </Button>
           </div>
         </div>
       )}
+
+      <VisitorDiaryRegistrationDialog
+        open={isDiaryRegistrationOpen}
+        expoId={effectiveExpoId || expoId}
+        initialEmail={session?.user?.email?.trim() || ""}
+        initialFirstName={headerFirstName || ""}
+        initialLastName={authLastName || ""}
+        initialZipCode={diaryProfileZip}
+        initialCity={diaryProfileCity}
+        isAuthenticated={Boolean(session?.user?.id)}
+        onClose={() => setIsDiaryRegistrationOpen(false)}
+        onSuccess={handleDiaryRegistrationSuccess}
+      />
 
       <VisitorProfilePopup
         open={isProfilePopupOpen}

@@ -55,6 +55,7 @@ export type DashboardProfile = {
   language: string | null;
   birth_year: number | null;
   created_at: string | null;
+  last_sign_in_at?: string | null;
 };
 
 export type DashboardAgency = {
@@ -443,6 +444,24 @@ async function buildSubscriptionFromStandbyState(agencyId: string): Promise<Dash
     },
     pricing,
   );
+}
+
+async function resolveProfileLastSignInAt(
+  profileUserId: string | null,
+  isSelf: boolean,
+): Promise<string | null> {
+  const uid = profileUserId?.trim();
+  if (!uid) return null;
+  if (isSelf) {
+    const { data } = await supabase.auth.getUser();
+    if (data.user?.id === uid) return data.user.last_sign_in_at ?? null;
+  }
+  const { data: rpcData, error } = await supabase.rpc("get_all_users_with_roles");
+  if (error || !rpcData) return null;
+  const row = (rpcData as Array<{ id?: string | null; last_sign_in_at?: string | null }>).find(
+    (entry) => entry.id === uid,
+  );
+  return typeof row?.last_sign_in_at === "string" ? row.last_sign_in_at : null;
 }
 
 async function resolveAgencyIdFromAgencyUsers(profileUserId: string): Promise<string | null> {
@@ -1326,7 +1345,12 @@ export function useDashboardProfile(
           setError(profileRes.error.message);
           setProfile(null);
         } else if (profileRes.data) {
-          setProfile(profileRes.data as DashboardProfile);
+          const lastSignInAt = await resolveProfileLastSignInAt(uid, isSelf);
+          if (cancelled) return;
+          setProfile({
+            ...(profileRes.data as DashboardProfile),
+            last_sign_in_at: lastSignInAt,
+          });
         } else if (uid) {
           // Compte auth sans ligne profiles (trigger manquant / migration legacy)
           const { data: authSession } = await supabase.auth.getUser();
@@ -1354,6 +1378,7 @@ export function useDashboardProfile(
               language: readMeta("language") ?? "fr",
               birth_year: null,
               created_at: authUser.created_at ?? null,
+              last_sign_in_at: authUser.last_sign_in_at ?? null,
             });
           } else {
             setProfile(null);

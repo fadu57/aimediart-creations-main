@@ -1,13 +1,31 @@
 import i18n from "@/i18n/instance";
 
-export type CommercialKind = "standard" | "partner_showcase" | "sponsoring" | "internal_test";
+export type PresetCommercialKind = "standard" | "partner_showcase" | "sponsoring" | "internal_test";
+export type CommercialKind = PresetCommercialKind | string;
 
-export const COMMERCIAL_KIND_OPTIONS: { value: CommercialKind; label: string }[] = [
+export const COMMERCIAL_KIND_OPTIONS: { value: PresetCommercialKind; label: string }[] = [
   { value: "standard", label: "Standard" },
   { value: "partner_showcase", label: "Partenaire vitrine" },
   { value: "sponsoring", label: "Sponsoring AIMediArt" },
   { value: "internal_test", label: "Organisation test" },
 ];
+
+export const COMMERCIAL_KIND_ADD_OPTION = "__add_commercial_kind__";
+
+const PRESET_COMMERCIAL_KIND_SET = new Set<string>(
+  COMMERCIAL_KIND_OPTIONS.map((option) => option.value),
+);
+
+export function isPresetCommercialKind(kind: string | null | undefined): boolean {
+  const value = (kind ?? "").trim();
+  return value === "" || value === "standard" || PRESET_COMMERCIAL_KIND_SET.has(value);
+}
+
+export function normalizeCommercialKindForSave(raw: string | null | undefined): string {
+  const value = (raw ?? "").trim();
+  if (!value) return "standard";
+  return value.slice(0, 120);
+}
 
 export type CommercialPlanCode = "ATELIER" | "HORIZON" | "RAYONNEMENT";
 
@@ -69,16 +87,17 @@ export function computeNetPriceEur(
 }
 
 export function commercialKindLabel(kind: CommercialKind | null | undefined): string | null {
-  switch (kind) {
+  const value = (kind ?? "").trim();
+  if (!value || value === "standard") return null;
+  switch (value) {
     case "partner_showcase":
       return i18n.t("commercial_kind.partner_showcase", { ns: "dashboard" });
     case "sponsoring":
       return i18n.t("commercial_kind.sponsoring", { ns: "dashboard" });
     case "internal_test":
       return i18n.t("commercial_kind.internal_test", { ns: "dashboard" });
-    case "standard":
     default:
-      return null;
+      return value;
   }
 }
 

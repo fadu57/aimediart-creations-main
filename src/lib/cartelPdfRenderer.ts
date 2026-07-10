@@ -3,8 +3,6 @@ import QRCode from "qrcode";
 import { QR_CODE_PRINT_OPTIONS } from "@/lib/qrCodeScanFriendly";
 
 import {
-  CARTEL_REF_WIDTH_MM,
-  cartelScaleForSlot,
   getCartelFormat,
   getCartelSlots,
   type CartelFormatId,
@@ -80,12 +78,17 @@ type CartelContent = {
   explorationLines: string[];
 };
 
+/**
+ * Maquette de référence : Micro format carré 85 × 85 mm.
+ * En-tête gras italique en haut, grand QR centré, titre + artiste dessous,
+ * logo AIMEDIArt en bas à droite. Les autres formats scalent uniformément
+ * (sw = largeur slot / 85) sans déformer QR ni logo.
+ */
 function renderCartelInSlot(
   pdf: jsPDF,
   slot: CartelSlot,
   assets: CartelAssets,
   content: CartelContent,
-  scale: number,
 ): void {
   const { logoImg, qrImg, logoWidthMm, logoHeightMm } = assets;
   const { titleText, artistText, explorationLines } = content;
@@ -95,83 +98,79 @@ function renderCartelInSlot(
   const slotW = slot.w;
   const slotH = slot.h;
 
-  const margin = 10 * scale;
-  const bottomSafe = slotY + slotH - margin;
+  const sw = slotW / 85;
+  const margin = 6 * sw;
   const maxTextWidth = slotW - 2 * margin;
+  const centerX = slotX + slotW / 2;
 
-  const logoMarginY = slotY + 5 * scale;
-  const logoMarginX = slotX + 4 * scale;
-  // Formats carrés : l’échelle globale suit la hauteur A6 (148 mm) et réduisait le logo
-  // plus que le reste ; on aligne sa taille sur la largeur du slot (comme en A6 portrait).
-  const logoScale = slotW / CARTEL_REF_WIDTH_MM;
-  const scaledLogoW = logoWidthMm * logoScale;
-  const scaledLogoH = logoHeightMm * logoScale;
-  pdf.addImage(logoImg, "PNG", logoMarginX, logoMarginY, scaledLogoW, scaledLogoH, undefined, "NONE");
+  // En-tête « Votre (audio) guide pour cette œuvre » — une ligne ajustée à la largeur.
+  const headerText = explorationLines.map((l) => l.trim()).filter(Boolean).join(" ");
+  let headerBottom = slotY + 3 * sw;
+  if (headerText) {
+    let headerFs = 12.5 * sw;
+    pdf.setFont("helvetica", "bolditalic");
+    pdf.setFontSize(headerFs);
+    while (headerFs > 5 && pdf.getTextWidth(headerText) > maxTextWidth) {
+      headerFs -= 0.25;
+      pdf.setFontSize(headerFs);
+    }
+    const headerBaseline = slotY + 7 * sw;
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(headerText, centerX, headerBaseline, { align: "center" });
+    headerBottom = headerBaseline + 1.5 * sw;
+  }
 
-  const artistFontSize = 16 * scale;
-  const artistLineHeight = 5.2 * scale;
-  const explorationFontSize = 14 * scale;
-  const explorationLineHeight = 5.5 * scale;
-  const explorationGap = 2 * scale;
-  const gapQrToTitleMm = 9 * scale;
-
-  const titleMaxFs = 22 * scale;
-  const titleMinFs = Math.max(8, 12 * scale);
+  // Logo AIMEDIArt en bas à droite (ratio préservé).
+  const logoW = 26 * sw;
+  const logoH = logoW * (logoHeightMm / logoWidthMm);
+  const logoX = slotX + slotW - margin - logoW;
+  const logoY = slotY + slotH - 6 * sw - logoH;
 
   const { lines: titleLines, fontSize: titleFontSize, lineHeight: titleLineHeight } = computePdfTitleUpToTwoLines(
     pdf,
     titleText,
     maxTextWidth,
-    titleMaxFs,
-    titleMinFs,
+    15 * sw,
+    Math.max(7, 9 * sw),
   );
 
+  const artistFontSize = 12 * sw;
+  const artistLineHeight = 4.6 * sw;
   pdf.setFont("helvetica", "italic");
   pdf.setFontSize(artistFontSize);
   const artistLines = pdf.splitTextToSize(artistText, maxTextWidth) as string[];
 
-  const belowTextBlockHeight =
-    gapQrToTitleMm + titleLines.length * titleLineHeight + 1 * scale + artistLines.length * artistLineHeight;
+  const gapQrToTitle = 7 * sw;
+  const gapTitleToArtist = 2.5 * sw;
+  const textBlockH =
+    gapQrToTitle +
+    titleLines.length * titleLineHeight +
+    gapTitleToArtist +
+    artistLines.length * artistLineHeight;
 
-  const contentTop = logoMarginY + scaledLogoH + 4 * scale;
-  const contentBottom = bottomSafe - belowTextBlockHeight - 2 * scale;
-  const maxQrByWidth = slotW - 2 * margin;
-  const availableHeight = Math.max(0, contentBottom - contentTop);
-  const qrSize = Math.min(maxQrByWidth * 0.7, availableHeight);
+  // QR carré : ~62 % de la largeur, borné par la hauteur restante ; bloc QR + textes
+  // centré verticalement entre l'en-tête et le logo.
+  const zoneTop = headerBottom + 1 * sw;
+  const zoneBottom = logoY - 2 * sw;
+  const zoneH = Math.max(0, zoneBottom - zoneTop);
+  const qrSize = Math.min(slotW * 0.62, Math.max(15 * sw, zoneH - textBlockH));
+  const blockTop = zoneTop + Math.max(0, (zoneH - (qrSize + textBlockH)) / 2);
 
   const qrX = slotX + (slotW - qrSize) / 2;
-  const qrY = contentTop + (availableHeight - qrSize) / 2;
+  pdf.addImage(qrImg, "PNG", qrX, blockTop, qrSize, qrSize, undefined, "NONE");
 
-  const lines = explorationLines.map((l) => l.trim()).filter(Boolean);
-  const showExploration = scale >= 0.42 && lines.length > 0;
-  if (showExploration) {
-    const textZoneTop = contentTop;
-    const textZoneBottom = qrY - explorationGap;
-    const midY = textZoneTop + (textZoneBottom - textZoneTop) / 2;
-    let explorationStartY = midY - ((lines.length - 1) * explorationLineHeight) / 2;
-    const minStart = textZoneTop + 1 * scale;
-    const maxStart = textZoneBottom - (lines.length - 1) * explorationLineHeight - 0.5 * scale;
-    const safeMax = Math.max(maxStart, minStart);
-    explorationStartY = Math.min(Math.max(explorationStartY, minStart), safeMax);
-
-    pdf.setTextColor(0, 0, 0);
-    pdf.setFont("helvetica", "bolditalic");
-    pdf.setFontSize(explorationFontSize);
-    pdf.text(lines, slotX + slotW / 2, explorationStartY, { align: "center" });
-  }
-
-  pdf.addImage(qrImg, "PNG", qrX, qrY, qrSize, qrSize, undefined, "NONE");
-
-  let textY = qrY + qrSize + gapQrToTitleMm;
+  let textY = blockTop + qrSize + gapQrToTitle;
   pdf.setTextColor(0, 0, 0);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(titleFontSize);
-  pdf.text(titleLines, slotX + slotW / 2, textY, { align: "center" });
-  textY += titleLines.length * titleLineHeight + 2 * scale;
+  pdf.text(titleLines, centerX, textY, { align: "center" });
+  textY += titleLines.length * titleLineHeight + gapTitleToArtist;
 
   pdf.setFont("helvetica", "italic");
   pdf.setFontSize(artistFontSize);
-  pdf.text(artistLines, slotX + slotW / 2, textY, { align: "center" });
+  pdf.text(artistLines, centerX, textY, { align: "center" });
+
+  pdf.addImage(logoImg, "PNG", logoX, logoY, logoW, logoH, undefined, "NONE");
 }
 
 export type GenerateCartelPdfInput = {
@@ -207,8 +206,7 @@ export async function generateCartelPdf(input: GenerateCartelPdfInput): Promise<
   };
 
   for (const slot of slots) {
-    const scale = cartelScaleForSlot(slot.w, slot.h);
-    renderCartelInSlot(pdf, slot, assets, content, scale);
+    renderCartelInSlot(pdf, slot, assets, content);
   }
 
   return pdf.output("bloburl") as string;

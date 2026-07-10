@@ -27,6 +27,7 @@ import {
   type StatisticsPdfExportTables,
 } from "@/lib/statisticsBrowserPdf";
 import { normalizeEmotionKey, emotionEmojiForPreview } from "@/lib/statisticsEmotions";
+import { loadEmotionCatalog } from "@/lib/expoEmotions";
 import { formatBarVisitLabel, sumChartVisits } from "@/lib/statisticsCharts";
 import { StatisticsReportView, type StatisticsArtistCoverLetter, type StatisticsReportViewProps } from "@/components/statistics/StatisticsReportView";
 import { VisitorGeographySection } from "@/components/statistics/VisitorGeographySection";
@@ -136,6 +137,14 @@ function startOfWeekMonday(d: Date): Date {
   const mondayDelta = day === 0 ? -6 : 1 - day;
   x.setDate(x.getDate() + mondayDelta);
   return x;
+}
+
+/** Décalage en semaines par rapport à la semaine courante (lundi → dimanche). */
+function weekOffsetFromDate(date: Date): number {
+  const currentWeekStart = startOfWeekMonday(new Date()).getTime();
+  const targetWeekStart = startOfWeekMonday(date).getTime();
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  return Math.round((targetWeekStart - currentWeekStart) / weekMs);
 }
 
 function toYmd(d: Date): string {
@@ -256,7 +265,8 @@ const Statistics = () => {
     targetAgencyId: string | null;
     targetExpoId: string | null;
     expoDateRange: { start: Date; end: Date } | null;
-  }>({ targetAgencyId: null, targetExpoId: null, expoDateRange: null });
+    artistArtworkIds: Set<string> | null;
+  }>({ targetAgencyId: null, targetExpoId: null, expoDateRange: null, artistArtworkIds: null });
   const geoRunRef = useRef(0);
   const [activeArtworksCount, setActiveArtworksCount] = useState(0);
   const [topSortKey, setTopSortKey] = useState<TopSortKey>("visits");
@@ -288,18 +298,37 @@ const Statistics = () => {
     let pollId: number | undefined;
     let readyId: number | undefined;
 
+    const markReportReady = () => {
+      if (!cancelled) statisticsPrintAreaRef.current?.setAttribute("data-statistics-export-ready", "true");
+    };
+
     const armReadyTimer = () => {
       const root = statisticsPrintAreaRef.current;
       if (!root || cancelled) return;
       root.removeAttribute("data-statistics-export-ready");
-      readyId = window.setTimeout(() => {
+
+      const needsMap =
+        root.querySelector("[data-statistics-geography-map-host]") != null;
+
+      if (!needsMap) {
+        readyId = window.setTimeout(() => {
+          requestAnimationFrame(() => requestAnimationFrame(markReportReady));
+        }, 1100);
+        return;
+      }
+
+      const started = Date.now();
+      const waitForMap = () => {
         if (cancelled) return;
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (!cancelled) statisticsPrintAreaRef.current?.setAttribute("data-statistics-export-ready", "true");
-          });
-        });
-      }, 1100);
+        const host = statisticsPrintAreaRef.current?.querySelector("[data-statistics-geography-map-host]");
+        if (host?.getAttribute("data-statistics-map-ready") === "true" || Date.now() - started > 14_000) {
+          requestAnimationFrame(() => requestAnimationFrame(markReportReady));
+          return;
+        }
+        pollId = window.setTimeout(waitForMap, 150);
+      };
+
+      readyId = window.setTimeout(waitForMap, 900);
     };
 
     const pollForRoot = () => {
@@ -318,7 +347,7 @@ const Statistics = () => {
       if (readyId !== undefined) window.clearTimeout(readyId);
       statisticsPrintAreaRef.current?.removeAttribute("data-statistics-export-ready");
     };
-  }, [printPreviewOpen, temporalSeriesForPdf, hourlySeries, printExportBusy]);
+  }, [printPreviewOpen, temporalSeriesForPdf, hourlySeries, printExportBusy, visitorGeoRows]);
 
   useEffect(() => {
     let cancelled = false;
@@ -326,6 +355,7 @@ const Statistics = () => {
       const { data, error } = await supabase
         .from("agencies")
         .select("id, name_agency, logo_agency")
+        .is("deleted_at", null)
         .order("name_agency", { ascending: true });
       if (cancelled) return;
       if (error || !Array.isArray(data)) {
@@ -412,54 +442,33 @@ const Statistics = () => {
     let cancelled = false;
     void (async () => {
       setEmotionCatalogError(null);
-      let data: unknown[] | null = null;
-      let error: { message?: string } | null = null;
-
-      // Schéma principal attendu (évite les 400 sur colonne absente ordonnancement).
-      let primary = await supabase
-        .from("emotions")
-        .select("id, name_emotion, icone_emotion")
-        .order("id", { ascending: true });
-      if (primary.error) {
-        // Fallback si la colonne icone_emotion n'existe pas dans un schéma legacy.
-        primary = await supabase
-          .from("emotions")
-          .select("id, name_emotion")
-          .order("id", { ascending: true });
-      }
-
-      data = primary.data as unknown[] | null;
-      error = primary.error ? { message: primary.error.message } : null;
-
-      // Fallback projet legacy: table emotion (singulier).
-      if (error) {
-        const fallback = await supabase.from("emotion").select("*").order("id", { ascending: true });
-        data = fallback.data as unknown[] | null;
-        error = fallback.error ? { message: fallback.error.message } : null;
-      }
-
-      if (cancelled) return;
-      if (error || !Array.isArray(data)) {
+      try {
+        const catalog = await loadEmotionCatalog();
+        if (cancelled) return;
+        const palette = emotions.map((e) => e.color);
+        const rows = catalog
+          .filter((row) => row.is_active)
+          .map((row, index) => ({
+            id: row.id,
+            name: (row.name_emotion ?? "").trim(),
+            color: palette[index % palette.length],
+            icon: (row.icone_emotion ?? "").trim(),
+          }))
+          .filter((row) => row.id && row.name);
+        if (!rows.length) {
+          setEmotionCatalogFromDb([]);
+          setEmotionCatalogError("Aucune émotion active trouvée en base.");
+          return;
+        }
+        setEmotionCatalogFromDb(rows);
+        setEmotionCatalogError(null);
+      } catch (error) {
+        if (cancelled) return;
         setEmotionCatalogFromDb([]);
-        setEmotionCatalogError(error?.message || "Impossible de charger la table emotions.");
-        return;
+        setEmotionCatalogError(
+          error instanceof Error ? error.message : "Impossible de charger la table emotions.",
+        );
       }
-      const palette = emotions.map((e) => e.color);
-      const rows = (data as Array<{ id?: string | null; name_emotion?: string | null; icone_emotion?: string | null }>)
-        .map((row, index) => ({
-          id: asTrimmedString(row.id),
-          name: asTrimmedString(row.name_emotion),
-          color: palette[index % palette.length],
-          icon: asTrimmedString(row.icone_emotion),
-        }))
-        .filter((row) => row.id && row.name);
-      if (!rows.length) {
-        setEmotionCatalogFromDb([]);
-        setEmotionCatalogError("Aucune émotion valide (name_emotion) trouvée en base.");
-        return;
-      }
-      setEmotionCatalogFromDb(rows);
-      setEmotionCatalogError(null);
     })();
     return () => {
       cancelled = true;
@@ -468,6 +477,7 @@ const Statistics = () => {
 
   const canEditAgencyScope = scope.mode === "all" || scope.mode === "agency";
   const showOrganizationFilter = (role_id ?? 99) <= 3;
+  const showDateRangeFilter = (role_id ?? 99) !== 7;
 
   const effectiveAgencyFilter = useMemo(() => {
     // Règle demandée:
@@ -582,34 +592,53 @@ const Statistics = () => {
     return expoOptions.find((e) => e.id === selectedFilteredExpoId) ?? null;
   }, [selectedFilteredExpoId, expoOptions]);
 
-  const showArtistFilter = selectedFilteredExpoId !== null;
+  const showArtistFilter = (role_id ?? 99) !== 7;
 
   const artistArtworkIds = useMemo((): Set<string> | null => {
     if (selectedArtistId === "all") return null;
     return artworkIdsByArtistId.get(selectedArtistId) ?? new Set();
   }, [selectedArtistId, artworkIdsByArtistId]);
 
+  const scopedActiveArtworkIds = useMemo(() => {
+    const all = new Set<string>();
+    for (const ids of artworkIdsByArtistId.values()) {
+      for (const id of ids) all.add(id);
+    }
+    return all;
+  }, [artworkIdsByArtistId]);
+
+  const effectiveArtworkFilterIds = useMemo((): Set<string> | null => {
+    if (selectedArtistId !== "all") return artistArtworkIds;
+    if (scopedActiveArtworkIds.size === 0) return null;
+    return scopedActiveArtworkIds;
+  }, [selectedArtistId, artistArtworkIds, scopedActiveArtworkIds]);
+
   useEffect(() => {
     setSelectedArtistId("all");
-  }, [selectedFilteredExpoId]);
+  }, [selectedFilteredExpoId, effectiveAgencyFilter]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      if (!selectedFilteredExpoId) {
+      const targetAgencyId =
+        effectiveAgencyFilter ??
+        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+
+      const scopedExpoIds = selectedFilteredExpoId
+        ? [selectedFilteredExpoId]
+        : expoOptionsForSelect.map((ex) => ex.id).filter(Boolean);
+
+      if (scopedExpoIds.length === 0) {
         setArtistOptions([]);
         setArtworkIdsByArtistId(new Map());
         return;
       }
 
-      const targetAgencyId =
-        effectiveAgencyFilter ??
-        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
-
       let query = supabase
         .from("artworks")
-        .select("artwork_id, artwork_artist_id, artists!left(artist_firstname, artist_lastname)")
-        .eq("artwork_expo_id", selectedFilteredExpoId);
+        .select("artwork_id, artwork_artist_id, artists!left(artist_firstname, artist_lastname, deleted_at)")
+        .is("artwork_deleted_at", null)
+        .in("artwork_expo_id", scopedExpoIds);
       if (targetAgencyId) query = query.eq("artwork_agency_id", targetAgencyId);
 
       const { data, error } = await query;
@@ -625,13 +654,14 @@ const Statistics = () => {
         artwork_id?: string | null;
         artwork_artist_id?: string | null;
         artists?:
-          | { artist_firstname?: string | null; artist_lastname?: string | null }
-          | Array<{ artist_firstname?: string | null; artist_lastname?: string | null }>;
+          | { artist_firstname?: string | null; artist_lastname?: string | null; deleted_at?: string | null }
+          | Array<{ artist_firstname?: string | null; artist_lastname?: string | null; deleted_at?: string | null }>;
       }>) {
         const artistId = asTrimmedString(row.artwork_artist_id);
         const artworkId = asTrimmedString(row.artwork_id);
         if (!artistId || !artworkId) continue;
         const artistJoin = Array.isArray(row.artists) ? row.artists[0] : row.artists;
+        if (artistJoin?.deleted_at) continue;
         const firstName = asTrimmedString(artistJoin?.artist_firstname);
         const lastName = asTrimmedString(artistJoin?.artist_lastname);
         const label = `${firstName} ${lastName}`.trim() || artistId;
@@ -658,7 +688,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedFilteredExpoId, effectiveAgencyFilter, scope.mode, scope.agencyId]);
+  }, [selectedFilteredExpoId, effectiveAgencyFilter, scope.mode, scope.agencyId, expoOptionsForSelect]);
 
   useEffect(() => {
     let cancelled = false;
@@ -797,8 +827,70 @@ const Statistics = () => {
   }, [drillExpoId]);
 
   useEffect(() => {
-    setWeekOffset(0);
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.expoId, selectedArtistId]);
+    let cancelled = false;
+    void (async () => {
+      if (expoDateRange) {
+        setWeekOffset(0);
+        return;
+      }
+
+      const targetAgencyId =
+        effectiveAgencyFilter ??
+        (scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : null);
+      const targetExpoId =
+        drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
+
+      if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size === 0) {
+        setWeekOffset(0);
+        return;
+      }
+
+      let query = supabase
+        .from("visitor_feedback")
+        .select("submitted_at, artwork_id")
+        .order("submitted_at", { ascending: false })
+        .limit(effectiveArtworkFilterIds ? 2000 : 1);
+      if (targetAgencyId) query = query.eq("agency_id", targetAgencyId);
+      if (targetExpoId) query = query.eq("expo_id", targetExpoId);
+      if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size > 0 && effectiveArtworkFilterIds.size <= 200) {
+        query = query.in("artwork_id", Array.from(effectiveArtworkFilterIds));
+      }
+
+      const { data, error } = await query;
+      if (cancelled) return;
+      if (error || !Array.isArray(data) || data.length === 0) {
+        setWeekOffset(0);
+        return;
+      }
+
+      const rows = filterFeedbackRowsByArtworkIds(
+        data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
+        effectiveArtworkFilterIds,
+      );
+      const lastSubmitted = rows.map((row) => asTrimmedString(row.submitted_at)).find(Boolean);
+      if (!lastSubmitted) {
+        setWeekOffset(0);
+        return;
+      }
+      const lastDate = new Date(lastSubmitted);
+      if (Number.isNaN(lastDate.getTime())) {
+        setWeekOffset(0);
+        return;
+      }
+      setWeekOffset(weekOffsetFromDate(lastDate));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    effectiveAgencyFilter,
+    drillExpoId,
+    scope.mode,
+    scope.expoId,
+    selectedArtistId,
+    effectiveArtworkFilterIds,
+    expoDateRange,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -809,7 +901,7 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      if (artistArtworkIds && artistArtworkIds.size === 0) {
+      if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size === 0) {
         setFeedbackCountsByEmotionId({});
         setFeedbackTotal(0);
         setUniqueVisitorsTotal(0);
@@ -841,7 +933,7 @@ const Statistics = () => {
           heart_rating?: string | number | null;
           artwork_id?: string | number | null;
         }>,
-        artistArtworkIds,
+        effectiveArtworkFilterIds,
       );
       const counts: Record<string, number> = {};
       const uniqueVisitorIds = new Set<string>();
@@ -873,7 +965,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds, expoDateRange]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, effectiveArtworkFilterIds, expoDateRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -884,31 +976,22 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("artworks")
-        .select("artwork_status, artwork_agency_id, artwork_expo_id, artwork_artist_id");
+        .select("artwork_id", { count: "exact", head: true })
+        .is("artwork_deleted_at", null)
+        .eq("artwork_status", "active");
+      if (targetAgencyId) query = query.eq("artwork_agency_id", targetAgencyId);
+      if (targetExpoId) query = query.eq("artwork_expo_id", targetExpoId);
+      if (selectedArtistId !== "all") query = query.eq("artwork_artist_id", selectedArtistId);
+
+      const { count, error } = await query;
       if (cancelled) return;
-      if (error || !Array.isArray(data)) {
+      if (error) {
         setActiveArtworksCount(0);
         return;
       }
-
-      const rows = (data as Array<{
-        artwork_status?: string | null;
-        artwork_agency_id?: string | null;
-        artwork_expo_id?: string | null;
-        artwork_artist_id?: string | null;
-      }>).filter((row) => {
-        const rowAgencyId = asTrimmedString(row.artwork_agency_id);
-        const rowExpoId = asTrimmedString(row.artwork_expo_id);
-        if (targetAgencyId && rowAgencyId !== targetAgencyId) return false;
-        if (targetExpoId && rowExpoId !== targetExpoId) return false;
-        if (selectedArtistId !== "all" && asTrimmedString(row.artwork_artist_id) !== selectedArtistId) return false;
-        return true;
-      });
-      const normalizedStatuses = rows.map((r) => asTrimmedString(r.artwork_status).toLowerCase()).filter(Boolean);
-      const count = normalizedStatuses.filter((s) => s === "active").length;
-      setActiveArtworksCount(count);
+      setActiveArtworksCount(count ?? 0);
     })();
     return () => {
       cancelled = true;
@@ -924,7 +1007,7 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      if (artistArtworkIds && artistArtworkIds.size === 0) {
+      if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size === 0) {
         setTemporalSeries([]);
         return;
       }
@@ -951,7 +1034,7 @@ const Statistics = () => {
         }
         const rows = filterFeedbackRowsByArtworkIds(
           data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
-          artistArtworkIds,
+          effectiveArtworkFilterIds,
         );
         setTemporalSeries(buildDailyTemporalSeries(rows, expoDateRange.start, expoDateRange.end));
         return;
@@ -987,7 +1070,7 @@ const Statistics = () => {
 
       for (const row of filterFeedbackRowsByArtworkIds(
         data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
-        artistArtworkIds,
+        effectiveArtworkFilterIds,
       )) {
         const submittedAt = asTrimmedString(row.submitted_at);
         if (!submittedAt) continue;
@@ -1017,7 +1100,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, weekOffset, expoDateRange, artistArtworkIds]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, weekOffset, expoDateRange, effectiveArtworkFilterIds]);
 
   const loadTemporalSeriesForPdf = useCallback(async () => {
     const targetAgencyId =
@@ -1026,7 +1109,7 @@ const Statistics = () => {
     const targetExpoId =
       drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-    if (artistArtworkIds && artistArtworkIds.size === 0) {
+    if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size === 0) {
       setTemporalSeriesForPdf([]);
       return;
     }
@@ -1052,7 +1135,7 @@ const Statistics = () => {
       }
       const rows = filterFeedbackRowsByArtworkIds(
         data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
-        artistArtworkIds,
+        effectiveArtworkFilterIds,
       );
       setTemporalSeriesForPdf(buildDailyTemporalSeries(rows, expoDateRange.start, expoDateRange.end));
       return;
@@ -1072,7 +1155,7 @@ const Statistics = () => {
     let maxMs = -Infinity;
     const filteredRows = filterFeedbackRowsByArtworkIds(
       data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
-      artistArtworkIds,
+      effectiveArtworkFilterIds,
     );
     if (filteredRows.length === 0) {
       setTemporalSeriesForPdf([]);
@@ -1130,7 +1213,7 @@ const Statistics = () => {
       });
     }
     setTemporalSeriesForPdf(series);
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, expoDateRange, artistArtworkIds]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, expoDateRange, effectiveArtworkFilterIds]);
 
   useEffect(() => {
     if (!printPreviewOpen) return;
@@ -1146,7 +1229,7 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      if (artistArtworkIds && artistArtworkIds.size === 0) {
+      if (effectiveArtworkFilterIds && effectiveArtworkFilterIds.size === 0) {
         setHourlySeries([]);
         return;
       }
@@ -1169,7 +1252,7 @@ const Statistics = () => {
       const counts = Array.from({ length: 24 }, () => 0);
       for (const row of filterFeedbackRowsByArtworkIds(
         data as Array<{ submitted_at?: string | null; artwork_id?: string | number | null }>,
-        artistArtworkIds,
+        effectiveArtworkFilterIds,
       )) {
         const raw = asTrimmedString(row.submitted_at);
         if (!raw) continue;
@@ -1187,7 +1270,7 @@ const Statistics = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, artistArtworkIds, expoDateRange]);
+  }, [effectiveAgencyFilter, drillExpoId, scope.mode, scope.agencyId, scope.expoId, effectiveArtworkFilterIds, expoDateRange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1201,7 +1284,8 @@ const Statistics = () => {
 
       let artworksQuery = supabase
         .from("artworks")
-        .select("artwork_id, artwork_title, artwork_artist_id, artwork_image_url, artwork_photo_url, artists!left(artist_firstname, artist_lastname)");
+        .select("artwork_id, artwork_title, artwork_artist_id, artwork_image_url, artwork_photo_url, artists!left(artist_firstname, artist_lastname)")
+        .is("artwork_deleted_at", null);
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
       if (selectedArtistId !== "all") artworksQuery = artworksQuery.eq("artwork_artist_id", selectedArtistId);
@@ -1419,13 +1503,19 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      visitorGeoScopeRef.current = { targetAgencyId, targetExpoId, expoDateRange };
+      visitorGeoScopeRef.current = {
+        targetAgencyId,
+        targetExpoId,
+        expoDateRange,
+        artistArtworkIds: effectiveArtworkFilterIds,
+      };
 
       try {
         const { rows, error } = await fetchVisitorGeographyForStatistics({
           targetAgencyId,
           targetExpoId,
           expoDateRange,
+          artistArtworkIds: effectiveArtworkFilterIds,
         });
 
         if (cancelled || runId !== geoRunRef.current) return;
@@ -1463,22 +1553,27 @@ const Statistics = () => {
     scope.agencyId,
     scope.expoId,
     expoDateRange,
+    effectiveArtworkFilterIds,
     runVisitorGeocoding,
   ]);
 
   const emotionCatalog = useMemo(() => emotionCatalogFromDb, [emotionCatalogFromDb]);
 
   const emotionSeries = useMemo(() => {
+    const activeFeedbackTotal = emotionCatalog.reduce(
+      (sum, emo) => sum + (feedbackCountsByEmotionId[emo.id] ?? 0),
+      0,
+    );
     return emotionCatalog.map((emo) => {
       const count = feedbackCountsByEmotionId[emo.id] ?? 0;
-      const percentage = feedbackTotal > 0 ? Math.round((count / feedbackTotal) * 100) : 0;
+      const percentage = activeFeedbackTotal > 0 ? Math.round((count / activeFeedbackTotal) * 100) : 0;
       return {
         ...emo,
         percentage,
         count,
       };
     });
-  }, [emotionCatalog, feedbackCountsByEmotionId, feedbackTotal]);
+  }, [emotionCatalog, feedbackCountsByEmotionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1490,7 +1585,7 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      let artworksQuery = supabase.from("artworks").select("artwork_id, artwork_title");
+      let artworksQuery = supabase.from("artworks").select("artwork_id, artwork_title").is("artwork_deleted_at", null);
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
       if (selectedArtistId !== "all") artworksQuery = artworksQuery.eq("artwork_artist_id", selectedArtistId);
@@ -1667,6 +1762,7 @@ const Statistics = () => {
     temporalSeries.length > 18 ? Math.max(1, Math.floor(temporalSeries.length / 14)) : 0;
 
   const filteredVisitsTotal = useMemo(() => sumChartVisits(hourlySeries), [hourlySeries]);
+  const temporalWeekVisitsTotal = useMemo(() => sumChartVisits(temporalSeries), [temporalSeries]);
 
   const expectedChartSurfaces = useMemo(() => {
     let n = 0;
@@ -1775,6 +1871,11 @@ const Statistics = () => {
     } catch {
       /* données déjà présentes ou délai */
     }
+    setExportProgress({ percent: 8, phase: "prepare" });
+    const geoWaitStarted = Date.now();
+    while (visitorGeoGeocoding && Date.now() - geoWaitStarted < 20_000) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
     setExportProgress({ percent: 10, phase: "prepare" });
     await new Promise((r) => setTimeout(r, 400));
   };
@@ -1799,6 +1900,9 @@ const Statistics = () => {
       crossError,
       sortedTopArtworks,
       topArtworksError,
+      visitorGeoRows,
+      visitorGeoError,
+      visitorGeoMapScopeKey,
       formatFrNumber,
     };
   }, [
@@ -1820,9 +1924,16 @@ const Statistics = () => {
     crossError,
     sortedTopArtworks,
     topArtworksError,
+    visitorGeoRows,
+    visitorGeoError,
+    visitorGeoMapScopeKey,
   ]);
 
   const buildPdfExportTables = useCallback((): StatisticsPdfExportTables => {
+    const geographyMappableCount = visitorGeoRows.filter(
+      (row) => row.latitude != null && row.longitude != null,
+    ).length;
+
     return {
       cross: {
         title: t("cross.title"),
@@ -1863,6 +1974,29 @@ const Statistics = () => {
               : formatFrNumber(row.avgHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
         })),
       },
+      geography: {
+        title: t("geography.title"),
+        disclaimer: t("geography.disclaimer"),
+        mapHint: t("geography.mapHint", {
+          mapped: geographyMappableCount,
+          total: visitorGeoRows.length,
+        }),
+        errorText: visitorGeoError,
+        emptyText: t("geography.empty"),
+        visitorHeader: t("geography.colVisitor"),
+        pseudoHeader: t("geography.colPseudo"),
+        cityHeader: t("geography.colCity"),
+        countryHeader: t("geography.colCountry"),
+        regionHeader: t("geography.colRegion"),
+        mapImage: null,
+        rows: visitorGeoRows.map((row) => ({
+          label: row.label,
+          pseudo: row.pseudo?.trim() || "—",
+          city: row.city?.trim() || "—",
+          country: row.country?.trim() || "—",
+          region: row.region?.trim() || "—",
+        })),
+      },
     };
   }, [
     t,
@@ -1871,6 +2005,8 @@ const Statistics = () => {
     sortedCrossRows,
     topArtworksError,
     sortedTopArtworks,
+    visitorGeoRows,
+    visitorGeoError,
   ]);
 
   const handleExportProgress = useCallback((progress: StatisticsPdfExportProgress) => {
@@ -1926,8 +2062,17 @@ const Statistics = () => {
     [selectedAgencyId, drillExpoId, selectedArtistId, printExportBusy, selectedFilteredExpo, manualPreviewDateFrom, uniqueVisitorsTotal],
   );
 
-  const liveReportViewProps = buildReportExportSnapshot();
-  const reportViewProps = reportExportSnapshot ?? liveReportViewProps;
+  const reportViewProps = useMemo((): StatisticsReportViewProps => {
+    const live = buildReportExportSnapshot();
+    if (!reportExportSnapshot) return live;
+    return {
+      ...live,
+      ...reportExportSnapshot,
+      visitorGeoRows: reportExportSnapshot.visitorGeoRows ?? live.visitorGeoRows,
+      visitorGeoError: reportExportSnapshot.visitorGeoError ?? live.visitorGeoError,
+      visitorGeoMapScopeKey: reportExportSnapshot.visitorGeoMapScopeKey ?? live.visitorGeoMapScopeKey,
+    };
+  }, [reportExportSnapshot, buildReportExportSnapshot]);
 
   const todayYmd = toYmd(new Date());
 
@@ -1943,7 +2088,10 @@ const Statistics = () => {
       const exportSnapshot = buildReportExportSnapshot();
       setReportExportSnapshot(exportSnapshot);
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      await new Promise((r) => window.setTimeout(r, 350));
+      const hasMappableVisitors = visitorGeoRows.some(
+        (row) => row.latitude != null && row.longitude != null,
+      );
+      await new Promise((r) => window.setTimeout(r, hasMappableVisitors ? 900 : 350));
 
       const root = statisticsPrintAreaRef.current;
       if (!root) throw new Error("missing-print-area");
@@ -2040,27 +2188,32 @@ const Statistics = () => {
   return (
     <div className="container min-w-0 max-w-full py-8 space-y-8">
       {exportProgressOverlay}
-      <div className="sticky top-16 z-30 flex min-w-0 flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+      <div className="sticky top-16 z-30 flex min-w-0 flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 max-w-full shrink-0 md:max-w-md">
-          <h2 className="text-2xl font-serif font-bold text-white sm:text-3xl">{t("page.title")}</h2>
-          <p className="text-muted-foreground">{t("page.subtitle")}</p>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(
-              "backoffice-toolbar-outline-btn mt-3",
-              uniqueVisitorsTotal === 0 &&
-                "cursor-not-allowed border-neutral-600 bg-neutral-700/50 text-neutral-500 opacity-100 hover:bg-neutral-700/50 hover:text-neutral-500",
-            )}
-            disabled={uniqueVisitorsTotal === 0}
-            title={uniqueVisitorsTotal === 0 ? t("page.previewDisabledNoVisitors") : undefined}
-            onClick={() => handlePrintPreviewOpenChange(true)}
-          >
-            {t("page.preview")}
-          </Button>
+          <div className="flex min-w-0 items-start gap-3">
+            <BackofficeStickyAgencyLogoSlot align="start" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-2xl font-serif font-bold text-white sm:text-3xl">{t("page.title")}</h2>
+              <p className="text-muted-foreground">{t("page.subtitle")}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "backoffice-toolbar-outline-btn mt-3",
+                  uniqueVisitorsTotal === 0 &&
+                    "cursor-not-allowed border-neutral-600 bg-neutral-700/50 text-neutral-500 opacity-100 hover:bg-neutral-700/50 hover:text-neutral-500",
+                )}
+                disabled={uniqueVisitorsTotal === 0}
+                title={uniqueVisitorsTotal === 0 ? t("page.previewDisabledNoVisitors") : undefined}
+                onClick={() => handlePrintPreviewOpenChange(true)}
+              >
+                {t("page.preview")}
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="flex min-h-[60px] flex-1 flex-col items-center justify-center px-2 md:min-w-0">
-          {selectedFilteredExpoId && stickyExpoLogoMeta.logoUrl ? (
+        {selectedFilteredExpoId && stickyExpoLogoMeta.logoUrl ? (
+          <div className="flex min-h-[60px] flex-1 flex-col items-center justify-center px-2 md:min-w-0">
             <img
               src={stickyExpoLogoMeta.logoUrl}
               alt={
@@ -2072,82 +2225,104 @@ const Statistics = () => {
               loading="lazy"
               decoding="async"
             />
-          ) : (
-            <BackofficeStickyAgencyLogoSlot />
-          )}
-        </div>
-        <div className="flex w-full min-w-0 flex-col gap-2 text-sm md:ml-auto md:min-w-[220px] md:shrink-0">
-          {showOrganizationFilter && (
-            <div>
-              <label htmlFor="statistics-scope-org" className="text-xs text-muted-foreground font-medium">
-                {t("filter.organisation")}
-              </label>
-              <select
-                id="statistics-scope-org"
-                name="statistics_scope_organization"
-                className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
-                disabled={!canEditAgencyScope}
-                value={selectedAgencyId === "all" ? "all" : selectedAgencyId}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (scope.mode === "all" && role_id === 1 && v === "all") {
-                    setSelectedAgencyId("all");
+          </div>
+        ) : null}
+        <div className="flex w-full min-w-0 max-w-full flex-col gap-2 text-sm md:ml-auto md:min-w-0 md:max-w-[min(100%,720px)] md:flex-1">
+          <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-end md:gap-3">
+            {showOrganizationFilter ? (
+              <div className="min-w-0 md:flex-1 md:basis-0">
+                <label htmlFor="statistics-scope-org" className="text-xs text-muted-foreground font-medium">
+                  {t("filter.organisation")}
+                </label>
+                <select
+                  id="statistics-scope-org"
+                  name="statistics_scope_organization"
+                  className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1 w-full min-w-0 max-w-full")}
+                  disabled={!canEditAgencyScope}
+                  value={selectedAgencyId === "all" ? "all" : selectedAgencyId}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (scope.mode === "all" && role_id === 1 && v === "all") {
+                      setSelectedAgencyId("all");
+                      setDrillExpoId("all");
+                      setSelectedArtistId("all");
+                      return;
+                    }
+                    setSelectedAgencyId(v);
                     setDrillExpoId("all");
                     setSelectedArtistId("all");
-                    return;
-                  }
-                  setSelectedAgencyId(v);
-                  setDrillExpoId("all");
+                    setManualPreviewDateFrom("");
+                    setManualPreviewDateTo("");
+                  }}
+                >
+                  {scope.mode === "all" && role_id === 1 && <option value="all">— (vue globale)</option>}
+                  {agencyOptions.length > 0 ? (
+                    agencyOptions.map((agency) => (
+                      <option key={agency.id} value={agency.id}>
+                        {agency.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={orgLabel}>{orgLabel}</option>
+                  )}
+                </select>
+              </div>
+            ) : null}
+            <div className="min-w-0 md:flex-1 md:basis-0">
+              <label htmlFor="statistics-scope-expo" className="text-xs text-muted-foreground font-medium">
+                {t("filter.exposition")}
+              </label>
+              <select
+                id="statistics-scope-expo"
+                name="statistics_scope_exposition"
+                className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1 w-full min-w-0 max-w-full")}
+                disabled={!canDrillExpo}
+                value={expoSelectValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDrillExpoId(v === "all" ? "all" : v);
                   setSelectedArtistId("all");
                   setManualPreviewDateFrom("");
                   setManualPreviewDateTo("");
                 }}
               >
-                {scope.mode === "all" && role_id === 1 && <option value="all">— (vue globale)</option>}
-                {agencyOptions.length > 0 ? (
-                  agencyOptions.map((agency) => (
-                    <option key={agency.id} value={agency.id}>
-                      {agency.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value={orgLabel}>{orgLabel}</option>
-                )}
+                {canDrillExpo && <option value="all">{t("filter.allExpos")}</option>}
+                {expoOptionsForSelect.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.expo_name}
+                  </option>
+                ))}
               </select>
             </div>
-          )}
-          <div>
-            <label htmlFor="statistics-scope-expo" className="text-xs text-muted-foreground font-medium">
-              {t("filter.exposition")}
-            </label>
-            <select
-              id="statistics-scope-expo"
-              name="statistics_scope_exposition"
-              className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
-              disabled={!canDrillExpo}
-              value={expoSelectValue}
-              onChange={(e) => {
-                const v = e.target.value;
-                setDrillExpoId(v === "all" ? "all" : v);
-                setSelectedArtistId("all");
-                setManualPreviewDateFrom("");
-                setManualPreviewDateTo("");
-              }}
-            >
-              {canDrillExpo && <option value="all">{t("filter.allExpos")}</option>}
-              {expoOptionsForSelect.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.expo_name}
-                </option>
-              ))}
-            </select>
+            {showArtistFilter ? (
+              <div className="min-w-0 md:flex-1 md:basis-0">
+                <label htmlFor="statistics-scope-artist" className="text-xs text-muted-foreground font-medium">
+                  {t("filter.artist")}
+                </label>
+                <select
+                  id="statistics-scope-artist"
+                  name="statistics_scope_artist"
+                  className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1 w-full min-w-0 max-w-full")}
+                  disabled={artistOptions.length === 0}
+                  value={selectedArtistId}
+                  onChange={(e) => setSelectedArtistId(e.target.value)}
+                >
+                  <option value="all">{t("filter.allArtists")}</option>
+                  {artistOptions.map((artist) => (
+                    <option key={artist.id} value={artist.id}>
+                      {artist.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
-          {showOrganizationFilter && selectedAgencyId === "all" && drillExpoId === "all" && (
-            <div>
+          {showDateRangeFilter ? (
+            <div className="min-w-0">
               <label className="text-xs text-muted-foreground font-medium">
                 {t("filter.expoPeriod")}
               </label>
-              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row">
                 <input
                   type="date"
                   value={manualPreviewDateFrom}
@@ -2157,7 +2332,7 @@ const Statistics = () => {
                     setManualPreviewDateFrom(v);
                     if (manualPreviewDateTo && v > manualPreviewDateTo) setManualPreviewDateTo("");
                   }}
-                  className={BACKOFFICE_FORM_CONTROL_CLASS}
+                  className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "min-w-0 flex-1")}
                   title={t("preview.dateFrom")}
                 />
                 <input
@@ -2166,32 +2341,10 @@ const Statistics = () => {
                   min={manualPreviewDateFrom || undefined}
                   max={todayYmd}
                   onChange={(e) => setManualPreviewDateTo(e.target.value)}
-                  className={BACKOFFICE_FORM_CONTROL_CLASS}
+                  className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "min-w-0 flex-1")}
                   title={t("preview.dateTo")}
                 />
               </div>
-            </div>
-          )}
-          {showArtistFilter ? (
-            <div>
-              <label htmlFor="statistics-scope-artist" className="text-xs text-muted-foreground font-medium">
-                {t("filter.artist")}
-              </label>
-              <select
-                id="statistics-scope-artist"
-                name="statistics_scope_artist"
-                className={cn(BACKOFFICE_FORM_CONTROL_CLASS, "mt-1")}
-                disabled={artistOptions.length === 0}
-                value={selectedArtistId}
-                onChange={(e) => setSelectedArtistId(e.target.value)}
-              >
-                <option value="all">{t("filter.allArtists")}</option>
-                {artistOptions.map((artist) => (
-                  <option key={artist.id} value={artist.id}>
-                    {artist.name}
-                  </option>
-                ))}
-              </select>
             </div>
           ) : null}
         </div>
@@ -2331,8 +2484,8 @@ const Statistics = () => {
             {temporalSeries.length > 0 ? (
               <p className="mt-2 text-center text-sm font-medium text-muted-foreground">
                 {expoDateRange
-                  ? t("timeline.totalVisitsExpo", { count: formatFrNumber(filteredVisitsTotal) })
-                  : t("timeline.totalVisitsFiltered", { count: formatFrNumber(filteredVisitsTotal) })}
+                  ? t("timeline.totalVisitsExpo", { count: formatFrNumber(temporalWeekVisitsTotal) })
+                  : t("timeline.totalVisitsWeek", { count: formatFrNumber(temporalWeekVisitsTotal) })}
               </p>
             ) : null}
           </CardContent>
