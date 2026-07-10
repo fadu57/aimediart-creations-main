@@ -625,8 +625,7 @@ const Expos = () => {
     return false;
   };
 
-  /** Carnet visiteur : staff global (toutes expos) ou rôles métier sur leur périmètre. */
-  const canViewExpoTravelDiary = (ex: ExpoRow) => canEditExpo(ex);
+  /** Carnet visiteur : visible pour tout utilisateur backoffice sur /expos (accès contrôlé au picker). */
 
   const openCreate = () => {
     setFormMode("create");
@@ -1072,21 +1071,19 @@ const Expos = () => {
                   })()}
                 </div>
                 <div className="flex w-full min-w-0 flex-col gap-2 md:w-[190px] md:shrink-0">
-                  {canViewExpoTravelDiary(ex) ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className={cn(EXPO_CARD_BTN, "gap-1 border-primary/40 text-xs")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDiaryPickerExpo({ id: ex.id, name: expoTitle(ex) });
-                      }}
-                    >
-                      <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      {t("card.travelDiary")}
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={cn(EXPO_CARD_BTN, "gap-1 border-primary/40 text-xs")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDiaryPickerExpo({ id: ex.id, name: expoTitle(ex) });
+                    }}
+                  >
+                    <BookOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    {t("card.travelDiary")}
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
