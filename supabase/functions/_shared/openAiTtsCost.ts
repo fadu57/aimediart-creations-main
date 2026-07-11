@@ -60,3 +60,47 @@ export function estimateGpt4oMiniTtsCostUsd(params: {
     totalUsd: inputCostUsd + audioCostUsd,
   };
 }
+
+type UsageEventLike = {
+  cost_estimated?: number | null;
+  input_units?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+/** Recalcule le coût d'un événement OpenAI TTS (historique ou courant). */
+export function recalculateOpenAiTtsEventCostUsd(event: UsageEventLike): number {
+  const meta = event.metadata ?? {};
+  if (meta.cost_model === GPT4O_MINI_TTS_COST_MODEL) {
+    return Number(event.cost_estimated) || 0;
+  }
+  const textChars = Number(meta.text_chars ?? event.input_units ?? 0);
+  const instructionChars = Number(meta.instruction_chars ?? 0);
+  const fileSizeBytes = Number(meta.file_size_bytes ?? 0);
+  return estimateGpt4oMiniTtsCostUsd({
+    textChars,
+    instructionChars,
+    audioFileSizeBytes: fileSizeBytes,
+  }).totalUsd;
+}
+
+type CostEventLike = UsageEventLike & {
+  provider?: string;
+  tool_type?: string;
+  currency?: string | null;
+};
+
+/** Coût normalisé USD pour agrégation KPI. */
+export function costAmountInUsd(
+  event: CostEventLike,
+  usdToEurRate: number | null = null,
+): number {
+  let amount = Number(event.cost_estimated) || 0;
+  if (event.provider === "openai" && event.tool_type === "tts") {
+    amount = recalculateOpenAiTtsEventCostUsd(event);
+  }
+  const currency = (event.currency ?? "USD").toUpperCase();
+  if (currency === "EUR" && usdToEurRate != null && usdToEurRate > 0) {
+    return amount / usdToEurRate;
+  }
+  return amount;
+}

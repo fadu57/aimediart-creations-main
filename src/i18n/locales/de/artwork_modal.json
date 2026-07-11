@@ -89,6 +89,8 @@
   "mediation_lang_help_single_optional": "KI-Generierung: alle 8 Personas in {{primary}} und zusätzlich in {{optional}} (optionale Sprache oben).",
   "mediation_lang_help_all": "KI-Generierung: alle 8 Personas in FR, EN, DE, ES und IT (Modus « alle Sprachen » in den Einstellungen).",
   "mediation_optional_lang_label": "Optionale Sprache (zusätzlich zu {{primary}})",
+  "mediation_optional_lang_admin_label": "Zusätzliche Sprachen — Admin Stufe 1 (zusätzlich zu {{primary}})",
+  "mediation_lang_help_admin_general": "Admin-Modus: Wählen Sie 1 bis 4 zusätzliche Sprachen zur Generierung, zusätzlich zu {{primary}}.",
   "mediation_optional_lang_none": "Keine",
   "mediation_optional_lang_hint": "Die Hauptsprache folgt der Sprachauswahl im Header (z. B. im Katalog). Höchstens eine weitere Sprache.",
   "dialog_lang_generate_title": "Mediationen auf {{lang}} erzeugen?",

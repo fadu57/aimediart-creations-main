@@ -283,16 +283,20 @@ export async function insertAiUsageLog(
   }
   const totalTokens = Math.max(0, Math.round(Number(total)));
 
+  const artworkId = row.artwork_id?.trim() || null;
+  const metadata: Record<string, unknown> = { ...(row.metadata ?? {}) };
+  if (artworkId) metadata.artwork_id = artworkId;
+
   const payload: Record<string, unknown> = {
     model_id: modelId,
     provider: row.provider,
     prompt_tokens: Math.max(0, Math.round(pt)),
     completion_tokens: Math.max(0, Math.round(ct)),
     total_tokens: totalTokens,
-    artwork_id: row.artwork_id ?? null,
+    artwork_id: artworkId,
   };
-  if (row.metadata && Object.keys(row.metadata).length > 0) {
-    payload.metadata = row.metadata;
+  if (Object.keys(metadata).length > 0) {
+    payload.metadata = metadata;
   }
 
   const { error } = await admin.from("ai_usage_logs").insert(payload);

@@ -12,6 +12,7 @@ import {
 import {
   formatWakaSeconds, formatWakaChartDayLabel, type WakaEntity, type WakaTimelineRow, type WakaTimeDashboard,
 } from "@/lib/wakatime";
+import { isCursorEditorName, sumCursorEditorSeconds } from "@/lib/wakatimeCursor";
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 function EmptyChart({ text }: { text: string }) {
@@ -269,21 +270,68 @@ export function WakaTimeDashboardCharts({
     [data.daily],
   );
 
+  const cursorDailyChart = useMemo(
+    () => (data.cursor?.daily ?? [])
+      .filter((d) => d.seconds > 0)
+      .map((d) => ({
+        date: formatWakaChartDayLabel(d.date),
+        heures: d.hours,
+      })),
+    [data.cursor?.daily],
+  );
+
+  const aiVsHumanChart = useMemo(() => {
+    const cursorByDate = new Map(
+      (data.cursor?.daily ?? []).map((d) => [d.date, d.hours]),
+    );
+    return (data.daily ?? []).map((d) => {
+      const ia = Math.round((cursorByDate.get(d.date) ?? 0) * 100) / 100;
+      const humain = Math.max(0, Math.round((d.hours - ia) * 100) / 100);
+      return {
+        date: formatWakaChartDayLabel(d.date),
+        ia,
+        humain,
+      };
+    });
+  }, [data.daily, data.cursor?.daily]);
+
+  const editorSplitChart = useMemo(() => {
+    const editors = stats.editors ?? [];
+    const cursorSec = sumCursorEditorSeconds(editors);
+    const otherSec = editors
+      .filter((e) => !isCursorEditorName(e.name))
+      .reduce((sum, e) => sum + e.total_seconds, 0);
+    const rows = [
+      {
+        name: "Cursor",
+        heures: Math.round((cursorSec / 3600) * 100) / 100,
+        fullName: "Cursor",
+      },
+      {
+        name: t("wakatime.chart_other_editors"),
+        heures: Math.round((otherSec / 3600) * 100) / 100,
+        fullName: t("wakatime.chart_other_editors"),
+      },
+    ].filter((row) => row.heures > 0);
+    return rows;
+  }, [stats.editors, t]);
+
+  const hasAiVsHumanData = aiVsHumanChart.some((d) => d.ia > 0 || d.humain > 0);
+  const hasCursorDaily = cursorDailyChart.length > 0;
+  const hasEditorSplit = editorSplitChart.length > 0;
+
   const gaugeSeconds = isSingleDay ? data.today.total_seconds : stats.total_seconds;
-  const gaugeLabel = isSingleDay
-    ? (data.today.human_readable_total || formatWakaSeconds(data.today.total_seconds))
-    : (stats.human_readable_total || formatWakaSeconds(stats.total_seconds));
+  const gaugeLabel = formatWakaSeconds(gaugeSeconds);
   const gaugeCaption = isSingleDay
     ? t("wakatime.kpi_today_sub")
     : t("wakatime.kpi_total_sub");
   const avgLabel = t("wakatime.gauge_avg", {
-    value: stats.human_readable_daily_average || formatWakaSeconds(stats.daily_average_seconds),
+    value: formatWakaSeconds(stats.daily_average_seconds),
   });
   const bestLabel = t("wakatime.gauge_best", {
-    value: stats.best_day?.text
-      ?? (stats.best_day?.total_seconds
-        ? formatWakaSeconds(Number(stats.best_day.total_seconds))
-        : "—"),
+    value: stats.best_day?.total_seconds
+      ? formatWakaSeconds(Number(stats.best_day.total_seconds))
+      : "—",
   });
 
   const xAxisInterval = dailyChart.length > 14 ? Math.max(0, Math.ceil(dailyChart.length / 8) - 1) : 0;
@@ -316,6 +364,78 @@ export function WakaTimeDashboardCharts({
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="glass-card border-[#E63946]/15">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t("wakatime.chart_agents_title")}</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[220px]">
+            {hasCursorDaily ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={cursorDailyChart} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+                  <defs>
+                    <linearGradient id="cursorAgentArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#E63946" stopOpacity={0.45} />
+                      <stop offset="100%" stopColor="#E63946" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={xAxisInterval} />
+                  <YAxis tick={{ fontSize: 10 }} width={32} />
+                  <Tooltip formatter={(v: number) => [`${v} h`, hoursLabel]} />
+                  <Area
+                    type="monotone"
+                    dataKey="heures"
+                    stroke="#E63946"
+                    fill="url(#cursorAgentArea)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : hasEditorSplit ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={editorSplitChart} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v: number) => [`${v} h`, hoursLabel]} />
+                  <Bar dataKey="heures" fill="#E63946" radius={[0, 3, 3, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChart text={t("wakatime.cursor.empty")} />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">{t("wakatime.chart_ai_title")}</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[220px]">
+            {hasAiVsHumanData ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={aiVsHumanChart} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={xAxisInterval} />
+                  <YAxis tick={{ fontSize: 10 }} width={32} />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [
+                      `${v} h`,
+                      name === "ia" ? t("wakatime.chart_ai_ia_label") : t("wakatime.chart_ai_human_label"),
+                    ]}
+                  />
+                  <Bar dataKey="ia" stackId="mix" fill="#E63946" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="humain" stackId="mix" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyChart text={empty} />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <HorizontalBarCard
@@ -394,25 +514,6 @@ export function WakaTimeDashboardCharts({
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t("wakatime.chart_agents_title")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmptyChart text={t("wakatime.empty_agents")} />
-          </CardContent>
-        </Card>
-        <Card className="glass-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">{t("wakatime.chart_ai_title")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmptyChart text={t("wakatime.empty_ai")} />
           </CardContent>
         </Card>
       </div>

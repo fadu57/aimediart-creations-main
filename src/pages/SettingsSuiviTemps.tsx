@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Clock, Loader2, RefreshCw } from "lucide-react";
 
 import { WakaTimeDashboardCharts } from "@/components/settings/WakaTimeDashboardCharts";
 import { CursorGitFilesPanel } from "@/components/settings/CursorGitFilesPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   chartDateFr,
   fetchWakaTimeDashboard,
   formatWakaSeconds,
+  summarizeWakaPeriodDaily,
   type WakaTimeDashboard,
 } from "@/lib/wakatime";
 import { fetchCursorGitStats, type CursorGitStats } from "@/lib/cursorGitStats";
@@ -47,6 +49,8 @@ export default function SettingsSuiviTemps() {
   const [gitLoading, setGitLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gitError, setGitError] = useState<string | null>(null);
+  const [gitPanelOpen, setGitPanelOpen] = useState(false);
+  const loadSeqRef = useRef(0);
 
   const range = useMemo(
     () => getWakaPeriodRange(period, periodOffset),
@@ -54,23 +58,41 @@ export default function SettingsSuiviTemps() {
   );
 
   const locale = dateLocale(i18n.language);
+  const rangeKey = `${range.dateFrom}|${range.dateTo}`;
 
   useEffect(() => {
     setPeriod(DEFAULT_WAKA_PERIOD);
     setPeriodOffset(0);
+    setData(null);
+    setGitData(null);
   }, [location.key]);
 
+  const resetLoadedData = useCallback(() => {
+    setData(null);
+    setGitData(null);
+  }, []);
+
+  const beginRangeChange = useCallback(() => {
+    setLoading(true);
+    setGitLoading(true);
+    resetLoadedData();
+  }, [resetLoadedData]);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
+    const rangeParams = { dateFrom: range.dateFrom, dateTo: range.dateTo };
+
     setLoading(true);
     setGitLoading(true);
     setError(null);
     setGitError(null);
 
-    const rangeParams = { dateFrom: range.dateFrom, dateTo: range.dateTo };
     const [wakaResult, gitResult] = await Promise.all([
       fetchWakaTimeDashboard(rangeParams),
       fetchCursorGitStats(rangeParams),
     ]);
+
+    if (seq !== loadSeqRef.current) return;
 
     setLoading(false);
     setGitLoading(false);
@@ -93,7 +115,63 @@ export default function SettingsSuiviTemps() {
   useEffect(() => {
     if (!canAccess) return;
     void load();
-  }, [canAccess, load]);
+  }, [canAccess, period, periodOffset, load]);
+
+  const dataMatchesRange = data?.range.dateFrom === range.dateFrom
+    && data?.range.dateTo === range.dateTo;
+  const displayData = dataMatchesRange ? data : null;
+  const isLoadingDashboard = loading || gitLoading || (data != null && !dataMatchesRange);
+
+  const periodStats = useMemo(
+    () => (displayData
+      ? summarizeWakaPeriodDaily(displayData.daily ?? [], range.dateFrom, range.dateTo)
+      : null),
+    [displayData, range.dateFrom, range.dateTo],
+  );
+
+  const kpis = useMemo(
+    () => (periodStats
+      ? [
+        {
+          label: t("wakatime.kpi_total"),
+          value: formatWakaSeconds(periodStats.total_seconds),
+          sub: range.dateFrom === range.dateTo
+            ? formatWakaPeriodDate(range.dateFrom, locale)
+            : t("wakatime.range_label", {
+              from: formatWakaPeriodDate(range.dateFrom, locale),
+              to: formatWakaPeriodDate(range.dateTo, locale),
+            }),
+        },
+        {
+          label: t("wakatime.kpi_avg"),
+          value: formatWakaSeconds(periodStats.daily_average_seconds),
+          sub: t("wakatime.kpi_avg_sub"),
+        },
+        {
+          label: t("wakatime.kpi_best"),
+          value: periodStats.best_day
+            ? formatWakaSeconds(periodStats.best_day.seconds)
+            : "—",
+          sub: periodStats.best_day?.date
+            ? chartDateFr(periodStats.best_day.date)
+            : t("wakatime.kpi_best_sub"),
+        },
+        {
+          label: t("wakatime.kpi_active_days"),
+          value: String(periodStats.active_days),
+          sub: t("wakatime.kpi_active_days_sub"),
+        },
+      ]
+      : []),
+    [periodStats, range.dateFrom, range.dateTo, locale, t],
+  );
+
+  const rangeLabel = range.dateFrom === range.dateTo
+    ? formatWakaPeriodDate(range.dateFrom, locale)
+    : t("wakatime.range_label", {
+      from: formatWakaPeriodDate(range.dateFrom, locale),
+      to: formatWakaPeriodDate(range.dateTo, locale),
+    });
 
   if (authLoading) {
     return (
@@ -103,48 +181,6 @@ export default function SettingsSuiviTemps() {
     );
   }
   if (!canAccess) return <Navigate to="/dashboard" replace />;
-
-  const stats = data?.stats;
-  const activeDays = data?.daily.filter((d) => d.seconds > 0).length ?? 0;
-
-  const kpis = stats
-    ? [
-      {
-        label: t("wakatime.kpi_total"),
-        value: stats.human_readable_total || formatWakaSeconds(stats.total_seconds),
-        sub: range.dateFrom === range.dateTo
-          ? formatWakaPeriodDate(range.dateFrom, locale)
-          : t("wakatime.kpi_total_sub"),
-      },
-      {
-        label: t("wakatime.kpi_avg"),
-        value: stats.human_readable_daily_average || formatWakaSeconds(stats.daily_average_seconds),
-        sub: t("wakatime.kpi_avg_sub"),
-      },
-      {
-        label: t("wakatime.kpi_best"),
-        value: stats.best_day?.text
-          ?? (stats.best_day?.total_seconds
-            ? formatWakaSeconds(Number(stats.best_day.total_seconds))
-            : "—"),
-        sub: stats.best_day?.date
-          ? chartDateFr(String(stats.best_day.date))
-          : t("wakatime.kpi_best_sub"),
-      },
-      {
-        label: t("wakatime.kpi_active_days"),
-        value: String(activeDays),
-        sub: t("wakatime.kpi_active_days_sub"),
-      },
-    ]
-    : [];
-
-  const rangeLabel = range.dateFrom === range.dateTo
-    ? formatWakaPeriodDate(range.dateFrom, locale)
-    : t("wakatime.range_label", {
-      from: formatWakaPeriodDate(range.dateFrom, locale),
-      to: formatWakaPeriodDate(range.dateTo, locale),
-    });
 
   return (
     <div className="container py-8 space-y-6">
@@ -197,6 +233,8 @@ export default function SettingsSuiviTemps() {
               variant={period === p ? "default" : "outline"}
               className={cn(period === p && "bg-[#E63946] hover:bg-[#c92f3b]")}
               onClick={() => {
+                if (period === p && periodOffset === 0) return;
+                beginRangeChange();
                 setPeriod(p);
                 setPeriodOffset(0);
               }}
@@ -213,7 +251,10 @@ export default function SettingsSuiviTemps() {
             variant="outline"
             className="h-8 w-8 shrink-0"
             aria-label={t("wakatime.period_prev")}
-            onClick={() => setPeriodOffset((o) => o - 1)}
+            onClick={() => {
+              beginRangeChange();
+              setPeriodOffset((o) => o - 1);
+            }}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
@@ -227,7 +268,10 @@ export default function SettingsSuiviTemps() {
             className="h-8 w-8 shrink-0"
             aria-label={t("wakatime.period_next")}
             disabled={!range.canGoNext}
-            onClick={() => setPeriodOffset((o) => o + 1)}
+            onClick={() => {
+              beginRangeChange();
+              setPeriodOffset((o) => o + 1);
+            }}
           >
             <ChevronRight className="h-4 w-4" aria-hidden />
           </Button>
@@ -237,7 +281,11 @@ export default function SettingsSuiviTemps() {
               size="sm"
               variant="ghost"
               className="h-8 text-xs"
-              onClick={() => setPeriodOffset(0)}
+              onClick={() => {
+                if (periodOffset === 0) return;
+                beginRangeChange();
+                setPeriodOffset(0);
+              }}
             >
               {t("wakatime.period_current")}
             </Button>
@@ -258,39 +306,59 @@ export default function SettingsSuiviTemps() {
         </Alert>
       )}
 
-      {loading && !data && gitLoading && !gitData ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      {isLoadingDashboard ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i} className="glass-card animate-pulse">
+              <CardContent className="h-[88px] rounded-xl bg-muted/30 p-4" />
+            </Card>
+          ))}
         </div>
-      ) : (
+      ) : displayData ? (
         <>
-          <CursorGitFilesPanel
-            stats={gitData}
-            loading={gitLoading}
-            error={gitError}
-            cursor={data?.cursor ?? null}
-            cursorLoading={loading}
-          />
-
-          {data ? (
-            <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
               <Card key={kpi.label} className="glass-card">
                 <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                  <p className="text-xl font-semibold mt-1">{kpi.value}</p>
+                  <p className="text-xl font-semibold mt-1 tabular-nums">{kpi.value}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">{kpi.sub}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          <WakaTimeDashboardCharts data={data} t={t} />
-            </>
-          ) : null}
+          <WakaTimeDashboardCharts key={rangeKey} data={displayData} t={t} />
+
+          <Collapsible open={gitPanelOpen} onOpenChange={setGitPanelOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between gap-2"
+              >
+                <span>{t("wakatime.cursor_git.section_title")}</span>
+                <ChevronDown
+                  className={cn("h-4 w-4 shrink-0 transition-transform", gitPanelOpen && "rotate-180")}
+                  aria-hidden
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-4">
+              <CursorGitFilesPanel
+                key={rangeKey}
+                stats={gitData}
+                loading={gitLoading}
+                error={gitError}
+                cursor={displayData.cursor ?? null}
+                cursorLoading={loading}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         </>
-      )}
+      ) : !error ? (
+        <p className="text-sm text-center text-muted-foreground py-10">{t("wakatime.empty")}</p>
+      ) : null}
     </div>
   );
 }

@@ -180,6 +180,42 @@ export function formatWakaSeconds(seconds: number): string {
   return `${h} h ${m} min`;
 }
 
+export type WakaPeriodStats = {
+  total_seconds: number;
+  daily_average_seconds: number;
+  active_days: number;
+  best_day: { date: string; seconds: number } | null;
+};
+
+/** KPI cohérents avec les graphiques — calculés depuis daily[], pas les libellés WakaTime (EN). */
+export function summarizeWakaPeriodDaily(
+  daily: WakaDailyPoint[],
+  dateFrom: string,
+  dateTo: string,
+): WakaPeriodStats {
+  const inRange = daily.filter((d) => d.date >= dateFrom && d.date <= dateTo);
+  const total_seconds = inRange.reduce((sum, d) => sum + d.seconds, 0);
+  const active_days = inRange.filter((d) => d.seconds > 0).length;
+  const spanDays = Math.max(
+    1,
+    Math.round(
+      (new Date(`${dateTo}T12:00:00`).getTime() - new Date(`${dateFrom}T12:00:00`).getTime())
+        / (24 * 3600 * 1000),
+    ) + 1,
+  );
+  const best = inRange.reduce<{ date: string; seconds: number } | null>(
+    (bestDay, d) => (!bestDay || d.seconds > bestDay.seconds ? { date: d.date, seconds: d.seconds } : bestDay),
+    null,
+  );
+
+  return {
+    total_seconds,
+    daily_average_seconds: total_seconds / spanDays,
+    active_days,
+    best_day: best && best.seconds > 0 ? best : null,
+  };
+}
+
 export function chartDateFr(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

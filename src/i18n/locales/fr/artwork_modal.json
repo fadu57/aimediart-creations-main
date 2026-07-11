@@ -92,6 +92,8 @@
   "mediation_lang_help_plan_range": "Génération IA : jusqu'à {{count}} langues incluses dans votre abonnement. Choisissez une langue optionnelle ci-dessus pour activer la seconde langue.",
   "mediation_lang_help_all": "Génération IA : les 8 personas en FR, EN, DE, ES et IT (forfait incluant les 5 langues).",
   "mediation_optional_lang_label": "Langue optionnelle (en plus de {{primary}})",
+  "mediation_optional_lang_admin_label": "Langues supplémentaires — admin niveau 1 (en plus de {{primary}})",
+  "mediation_lang_help_admin_general": "Mode administrateur : sélectionnez 1 à 4 langues supplémentaires à générer, en plus de {{primary}}.",
   "mediation_optional_lang_none": "Aucune",
   "mediation_optional_lang_hint": "La langue principale suit le sélecteur de langue du header. Les langues activées dépendent de votre formule d'abonnement.",
   "dialog_lang_generate_title": "Générer les médiations en {{lang}} ?",

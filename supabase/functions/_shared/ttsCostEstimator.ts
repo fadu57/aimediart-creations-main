@@ -15,6 +15,7 @@ import {
   type ProviderSyncContext,
 } from "./providerSyncContext.ts";
 import type { ProviderSyncResult } from "./providerRegistry.ts";
+import { artworkIdFromUsageLogRow } from "./usageLogArtwork.ts";
 
 export const GOOGLE_TTS_USD_PER_MILLION_CHARS = 16;
 export const GOOGLE_TTS_FREE_CHARS_PER_MONTH = 1_000_000;
@@ -84,6 +85,12 @@ export function buildGoogleTtsCostEvents(logs: AiUsageLogRow[]): CostEventInsert
     const { costUsd, billableChars, freeCharsApplied } = estimateGoogleTtsCostUsd(chars, already);
     monthCharsUsed.set(month, already + freeCharsApplied + billableChars);
 
+    const artworkId = artworkIdFromUsageLogRow(log);
+    const textId =
+      typeof log.metadata?.text_id === "string" && log.metadata.text_id.trim()
+        ? log.metadata.text_id.trim()
+        : artworkId;
+
     events.push({
       import_hash: `google_tts_log:${log.id}`,
       created_at: log.created_at,
@@ -106,9 +113,11 @@ export function buildGoogleTtsCostEvents(logs: AiUsageLogRow[]): CostEventInsert
         billable_chars: billableChars,
         free_chars_applied: freeCharsApplied,
         ai_usage_log_id: log.id,
-        artwork_id: log.artwork_id,
+        artwork_id: artworkId,
+        ...(textId ? { text_id: textId } : {}),
         disclaimer:
           "Coût estimé Neural2 — quota gratuit 1 M car./mois appliqué. Vérifier sur console.cloud.google.com.",
+        ...(log.metadata ?? {}),
       },
     });
   }

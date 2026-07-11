@@ -72,6 +72,7 @@ export default function SettingsSuiviTokens() {
   const [dataEarliest, setDataEarliest] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState(ALL_PROVIDERS);
   const limitsRefetchRef = useRef<(() => void) | null>(null);
+  const loadSeqRef = useRef(0);
 
   const range = useMemo(
     () => getTokenPeriodRange(period, periodOffset),
@@ -96,12 +97,18 @@ export default function SettingsSuiviTokens() {
   }, [dataEarliest, range.dateTo]);
 
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     setError(null);
+    setRows([]);
+
     const [logsRes, eventsRes] = await Promise.all([
       fetchTokenUsageLogs(fetchRange),
       fetchTtsUsageEvents(fetchRange),
     ]);
+
+    if (seq !== loadSeqRef.current) return;
+
     setLoading(false);
     if (logsRes.error) {
       setError(logsRes.error);
@@ -114,12 +121,12 @@ export default function SettingsSuiviTokens() {
       return;
     }
     setRows(mergeUsageRows(logsRes.data, eventsRes.data));
-  }, [fetchRange]);
+  }, [fetchRange.dateFrom, fetchRange.dateTo]);
 
   useEffect(() => {
     if (!canAccess) return;
     void load();
-  }, [canAccess, load]);
+  }, [canAccess, period, periodOffset, load]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -258,6 +265,7 @@ export default function SettingsSuiviTokens() {
               variant={period === p ? "default" : "outline"}
               className={cn(period === p && "bg-[#E63946] hover:bg-[#c92f3b]")}
               onClick={() => {
+                if (period === p && periodOffset === 0) return;
                 setPeriod(p);
                 setPeriodOffset(0);
               }}

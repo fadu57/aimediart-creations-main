@@ -1,9 +1,6 @@
 /**
- * Estimation des coûts Groq à partir de ai_usage_logs.
- *
- * Groq ne fournit pas d'API de facturation publique dans ce projet.
- * Les montants sont ESTIMÉS via la grille tarifaire codée ci-dessous.
- * Mettre à jour périodiquement depuis https://console.groq.com/docs/pricing
+ * Estimation des coûts Gemini (médiation) depuis ai_usage_logs → ai_usage_events.
+ * Complète l'export BigQuery (coûts projet) par les coûts rattachables aux œuvres.
  */
 
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
@@ -21,23 +18,17 @@ import {
   isMediationUsageLog,
 } from "./usageLogArtwork.ts";
 
-/** USD par million de tokens (input / output). */
-type GroqModelRates = { inputPerM: number; outputPerM: number };
+/** USD par million de tokens (input / output) — grille indicative. */
+type GeminiModelRates = { inputPerM: number; outputPerM: number };
 
-/**
- * Grille indicative — à maintenir manuellement.
- * Modèles inconnus : tarif fallback conservateur.
- */
-const GROQ_MODEL_RATES: Record<string, GroqModelRates> = {
-  "llama-3.3-70b-versatile": { inputPerM: 0.59, outputPerM: 0.79 },
-  "llama-3.1-8b-instant": { inputPerM: 0.05, outputPerM: 0.08 },
-  "llama3-70b-8192": { inputPerM: 0.59, outputPerM: 0.79 },
-  "llama3-8b-8192": { inputPerM: 0.05, outputPerM: 0.08 },
-  "mixtral-8x7b-32768": { inputPerM: 0.24, outputPerM: 0.24 },
-  "gemma2-9b-it": { inputPerM: 0.20, outputPerM: 0.20 },
+const GEMINI_MODEL_RATES: Record<string, GeminiModelRates> = {
+  "gemini-2.5-flash": { inputPerM: 0.15, outputPerM: 0.6 },
+  "gemini-2.5-pro": { inputPerM: 1.25, outputPerM: 10 },
+  "gemini-2.0-flash": { inputPerM: 0.1, outputPerM: 0.4 },
+  "gemini-2.5-pro-preview-05-06": { inputPerM: 1.25, outputPerM: 10 },
 };
 
-const GROQ_FALLBACK_RATES: GroqModelRates = { inputPerM: 0.50, outputPerM: 0.50 };
+const GEMINI_FALLBACK_RATES: GeminiModelRates = { inputPerM: 0.35, outputPerM: 1.05 };
 
 type AiUsageLogRow = {
   id: string;
@@ -55,26 +46,24 @@ function normalizeModelId(raw: string): string {
   return raw.trim().toLowerCase().replace(/^models\//, "");
 }
 
-function getRatesForModel(modelId: string): { rates: GroqModelRates; known: boolean } {
+function getRatesForModel(modelId: string): { rates: GeminiModelRates; known: boolean } {
   const norm = normalizeModelId(modelId);
-  if (GROQ_MODEL_RATES[norm]) {
-    return { rates: GROQ_MODEL_RATES[norm], known: true };
+  if (GEMINI_MODEL_RATES[norm]) {
+    return { rates: GEMINI_MODEL_RATES[norm], known: true };
   }
-  // Correspondance partielle (ex. llama-3.3-70b-versatile-xxx)
-  for (const [key, rates] of Object.entries(GROQ_MODEL_RATES)) {
+  for (const [key, rates] of Object.entries(GEMINI_MODEL_RATES)) {
     if (norm.includes(key) || key.includes(norm)) {
       return { rates, known: true };
     }
   }
-  return { rates: GROQ_FALLBACK_RATES, known: false };
+  return { rates: GEMINI_FALLBACK_RATES, known: false };
 }
 
-/** Coût USD estimé pour une ligne de log. */
-export function estimateGroqCostUsd(
+export function estimateGeminiLogCostUsd(
   promptTokens: number,
   completionTokens: number,
   modelId: string,
-): { cost: number; rates: GroqModelRates; pricingKnown: boolean } {
+): { cost: number; rates: GeminiModelRates; pricingKnown: boolean } {
   const { rates, known } = getRatesForModel(modelId);
   const cost =
     (promptTokens / 1_000_000) * rates.inputPerM +
@@ -85,16 +74,16 @@ export function estimateGroqCostUsd(
 function logToCostEvent(log: AiUsageLogRow): CostEventInsert {
   const pt = Math.max(0, Number(log.prompt_tokens ?? 0));
   const ct = Math.max(0, Number(log.completion_tokens ?? 0));
-  const { cost, rates, pricingKnown } = estimateGroqCostUsd(pt, ct, log.model_id);
+  const { cost, rates, pricingKnown } = estimateGeminiLogCostUsd(pt, ct, log.model_id);
   const artworkId = artworkIdFromUsageLogRow(log);
   const mediation = isMediationUsageLog(log);
 
   return {
-    import_hash: `groq_log:${log.id}`,
+    import_hash: `gemini_log:${log.id}`,
     created_at: log.created_at,
     tool_type: "llm",
-    provider: "groq",
-    api_name: "groq_chat_completions",
+    provider: "google_gemini",
+    api_name: "gemini_generate_content",
     model_name: log.model_id,
     operation_name: mediation ? "mediation" : "ai_usage_log_backfill",
     input_units: pt,
@@ -113,16 +102,14 @@ function logToCostEvent(log: AiUsageLogRow): CostEventInsert {
       artwork_id: artworkId,
       ...(artworkId ? { text_id: artworkId } : {}),
       total_tokens: log.total_tokens,
-      disclaimer: "Coût estimé — pas de facturation Groq directe. Vérifier sur console.groq.com.",
+      disclaimer: "Coût Gemini estimé depuis ai_usage_logs — pas la facture BigQuery.",
       ...(log.metadata ?? {}),
     },
   };
 }
 
-/**
- * Backfill / sync incrémentale Groq depuis ai_usage_logs → ai_usage_events.
- */
-export async function syncGroqEstimatedCosts(
+/** Sync des logs Gemini (médiation) vers ai_usage_events. */
+export async function syncGeminiLogEstimatedCosts(
   ctx: ProviderSyncContext,
 ): Promise<ProviderSyncResult & { stats?: Record<string, number> }> {
   let dateRange: { from: string; to: string };
@@ -141,7 +128,7 @@ export async function syncGroqEstimatedCosts(
     .select(
       "id, model_id, provider, prompt_tokens, completion_tokens, total_tokens, artwork_id, created_at, metadata",
     )
-    .eq("provider", "groq")
+    .eq("provider", "gemini")
     .gte("created_at", fromIso)
     .lte("created_at", toIso)
     .order("created_at", { ascending: true });
@@ -149,7 +136,7 @@ export async function syncGroqEstimatedCosts(
   if (error) {
     return {
       status: "error",
-      message: "Lecture ai_usage_logs impossible.",
+      message: "Lecture ai_usage_logs impossible (gemini).",
       error: error.message,
     };
   }
@@ -158,7 +145,7 @@ export async function syncGroqEstimatedCosts(
   if (rows.length === 0) {
     return {
       status: "success",
-      message: `Aucun log Groq sur la période ${dateRange.from} → ${dateRange.to}.`,
+      message: `Aucun log Gemini sur la période ${dateRange.from} → ${dateRange.to}.`,
       rawData: { logs: 0, inserted: 0, skipped: 0 },
     };
   }
@@ -166,10 +153,13 @@ export async function syncGroqEstimatedCosts(
   const events = rows.map(logToCostEvent);
   const insertResult = await insertCostEventsIdempotent(ctx.admin, events);
 
+  const withoutArtwork = rows.filter((r) => !artworkIdFromUsageLogRow(r)).length;
+
   const stats = {
     logs: rows.length,
     inserted: insertResult.inserted,
     skipped: insertResult.skipped,
+    without_artwork_id: withoutArtwork,
     dateFrom: dateRange.from,
     dateTo: dateRange.to,
   };
@@ -177,39 +167,44 @@ export async function syncGroqEstimatedCosts(
   if (insertResult.errors.length) {
     return {
       status: "partial",
-      message: `${rows.length} log(s) traité(s), ${insertResult.inserted} inséré(s).`,
+      message: `${rows.length} log(s) Gemini traité(s), ${insertResult.inserted} inséré(s).`,
       error: insertResult.errors.slice(0, 3).join("; "),
       rawData: stats,
     };
   }
 
+  const artworkWarn = withoutArtwork > 0
+    ? ` ${withoutArtwork} log(s) sans artwork_id (non filtrables par expo).`
+    : "";
+
   return {
     status: "success",
     message:
-      `${rows.length} log(s) Groq → ${insertResult.inserted} événement(s) estimé(s), ` +
-      `${insertResult.skipped} doublon(s). Période ${dateRange.from} → ${dateRange.to}. ` +
-      "Montants estimés (USD) — pas de facturation Groq directe.",
+      `${rows.length} log(s) Gemini → ${insertResult.inserted} événement(s) estimé(s), ` +
+      `${insertResult.skipped} doublon(s). Période ${dateRange.from} → ${dateRange.to}.${artworkWarn}`,
     rawData: stats,
   };
 }
 
-export async function updateGroqProviderSyncStatus(
+export async function updateGeminiLogProviderSyncNotes(
   admin: SupabaseClient,
-  result: ProviderSyncResult,
+  logSyncResult: ProviderSyncResult,
 ): Promise<void> {
   const now = new Date().toISOString();
+  const { data: row } = await admin
+    .from("cost_providers")
+    .select("metadata, notes")
+    .eq("provider_key", "google_gemini")
+    .maybeSingle();
+
+  const prevMeta = (row as { metadata?: Record<string, unknown> } | null)?.metadata ?? {};
   await admin.from("cost_providers").update({
     last_synced_at: now,
-    last_sync_status: result.status,
-    last_sync_error: result.error ?? null,
-    sync_supported: true,
-    cost_import_supported: true,
-    notes: "Coûts estimés depuis ai_usage_logs + grille tarifaire Groq (USD). Pas d'API billing Groq.",
     metadata: {
-      billing_mode: "estimated_from_logs",
-      pricing_source: "https://console.groq.com/docs/pricing",
-      disclaimer: "Montants indicatifs — vérifier sur le dashboard Groq.",
-      last_stats: result.rawData ?? null,
+      ...prevMeta,
+      logs_sync_last_at: now,
+      logs_sync_last_status: logSyncResult.status,
+      logs_sync_last_stats: logSyncResult.rawData ?? null,
     },
-  }).eq("provider_key", "groq");
+  }).eq("provider_key", "google_gemini");
 }

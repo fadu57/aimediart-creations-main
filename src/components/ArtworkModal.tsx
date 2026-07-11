@@ -10,11 +10,14 @@ import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
 import {
   buildPlanEnabledMediationLangSet,
+  isAdminGeneralMediationOverride,
   isMediationLangEnabledForPlan,
   planMediationAllLanguagesUnlocked,
   planMediationAllowsOptionalLang,
   resolvePlanMaxMediationLangs,
   resolvePlanMediationGenerationLangs,
+  resolveWorkflowOptionalLangMax,
+  resolveWorkflowPlanGenerationLangs,
 } from "@/lib/organisation/planMediationLangs";
 import { generateMediation, type MediationStyleRequest } from "@/services/mediationService";
 import {
@@ -563,7 +566,7 @@ export function ArtworkModal({
   experimentalWorkflow = false,
 }: ArtworkModalProps) {
   const { t, i18n } = useTranslation("artwork_modal");
-  const { role_id, agency_id, expo_id, agency_role_id } = useAuthUser();
+  const { role_id, agency_id, expo_id, agency_role_id, global_role_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
   const {
     primaryLang: mediationPrimaryLang,
@@ -603,6 +606,15 @@ export function ArtworkModal({
   );
   const planAllowsOptionalLang = planMediationAllowsOptionalLang(planMaxMediationLangs);
   const planAllLanguagesMode = planMediationAllLanguagesUnlocked(planMaxMediationLangs);
+  const adminGeneralMediationOverride =
+    isAdminGeneralMediationOverride(global_role_id) && experimentalWorkflow;
+  const maxOptionalMediationLangs = resolveWorkflowOptionalLangMax({
+    globalRoleId: global_role_id,
+    planMaxLangs: planMaxMediationLangs,
+    experimentalWorkflow,
+  });
+  const showOptionalLangPicker =
+    adminGeneralMediationOverride || planAllowsOptionalLang || planMaxMediationLangs <= 1;
   const [workflowOptionalLangs, setWorkflowOptionalLangs] = useState<MediationUiLang[]>([]);
   const planGenerationLangs = useMemo(
     () =>
@@ -613,17 +625,23 @@ export function ArtworkModal({
       }),
     [planMaxMediationLangs, mediationPrimaryLang, mediationOptionalLang],
   );
-  const workflowPlanGenerationLangs = useMemo(() => {
-    if (planMaxMediationLangs <= 1) return [mediationPrimaryLang];
-    if (planAllLanguagesMode) return [...MEDIATION_UI_LANGS];
-    const extras = workflowOptionalLangs.filter((lng) => lng !== mediationPrimaryLang);
-    return [mediationPrimaryLang, ...extras].slice(0, planMaxMediationLangs);
-  }, [
-    planMaxMediationLangs,
-    planAllLanguagesMode,
-    mediationPrimaryLang,
-    workflowOptionalLangs,
-  ]);
+  const workflowPlanGenerationLangs = useMemo(
+    () =>
+      resolveWorkflowPlanGenerationLangs({
+        planMaxLangs: planMaxMediationLangs,
+        primaryLang: mediationPrimaryLang,
+        optionalLangs: workflowOptionalLangs,
+        allLanguagesMode: planAllLanguagesMode,
+        adminGeneralOverride: adminGeneralMediationOverride,
+      }),
+    [
+      planMaxMediationLangs,
+      planAllLanguagesMode,
+      mediationPrimaryLang,
+      workflowOptionalLangs,
+      adminGeneralMediationOverride,
+    ],
+  );
   const effectivePlanGenerationLangs = experimentalWorkflow
     ? workflowPlanGenerationLangs
     : planGenerationLangs;
@@ -638,11 +656,13 @@ export function ArtworkModal({
   );
   const effectivePlanEnabledLangSet = useMemo(() => {
     if (!experimentalWorkflow) return planEnabledLangSet;
+    if (adminGeneralMediationOverride) return new Set(workflowPlanGenerationLangs);
     if (planMaxMediationLangs <= 1) return new Set([mediationPrimaryLang]);
     if (planAllLanguagesMode) return new Set(MEDIATION_UI_LANGS);
     return new Set(workflowPlanGenerationLangs);
   }, [
     experimentalWorkflow,
+    adminGeneralMediationOverride,
     planEnabledLangSet,
     planMaxMediationLangs,
     planAllLanguagesMode,
@@ -1087,7 +1107,7 @@ export function ArtworkModal({
           const filledLangs = mediationLangsWithContent(nextByLang);
           const optionalLangs = filledLangs.filter((lng) => lng !== mediationPrimaryLang);
           setWorkflowOptionalLangs(
-            optionalLangs.slice(0, Math.max(0, planMaxMediationLangs - 1)),
+            optionalLangs.slice(0, maxOptionalMediationLangs),
           );
         }
       } finally {
@@ -1520,6 +1540,11 @@ export function ArtworkModal({
   ]);
 
   const mediationLangHelp = useMemo(() => {
+    if (adminGeneralMediationOverride) {
+      return t("mediation_lang_help_admin_general", {
+        primary: mediationPrimaryLang.toUpperCase(),
+      });
+    }
     if (planAllLanguagesMode) {
       return t("mediation_lang_help_all");
     }
@@ -1533,7 +1558,14 @@ export function ArtworkModal({
       return t("mediation_lang_help_plan_range", { count: planMaxMediationLangs });
     }
     return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
-  }, [planAllLanguagesMode, planMaxMediationLangs, mediationOptionalLang, mediationPrimaryLang, t]);
+  }, [
+    adminGeneralMediationOverride,
+    planAllLanguagesMode,
+    planMaxMediationLangs,
+    mediationOptionalLang,
+    mediationPrimaryLang,
+    t,
+  ]);
 
   const handlePersonaAudioRetryCell = useCallback(
     (lang: string, styleKey: string, promptStyleId: string) => {
@@ -2396,6 +2428,9 @@ export function ArtworkModal({
               workflowOptionalLangs={workflowOptionalLangs}
               onWorkflowOptionalLangsChange={setWorkflowOptionalLangs}
               planAllowsOptionalLang={planAllowsOptionalLang}
+              showOptionalLangPicker={showOptionalLangPicker}
+              adminGeneralOptionalLangPicker={adminGeneralMediationOverride}
+              maxOptionalMediationLangs={maxOptionalMediationLangs}
               planEnabledLangSet={effectivePlanEnabledLangSet}
               mediationLegacyLangs={mediationLegacyLangs}
               styleTabs={styleTabs ?? []}

@@ -13,6 +13,7 @@ import {
   tokensFromGroqOpenAiUsage,
 } from "../_shared/ai_usage_log.ts";
 import { ingestGroqRateLimitHeaders } from "../_shared/groqObservedLimits.ts";
+import { mediationUsageLogMetadata } from "../_shared/usageLogArtwork.ts";
 
 const SELECTED_MODEL_KEY = "selected_ai_model";
 
@@ -656,6 +657,7 @@ async function runGeminiMediationFallback(params: {
     completion_tokens: tok.completion_tokens,
     total_tokens: tok.total_tokens,
     artwork_id: params.artworkId,
+    metadata: mediationUsageLogMetadata(params.artworkId),
   });
   return { ...parsed, model: params.fallbackModel };
 }
@@ -702,6 +704,12 @@ serve(async (req: Request) => {
   const langInstruction = buildLangInstruction(body.lang);
   const artworkId =
     typeof body.artwork_id === "string" && body.artwork_id.trim() ? body.artwork_id.trim() : null;
+
+  if (!artworkId) {
+    console.warn(
+      "[generate-mediation] artwork_id absent — le coût médiation ne sera pas rattachable à une œuvre dans les coûts.",
+    );
+  }
 
   if (!sourceText) {
     return jsonResponse(400, { error: "source_text est requis." });
@@ -937,6 +945,7 @@ serve(async (req: Request) => {
       completion_tokens: tok.completion_tokens,
       total_tokens: tok.total_tokens,
       artwork_id: artworkId,
+      metadata: mediationUsageLogMetadata(artworkId),
     });
   } else {
     const groqApiKey = Deno.env.get("GROQ_API_KEY")?.trim();
@@ -1096,6 +1105,7 @@ serve(async (req: Request) => {
       completion_tokens: tok.completion_tokens,
       total_tokens: tok.total_tokens,
       artwork_id: artworkId,
+      metadata: mediationUsageLogMetadata(artworkId),
     });
   }
 

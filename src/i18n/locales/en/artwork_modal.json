@@ -90,6 +90,8 @@
   "mediation_lang_help_single_optional": "AI generation: all 8 personas in {{primary}}, and also in {{optional}} (optional language selected above).",
   "mediation_lang_help_all": "AI generation: all 8 personas in FR, EN, DE, ES and IT (“all languages” mode in settings).",
   "mediation_optional_lang_label": "Optional language (in addition to {{primary}})",
+  "mediation_optional_lang_admin_label": "Extra languages — level 1 admin (in addition to {{primary}})",
+  "mediation_lang_help_admin_general": "Administrator mode: select 1 to 4 additional languages to generate, in addition to {{primary}}.",
   "mediation_optional_lang_none": "None",
   "mediation_optional_lang_hint": "The primary language follows the header language selector (e.g. on the catalogue). At most one extra language.",
   "dialog_lang_generate_title": "Generate mediations in {{lang}}?",

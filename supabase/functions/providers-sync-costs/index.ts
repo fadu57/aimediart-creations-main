@@ -30,6 +30,10 @@ import {
   updateGroqProviderSyncStatus,
 } from "../_shared/groqCostEstimator.ts";
 import {
+  syncGeminiLogEstimatedCosts,
+  updateGeminiLogProviderSyncNotes,
+} from "../_shared/geminiLogCostEstimator.ts";
+import {
   syncGoogleTtsEstimatedCosts,
   updateGoogleTtsProviderSyncStatus,
 } from "../_shared/ttsCostEstimator.ts";
@@ -82,7 +86,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const syncResults: Array<{ provider_key: string; status: string; message: string }> = [];
 
   try {
-    // --- Google Gemini (export billing BigQuery) ---
+    // --- Google Gemini (export billing BigQuery + logs médiation par œuvre) ---
     if (keysToSync.includes(GOOGLE_GEMINI_PROVIDER_KEY)) {
       const googleResult = await syncGoogleBillingCosts(ctx, [GOOGLE_GEMINI_PROVIDER_KEY]);
       await updateGoogleProviderSyncStatus(admin, googleResult, googleResult.stats);
@@ -91,6 +95,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         provider_key: GOOGLE_GEMINI_PROVIDER_KEY,
         status: googleResult.status,
         message: googleResult.message,
+      });
+
+      const geminiLogsResult = await syncGeminiLogEstimatedCosts(ctx);
+      await updateGeminiLogProviderSyncNotes(admin, geminiLogsResult);
+      syncResults.push({
+        provider_key: "google_gemini_logs",
+        status: geminiLogsResult.status,
+        message: geminiLogsResult.message,
       });
     }
 

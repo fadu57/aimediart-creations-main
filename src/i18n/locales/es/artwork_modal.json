@@ -89,6 +89,8 @@
   "mediation_lang_help_single_optional": "Generación IA: los 8 personas en {{primary}} y también en {{optional}} (idioma opcional arriba).",
   "mediation_lang_help_all": "Generación IA: los 8 personas en FR, EN, DE, ES e IT (modo « todas las lenguas » en ajustes).",
   "mediation_optional_lang_label": "Idioma opcional (además de {{primary}})",
+  "mediation_optional_lang_admin_label": "Idiomas adicionales — admin nivel 1 (además de {{primary}})",
+  "mediation_lang_help_admin_general": "Modo administrador: seleccione de 1 a 4 idiomas adicionales para generar, además de {{primary}}.",
   "mediation_optional_lang_none": "Ninguno",
   "mediation_optional_lang_hint": "El idioma principal sigue el selector del encabezado (p. ej. en el catálogo). Como máximo un idioma adicional.",
   "dialog_lang_generate_title": "¿Generar las mediaciones en {{lang}}?",

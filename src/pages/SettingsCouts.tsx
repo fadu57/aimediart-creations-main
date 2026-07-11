@@ -7,7 +7,7 @@ import {
 import {
   ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
   Euro, Activity, TrendingUp, Award, RefreshCw, Search, CheckCircle2, XCircle, HelpCircle, History, ExternalLink,
-  ArrowUp, ArrowDown, ArrowUpDown, Database, Plus, Paperclip, Trash2, Upload, FileText, Pencil,
+  ArrowUp, ArrowDown, ArrowUpDown, Plus, Paperclip, Trash2, Upload, FileText, Pencil,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,14 +20,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { getCostIntegrityReport, type CostIntegrityReport } from "@/lib/costIntegrity";
+import { fetchVerifiedCostKpi } from "@/lib/costKpiApi";
 import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
-  getCostTimeSeries, getCostSelectOptions, getCostEntityFilterOptions, getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
+  getCostTimeSeries, getCostLinkedFilterOptions, getAllFilteredCostEvents,
+  getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
+  getCostArtworkDisplayMetaByIds, getCostEventArtworkId,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
+  hasActiveCostFilters, fillKnownCostProvidersBreakdown,
   effectiveCostEstimatedUsd,
+  sanitizeCostFilters, EMPTY_COST_LINKED_FILTER_OPTIONS,
   type CostEvent, type CostFilters, type CostSummary, type CostEventsTotals,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
-  type CostEntityFilterOptions,
+  type CostArtworkDisplayMeta, type CostLinkedFilterOptions,
   type CostSort, type CostSortColumn,
 } from "@/lib/costs";
 import {
@@ -68,12 +74,8 @@ import {
 } from "@/lib/manualCosts";
 import { formatTokenCount } from "@/lib/aiTokenUsage";
 import { formatProjectDate, PROJECT_CREATED_DATE } from "@/lib/projectMeta";
-import {
-  formatActivityDateTime,
-  formatActivityDay,
-  type ProjectActivityScanResult,
-} from "@/lib/projectActivityScan";
 import { GoogleBillingCard } from "@/components/admin/GoogleBillingCard";
+import { MEDIATION_UI_LANGS } from "@/lib/artworkDescriptionI18n";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchOpenAiTtsMonthStats, type OpenAiTtsMonthStats } from "@/lib/openAiTtsStats";
@@ -280,13 +282,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const EMPTY_FILTERS: CostFilters = {
   dateFrom: "", dateTo: "", toolType: "", provider: "",
   apiName: "", modelName: "", operationName: "", status: "", currency: "",
-  artworkId: "", expoId: "", agencyId: "",
-};
-
-const EMPTY_ENTITY_FILTER_OPTIONS: CostEntityFilterOptions = {
-  artworks: [],
-  expos: [],
-  agencies: [],
+  artworkId: "", expoId: "", agencyId: "", mediationLangCount: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -531,186 +527,6 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
         </div>
       </div>
     </div>
-  );
-}
-
-function ProjectDbActivitySection() {
-  const { t } = useTranslation("settings");
-  const [scan, setScan] = useState<ProjectActivityScanResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const runScan = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: invokeErr } = await supabase.functions.invoke("project-activity-scan", {
-        method: "POST",
-        body: {},
-      });
-      if (invokeErr) throw new Error(await parseInvokeError(invokeErr));
-      setScan(data as ProjectActivityScanResult);
-    } catch (err) {
-      const msg = String(err);
-      setError(msg);
-      toast.error(t("couts.db_activity_error") + " — " + msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const chartData = useMemo(() => {
-    if (!scan?.daily_activity?.length) return [];
-    return scan.daily_activity.map((d) => ({
-      date: formatActivityDay(d.day),
-      events: d.event_count,
-    }));
-  }, [scan]);
-
-  const summary = scan?.summary;
-
-  return (
-    <Card className="glass-card">
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Database className="h-4 w-4 text-primary" aria-hidden />
-              {t("couts.db_activity_title")}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t("couts.db_activity_sub")}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 gap-2 shrink-0"
-            disabled={loading}
-            onClick={() => void runScan()}
-          >
-            {loading
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              : <Search className="h-3.5 w-3.5" aria-hidden />}
-            {t("couts.db_activity_analyze")}
-          </Button>
-        </div>
-        {error && (
-          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2">
-            {error}
-          </p>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!scan && !loading && (
-          <p className="text-sm text-center text-muted-foreground py-8">
-            {t("couts.db_activity_empty")}
-          </p>
-        )}
-
-        {scan && summary && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
-                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_first")}</p>
-                <p className="text-sm font-semibold mt-1">
-                  {formatActivityDateTime(summary.project_first_activity)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
-                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_last")}</p>
-                <p className="text-sm font-semibold mt-1">
-                  {formatActivityDateTime(summary.project_last_activity)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
-                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_columns_ok")}</p>
-                <p className="text-sm font-semibold mt-1">{summary.columns_scanned_ok}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
-                <p className="text-[11px] text-muted-foreground">{t("couts.db_activity_scan_errors")}</p>
-                <p className="text-sm font-semibold mt-1">{summary.columns_scan_errors}</p>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground font-mono">
-              {t("couts.db_activity_scanned_at", {
-                at: formatActivityDateTime(scan.scanned_at),
-              })}
-            </p>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="min-h-[220px]">
-                {chartData.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                    {t("settings_no_data")}
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                      <YAxis tick={{ fontSize: 10 }} width={36} allowDecimals={false} />
-                      <Tooltip
-                        formatter={(value: number) => [value, t("couts.db_activity_events")]}
-                        contentStyle={{ fontSize: 12 }}
-                      />
-                      <Bar dataKey="events" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  {t("couts.db_activity_chart_hint")}
-                </p>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-border/50 max-h-[280px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
-                    <tr className="border-b border-border/50">
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                        {t("couts.db_activity_col_table")}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                        {t("couts.db_activity_col_column")}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                        {t("couts.db_activity_col_first")}
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">
-                        {t("couts.db_activity_col_last")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...(scan.columns ?? [])]
-                      .sort((a, b) => a.table_name.localeCompare(b.table_name) || a.column_name.localeCompare(b.column_name))
-                      .map((col, i) => (
-                        <tr
-                          key={`${col.table_name}.${col.column_name}`}
-                          className={`border-b border-border/30 ${i % 2 === 1 ? "bg-muted/10" : ""}`}
-                        >
-                          <td className="px-3 py-2 whitespace-nowrap text-xs font-mono">{col.table_name}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs">{col.column_name}</td>
-                          <td className="px-3 py-2 whitespace-nowrap text-[11px] text-muted-foreground">
-                            {col.scan_error ? "—" : formatActivityDateTime(col.first_activity)}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-[11px] text-muted-foreground">
-                            {col.scan_error
-                              ? <span className="text-amber-700" title={col.scan_error}>err</span>
-                              : formatActivityDateTime(col.last_activity)}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1309,13 +1125,15 @@ type CostsTableProps = {
   onSortChange: (sort: CostSort) => void;
   onPageChange: (p: number) => void;
   onExport: () => void;
+  exportingCsv?: boolean;
   currency: string;
   totals: CostEventsTotals | null;
   loadingTotals: boolean;
   usdEurRate: number | null;
   isAdmin?: boolean;
   filters: CostFilters;
-  entityOptions: CostEntityFilterOptions;
+  linkedFilterOptions: CostLinkedFilterOptions;
+  artworkMetaById: Record<string, CostArtworkDisplayMeta>;
   onFiltersChange: (filters: CostFilters) => void;
   onAddCost?: () => void;
   onEditCost?: (event: CostEvent) => void;
@@ -1333,6 +1151,8 @@ const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[
 ];
 
 const COST_TABLE_STATIC_COLUMNS = [
+  "couts.col_artwork",
+  "couts.col_mediation_langs",
   "couts.col_units_in",
   "couts.col_units_out",
   "couts.col_unit_type",
@@ -1344,7 +1164,10 @@ function nextCostSort(column: CostSortColumn, current: CostSort): CostSort {
   if (current.column === column) {
     return { column, ascending: !current.ascending };
   }
-  const descFirst = column === "created_at" || column === "cost_estimated";
+  const descFirst =
+    column === "created_at" ||
+    column === "cost_estimated" ||
+    column === "mediation_lang_count";
   return { column, ascending: !descFirst };
 }
 
@@ -1378,26 +1201,38 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
 }
 
 function CostsTable({
-  events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, currency,
-  totals, loadingTotals, usdEurRate, isAdmin = false, filters, entityOptions, onFiltersChange,
+  events, loading, error, page, total, sort, onSortChange, onPageChange, onExport, exportingCsv = false, currency,
+  totals, loadingTotals, usdEurRate, isAdmin = false, filters, linkedFilterOptions, artworkMetaById,
+  onFiltersChange,
   onAddCost, onEditCost, onAttachCost, onDeleted,
 }: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const filterSelectClass = cn(BACKOFFICE_FORM_CONTROL_CLASS, "h-9 w-full min-w-0 text-xs");
+  const { artworks, expos, agencies, selectOptions, mediationLangCounts } = linkedFilterOptions;
 
-  const setEntityFilter = (key: "artworkId" | "expoId" | "agencyId", value: string) => {
-    const next: CostFilters = { ...filters, [key]: value };
-    if (key === "artworkId" && value) {
-      next.expoId = "";
-      next.agencyId = "";
-    } else if (key === "expoId" && value) {
+  const setEntityFilter = (key: "artworkId" | "expoId" | "agencyId" | "toolType" | "mediationLangCount", value: string) => {
+    const next: CostFilters = { ...filters };
+    if (key === "toolType") {
+      next.toolType = value;
+      onFiltersChange(next);
+      return;
+    }
+    if (key === "mediationLangCount") {
+      next.mediationLangCount = value;
+      onFiltersChange(next);
+      return;
+    }
+    next[key] = value;
+    if (key === "expoId" && value) {
       next.artworkId = "";
-      next.agencyId = "";
     } else if (key === "agencyId" && value) {
       next.artworkId = "";
       next.expoId = "";
+    } else if (key === "artworkId" && value) {
+      next.expoId = "";
+      next.agencyId = "";
     }
     onFiltersChange(next);
   };
@@ -1445,7 +1280,7 @@ function CostsTable({
   return (
     <div>
       <div className="mb-3 flex flex-col gap-3">
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               {t("couts.filter_artwork")}
@@ -1456,7 +1291,7 @@ function CostsTable({
               className={filterSelectClass}
             >
               <option value="">{t("couts.filter_all")}</option>
-              {entityOptions.artworks.map((item) => (
+              {artworks.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
@@ -1471,7 +1306,7 @@ function CostsTable({
               className={filterSelectClass}
             >
               <option value="">{t("couts.filter_all")}</option>
-              {entityOptions.expos.map((item) => (
+              {expos.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
@@ -1486,8 +1321,40 @@ function CostsTable({
               className={filterSelectClass}
             >
               <option value="">{t("couts.filter_all")}</option>
-              {entityOptions.agencies.map((item) => (
+              {agencies.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_tool_type")}
+            </label>
+            <select
+              value={filters.toolType ?? ""}
+              onChange={(e) => setEntityFilter("toolType", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {selectOptions.toolTypes.map((v) => (
+                <option key={v} value={v}>{costToolTypeLabel(v, t)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_mediation_lang_count")}
+            </label>
+            <select
+              value={filters.mediationLangCount ?? ""}
+              onChange={(e) => setEntityFilter("mediationLangCount", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {mediationLangCounts.map((n) => (
+                <option key={n} value={String(n)}>
+                  {t("couts.filter_mediation_lang_count_option", { count: n })}
+                </option>
               ))}
             </select>
           </div>
@@ -1503,8 +1370,19 @@ function CostsTable({
               {t("couts.manual.btn_add")}
             </Button>
           )}
-          <Button type="button" variant="outline" size="sm" onClick={onExport} className="gap-2">
-            <Download className="h-3.5 w-3.5" aria-hidden />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onExport}
+            disabled={exportingCsv || total === 0}
+            className="gap-2"
+          >
+            {exportingCsv ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Download className="h-3.5 w-3.5" aria-hidden />
+            )}
             {t("couts.btn_export_csv")}
           </Button>
         </div>
@@ -1519,8 +1397,8 @@ function CostsTable({
         </div>
       ) : (
         <>
-      <div className="overflow-x-auto rounded-xl border border-border/50">
-        <table className="w-full min-w-[800px] table-fixed text-sm">
+      <div className="max-h-[540px] overflow-x-auto overflow-y-auto rounded-xl border border-border/50">
+        <table className="w-full min-w-[980px] table-fixed text-[12px]">
           <colgroup>
             <col className="w-[96px]" />
             <col className="w-[60px]" />
@@ -1528,6 +1406,8 @@ function CostsTable({
             <col className="w-[80px]" />
             <col className="w-[92px]" />
             <col className="w-[84px]" />
+            <col className="w-[120px]" />
+            <col className="w-[52px]" />
             <col className="w-[46px]" />
             <col className="w-[46px]" />
             <col className="w-[44px]" />
@@ -1557,6 +1437,28 @@ function CostsTable({
                     />
                   );
                 }
+                if (labelKey === "couts.col_artwork") {
+                  return (
+                    <SortableTh
+                      key={labelKey}
+                      column="artwork_title"
+                      label={t(labelKey)}
+                      sort={sort}
+                      onSort={handleSort}
+                    />
+                  );
+                }
+                if (labelKey === "couts.col_mediation_langs") {
+                  return (
+                    <SortableTh
+                      key={labelKey}
+                      column="mediation_lang_count"
+                      label={t(labelKey)}
+                      sort={sort}
+                      onSort={handleSort}
+                    />
+                  );
+                }
                 return (
                   <th
                     key={labelKey}
@@ -1571,7 +1473,7 @@ function CostsTable({
               <td colSpan={5} className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("couts.table_totals_label")}
               </td>
-              <td className="px-2 py-1.5 font-mono text-xs font-semibold text-primary">
+              <td className="px-2 py-1.5 font-mono text-[12px] font-semibold text-primary">
                 {loadingTotals ? (
                   "…"
                 ) : (
@@ -1582,39 +1484,47 @@ function CostsTable({
                   />
                 )}
               </td>
-              <td className="px-1.5 py-1.5 text-right font-mono text-[11px] font-semibold whitespace-nowrap">
+              <td colSpan={2} />
+              <td className="px-1.5 py-1.5 text-right font-mono text-[12px] font-semibold whitespace-nowrap">
                 {loadingTotals ? "…" : (totals?.totalInputUnits ?? 0).toLocaleString("fr-FR")}
               </td>
-              <td className="px-1.5 py-1.5 text-right font-mono text-[11px] font-semibold whitespace-nowrap">
+              <td className="px-1.5 py-1.5 text-right font-mono text-[12px] font-semibold whitespace-nowrap">
                 {loadingTotals ? "…" : (totals?.totalOutputUnits ?? 0).toLocaleString("fr-FR")}
               </td>
               <td colSpan={3} />
             </tr>
           </thead>
           <tbody>
-            {events.map((e, i) => (
+            {events.map((e, i) => {
+              const artworkId = getCostEventArtworkId(e);
+              const artworkMeta = artworkId ? artworkMetaById[artworkId] : undefined;
+              const artworkTitle =
+                artworkMeta?.title ??
+                (artworkId ? artworks.find((a) => a.id === artworkId)?.label : null);
+
+              return (
               <tr
                 key={e.id}
                 className={`border-b border-border/30 transition-colors hover:bg-muted/20 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
               >
-                <td className="px-2 py-1 text-[11px] text-muted-foreground font-mono truncate leading-tight" title={frDate(e.created_at)}>
+                <td className="px-2 py-1 text-[12px] text-muted-foreground font-mono truncate leading-tight" title={frDate(e.created_at)}>
                   {frDate(e.created_at)}
                 </td>
                 <td className="px-2 py-1 truncate leading-tight">
-                  <span className="rounded bg-primary/10 px-1 py-0 text-[10px] font-medium text-primary">
+                  <span className="rounded bg-primary/10 px-1 py-0 text-[12px] font-medium text-primary">
                     {costToolTypeLabel(e.tool_type, t)}
                   </span>
                 </td>
-                <td className="px-2 py-1 text-xs font-medium truncate leading-tight" title={costProviderDisplayName(e.provider)}>
+                <td className="px-2 py-1 text-[12px] font-medium truncate leading-tight" title={costProviderDisplayName(e.provider)}>
                   {costProviderDisplayName(e.provider)}
                 </td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight" title={e.model_name ?? undefined}>
+                <td className="px-2 py-1 text-[12px] text-muted-foreground truncate leading-tight" title={e.model_name ?? undefined}>
                   {e.model_name ?? "—"}
                 </td>
-                <td className="px-2 py-1 text-[11px] truncate leading-tight" title={e.operation_name ?? undefined}>
+                <td className="px-2 py-1 text-[12px] truncate leading-tight" title={e.operation_name ?? undefined}>
                   {e.operation_name ? costOperationLabel(e.operation_name, t) : "—"}
                 </td>
-                <td className="px-2 py-1 font-mono text-xs font-semibold text-primary leading-tight">
+                <td className="px-2 py-1 font-mono text-[12px] font-semibold text-primary leading-tight">
                   <CostAmountCell
                     value={effectiveCostEstimatedUsd(e)}
                     currency={e.currency}
@@ -1622,15 +1532,24 @@ function CostsTable({
                     showEurHint={false}
                   />
                 </td>
-                <td className="px-1.5 py-1 text-[11px] text-right font-mono whitespace-nowrap leading-tight">
+                <td
+                  className="px-2 py-1 text-[12px] truncate leading-tight"
+                  title={artworkTitle ?? artworkId ?? undefined}
+                >
+                  {artworkTitle ?? (artworkId ? artworkId.slice(0, 8) : "—")}
+                </td>
+                <td className="px-2 py-1 text-center text-[12px] tabular-nums leading-tight">
+                  {artworkMeta ? artworkMeta.mediationLangCount : artworkId ? "…" : "—"}
+                </td>
+                <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
                   {e.input_units != null ? e.input_units.toLocaleString("fr-FR") : "—"}
                 </td>
-                <td className="px-1.5 py-1 text-[11px] text-right font-mono whitespace-nowrap leading-tight">
+                <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
                   {e.output_units != null ? e.output_units.toLocaleString("fr-FR") : "—"}
                 </td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground truncate leading-tight">{e.unit_type ?? "—"}</td>
+                <td className="px-2 py-1 text-[12px] text-muted-foreground truncate leading-tight">{e.unit_type ?? "—"}</td>
                 <td className="px-2 py-1 truncate leading-tight">{statusBadge(e.status, costEventStatusLabel(e.status, t))}</td>
-                <td className="px-2 py-1 text-[11px] text-muted-foreground leading-tight">
+                <td className="px-2 py-1 text-[12px] text-muted-foreground leading-tight">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate" title={e.source ?? undefined}>{e.source ?? "—"}</span>
                     <CostDocumentsCell documents={manualCostDocuments(e.metadata)} />
@@ -1673,7 +1592,8 @@ function CostsTable({
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -3131,7 +3051,7 @@ function ProvidersSection({ onCostsRefresh, showOpenAiTtsReconciliation = false 
 
 export default function SettingsCouts() {
   const { t } = useTranslation("settings");
-  const { role_id, global_role_id } = useAuthUser();
+  const { role_id, global_role_id, session, loading: authLoading } = useAuthUser();
   const showOpenAiTtsReconciliation = role_id === 1;
   /** Saisie manuelle des coûts réservée aux admins globaux (role_id 1-2). */
   const isCostAdmin = global_role_id === 1 || global_role_id === 2;
@@ -3149,10 +3069,10 @@ export default function SettingsCouts() {
   const [summary, setSummary] = useState<CostSummary | null>(null);
   const [byProvider, setByProvider] = useState<CostBreakdownItem[]>([]);
   const [timeSeries, setTimeSeries] = useState<CostTimeSeriesPoint[]>([]);
-  const [options,  setOptions]  = useState<CostSelectOptions>({
-    toolTypes: [], providers: [], apiNames: [], modelNames: [], operationNames: [], statuses: [], currencies: [],
-  });
-  const [entityFilterOptions, setEntityFilterOptions] = useState<CostEntityFilterOptions>(EMPTY_ENTITY_FILTER_OPTIONS);
+  const [linkedFilterOptions, setLinkedFilterOptions] = useState<CostLinkedFilterOptions>(
+    EMPTY_COST_LINKED_FILTER_OPTIONS,
+  );
+  const [artworkMetaById, setArtworkMetaById] = useState<Record<string, CostArtworkDisplayMeta>>({});
   const [eventsTotals, setEventsTotals] = useState<CostEventsTotals | null>(null);
   const [loadingEventsTotals, setLoadingEventsTotals] = useState(true);
 
@@ -3162,16 +3082,38 @@ export default function SettingsCouts() {
   const [errorEvents,    setErrorEvents]    = useState<string | null>(null);
   const [costsRefreshKey, setCostsRefreshKey] = useState(0);
   const [usdEurRate, setUsdEurRate] = useState<number | null>(null);
+  const [integrityReport, setIntegrityReport] = useState<CostIntegrityReport | null>(null);
+  const [kpiError, setKpiError] = useState<string | null>(null);
+  const [kpiIntegrity, setKpiIntegrity] = useState<{
+    rows_scanned: number;
+    cursor_total_usd: number;
+    computed_at: string;
+  } | null>(null);
+  const kpiBarRef = useRef<HTMLDivElement>(null);
+  const [kpiBarHeight, setKpiBarHeight] = useState(120);
+
+  const isGlobalCostViewer = global_role_id != null && global_role_id >= 1 && global_role_id <= 3;
 
   const refreshCostData = useCallback(() => {
     setCostsRefreshKey((k) => k + 1);
   }, []);
 
-  // ---- Chargement options filtres (une seule fois) ----
+  // ---- Options filtres liées (cascade expo / œuvre / agence / outils) ----
   useEffect(() => {
-    getCostSelectOptions().then(setOptions).catch(() => {});
-    getCostEntityFilterOptions().then(setEntityFilterOptions).catch(() => {});
-  }, []);
+    let cancelled = false;
+    void getCostLinkedFilterOptions(filters).then((linked) => {
+      if (cancelled) return;
+      setLinkedFilterOptions(linked);
+      setFilters((prev) => {
+        const sanitized = sanitizeCostFilters(prev, linked);
+        const changed = (Object.keys(sanitized) as (keyof CostFilters)[]).some(
+          (k) => sanitized[k] !== prev[k],
+        );
+        return changed ? sanitized : prev;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [filters, costsRefreshKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3180,6 +3122,18 @@ export default function SettingsCouts() {
     });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!isGlobalCostViewer) {
+      setIntegrityReport(null);
+      return;
+    }
+    let cancelled = false;
+    void getCostIntegrityReport().then((report) => {
+      if (!cancelled) setIntegrityReport(report);
+    });
+    return () => { cancelled = true; };
+  }, [isGlobalCostViewer, costsRefreshKey]);
 
   // ---- Chargement événements ----
   useEffect(() => {
@@ -3202,52 +3156,78 @@ export default function SettingsCouts() {
 
   useEffect(() => {
     let cancelled = false;
+    const ids = events.map(getCostEventArtworkId).filter((id): id is string => Boolean(id));
+    if (ids.length === 0) {
+      setArtworkMetaById({});
+      return;
+    }
+    void getCostArtworkDisplayMetaByIds(ids).then((map) => {
+      if (!cancelled) setArtworkMetaById(map);
+    });
+    return () => { cancelled = true; };
+  }, [events]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (authLoading || !session) {
+      return () => { cancelled = true; };
+    }
+
     setLoadingEventsTotals(true);
-    getCostEventsTotals(filters)
-      .then((totals) => {
+    setLoadingSummary(true);
+    setLoadingCharts(true);
+    setKpiError(null);
+
+    void fetchVerifiedCostKpi(filters, usdEurRate)
+      .then(async ({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          setKpiError(error ?? t("couts.kpi_error_fallback"));
+          setKpiIntegrity(null);
+          setSummary(null);
+          setByProvider([]);
+          setEventsTotals(null);
+          const ts = await getCostTimeSeries(filters, { usdToEurRate: usdEurRate });
+          if (!cancelled) setTimeSeries(ts);
+          return;
+        }
+        setKpiError(null);
+        setSummary(data.summary);
+        setByProvider(data.byProvider);
+        setEventsTotals({
+          totalCost: data.summary.totalCost,
+          totalInputUnits: data.summary.totalInputUnits ?? 0,
+          totalOutputUnits: data.summary.totalOutputUnits ?? 0,
+          currency: data.summary.currency,
+        });
+        setKpiIntegrity({
+          rows_scanned: data.integrity.rows_scanned,
+          cursor_total_usd: data.integrity.cursor_total_usd,
+          computed_at: data.integrity.computed_at,
+        });
+        const ts = await getCostTimeSeries(filters, { usdToEurRate: usdEurRate });
+        if (!cancelled) setTimeSeries(ts);
+      })
+      .catch((e) => {
         if (!cancelled) {
-          setEventsTotals(totals);
-          setLoadingEventsTotals(false);
+          setKpiError(String(e));
+          setSummary(null);
+          setByProvider([]);
+          setEventsTotals(null);
+          setKpiIntegrity(null);
         }
       })
-      .catch(() => {
-        if (!cancelled) setLoadingEventsTotals(false);
-      });
-    return () => { cancelled = true; };
-  }, [filters, costsRefreshKey]);
-
-  // ---- Chargement KPIs ----
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingSummary(true);
-
-    getCostSummary(filters).then((s) => {
-      if (!cancelled) { setSummary(s); setLoadingSummary(false); }
-    }).catch(() => {
-      if (!cancelled) setLoadingSummary(false);
-    });
-
-    return () => { cancelled = true; };
-  }, [filters, costsRefreshKey]);
-
-  // ---- Chargement graphiques ----
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingCharts(true);
-
-    Promise.all([getCostBreakdownByProvider(filters), getCostTimeSeries(filters)])
-      .then(([bp, ts]) => {
-        if (cancelled) return;
-        setByProvider(bp);
-        setTimeSeries(ts);
-        setLoadingCharts(false);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadingCharts(false);
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingEventsTotals(false);
+          setLoadingSummary(false);
+          setLoadingCharts(false);
+        }
       });
 
     return () => { cancelled = true; };
-  }, [filters, costsRefreshKey]);
+  }, [filters, costsRefreshKey, usdEurRate, authLoading, session, t]);
 
   // ---- Handlers ----
   const handleFiltersChange = useCallback((f: CostFilters) => {
@@ -3266,9 +3246,30 @@ export default function SettingsCouts() {
     setPage(0);
   }, []);
 
+  const [exportingCsv, setExportingCsv] = useState(false);
+
   const handleExport = useCallback(() => {
-    exportCostsCsv(events);
-  }, [events]);
+    void (async () => {
+      setExportingCsv(true);
+      try {
+        const { data, error } = await getAllFilteredCostEvents(filters, sort);
+        if (error) {
+          toast.error(t("couts.export_error", { detail: error }));
+          return;
+        }
+        if (data.length === 0) {
+          toast.warning(t("couts.export_empty"));
+          return;
+        }
+        exportCostsCsv(data);
+        toast.success(t("couts.export_done", { count: data.length.toLocaleString("fr-FR") }));
+      } catch (e) {
+        toast.error(t("couts.export_error", { detail: String(e) }));
+      } finally {
+        setExportingCsv(false);
+      }
+    })();
+  }, [filters, sort, t]);
 
   // ---- KPI cards ----
   const currency = summary?.currency ?? "EUR";
@@ -3315,16 +3316,32 @@ export default function SettingsCouts() {
     ];
   }, [summary, currency, isUsd, usdEurRate, fxSub, t]);
 
+  useEffect(() => {
+    const el = kpiBarRef.current;
+    if (!el) return;
+    const update = () => setKpiBarHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loadingSummary, kpiError, summary, kpis.length]);
+
   // ---- Chart data ----
   // Montant converti en euros (les barres affichent le coût en €, 2 décimales).
   const toEur = (v: number) => (isUsd && usdEurRate ? v * usdEurRate : v);
 
-  const providerChartData = byProvider.slice(0, 8).map((item) => ({
-    name: item.label,
-    coût: parseFloat(item.totalCost.toFixed(6)),
-    eur: toEur(item.totalCost),
-    appels: item.callCount,
-  }));
+  const providerChartData = useMemo(() => {
+    const source = hasActiveCostFilters(filters)
+      ? byProvider
+      : fillKnownCostProvidersBreakdown(byProvider);
+    return source.map((item) => ({
+      providerKey: item.label,
+      name: costProviderDisplayName(item.label),
+      coût: parseFloat(item.totalCost.toFixed(6)),
+      eur: toEur(item.totalCost),
+      appels: item.callCount,
+    }));
+  }, [byProvider, filters, isUsd, usdEurRate]);
 
   const timeSeriesChartData = timeSeries.slice(-60).map((p) => ({
     date: chartDateFr(p.date),
@@ -3336,6 +3353,40 @@ export default function SettingsCouts() {
   // ---- Render ----
   return (
     <div className="container py-8 space-y-6">
+
+      {/* Barre KPI — fixe en haut, toujours visible au scroll */}
+      <div
+        ref={kpiBarRef}
+        className="fixed left-0 right-0 z-40 border-b border-border/50 bg-[#121212] shadow-[0_4px_24px_rgba(0,0,0,0.45)]"
+        style={{ top: "calc(4.25rem + 10px)" }}
+      >
+        <div className="mx-auto w-full max-w-[1200px] px-4 py-3">
+          {loadingSummary ? (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <Card key={i} className="glass-card animate-pulse">
+                  <CardContent className="h-20 rounded-xl bg-muted/30 p-5" />
+                </Card>
+              ))}
+            </div>
+          ) : kpiError || !summary ? (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <p className="font-medium">{t("couts.kpi_error_title")}</p>
+                <p className="mt-1 text-sm">{kpiError ?? t("couts.kpi_error_fallback")}</p>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {kpis.map((kpi) => (
+                <KpiCard key={kpi.label} {...kpi} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div aria-hidden style={{ height: kpiBarHeight }} />
 
       {/* En-tête */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -3357,37 +3408,72 @@ export default function SettingsCouts() {
         </div>
       </div>
 
-      <ProjectDbActivitySection />
+      {integrityReport && !integrityReport.ok && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <p className="font-medium mb-1">{t("couts.integrity_alert_title")}</p>
+            <ul className="list-disc pl-4 space-y-0.5 text-sm">
+              {integrityReport.issues.map((issue) => (
+                <li key={issue.code}>
+                  {issue.code === "mediation_logs_without_artwork"
+                    ? t("couts.integrity_mediation_logs_without_artwork", { count: issue.count })
+                    : issue.code === "usage_logs_without_artwork"
+                      ? t("couts.integrity_usage_logs_without_artwork", { count: issue.count })
+                    : issue.code === "openai_events_without_text_id"
+                      ? t("couts.integrity_openai_without_text_id", { count: issue.count })
+                      : issue.code === "logs_unreadable"
+                        ? t("couts.integrity_logs_unreadable")
+                        : `${issue.message} (${issue.count})`}
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
 
-      {/* Filtres */}
+      {/* Filtres — au-dessus du tableau détaillé */}
       <FiltersBar
         filters={filters}
-        options={options}
+        options={linkedFilterOptions.selectOptions}
         onChange={handleFiltersChange}
         onReset={handleReset}
         loading={loadingEvents}
       />
 
-      {/* KPI Cards */}
-      {loadingSummary ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map((i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-5 h-20 bg-muted/30 rounded-xl" />
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {kpis.map((kpi) => (
-            <KpiCard key={kpi.label} {...kpi} />
-          ))}
-        </div>
-      )}
-
-      {showOpenAiTtsReconciliation ? (
-        <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} usdEurRate={usdEurRate} />
-      ) : null}
+      {/* Table détaillée */}
+      <Card className="glass-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">{t("couts.table_title")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CostsTable
+            events={events}
+            loading={loadingEvents}
+            error={errorEvents}
+            page={page}
+            total={total}
+            sort={sort}
+            onSortChange={handleSortChange}
+            onPageChange={setPage}
+            onExport={handleExport}
+            exportingCsv={exportingCsv}
+            currency={currency}
+            totals={eventsTotals}
+            loadingTotals={loadingEventsTotals}
+            usdEurRate={usdEurRate}
+            isAdmin={isCostAdmin}
+            filters={filters}
+            linkedFilterOptions={linkedFilterOptions}
+            artworkMetaById={artworkMetaById}
+            onFiltersChange={handleFiltersChange}
+            onAddCost={() => { setEditCostEvent(null); setManualCostOpen(true); }}
+            onEditCost={(ev) => { setEditCostEvent(ev); setManualCostOpen(true); }}
+            onAttachCost={(ev) => setAttachCostEvent(ev)}
+            onDeleted={refreshCostData}
+          />
+        </CardContent>
+      </Card>
 
       {/* Graphiques */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -3411,12 +3497,12 @@ export default function SettingsCouts() {
                 <BarChart data={timeSeriesChartData} margin={{ top: 48, right: 28, bottom: 4, left: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={48} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={formatEurChartLabel} />
                   <Tooltip
                     formatter={(_value: number, _name, item) => [formatEurChartLabel(item?.payload?.eur), "Coût"]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Bar dataKey="coût" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={32}>
+                  <Bar dataKey="eur" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={32}>
                     <LabelList
                       dataKey="eur"
                       position="top"
@@ -3450,17 +3536,17 @@ export default function SettingsCouts() {
               <ResponsiveContainer width="100%" height={Math.max(200, providerChartData.length * 34 + 40)}>
                 <BarChart data={providerChartData} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={formatEurChartLabel} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={110} interval={0} />
                   <Tooltip
                     formatter={(_value: number, _name, item) => [formatEurChartLabel(item?.payload?.eur), "Coût"]}
                     contentStyle={{ fontSize: 12 }}
                   />
-                  <Bar dataKey="coût" radius={[0, 3, 3, 0]} maxBarSize={22}>
+                  <Bar dataKey="eur" radius={[0, 3, 3, 0]} maxBarSize={22}>
                     {providerChartData.map((entry, index) => (
                       <Cell
-                        key={entry.name}
-                        fill={costProviderChartColor(entry.name, index)}
+                        key={entry.providerKey}
+                        fill={costProviderChartColor(entry.providerKey, index)}
                       />
                     ))}
                     <LabelList
@@ -3477,37 +3563,21 @@ export default function SettingsCouts() {
         </Card>
       </div>
 
-      {/* Table détaillée */}
-      <Card className="glass-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">{t("couts.table_title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CostsTable
-            events={events}
-            loading={loadingEvents}
-            error={errorEvents}
-            page={page}
-            total={total}
-            sort={sort}
-            onSortChange={handleSortChange}
-            onPageChange={setPage}
-            onExport={handleExport}
-            currency={currency}
-            totals={eventsTotals}
-            loadingTotals={loadingEventsTotals}
-            usdEurRate={usdEurRate}
-            isAdmin={isCostAdmin}
-            filters={filters}
-            entityOptions={entityFilterOptions}
-            onFiltersChange={handleFiltersChange}
-            onAddCost={() => { setEditCostEvent(null); setManualCostOpen(true); }}
-            onEditCost={(ev) => { setEditCostEvent(ev); setManualCostOpen(true); }}
-            onAttachCost={(ev) => setAttachCostEvent(ev)}
-            onDeleted={refreshCostData}
-          />
-        </CardContent>
-      </Card>
+      {kpiIntegrity && !kpiError && (
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            {t("couts.kpi_verified", {
+              count: kpiIntegrity.rows_scanned.toLocaleString("fr-FR"),
+              cursor: kpiIntegrity.cursor_total_usd.toFixed(2),
+            })}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showOpenAiTtsReconciliation ? (
+        <OpenAiTtsSummaryCard refreshKey={costsRefreshKey} usdEurRate={usdEurRate} />
+      ) : null}
 
       {/* Budgets Google Cloud (cache Budget API) */}
       <GoogleBillingCard />

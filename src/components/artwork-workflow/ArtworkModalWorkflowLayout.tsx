@@ -121,6 +121,9 @@ export type ArtworkModalWorkflowLayoutProps = {
   workflowOptionalLangs: MediationUiLang[];
   onWorkflowOptionalLangsChange: (langs: MediationUiLang[]) => void;
   planAllowsOptionalLang: boolean;
+  showOptionalLangPicker: boolean;
+  adminGeneralOptionalLangPicker: boolean;
+  maxOptionalMediationLangs: number;
   planEnabledLangSet: Set<MediationUiLang>;
   mediationLegacyLangs: MediationUiLang[];
   styleTabs: StyleTabEntry[];
@@ -285,6 +288,9 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
     workflowOptionalLangs,
     onWorkflowOptionalLangsChange,
     planAllowsOptionalLang,
+    showOptionalLangPicker,
+    adminGeneralOptionalLangPicker,
+    maxOptionalMediationLangs,
     planEnabledLangSet,
     mediationLegacyLangs,
     styleTabs,
@@ -762,17 +768,23 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
               Médiations IA
             </p>
 
-            {planAllowsOptionalLang || planMaxMediationLangs <= 1 ? (
+            {showOptionalLangPicker ? (
               <div className="space-y-1.5">
                 <Label className="text-xs">
-                  {t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
+                  {adminGeneralOptionalLangPicker
+                    ? t("mediation_optional_lang_admin_label", { primary: mediationPrimaryLang.toUpperCase() })
+                    : t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
                 </Label>
                 <MultiOptionalLangPicker
                   primaryLang={mediationPrimaryLang}
                   availableLangs={[...MEDIATION_UI_LANGS]}
                   selectedLangs={workflowOptionalLangs}
-                  maxOptional={Math.max(0, planMaxMediationLangs - 1)}
-                  disabled={generatingMediation || isLoading || planMaxMediationLangs <= 1}
+                  maxOptional={maxOptionalMediationLangs}
+                  disabled={
+                    generatingMediation ||
+                    isLoading ||
+                    (!adminGeneralOptionalLangPicker && planMaxMediationLangs <= 1)
+                  }
                   onChange={onWorkflowOptionalLangsChange}
                 />
               </div>
@@ -827,7 +839,7 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
                       size="sm"
                       variant="outline"
                       className={cn(
-                        "h-8 min-w-[2.5rem] px-2 text-xs font-semibold",
+                        "h-8 min-w-[2.5rem] px-2 text-[12px] font-semibold leading-none",
                         mediationLangButtonClassName(mediationEditLang === lng, langEnabled),
                       )}
                       disabled={isAiBusy || isLoading || !langEnabled}
