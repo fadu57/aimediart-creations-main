@@ -59,6 +59,7 @@
   "list": {
     "title": "Utilisateurs",
     "search_placeholder": "Rechercher un utilisateur...",
+    "search_label": "utilisateur",
     "clear_search": "Effacer la recherche",
     "clear": "Effacer",
     "new_user": "+ Nouvel utilisateur",

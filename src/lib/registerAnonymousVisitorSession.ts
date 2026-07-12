@@ -108,6 +108,7 @@ export function resolveFeedbackVisitorId(authUserId?: string | null): string {
   const fingerprintId = getOrCreateVisitorUuid().trim();
   const rawVisitorId = authUserId?.trim() || fingerprintId;
   if (rawVisitorId && isUuidLike(rawVisitorId)) return rawVisitorId;
+  if (rawVisitorId) return rawVisitorId;
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }

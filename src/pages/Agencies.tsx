@@ -89,12 +89,15 @@ function AgencyExpoList({ expos }: { expos: ExpoBrief[] }) {
   };
 
   return (
-    <ul className="mt-2 grid grid-cols-[max-content_250px_2rem_max-content] items-center gap-x-3 gap-y-1 text-sm pointer-events-auto">
+    <ul className="mt-2 flex w-full min-w-0 flex-col gap-2 text-sm pointer-events-auto md:grid md:grid-cols-[max-content_minmax(0,1fr)_2rem_max-content] md:items-center md:gap-x-3 md:gap-y-1">
       {EXPO_TIMING_CATEGORY_ORDER.flatMap((cat) =>
         grouped[cat].map((ex) => {
           const expoTitle = ex.expo_name?.trim() || ex.id;
           return (
-          <li key={ex.id} className="contents">
+          <li
+            key={ex.id}
+            className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border/40 p-2 md:contents md:rounded-none md:border-0 md:p-0"
+          >
             <span
               className={cn(
                 "inline-flex w-fit max-w-full items-center justify-start rounded-full border px-3 py-0.5 text-left text-[11px] font-medium",
@@ -105,27 +108,29 @@ function AgencyExpoList({ expos }: { expos: ExpoBrief[] }) {
             </span>
             <Link
               to={`/expos?expo=${encodeURIComponent(ex.id)}`}
-              className="block w-[250px] max-w-[250px] min-w-0 truncate text-primary underline-offset-2 hover:underline"
+              className="block min-w-0 w-full truncate text-primary underline-offset-2 hover:underline md:w-auto md:max-w-none"
               title={expoTitle}
               onClick={(e) => e.stopPropagation()}
             >
               {expoTitle}
             </Link>
+            <div className="flex min-w-0 items-center justify-between gap-2 md:contents">
             <Link
               to={`/catalogue?expo=${encodeURIComponent(ex.id)}`}
-              className="inline-flex h-8 w-8 items-center justify-center justify-self-center rounded-md text-primary hover:bg-primary/10"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-primary hover:bg-primary/10 md:justify-self-center"
               title={t("page.viewCatalogue")}
               aria-label={t("page.viewCatalogue")}
               onClick={(e) => e.stopPropagation()}
             >
               <GalleryVerticalEnd className="h-4 w-4" aria-hidden />
             </Link>
-            <span className="text-right text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground md:text-right">
               {formatExpoDatesLabel(ex.date_expo_du, ex.date_expo_au, i18n.language, t, {
                 range: "expos.dateRange",
                 permanent: "expos.permanentExpo",
               })}
             </span>
+            </div>
           </li>
           );
         }),
@@ -376,7 +381,7 @@ const Agencies = () => {
             <Card key={ag.id} className="glass-card hover:shadow-lg transition-all duration-300 overflow-hidden">
               <CardContent className="relative p-0 flex flex-col md:flex-row items-stretch">
                 <div
-                  className={`flex flex-1 flex-col sm:flex-row items-start gap-4 p-4 min-w-0 border-b md:border-b-0 md:border-r border-border/60 transition-colors ${
+                  className={`flex flex-1 min-w-0 flex-row items-start gap-3 p-4 border-b md:border-b-0 md:border-r border-border/60 transition-colors ${
                     editable ? "cursor-pointer hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" : ""
                   }`}
                   role={editable ? "button" : undefined}

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { resolveFeedbackVisitorId } from "@/lib/registerAnonymousVisitorSession";
 import { isDiaryUnlocked } from "@/lib/visitorDiaryAccess";
+import { resolveTravelDiaryShareToken, type TravelDiaryShareAccess } from "@/lib/travelDiaryShare";
 import { fetchVisitorTravelDiaryPackage } from "@/lib/visitorTravelDiary";
 import type { TravelDiaryPackage } from "@/lib/visitorTravelDiary";
 import { supabase } from "@/lib/supabase";
@@ -18,28 +19,58 @@ export default function Summary() {
   const [searchParams] = useSearchParams();
   const expoId = searchParams.get("expo_id")?.trim() || null;
   const visitorIdParam = searchParams.get("visitor_id")?.trim() || null;
+  const shareToken = searchParams.get("share")?.trim() || null;
   const isAdminPreview = searchParams.get("admin") === "1";
   const { session, first_name, role_id, loading: authLoading } = useAuthUser();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [diary, setDiary] = useState<TravelDiaryPackage | null>(null);
+  const [diaryOwnerVisitorId, setDiaryOwnerVisitorId] = useState<string | null>(null);
   const [profileNames, setProfileNames] = useState<{ first: string; last: string }>({ first: "", last: "" });
+  const [shareAccess, setShareAccess] = useState<TravelDiaryShareAccess | null>(null);
+  const [shareResolving, setShareResolving] = useState(Boolean(shareToken));
 
   const isBackofficeDiaryViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 6;
   const canAccessAsAdmin = isAdminPreview && isBackofficeDiaryViewer && Boolean(visitorIdParam);
+  const isSharedView = Boolean(shareToken && shareAccess?.valid);
 
   const visitorAllowed = useMemo(() => isDiaryUnlocked(expoId), [expoId]);
 
-  const accessDenied = !canAccessAsAdmin && !visitorAllowed;
+  const accessDenied = !canAccessAsAdmin && !visitorAllowed && !isSharedView;
+
+  const resolvedExpoId = isSharedView ? shareAccess?.expoId ?? null : expoId;
 
   const resolvedVisitorId = useMemo(() => {
+    if (isSharedView && shareAccess?.visitorId) return shareAccess.visitorId;
     if (canAccessAsAdmin && visitorIdParam) return visitorIdParam;
     return resolveFeedbackVisitorId(session?.user?.id?.trim() || null);
-  }, [canAccessAsAdmin, visitorIdParam, session?.user?.id]);
+  }, [canAccessAsAdmin, isSharedView, shareAccess?.visitorId, session?.user?.id, visitorIdParam]);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!shareToken) {
+      setShareAccess(null);
+      setShareResolving(false);
+      return;
+    }
+
+    let cancelled = false;
+    setShareResolving(true);
+    void (async () => {
+      const access = await resolveTravelDiaryShareToken(shareToken);
+      if (!cancelled) {
+        setShareAccess(access);
+        setShareResolving(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shareToken]);
+
+  useEffect(() => {
+    if (authLoading || shareResolving) return;
     if (accessDenied) {
       setLoading(false);
       return;
@@ -53,6 +84,7 @@ export default function Summary() {
 
       if (!resolvedVisitorId) {
         setDiary(null);
+        setDiaryOwnerVisitorId(null);
         setLoading(false);
         return;
       }
@@ -60,7 +92,26 @@ export default function Summary() {
       let firstName = first_name?.trim() || profileNames.first;
       let lastName = profileNames.last;
 
-      if (canAccessAsAdmin && visitorIdParam) {
+      if (isSharedView) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", resolvedVisitorId)
+          .maybeSingle();
+        if (profile) {
+          firstName = profile.first_name?.trim() || firstName;
+          lastName = profile.last_name?.trim() || lastName;
+        }
+        if (!firstName && !lastName) {
+          const { data: anon } = await supabase
+            .from("visitors")
+            .select("visitor_pseudo")
+            .eq("visitor_client_id", resolvedVisitorId)
+            .maybeSingle();
+          const pseudo = anon?.visitor_pseudo?.trim();
+          if (pseudo) firstName = pseudo;
+        }
+      } else if (canAccessAsAdmin && visitorIdParam) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("first_name, last_name")
@@ -95,19 +146,22 @@ export default function Summary() {
         }
       }
 
-      const { diary: loaded, error: loadError } = await fetchVisitorTravelDiaryPackage(resolvedVisitorId, {
-        expoId,
+      const { diary: loaded, error: loadError, ownerVisitorId } = await fetchVisitorTravelDiaryPackage(resolvedVisitorId, {
+        expoId: resolvedExpoId,
         lang: i18n.language,
         visitorFirstName: firstName,
         visitorLastName: lastName,
+        shareToken: isSharedView ? shareToken : null,
       });
 
       if (cancelled) return;
       if (loadError) {
         setError(loadError);
         setDiary(null);
+        setDiaryOwnerVisitorId(null);
       } else {
         setDiary(loaded);
+        setDiaryOwnerVisitorId(ownerVisitorId);
       }
       setLoading(false);
     })();
@@ -119,7 +173,7 @@ export default function Summary() {
     authLoading,
     accessDenied,
     resolvedVisitorId,
-    expoId,
+    resolvedExpoId,
     i18n.language,
     first_name,
     canAccessAsAdmin,
@@ -127,9 +181,23 @@ export default function Summary() {
     session?.user?.id,
     profileNames.first,
     profileNames.last,
+    isSharedView,
+    shareToken,
+    shareResolving,
   ]);
 
-  if (!authLoading && accessDenied) {
+  if (!authLoading && !shareResolving && shareToken && shareAccess && !shareAccess.valid) {
+    return (
+      <VisitorPageShell contentClassName="px-4">
+        <div className="rounded-2xl border border-white/10 bg-[#1e1e1e] p-6 text-center">
+          <p className="font-serif text-lg text-[#F0F0F0]">{t("diary.share_expired_title")}</p>
+          <p className="mt-2 text-sm text-[#F0F0F0]/70">{t("diary.share_expired_desc")}</p>
+        </div>
+      </VisitorPageShell>
+    );
+  }
+
+  if (!authLoading && !shareResolving && accessDenied) {
     return <Navigate to="/visitor" replace />;
   }
 
@@ -152,6 +220,9 @@ export default function Summary() {
       ) : (
         <TravelDiaryNotebook
           diary={diary}
+          visitorId={diaryOwnerVisitorId ?? resolvedVisitorId}
+          expoId={resolvedExpoId}
+          shareToken={isSharedView ? shareToken : null}
           secondaryAction={
             canAccessAsAdmin ? (
               <Button
@@ -172,7 +243,7 @@ export default function Summary() {
         />
       )}
 
-      {!canAccessAsAdmin ? (
+      {!canAccessAsAdmin && !isSharedView ? (
         <div className="mt-8 flex flex-col gap-2">
           <Button
             type="button"

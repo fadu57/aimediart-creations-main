@@ -95,16 +95,59 @@ export const EMPTY_COST_LINKED_FILTER_OPTIONS: CostLinkedFilterOptions = {
 export type CostArtworkDisplayMeta = {
   title: string | null;
   mediationLangCount: number;
+  expoName: string | null;
+  agencyName: string | null;
+  /** artwork_id ou artist_id selon le type d'événement. */
+  linkedEntityId?: string | null;
 };
+
+/** Événement biographie artiste (TTS ou autre) — text_id = id ligne artist_bios. */
+export function isCostBioEvent(event: CostEvent): boolean {
+  const op = (event.operation_name ?? "").trim().toLowerCase();
+  if (op === "bio" || op === "bio_extraction" || op.includes("bio")) return true;
+  const textType = String(event.metadata?.text_type ?? "").trim().toLowerCase();
+  if (textType === "bio") return true;
+  const metaOp = String(event.metadata?.operation ?? "").trim().toLowerCase();
+  return metaOp === "bio" || metaOp.includes("bio");
+}
+
+export function getCostEventBioRowId(event: CostEvent): string | null {
+  if (!isCostBioEvent(event)) return null;
+  const meta = event.metadata ?? {};
+  const textId = String(meta.text_id ?? meta.artist_id ?? "").trim();
+  return textId || null;
+}
+
+/** Clé d'affichage tableau (œuvre ou bio). */
+export function getCostEventDisplayKey(event: CostEvent): string | null {
+  const bioRowId = getCostEventBioRowId(event);
+  if (bioRowId) return `bio:${bioRowId}`;
+  const artworkId = getCostEventArtworkId(event);
+  return artworkId ? `artwork:${artworkId}` : null;
+}
 
 /** Identifiant œuvre rattaché à un événement de coût (metadata directe). */
 export function getCostEventArtworkId(event: CostEvent): string | null {
   const meta = event.metadata ?? {};
   const artworkId = typeof meta.artwork_id === "string" ? meta.artwork_id.trim() : "";
   if (artworkId) return artworkId;
+  if (isCostBioEvent(event)) return null;
   const textId = typeof meta.text_id === "string" ? meta.text_id.trim() : "";
   if (textId) return textId;
   return null;
+}
+
+function formatArtistDisplayName(row: {
+  artist_firstname?: string | null;
+  artist_lastname?: string | null;
+  artist_nickname?: string | null;
+}): string {
+  const first = row.artist_firstname?.trim() ?? "";
+  const last = row.artist_lastname?.trim() ?? "";
+  const nick = row.artist_nickname?.trim() ?? "";
+  const full = [first, last].filter(Boolean).join(" ");
+  if (full && nick) return `${full} (${nick})`;
+  return full || nick || "";
 }
 
 /** Titres et nombre de langues de médiation pour l'affichage tableau coûts. */
@@ -117,25 +160,275 @@ export async function getCostArtworkDisplayMetaByIds(
 
   const { data, error } = await supabase
     .from("artworks")
-    .select("artwork_id, artwork_title, artwork_description_i18n")
+    .select("artwork_id, artwork_title, artwork_description_i18n, artwork_expo_id, artwork_agency_id")
     .in("artwork_id", ids)
     .is("artwork_deleted_at", null);
 
   if (error) return result;
 
-  for (const row of (data ?? []) as Array<{
+  const rows = (data ?? []) as Array<{
     artwork_id?: string | null;
     artwork_title?: string | null;
     artwork_description_i18n?: unknown;
-  }>) {
+    artwork_expo_id?: string | null;
+    artwork_agency_id?: string | null;
+  }>;
+
+  const expoIds = [...new Set(rows.map((r) => r.artwork_expo_id?.trim()).filter((id): id is string => Boolean(id)))];
+  const agencyIds = [...new Set(rows.map((r) => r.artwork_agency_id?.trim()).filter((id): id is string => Boolean(id)))];
+
+  const [exposRes, agenciesRes] = await Promise.all([
+    expoIds.length > 0
+      ? supabase.from("expos").select("id, expo_name").in("id", expoIds)
+      : Promise.resolve({ data: [] as Array<{ id?: string; expo_name?: string | null }> }),
+    agencyIds.length > 0
+      ? supabase.from("agencies").select("id, name_agency").in("id", agencyIds)
+      : Promise.resolve({ data: [] as Array<{ id?: string; name_agency?: string | null }> }),
+  ]);
+
+  const expoNameById = new Map<string, string>();
+  for (const row of exposRes.data ?? []) {
+    const id = row.id?.trim();
+    if (!id) continue;
+    expoNameById.set(id, row.expo_name?.trim() || id.slice(0, 8));
+  }
+
+  const agencyNameById = new Map<string, string>();
+  for (const row of agenciesRes.data ?? []) {
+    const id = row.id?.trim();
+    if (!id) continue;
+    agencyNameById.set(id, row.name_agency?.trim() || id.slice(0, 8));
+  }
+
+  for (const row of rows) {
     const id = row.artwork_id?.trim();
     if (!id) continue;
+    const expoId = row.artwork_expo_id?.trim() ?? "";
+    const agencyId = row.artwork_agency_id?.trim() ?? "";
     result[id] = {
       title: row.artwork_title?.trim() || null,
       mediationLangCount: getMediationFilledUiLangs(row.artwork_description_i18n).length,
+      expoName: expoId ? (expoNameById.get(expoId) ?? null) : null,
+      agencyName: agencyId ? (agencyNameById.get(agencyId) ?? null) : null,
+      linkedEntityId: id,
     };
   }
   return result;
+}
+
+/** Résout text_id bio → artist_id (ligne artist_bios ou artist_id direct). */
+async function resolveBioTextIdsToArtistIds(
+  textIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const ids = [...new Set(textIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return map;
+
+  const { data: bioByRowId } = await supabase
+    .from("artist_bios")
+    .select("id, artist_id")
+    .in("id", ids);
+
+  const foundRowIds = new Set<string>();
+  for (const row of (bioByRowId ?? []) as Array<{ id?: string | null; artist_id?: string | null }>) {
+    const bioId = row.id?.trim();
+    const artistId = row.artist_id?.trim();
+    if (!bioId || !artistId) continue;
+    map.set(bioId, artistId);
+    foundRowIds.add(bioId);
+  }
+
+  const unresolved = ids.filter((id) => !foundRowIds.has(id));
+  if (unresolved.length > 0) {
+    const { data: bioByArtistId } = await supabase
+      .from("artist_bios")
+      .select("id, artist_id")
+      .in("artist_id", unresolved);
+
+    const artistMatched = new Set<string>();
+    for (const row of (bioByArtistId ?? []) as Array<{ id?: string | null; artist_id?: string | null }>) {
+      const artistId = row.artist_id?.trim();
+      if (!artistId || artistMatched.has(artistId)) continue;
+      if (unresolved.includes(artistId)) {
+        map.set(artistId, artistId);
+        artistMatched.add(artistId);
+      }
+    }
+
+    for (const id of unresolved) {
+      if (!map.has(id)) map.set(id, id);
+    }
+  }
+
+  return map;
+}
+
+async function loadArtistDisplayMetaByIds(
+  artistIds: string[],
+): Promise<Map<string, { name: string; agencyId: string | null; expoId: string | null }>> {
+  const ids = [...new Set(artistIds.map((id) => id.trim()).filter(Boolean))];
+  const result = new Map<string, { name: string; agencyId: string | null; expoId: string | null }>();
+  if (ids.length === 0) return result;
+
+  const [artistsRes, agencyLinksRes, artworksRes] = await Promise.all([
+    supabase
+      .from("artists")
+      .select("artist_id, artist_firstname, artist_lastname, artist_nickname, artist_initiale_artist")
+      .in("artist_id", ids),
+    supabase
+      .from("artist_agency_details")
+      .select("artist_id, agency_id")
+      .in("artist_id", ids),
+    supabase
+      .from("artworks")
+      .select("artwork_artist_id, artwork_expo_id, artwork_created_at")
+      .in("artwork_artist_id", ids)
+      .is("artwork_deleted_at", null)
+      .order("artwork_created_at", { ascending: false }),
+  ]);
+
+  const agencyIdByArtist = new Map<string, string>();
+  for (const row of (agencyLinksRes.data ?? []) as Array<{
+    artist_id?: string | null;
+    agency_id?: string | null;
+  }>) {
+    const artistId = row.artist_id?.trim();
+    const agencyId = row.agency_id?.trim();
+    if (!artistId || !agencyId || agencyIdByArtist.has(artistId)) continue;
+    agencyIdByArtist.set(artistId, agencyId);
+  }
+
+  const expoIdByArtist = new Map<string, string>();
+  for (const row of (artworksRes.data ?? []) as Array<{
+    artwork_artist_id?: string | null;
+    artwork_expo_id?: string | null;
+  }>) {
+    const artistId = row.artwork_artist_id?.trim();
+    const expoId = row.artwork_expo_id?.trim();
+    if (!artistId || !expoId || expoIdByArtist.has(artistId)) continue;
+    expoIdByArtist.set(artistId, expoId);
+  }
+
+  for (const row of (artistsRes.data ?? []) as Array<{
+    artist_id?: string | null;
+    artist_firstname?: string | null;
+    artist_lastname?: string | null;
+    artist_nickname?: string | null;
+    artist_initiale_artist?: string | null;
+  }>) {
+    const id = row.artist_id?.trim();
+    if (!id) continue;
+    const label =
+      formatArtistDisplayName(row) ||
+      row.artist_initiale_artist?.trim() ||
+      id.slice(0, 8);
+    result.set(id, {
+      name: label,
+      agencyId: agencyIdByArtist.get(id) ?? null,
+      expoId: expoIdByArtist.get(id) ?? null,
+    });
+  }
+
+  for (const id of ids) {
+    if (result.has(id)) continue;
+    result.set(id, {
+      name: id.slice(0, 8),
+      agencyId: agencyIdByArtist.get(id) ?? null,
+      expoId: expoIdByArtist.get(id) ?? null,
+    });
+  }
+
+  return result;
+}
+
+/** Métadonnées d'affichage pour les bios (nom artiste, expo/agence liées). */
+export async function getCostBioDisplayMetaByBioRowIds(
+  bioRowIds: string[],
+): Promise<Record<string, CostArtworkDisplayMeta>> {
+  const ids = [...new Set(bioRowIds.map((id) => id.trim()).filter(Boolean))];
+  const result: Record<string, CostArtworkDisplayMeta> = {};
+  if (ids.length === 0) return result;
+
+  const bioToArtist = await resolveBioTextIdsToArtistIds(ids);
+  const artistIds = [...new Set(bioToArtist.values())];
+  const artistMetaById = await loadArtistDisplayMetaByIds(artistIds);
+
+  const agencyIds = [...new Set(
+    [...artistMetaById.values()].map((m) => m.agencyId).filter((id): id is string => Boolean(id)),
+  )];
+  const expoIds = [...new Set(
+    [...artistMetaById.values()].map((m) => m.expoId).filter((id): id is string => Boolean(id)),
+  )];
+  const [agenciesRes, exposRes] = await Promise.all([
+    agencyIds.length > 0
+      ? supabase.from("agencies").select("id, name_agency").in("id", agencyIds)
+      : Promise.resolve({ data: [] as Array<{ id?: string; name_agency?: string | null }> }),
+    expoIds.length > 0
+      ? supabase.from("expos").select("id, expo_name").in("id", expoIds)
+      : Promise.resolve({ data: [] as Array<{ id?: string; expo_name?: string | null }> }),
+  ]);
+
+  const agencyNameById = new Map<string, string>();
+  for (const row of agenciesRes.data ?? []) {
+    const id = row.id?.trim();
+    if (!id) continue;
+    agencyNameById.set(id, row.name_agency?.trim() || id.slice(0, 8));
+  }
+
+  const expoNameById = new Map<string, string>();
+  for (const row of exposRes.data ?? []) {
+    const id = row.id?.trim();
+    if (!id) continue;
+    expoNameById.set(id, row.expo_name?.trim() || id.slice(0, 8));
+  }
+
+  for (const textId of ids) {
+    const artistId = bioToArtist.get(textId);
+    if (!artistId) continue;
+    const artistMeta = artistMetaById.get(artistId);
+    result[textId] = {
+      title: artistMeta?.name ?? null,
+      mediationLangCount: -1,
+      expoName: artistMeta?.expoId ? (expoNameById.get(artistMeta.expoId) ?? null) : null,
+      agencyName: artistMeta?.agencyId ? (agencyNameById.get(artistMeta.agencyId) ?? null) : null,
+      linkedEntityId: artistId,
+    };
+  }
+
+  return result;
+}
+
+/** Métadonnées tableau (œuvres + bios) indexées par getCostEventDisplayKey. */
+export async function getCostEntityDisplayMetaForEvents(
+  events: CostEvent[],
+): Promise<Record<string, CostArtworkDisplayMeta>> {
+  const artworkIds = [
+    ...new Set(
+      events
+        .filter((e) => !isCostBioEvent(e))
+        .map(getCostEventArtworkId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const bioRowIds = [
+    ...new Set(
+      events.map(getCostEventBioRowId).filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [artworkMeta, bioMeta] = await Promise.all([
+    getCostArtworkDisplayMetaByIds(artworkIds),
+    getCostBioDisplayMetaByBioRowIds(bioRowIds),
+  ]);
+
+  const merged: Record<string, CostArtworkDisplayMeta> = {};
+  for (const [id, meta] of Object.entries(artworkMeta)) {
+    merged[`artwork:${id}`] = meta;
+  }
+  for (const [id, meta] of Object.entries(bioMeta)) {
+    merged[`bio:${id}`] = meta;
+  }
+  return merged;
 }
 
 export type CostEventsTotals = {
@@ -187,6 +480,8 @@ export type CostSortColumn =
   | "cost_estimated"
   | "status"
   | "artwork_title"
+  | "expo_title"
+  | "agency_title"
   | "mediation_lang_count";
 
 export type CostArtworkSortContext = {
@@ -195,7 +490,12 @@ export type CostArtworkSortContext = {
 };
 
 export function isClientOnlyCostSortColumn(column: CostSortColumn): boolean {
-  return column === "artwork_title" || column === "mediation_lang_count";
+  return (
+    column === "artwork_title" ||
+    column === "expo_title" ||
+    column === "agency_title" ||
+    column === "mediation_lang_count"
+  );
 }
 
 export type CostSort = {
@@ -681,25 +981,44 @@ async function fetchUnsyncedUsageLogsAsEvents(
   return logs.filter((log) => !synced.has(log.id)).map(mapUsageLogToCostEvent);
 }
 
+function costEventDisplayMeta(
+  event: CostEvent,
+  ctx?: CostArtworkSortContext,
+): CostArtworkDisplayMeta | undefined {
+  const key = getCostEventDisplayKey(event);
+  if (!key || !ctx) return undefined;
+  return ctx.artworkMetaById[key];
+}
+
 function artworkSortLabel(event: CostEvent, ctx?: CostArtworkSortContext): string {
-  const id = getCostEventArtworkId(event);
+  const display = costEventDisplayMeta(event, ctx);
+  if (display?.title?.trim()) return display.title.trim();
+  const id = getCostEventArtworkId(event) ?? getCostEventBioRowId(event);
   if (!id) return "";
   return (
-    ctx?.artworkMetaById[id]?.title?.trim() ||
     ctx?.artworkLabelById[id]?.trim() ||
     id
   );
 }
 
 function mediationLangCountForSort(event: CostEvent, ctx?: CostArtworkSortContext): number {
+  const display = costEventDisplayMeta(event, ctx);
+  if (display) return display.mediationLangCount;
   const id = getCostEventArtworkId(event);
   if (!id) return -1;
-  return ctx?.artworkMetaById[id]?.mediationLangCount ?? -1;
+  return ctx?.artworkMetaById[`artwork:${id}`]?.mediationLangCount ?? -1;
+}
+
+function expoSortLabel(event: CostEvent, ctx?: CostArtworkSortContext): string {
+  return costEventDisplayMeta(event, ctx)?.expoName?.trim() ?? "";
+}
+
+function agencySortLabel(event: CostEvent, ctx?: CostArtworkSortContext): string {
+  return costEventDisplayMeta(event, ctx)?.agencyName?.trim() ?? "";
 }
 
 async function buildArtworkSortContext(events: CostEvent[]): Promise<CostArtworkSortContext> {
-  const ids = events.map(getCostEventArtworkId).filter((id): id is string => Boolean(id));
-  const artworkMetaById = await getCostArtworkDisplayMetaByIds(ids);
+  const artworkMetaById = await getCostEntityDisplayMetaForEvents(events);
   return { artworkMetaById, artworkLabelById: {} };
 }
 
@@ -713,6 +1032,16 @@ function sortCostEvents(events: CostEvent[], sort: CostSort, ctx?: CostArtworkSo
     }
     if (sort.column === "mediation_lang_count") {
       return (mediationLangCountForSort(a, ctx) - mediationLangCountForSort(b, ctx)) * dir;
+    }
+    if (sort.column === "expo_title") {
+      return expoSortLabel(a, ctx).localeCompare(expoSortLabel(b, ctx), "fr", {
+        sensitivity: "base",
+      }) * dir;
+    }
+    if (sort.column === "agency_title") {
+      return agencySortLabel(a, ctx).localeCompare(agencySortLabel(b, ctx), "fr", {
+        sensitivity: "base",
+      }) * dir;
     }
 
     const col = sort.column;
@@ -1813,22 +2142,64 @@ export async function getCostTotalsByExpoIds(expoIds: string[]): Promise<Record<
 // Export CSV
 // ---------------------------------------------------------------------------
 
-/** Exporte les événements courants vers un fichier CSV (BOM UTF-8). */
-export function exportCostsCsv(events: CostEvent[]): void {
+/** Exporte les événements courants vers un fichier CSV (BOM UTF-8), aligné sur le tableau détaillé. */
+export async function exportCostsCsv(events: CostEvent[]): Promise<void> {
+  const artworkMetaById = await getCostEntityDisplayMetaForEvents(events);
+
   const headers = [
-    "date", "tool_type", "provider", "api_name", "model_name",
-    "operation_name", "cost_estimated", "currency", "status",
-    "input_units", "output_units", "unit_type", "source", "request_id",
+    "date",
+    "tool_type",
+    "provider",
+    "model_name",
+    "operation_name",
+    "cost_estimated_usd",
+    "currency",
+    "artwork_id",
+    "artwork_title",
+    "expo_name",
+    "agency_name",
+    "mediation_lang_count",
+    "input_units",
+    "input_units_kind",
+    "output_units",
+    "output_units_kind",
+    "total_tokens",
+    "status",
+    "source",
+    "api_name",
+    "request_id",
   ];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const rows = events.map((e) => [
-    e.created_at.slice(0, 19).replace("T", " "),
-    e.tool_type, e.provider,
-    e.api_name ?? "", e.model_name ?? "", e.operation_name ?? "",
-    effectiveCostEstimatedUsd(e).toFixed(8), e.currency, e.status,
-    e.input_units ?? "", e.output_units ?? "", e.unit_type ?? "",
-    e.source ?? "", e.request_id ?? "",
-  ].map(esc).join(","));
+  const rows = events.map((e) => {
+    const displayKey = getCostEventDisplayKey(e);
+    const entityMeta = displayKey ? artworkMetaById[displayKey] : undefined;
+    const artworkId = getCostEventArtworkId(e);
+    const bioRowId = getCostEventBioRowId(e);
+
+    return [
+      e.created_at.slice(0, 19).replace("T", " "),
+      e.tool_type,
+      e.provider,
+      e.model_name ?? "",
+      e.operation_name ?? "",
+      effectiveCostEstimatedUsd(e).toFixed(8),
+      e.currency,
+      entityMeta?.linkedEntityId ?? artworkId ?? bioRowId ?? "",
+      entityMeta?.title ?? "",
+      entityMeta?.expoName ?? "",
+      entityMeta?.agencyName ?? "",
+      entityMeta != null && entityMeta.mediationLangCount >= 0 ? entityMeta.mediationLangCount : "",
+      e.input_units ?? "",
+      costEventInputUnitKind(e),
+      e.output_units ?? "",
+      costEventOutputUnitKind(e),
+      costEventTotalUnits(e) ?? "",
+      e.status,
+      e.source ?? "",
+      e.api_name ?? "",
+      e.request_id ?? "",
+    ].map(esc).join(",");
+  });
 
   const csv = [headers.map(esc).join(","), ...rows].join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
@@ -1847,6 +2218,42 @@ export function exportCostsCsv(events: CostEvent[]): void {
 const CURRENCY_SYMBOLS: Record<string, string> = { EUR: "€", USD: "$", GBP: "£" };
 
 export { effectiveCostEstimatedUsd };
+
+/** Somme entrée + sortie pour une ligne événement (affichage « Tokens total »). */
+export function costEventTotalUnits(event: CostEvent): number | null {
+  const input = event.input_units;
+  const output = event.output_units;
+  if (input == null && output == null) return null;
+  return (Number(input) || 0) + (Number(output) || 0);
+}
+
+export type CostUnitKind = "text" | "audio" | "characters" | "unknown";
+
+function isCostTtsEvent(event: CostEvent): boolean {
+  const tool = (event.tool_type ?? "").trim();
+  if (tool === "tts") return true;
+  return (event.provider ?? "").trim() === "google_tts";
+}
+
+/** Nature des unités en entrée (texte écrit vs audio). */
+export function costEventInputUnitKind(event: CostEvent): CostUnitKind {
+  if (isCostTtsEvent(event)) {
+    if ((event.unit_type ?? "").trim() === "characters") return "unknown";
+    return "text";
+  }
+  if ((event.tool_type ?? "").trim() === "llm") return "text";
+  return "unknown";
+}
+
+/** Nature des unités en sortie (texte généré vs audio TTS). */
+export function costEventOutputUnitKind(event: CostEvent): CostUnitKind {
+  if (isCostTtsEvent(event)) {
+    if ((event.unit_type ?? "").trim() === "characters") return "characters";
+    return "audio";
+  }
+  if ((event.tool_type ?? "").trim() === "llm") return "text";
+  return "unknown";
+}
 
 export function formatCost(value: number, currency = "EUR", decimals = 4): string {
   const sym = CURRENCY_SYMBOLS[currency] ?? currency;

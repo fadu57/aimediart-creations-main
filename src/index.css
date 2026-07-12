@@ -1290,8 +1290,9 @@
 }
 
 .travel-diary-root.travel-diary-root--with-toolbar {
-  /* barre outils compacte (icône + 2 lignes max) sous le carnet */
-  --diary-h: min(840px, calc(100dvh - 9rem));
+  /* header 64px + gap carnet/toolbar + barre 3 boutons + pb-6 */
+  --diary-chrome: calc(4rem + 1rem + 3.5rem + 1.5rem + env(safe-area-inset-bottom, 0px));
+  --diary-h: min(840px, calc(100dvh - var(--diary-chrome)));
 }
 
 @media (max-width: 420px) {
@@ -1300,7 +1301,9 @@
   }
 
   .travel-diary-root.travel-diary-root--with-toolbar {
-    --diary-h: min(840px, calc(100dvh - 6rem));
+    /* gap-2 (0.5rem) sous le carnet sur mobile */
+    --diary-chrome: calc(4rem + 0.5rem + 3.5rem + 1.5rem + env(safe-area-inset-bottom, 0px));
+    --diary-h: min(840px, calc(100dvh - var(--diary-chrome)));
   }
 }
 
@@ -1367,12 +1370,59 @@
 }
 
 .travel-diary-flipbook-host {
+  position: relative;
   display: flex;
   justify-content: center;
 }
 
+.travel-diary-flip-edge-zones {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.travel-diary-flip-edge-zone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: min(22%, 88px);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.travel-diary-flip-edge-zone--next {
+  right: 0;
+}
+
+.travel-diary-flip-edge-zone--prev {
+  left: 0;
+}
+
+.travel-diary-flip-edge-zone:disabled {
+  pointer-events: none;
+  cursor: default;
+}
+
+.travel-diary-flipbook .stf__parent {
+  width: 100%;
+  height: var(--diary-h);
+}
+
+.travel-diary-flipbook .stf__parent canvas,
+.travel-diary-flipbook .stf__outerShadow,
+.travel-diary-flipbook .stf__innerShadow,
+.travel-diary-flipbook .stf__hardShadow,
+.travel-diary-flipbook .stf__hardInnerShadow {
+  pointer-events: none;
+}
+
 .travel-diary-flipbook,
-.travel-diary-flipbook .stf__parent,
 .travel-diary-flipbook .stf__wrapper,
 .travel-diary-flipbook .stf__block {
   width: 100%;
@@ -1416,14 +1466,20 @@
 
 .travel-diary-cover-title-box {
   min-height: calc(var(--diary-h) * 90 / 840);
-  width: min(299px, 100%);
-  max-width: 100%;
+  width: 300px;
 }
 
 .travel-diary-page-inner {
+  position: relative;
   height: 100%;
   overflow: hidden;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, transparent 50%);
+}
+
+.travel-diary-page-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
 }
 
 .travel-diary-artwork-watermark {

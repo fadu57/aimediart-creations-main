@@ -59,6 +59,7 @@
   "list": {
     "title": "Users",
     "search_placeholder": "Search for a user...",
+    "search_label": "user",
     "clear_search": "Clear search",
     "clear": "Clear",
     "new_user": "+ New user",

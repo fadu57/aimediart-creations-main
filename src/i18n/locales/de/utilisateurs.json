@@ -59,6 +59,7 @@
   "list": {
     "title": "Benutzer",
     "search_placeholder": "Benutzer suchen...",
+    "search_label": "Benutzer",
     "clear_search": "Suche löschen",
     "clear": "Löschen",
     "new_user": "+ Neuer Benutzer",

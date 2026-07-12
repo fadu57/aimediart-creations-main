@@ -501,7 +501,7 @@ export default function Utilisateurs() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[980px] px-4 py-6 space-y-4">
+    <div className="mx-auto w-full min-w-0 px-4 py-[63px] space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/user")}>
           {t("page.back")}
@@ -513,7 +513,7 @@ export default function Utilisateurs() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="!mt-[7px]">
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <CardTitle>{t("page.title")}</CardTitle>
           <div className="relative w-full md:w-[360px]">
@@ -543,7 +543,7 @@ export default function Utilisateurs() {
             </datalist>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="min-w-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">{t("page.loading")}</p>
           ) : error ? (
@@ -552,31 +552,31 @@ export default function Utilisateurs() {
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="w-36 px-2 py-1">
+                  <th className="w-[9%] px-1.5 py-1 leading-tight">
                     {t("page.colPrenom")}
                     <SortButtons column="first_name" />
                   </th>
-                  <th className="w-36 px-2 py-1">
+                  <th className="w-[9%] px-1.5 py-1 leading-tight">
                     {t("page.colNom")}
                     <SortButtons column="last_name" />
                   </th>
-                  <th className="w-44 px-2 py-1">
+                  <th className="w-[20%] px-1.5 py-1 leading-tight">
                     {t("page.colOrganisation")}
                     <SortButtons column="agency" />
                   </th>
-                  <th className="w-44 px-2 py-1">
+                  <th className="w-[17%] px-1.5 py-1 leading-tight">
                     {t("page.colExpo")}
                     <SortButtons column="expo" />
                   </th>
-                  <th className="w-40 px-2 py-1 whitespace-nowrap">
+                  <th className="w-[18%] px-1.5 py-1 leading-tight">
                     {t("page.colRole")}
                     <SortButtons column="role" />
                   </th>
-                  <th className="w-52 px-2 py-1 whitespace-nowrap">
+                  <th className="w-[23%] px-1.5 py-1 leading-tight">
                     {t("page.colLastSignIn")}
                     <SortButtons column="last_sign_in" />
                   </th>
-                  <th className="w-10 px-2 py-1" aria-label="Actions" />
+                  <th className="w-[4%] px-1 py-1" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -596,44 +596,34 @@ export default function Utilisateurs() {
 
                   return (
                     <tr key={row.id} className={`border-b ${rowClass}`} onClick={handleOpen}>
-                      <td className="w-36 px-2 py-1">
-                        <span className="block truncate whitespace-nowrap" title={row.first_name || "—"}>
-                          {row.first_name || "—"}
-                        </span>
+                      <td className="px-1.5 py-1 truncate" title={row.first_name || "—"}>
+                        {row.first_name || "—"}
                       </td>
-                      <td className="w-36 px-2 py-1">
-                        <span className="block truncate whitespace-nowrap" title={row.last_name || "—"}>
-                          {row.last_name || "—"}
-                        </span>
+                      <td className="px-1.5 py-1 truncate" title={row.last_name || "—"}>
+                        {row.last_name || "—"}
                       </td>
-                      <td className="w-44 px-2 py-1">
-                        <span
-                          className="block truncate whitespace-nowrap"
-                          title={(row.agency_id && agencyLabelById.get(row.agency_id)) || "—"}
-                        >
-                          {(row.agency_id && agencyLabelById.get(row.agency_id)) || "—"}
-                        </span>
+                      <td
+                        className="px-1.5 py-1 truncate"
+                        title={(row.agency_id && agencyLabelById.get(row.agency_id)) || "—"}
+                      >
+                        {(row.agency_id && agencyLabelById.get(row.agency_id)) || "—"}
                       </td>
-                      <td className="w-44 px-2 py-1">
-                        <span
-                          className="block truncate whitespace-nowrap"
-                          title={(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
-                        >
-                          {(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
-                        </span>
+                      <td
+                        className="px-1.5 py-1 truncate"
+                        title={(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
+                      >
+                        {(row.expo_id && expoLabelById.get(row.expo_id)) || "—"}
                       </td>
-                      <td className="w-40 px-2 py-1">
-                        <span
-                          className="block truncate whitespace-nowrap"
-                          title={row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "—"}
-                        >
-                          {row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "—"}
-                        </span>
+                      <td
+                        className="px-1.5 py-1 truncate"
+                        title={row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "—"}
+                      >
+                        {row.role_id != null ? roleLabelById.get(row.role_id) || `Rôle ${row.role_id}` : "—"}
                       </td>
-                      <td className="w-52 px-2 py-1 whitespace-nowrap">
+                      <td className="px-1.5 py-1 truncate" title={formatUserLastSignIn(row.last_sign_in_at, t("page.neverSignedIn"))}>
                         {formatUserLastSignIn(row.last_sign_in_at, t("page.neverSignedIn"))}
                       </td>
-                      <td className="w-10 px-2 py-1">
+                      <td className="px-1 py-1">
                         {canShowDelete ? (
                           <Button
                             type="button"

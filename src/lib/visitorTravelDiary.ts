@@ -648,28 +648,49 @@ export async function fetchVisitorTravelDiaryPackage(
     lang?: string;
     visitorFirstName?: string;
     visitorLastName?: string;
+    shareToken?: string | null;
   },
-): Promise<{ diary: TravelDiaryPackage | null; error: string | null }> {
+): Promise<{ diary: TravelDiaryPackage | null; error: string | null; ownerVisitorId: string | null }> {
   const vid = visitorId.trim();
-  if (!vid) return { diary: null, error: "missing-visitor-id" };
+  if (!vid) return { diary: null, error: "missing-visitor-id", ownerVisitorId: null };
 
   const lang = resolveMediationUiLang(options?.lang ?? "fr");
   const expoFilter = options?.expoId?.trim() || null;
+  const shareToken = options?.shareToken?.trim() || null;
 
-  let query = supabase
-    .from("visitor_feedback")
-    .select("id, artwork_id, emotion_id, heart_rating, comment_text, submitted_at, expo_id, visitor_id, visit_id")
-    .eq("visitor_id", vid)
-    .order("submitted_at", { ascending: true })
-    .limit(80);
+  let feedbackData: FeedbackRow[] | null = null;
+  let feedbackError: { message: string } | null = null;
 
-  if (expoFilter) query = query.eq("expo_id", expoFilter);
+  if (shareToken) {
+    const { data, error } = await supabase.rpc("get_visitor_feedback_for_share", {
+      p_token: shareToken,
+    });
+    feedbackData = (data as FeedbackRow[] | null) ?? null;
+    feedbackError = error;
+  } else {
+    let query = supabase
+      .from("visitor_feedback")
+      .select("id, artwork_id, emotion_id, heart_rating, comment_text, submitted_at, expo_id, visitor_id, visit_id")
+      .eq("visitor_id", vid)
+      .order("submitted_at", { ascending: true })
+      .limit(80);
 
-  const { data: feedbackData, error: feedbackError } = await query;
-  if (feedbackError) return { diary: null, error: feedbackError.message };
+    if (expoFilter) query = query.eq("expo_id", expoFilter);
 
-  const feedbackRows = (feedbackData ?? []) as FeedbackRow[];
-  if (feedbackRows.length === 0) return { diary: null, error: null };
+    const result = await query;
+    feedbackData = (result.data as FeedbackRow[] | null) ?? null;
+    feedbackError = result.error;
+  }
+
+  if (feedbackError) return { diary: null, error: feedbackError.message, ownerVisitorId: null };
+
+  let feedbackRows = feedbackData ?? [];
+  if (expoFilter) {
+    feedbackRows = feedbackRows.filter((row) => asTrimmed(row.expo_id) === expoFilter);
+  }
+  if (feedbackRows.length === 0) return { diary: null, error: null, ownerVisitorId: null };
+
+  const ownerVisitorId = asTrimmed(feedbackRows[0]?.visitor_id) || vid;
 
   const uniqueFeedbackRows = pickLatestFeedbackPerArtwork(feedbackRows);
 
@@ -921,6 +942,7 @@ export async function fetchVisitorTravelDiaryPackage(
   return {
     diary: { cover, stats, artistPages, artworkPages: enrichedArtworkPages },
     error: null,
+    ownerVisitorId,
   };
 }
 

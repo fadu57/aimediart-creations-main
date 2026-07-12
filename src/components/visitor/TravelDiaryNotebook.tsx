@@ -1,4 +1,13 @@
-import { useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, createContext, type ReactNode } from "react";
+import {
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  createContext,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -9,7 +18,11 @@ import "page-flip/src/Style/stPageFlip.css";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { Button } from "@/components/ui/button";
-import { exportTravelDiaryPdf, travelDiaryPdfFilename } from "@/lib/travelDiaryBrowserPdf";
+import {
+  exportTravelDiaryPdf,
+  prepareTravelDiaryExportPages,
+  travelDiaryPdfFilename,
+} from "@/lib/travelDiaryBrowserPdf";
 import type { TravelDiaryPackage } from "@/lib/visitorTravelDiary";
 import {
   buildArtistPageViews,
@@ -17,19 +30,66 @@ import {
   buildStatsPageConfigs,
   type StatsPageConfig,
 } from "@/lib/travelDiaryPagination";
+import { buildTravelDiaryShareUrl, createTravelDiaryShareLink } from "@/lib/travelDiaryShare";
+import { ensureStPageFlipPortraitBackPatch } from "@/lib/stPageFlipPortraitBackPatch";
 import { cn } from "@/lib/utils";
 
+type FlipBookBounds = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  pageWidth: number;
+};
+
+type FlipBookController = {
+  flip: (point: { x: number; y: number }) => void;
+};
+
+type PageFlipInstance = {
+  flipNext: (corner?: "top" | "bottom") => void;
+  flipPrev: (corner?: "top" | "bottom") => void;
+  getCurrentPageIndex: () => number;
+  turnToPage: (pageNum: number) => void;
+  turnToNextPage: () => void;
+  turnToPrevPage: () => void;
+  getBoundsRect: () => FlipBookBounds;
+  getFlipController: () => FlipBookController;
+  getPageCollection: () => unknown;
+  getRender: () => object;
+  getOrientation: () => string;
+};
+
 type FlipBookHandle = {
-  pageFlip: () => {
-    flipNext: (corner?: "top" | "bottom") => void;
-    flipPrev: (corner?: "top" | "bottom") => void;
-    getCurrentPageIndex: () => number;
-    turnToPage: (pageNum: number) => void;
-  };
+  pageFlip: () => PageFlipInstance | null;
 };
 
 const FLIPBOOK_WIDTH = 392;
 const FLIPBOOK_HEIGHT = 792;
+
+/** page-flip : bord droit, milieu vertical (page suivante). */
+function flipDiaryPageForward(pageFlip: {
+  getBoundsRect: () => FlipBookBounds;
+  getFlipController: () => FlipBookController;
+}) {
+  const rect = pageFlip.getBoundsRect();
+  pageFlip.getFlipController().flip({
+    x: rect.left + 2 * rect.pageWidth - 10,
+    y: rect.top + rect.height / 2,
+  });
+}
+
+/** page-flip : bord gauche, milieu vertical — retour arrière (gauche → droite). */
+function flipDiaryPageBack(pageFlip: {
+  getBoundsRect: () => FlipBookBounds;
+  getFlipController: () => FlipBookController;
+}) {
+  const rect = pageFlip.getBoundsRect();
+  pageFlip.getFlipController().flip({
+    x: rect.left + 10,
+    y: rect.top + rect.height / 2,
+  });
+}
 
 function parseDiaryPageParam(raw: string | null, slideCount: number): number {
   const parsed = raw ? parseInt(raw, 10) : 1;
@@ -37,10 +97,26 @@ function parseDiaryPageParam(raw: string | null, slideCount: number): number {
   return Math.min(parsed - 1, Math.max(0, slideCount - 1));
 }
 
+/** onFlip → data: number ; onInit/onUpdate → data: { page, mode }. */
+function resolveFlipBookPageIndex(data: unknown): number {
+  if (typeof data === "number" && Number.isFinite(data)) return data;
+  if (typeof data === "object" && data !== null && "page" in data) {
+    const page = (data as { page: unknown }).page;
+    if (typeof page === "number" && Number.isFinite(page)) return page;
+  }
+  return 0;
+}
+
 type Props = {
   diary: TravelDiaryPackage;
   className?: string;
   secondaryAction?: ReactNode;
+  /** Identifiant visiteur pour générer un lien de partage public. */
+  visitorId?: string | null;
+  /** Expo filtrée (optionnelle) pour le lien de partage. */
+  expoId?: string | null;
+  /** Jeton de partage actif (préservé dans l'URL). */
+  shareToken?: string | null;
   /** Barre partage / PDF sous le carnet. */
   showToolbar?: boolean;
   /** Synchronise la page courante dans l'URL. */
@@ -106,14 +182,14 @@ function DiaryPageFooter() {
   const nav = useContext(DiaryNavContext);
 
   return (
-    <div className="shrink-0 pt-2">
+    <div className="travel-diary-page-footer shrink-0 pt-2">
       {nav && nav.slideCount > 1 ? (
         <div className="mb-1 flex items-center justify-center gap-2" aria-live="polite">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
+            className="travel-diary-export-hide h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
             onClick={nav.onPrev}
             disabled={nav.activeIndex <= 0}
             aria-label={t("diary.prev_page")}
@@ -127,7 +203,7 @@ function DiaryPageFooter() {
             type="button"
             variant="outline"
             size="icon"
-            className="h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
+            className="travel-diary-export-hide h-7 w-7 border-neutral-400/40 bg-white/55 text-neutral-800 shadow-none hover:bg-white/75"
             onClick={nav.onNext}
             disabled={nav.activeIndex >= nav.slideCount - 1}
             aria-label={t("diary.next_page")}
@@ -171,42 +247,44 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
   const visitorName = [cover.visitorFirstName, cover.visitorLastName].filter(Boolean).join(" ").trim();
 
   return (
-    <div className="travel-diary-page-inner flex h-full flex-col items-center justify-between px-4 py-4 text-center sm:px-6 sm:py-6">
-      <AimediartBrandLogoBlock size="sm" className="shrink-0 opacity-90" />
+    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-4 text-center sm:px-6 sm:py-6">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+        <AimediartBrandLogoBlock size="sm" className="shrink-0 opacity-90" />
 
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex w-full flex-col items-center gap-4">
-          {cover.expoName ? (
-            <h2 className="font-serif text-xl font-bold text-neutral-900">{cover.expoName}</h2>
-          ) : null}
-          {cover.expoLogoUrl ? (
-            <img
-              src={cover.expoLogoUrl}
-              alt={cover.expoName || t("diary.cover_expo_fallback")}
-              className="max-h-24 max-w-[200px] object-contain"
-              crossOrigin="anonymous"
-            />
-          ) : (
-            <div className="flex h-20 w-40 items-center justify-center rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-400">
-              {t("diary.no_expo_logo")}
-            </div>
-          )}
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex w-full flex-col items-center gap-4">
+            {cover.expoName ? (
+              <h2 className="font-serif text-xl font-bold text-neutral-900">{cover.expoName}</h2>
+            ) : null}
+            {cover.expoLogoUrl ? (
+              <img
+                src={cover.expoLogoUrl}
+                alt={cover.expoName || t("diary.cover_expo_fallback")}
+                className="max-h-24 max-w-[200px] object-contain"
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div className="flex h-20 w-40 items-center justify-center rounded-lg border border-dashed border-neutral-300 text-xs text-neutral-400">
+                {t("diary.no_expo_logo")}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col items-center space-y-2">
+            <h1 className="travel-diary-cover-title-box grid place-content-center rounded-[7px] border border-black font-sans text-2xl font-bold leading-tight text-neutral-900">
+              {t("diary.cover_title_line1")}
+              <br />
+              {t("diary.cover_title_line2")}
+            </h1>
+            <p className="font-serif text-lg font-semibold text-[#E63946]">{cover.visitDateLabel || "—"}</p>
+            {visitorName ? (
+              <p className="font-serif text-2xl font-bold italic text-neutral-900">{visitorName}</p>
+            ) : null}
+          </div>
         </div>
 
-        <div className="flex flex-col items-center space-y-2">
-          <h1 className="travel-diary-cover-title-box grid place-content-center rounded-[7px] border border-black font-sans text-2xl font-bold leading-tight text-neutral-900">
-            {t("diary.cover_title_line1")}
-            <br />
-            {t("diary.cover_title_line2")}
-          </h1>
-          <p className="font-serif text-lg font-semibold text-[#E63946]">{cover.visitDateLabel || "—"}</p>
-          {visitorName ? (
-            <p className="font-serif text-2xl font-bold italic text-neutral-900">{visitorName}</p>
-          ) : null}
-        </div>
+        <CoverSponsorLogos logos={cover.sponsorLogoUrls} />
       </div>
-
-      <CoverSponsorLogos logos={cover.sponsorLogoUrls} />
       <DiaryPageFooter />
     </div>
   );
@@ -340,7 +418,7 @@ function buildDiarySlideDescriptors(diary: TravelDiaryPackage): DiarySlideDescri
 
 function SectionDividerPage({ title }: { title: string }) {
   return (
-    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-6">
+    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-6 py-4">
       <div className="flex min-h-0 flex-1 items-center justify-center bg-white">
         <h2 className="text-center font-serif text-2xl font-bold text-neutral-900">{title}</h2>
       </div>
@@ -361,7 +439,7 @@ function ArtistPage({
   const pageView = buildArtistPageViews(page)[partIndex] ?? buildArtistPageViews(page)[0];
 
   return (
-    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-3">
+    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-4">
       <div className="flex min-h-0 flex-1 flex-col items-center overflow-hidden">
         {pageView.showPortrait ? (
           <>
@@ -418,7 +496,7 @@ function ArtworkPage({
   const view = buildArtworkPageViews(page)[0];
 
   return (
-    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-3">
+    <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-4">
       {view.showImage ? (
         page.artworkImageUrl ? (
           <div className="travel-diary-artwork-frame relative mt-2 w-full overflow-hidden rounded-lg border border-neutral-200/80 shadow-sm">
@@ -482,53 +560,54 @@ function ArtworkPage({
             )}
           </div>
         </div>
-      </div>
 
-      {view.showEmotion ? (
-        <div className="mt-1.5 shrink-0 border-t border-[#E63946]/15 pt-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <p className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-neutral-500">
-                {t("diary.felt_emotion")}
-              </p>
-              <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-neutral-900">
-                <span aria-hidden>{page.emotionEmoji}</span>
-                {page.emotionLabel}
-              </p>
-            </div>
-            {page.heartRating > 0 ? (
-              <div className="flex shrink-0 items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Heart
-                    key={i}
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      i < page.heartRating ? "fill-[#E63946] text-[#E63946]" : "text-neutral-300",
-                    )}
-                  />
-                ))}
+        {view.showEmotion ? (
+          <div className="mt-1.5 shrink-0 border-t border-[#E63946]/15 pt-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-neutral-500">
+                  {t("diary.felt_emotion")}
+                </p>
+                <p className="flex min-w-0 items-center gap-1 text-sm font-semibold text-neutral-900">
+                  <span aria-hidden>{page.emotionEmoji}</span>
+                  {page.emotionLabel}
+                </p>
               </div>
+              {page.heartRating > 0 ? (
+                <div className="flex shrink-0 items-center gap-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Heart
+                      key={i}
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        i < page.heartRating ? "fill-[#E63946] text-[#E63946]" : "text-neutral-300",
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {page.communityInsight ? (
+              page.communityInsight.isFirstVisitor ? (
+                <p className="mt-1 text-left text-[10px] italic leading-snug text-neutral-500">
+                  {t("diary.community_first", { emotion: page.communityInsight.emotionLabel })}
+                </p>
+              ) : page.communityInsight.sameEmotionPercentage > 0 ? (
+                <p className="mt-1 text-left text-[10px] font-semibold italic text-neutral-500">
+                  {t("diary.community_percentage_inline", {
+                    percent: page.communityInsight.sameEmotionPercentage,
+                  })}
+                </p>
+              ) : (
+                <p className="mt-1 text-left text-[10px] italic leading-snug text-neutral-500">
+                  {t("diary.community_no_same_emotion")}
+                </p>
+              )
             ) : null}
           </div>
-          {page.communityInsight ? (
-            page.communityInsight.isFirstVisitor ? (
-              <p className="mt-1 text-left text-[10px] italic leading-snug text-neutral-500">
-                {t("diary.community_first", { emotion: page.communityInsight.emotionLabel })}
-              </p>
-            ) : page.communityInsight.sameEmotionPercentage > 0 ? (
-              <p className="mt-1 text-left text-[10px] font-semibold italic text-neutral-500">
-                {t("diary.community_percentage_inline", {
-                  percent: page.communityInsight.sameEmotionPercentage,
-                })}
-              </p>
-            ) : (
-              <p className="mt-1 text-left text-[10px] italic leading-snug text-neutral-500">
-                {t("diary.community_no_same_emotion")}
-              </p>
-            )
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
+
       <DiaryPageFooter />
     </div>
   );
@@ -538,6 +617,9 @@ export function TravelDiaryNotebook({
   diary,
   className = "",
   secondaryAction,
+  visitorId = null,
+  expoId = null,
+  shareToken = null,
   showToolbar = true,
   syncUrl = true,
 }: Props) {
@@ -545,6 +627,7 @@ export function TravelDiaryNotebook({
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeIndex, setActiveIndex] = useState(0);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [sharingLink, setSharingLink] = useState(false);
   const flipBookRef = useRef<FlipBookHandle | null>(null);
   const bookHostRef = useRef<HTMLDivElement | null>(null);
   const [bookDims, setBookDims] = useState({ width: FLIPBOOK_WIDTH, height: FLIPBOOK_HEIGHT });
@@ -581,30 +664,74 @@ export function TravelDiaryNotebook({
     (pageIndex: number) => {
       if (!syncUrl) return;
       const next = new URLSearchParams(searchParams);
+      if (shareToken?.trim()) {
+        next.set("share", shareToken.trim());
+        next.delete("expo_id");
+        next.delete("visitor_id");
+        next.delete("admin");
+      }
       next.set("page", String(pageIndex + 1));
       setSearchParams(next, { replace: true });
     },
-    [searchParams, setSearchParams, syncUrl],
+    [searchParams, setSearchParams, syncUrl, shareToken],
   );
 
+  const applyPageFlipPortraitBackPatch = useCallback((pageFlip?: PageFlipInstance) => {
+    const instance = pageFlip ?? flipBookRef.current?.pageFlip();
+    if (!instance) return;
+    ensureStPageFlipPortraitBackPatch(instance);
+  }, []);
+
   const handleFlip = useCallback(
-    (event: { data: number }) => {
-      setActiveIndex(event.data);
-      syncPageInUrl(event.data);
+    (event: { data: unknown }) => {
+      const pageIndex = resolveFlipBookPageIndex(event.data);
+      setActiveIndex(pageIndex);
+      syncPageInUrl(pageIndex);
     },
     [syncPageInUrl],
   );
 
   const handleCopyShareUrl = useCallback(async () => {
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("page", String(activeIndex + 1));
-      await navigator.clipboard.writeText(url.toString());
-      toast.success(t("diary.toolbar_share_copied"));
-    } catch {
+    const ownerVisitorId = visitorId?.trim();
+    if (!ownerVisitorId) {
       toast.error(t("diary.toolbar_share_failed"));
+      return;
     }
-  }, [activeIndex, t]);
+
+    setSharingLink(true);
+    try {
+      const link = shareToken?.trim()
+        ? { token: shareToken.trim(), expiresAt: "" }
+        : await createTravelDiaryShareLink(ownerVisitorId, expoId);
+      if (!link?.token) {
+        toast.error(t("diary.toolbar_share_failed"));
+        return;
+      }
+
+      const shareUrl = buildTravelDiaryShareUrl(link.token, activeIndex);
+      const shareTitle = diary.cover.expoName?.trim() || t("diary.share_default_title");
+      const shareNotice = t("diary.toolbar_share_public_notice");
+      const shareText = `${t("diary.share_text")} — ${shareNotice}`;
+
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+          toast.success(shareNotice);
+          return;
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+        }
+      }
+
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success(t("diary.toolbar_share_copied"));
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+      toast.error(t("diary.toolbar_share_failed"));
+    } finally {
+      setSharingLink(false);
+    }
+  }, [activeIndex, diary.cover.expoName, expoId, shareToken, t, visitorId]);
 
   const handleDownloadPdf = useCallback(async () => {
     const host = bookHostRef.current;
@@ -616,34 +743,22 @@ export function TravelDiaryNotebook({
     const visiblePage = sourcePages.find((page) => page.getBoundingClientRect().height > 0) ?? sourcePages[0];
     const { width: pageWidth, height: pageHeight } = visiblePage.getBoundingClientRect();
 
-    const exportRoot = document.createElement("div");
-    exportRoot.setAttribute("aria-hidden", "true");
-    exportRoot.style.position = "fixed";
-    exportRoot.style.left = "-10000px";
-    exportRoot.style.top = "0";
-    exportRoot.style.width = `${Math.max(1, Math.round(pageWidth))}px`;
-    exportRoot.style.pointerEvents = "none";
-    document.body.appendChild(exportRoot);
-
-    const exportPages = sourcePages.map((page) => {
-      const clone = page.cloneNode(true) as HTMLElement;
-      clone.style.height = `${Math.max(1, Math.round(pageHeight))}px`;
-      exportRoot.appendChild(clone);
-      return clone;
-    });
-
     setExportingPdf(true);
+    let exportRoot: HTMLDivElement | null = null;
     try {
+      const prepared = await prepareTravelDiaryExportPages(sourcePages, pageWidth, pageHeight);
+      exportRoot = prepared.exportRoot;
+
       const visitorLabel = [diary.cover.visitorFirstName, diary.cover.visitorLastName]
         .filter(Boolean)
         .join(" ")
         .trim();
-      await exportTravelDiaryPdf(exportPages, travelDiaryPdfFilename(visitorLabel));
+      await exportTravelDiaryPdf(prepared.exportPages, travelDiaryPdfFilename(visitorLabel));
       toast.success(t("diary.toolbar_pdf_ready"));
     } catch {
       toast.error(t("diary.toolbar_pdf_failed"));
     } finally {
-      exportRoot.remove();
+      exportRoot?.remove();
       setExportingPdf(false);
     }
   }, [diary.cover.visitorFirstName, diary.cover.visitorLastName, exportingPdf, t]);
@@ -681,28 +796,46 @@ export function TravelDiaryNotebook({
     }
   };
 
+  const flipDiaryNext = useCallback(() => {
+    const pageFlip = flipBookRef.current?.pageFlip();
+    if (!pageFlip) return;
+    if (pageFlip.getCurrentPageIndex() >= slideCount - 1) return;
+    flipDiaryPageForward(pageFlip);
+  }, [slideCount]);
+
+  const flipDiaryPrev = useCallback(() => {
+    const pageFlip = flipBookRef.current?.pageFlip();
+    if (!pageFlip) return;
+    if (pageFlip.getCurrentPageIndex() <= 0) return;
+    ensureStPageFlipPortraitBackPatch(pageFlip);
+    flipDiaryPageBack(pageFlip);
+  }, []);
+
   const diaryNav = useMemo<DiaryNavContextValue>(
     () => ({
       activeIndex,
       slideCount,
-      onPrev: () => flipBookRef.current?.pageFlip().flipPrev(),
-      onNext: () => flipBookRef.current?.pageFlip().flipNext(),
+      onPrev: flipDiaryPrev,
+      onNext: flipDiaryNext,
     }),
-    [activeIndex, slideCount],
+    [activeIndex, flipDiaryNext, flipDiaryPrev, slideCount],
   );
 
   return (
     <DiaryNavContext.Provider value={diaryNav}>
     <div
       className={cn(
-        "travel-diary-root flex flex-col gap-4",
+        "travel-diary-root flex flex-col gap-2 sm:gap-4",
         showToolbar && "travel-diary-root--with-toolbar",
         className,
       )}
     >
       <div className="travel-diary-notebook relative mx-auto w-full max-w-[416px]">
         <div className="travel-diary-spiral" aria-hidden />
-        <div ref={bookHostRef} className="travel-diary-page travel-diary-flipbook-host overflow-hidden rounded-r-2xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
+        <div
+          ref={bookHostRef}
+          className="travel-diary-page travel-diary-flipbook-host overflow-hidden rounded-r-2xl shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+        >
           <HTMLFlipBook
             ref={flipBookRef}
             className="travel-diary-flipbook"
@@ -714,14 +847,21 @@ export function TravelDiaryNotebook({
             minHeight={bookDims.height}
             maxHeight={bookDims.height}
             showCover
+            usePortrait
             mobileScrollSupport
             drawShadow
-            useMouseEvents
+            useMouseEvents={false}
+            showPageCorners={false}
             flippingTime={700}
             startPage={startPage}
             onFlip={handleFlip}
             onInit={(event) => {
-              setActiveIndex(event.data);
+              applyPageFlipPortraitBackPatch(event.object as PageFlipInstance);
+              setActiveIndex(resolveFlipBookPageIndex(event.data));
+            }}
+            onUpdate={(event) => {
+              applyPageFlipPortraitBackPatch(event.object as PageFlipInstance);
+              setActiveIndex(resolveFlipBookPageIndex(event.data));
             }}
           >
             {slideDescriptors.map((slide, index) => (
@@ -730,6 +870,25 @@ export function TravelDiaryNotebook({
               </div>
             ))}
           </HTMLFlipBook>
+
+          {slideCount > 1 ? (
+            <div className="travel-diary-flip-edge-zones">
+              <button
+                type="button"
+                className="travel-diary-flip-edge-zone travel-diary-flip-edge-zone--prev"
+                aria-label={t("diary.prev_page")}
+                disabled={activeIndex <= 0}
+                onClick={flipDiaryPrev}
+              />
+              <button
+                type="button"
+                className="travel-diary-flip-edge-zone travel-diary-flip-edge-zone--next"
+                aria-label={t("diary.next_page")}
+                disabled={activeIndex >= slideCount - 1}
+                onClick={flipDiaryNext}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -740,8 +899,13 @@ export function TravelDiaryNotebook({
           variant="outline"
           className="h-auto min-h-10 min-w-0 flex-1 flex-col gap-0.5 px-1 py-1.5 whitespace-normal border-white/20 bg-transparent text-[#F0F0F0] hover:bg-white/10"
           onClick={() => void handleCopyShareUrl()}
+          disabled={sharingLink}
         >
-          <Share2 className="h-4 w-4 shrink-0" />
+          {sharingLink ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          ) : (
+            <Share2 className="h-4 w-4 shrink-0" />
+          )}
           <span className="w-full text-center text-[10px] leading-[1.2] line-clamp-2 sm:text-xs">
             {t("diary.toolbar_share")}
           </span>

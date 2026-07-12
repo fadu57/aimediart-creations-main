@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, Search } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
@@ -56,6 +56,10 @@ import {
   roleIdsNeedOrganisation,
 } from "@/lib/userRoleAssignment";
 import { formatUserLastSignIn } from "@/lib/userLastSignIn";
+
+/** Boutons barre d'outils /utilisateurs : même largeur et hauteur. */
+const USERS_TOOLBAR_BTN_GOLD =
+  "h-10 min-w-[162px] justify-center gap-2 px-4 gradient-gold gradient-gold-hover-bg text-primary-foreground";
 
 // ---------------------------------------------------------------------------
 // Nouveau modèle :
@@ -2274,19 +2278,24 @@ const Users = ({
   return (
     <div className="container py-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-3 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full shrink-0 flex-wrap items-center gap-4 md:max-w-[min(100%,680px)]">
-          <div>
+        <div className="flex w-full shrink-0 flex-col gap-3 md:max-w-[min(100%,680px)] md:flex-row md:flex-wrap md:items-center md:gap-4">
+          <div className="flex w-full flex-row items-center justify-between gap-3 md:w-auto md:flex-none md:justify-start">
             <h2 className="text-3xl font-serif font-bold text-white">{t("list.title")}</h2>
+            <BackofficeStickyAgencyLogoSlot className="md:hidden shrink-0 px-0 sm:min-h-0" align="start" />
           </div>
-        <div className="relative w-[210px] min-w-[210px] max-w-[210px]">
-          <Input
+        <div className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5">
+          <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+          {!searchTerm.trim() ? (
+            <span className="shrink-0 text-sm font-medium text-neutral-900">{t("list.search_label")}</span>
+          ) : null}
+          <input
             type="text"
             autoComplete="off"
             list="users-search-suggestions"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={t("list.search_placeholder")}
-            className="h-9 !w-[210px] min-w-[210px] max-w-[210px] bg-white pr-9"
+            aria-label={t("list.search_placeholder")}
+            className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent pr-6"
           />
           {searchTerm.trim().length > 0 && (
             <button
@@ -2306,17 +2315,17 @@ const Users = ({
           </datalist>
         </div>
         </div>
-        <BackofficeStickyAgencyLogoSlot />
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <BackofficeStickyAgencyLogoSlot className="hidden md:flex" />
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-center gap-2 text-center md:w-auto">
           <Button
             type="button"
-            className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+            className={USERS_TOOLBAR_BTN_GOLD}
             onClick={openCreate}
           >
             {t("list.new_user")}
           </Button>
-          <Button asChild type="button" variant="outline" className="backoffice-toolbar-outline-btn">
-            <Link to="/user/utilisateurs" className="text-center leading-tight">{t("list.table")}</Link>
+          <Button asChild type="button" className={USERS_TOOLBAR_BTN_GOLD}>
+            <Link to="/user/utilisateurs">{t("list.table")}</Link>
           </Button>
         </div>
       </div>
@@ -2336,7 +2345,7 @@ const Users = ({
         {filteredUsers.map((u) => (
           <Card key={u.id} className="glass-card hover:shadow-lg transition-all duration-300">
             <CardContent
-              className="p-4 flex flex-col sm:flex-row items-start gap-4 cursor-pointer hover:bg-muted/10"
+              className="p-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 sm:flex sm:flex-row sm:items-start sm:gap-4 cursor-pointer hover:bg-muted/10"
               role="button"
               tabIndex={0}
               onClick={() => openEdit(u)}
@@ -2348,23 +2357,7 @@ const Users = ({
               }}
             >
               <UserListAvatar userId={u.id} seedAvatarUrl={u.avatar_url} authUser={authUser} />
-              <div className="min-w-0 flex-1 space-y-1">
-                <h3 className="font-serif font-bold text-lg">{userFullName(u)}</h3>
-                {u.username?.trim() ? (
-                  <p
-                    className="font-sans text-[12px] font-bold italic text-[#000091]"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                  >
-                    {t("list.alias", { name: u.username.trim() })}
-                  </p>
-                ) : null}
-                <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
-                <p className="text-xs text-muted-foreground">
-                  {t("list.last_sign_in")}&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
-                </p>
-                {u.phone?.trim() ? <p className="text-sm">{u.phone.trim()}</p> : null}
-              </div>
-              <div className="ml-auto flex w-24 shrink-0 flex-col gap-1">
+              <div className="flex shrink-0 flex-row gap-1 sm:w-24 sm:flex-col sm:order-3 sm:ml-auto">
                 <div className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-muted/20">
                   {u.agency_id && agencyLogoById.get(u.agency_id) ? (
                     <img
@@ -2395,6 +2388,22 @@ const Users = ({
                     <div className="h-full w-full" />
                   )}
                 </div>
+              </div>
+              <div className="col-span-2 min-w-0 space-y-1 sm:col-span-1 sm:flex-1 sm:order-2">
+                <h3 className="font-serif font-bold text-lg">{userFullName(u)}</h3>
+                {u.username?.trim() ? (
+                  <p
+                    className="font-sans text-[12px] font-bold italic text-[#000091]"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    {t("list.alias", { name: u.username.trim() })}
+                  </p>
+                ) : null}
+                <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("list.last_sign_in")}&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
+                </p>
+                {u.phone?.trim() ? <p className="text-sm">{u.phone.trim()}</p> : null}
               </div>
             </CardContent>
           </Card>

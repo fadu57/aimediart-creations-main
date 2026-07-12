@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { ArrowLeft, ChevronLeft, ChevronRight, Coins, Loader2, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Coins, Download, Loader2, RefreshCw } from "lucide-react";
 
 import { AILimitsMonitor } from "@/components/admin/AILimitsMonitor";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -15,32 +15,91 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import {
   breakdownByModel,
   breakdownByProvider,
+  costFiltersToTokenEntity,
+  EMPTY_TOKEN_ENTITY_FILTERS,
   fetchTokenUsageDateBounds,
   fetchTokenUsageLogs,
   fetchTtsUsageEvents,
+  filterTokenRowsByEntity,
   filterTokenRowsByProvider,
   filterTokenRowsToAnchorDay,
   formatTokenCount,
+  getTokenArtworkContextByIds,
+  getTokenRowToolType,
   listDistinctProviders,
   formatTokenUsageDate,
   formatTokenChartDayLabel,
   formatUsageTableCell,
+  exportTokenUsageCsv,
   getTokenChartRange,
   getTokenFetchRange,
   getTokenPeriodRange,
   jobTypeLabel,
   mergeUsageRows,
+  nextTokenTableSort,
+  sortTokenUsageRows,
   summarizeTokenUsage,
   summarizeTtsUsageRecap,
+  tokenEntityFiltersToCostFilters,
   tokenTimeSeries,
   usageProviderLabel,
+  DEFAULT_TOKEN_TABLE_SORT,
+  type TokenArtworkContext,
+  type TokenEntityFilters,
   type TokenPeriod,
+  type TokenTableSort,
+  type TokenTableSortColumn,
 } from "@/lib/aiTokenUsage";
+import {
+  EMPTY_COST_LINKED_FILTER_OPTIONS,
+  getCostLinkedFilterOptions,
+  sanitizeCostFilters,
+  type CostLinkedFilterOptions,
+} from "@/lib/costs";
+import { BACKOFFICE_FORM_CONTROL_CLASS, costToolTypeLabel } from "@/lib/costLabels";
+import { WAKA_PERIODS } from "@/lib/wakatimePeriod";
 import { formatCost } from "@/lib/costs";
 import { cn } from "@/lib/utils";
 
-const PERIODS: TokenPeriod[] = ["day", "week", "month"];
+const PERIODS: TokenPeriod[] = WAKA_PERIODS;
 const ALL_PROVIDERS = "all";
+const filterSelectClass = cn(BACKOFFICE_FORM_CONTROL_CLASS, "h-9 w-full min-w-0 text-xs");
+
+type SortableThProps = {
+  label: string;
+  column: TokenTableSortColumn;
+  sort: TokenTableSort;
+  onSort: (column: TokenTableSortColumn) => void;
+  align?: "left" | "right";
+};
+
+function SortableTh({ label, column, sort, onSort, align = "left" }: SortableThProps) {
+  const active = sort.column === column;
+  const SortIcon = active ? (sort.ascending ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <th
+      className={cn(
+        "py-2 pr-3 font-medium",
+        align === "right" && "text-right",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={cn(
+          "inline-flex items-center gap-0.5 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          align === "right" ? "w-full justify-end" : "text-left",
+          active && "text-foreground",
+        )}
+        aria-sort={active ? (sort.ascending ? "ascending" : "descending") : "none"}
+      >
+        {label}
+        <SortIcon className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+      </button>
+    </th>
+  );
+}
 
 function dateLocale(lang: string): string {
   const code = (lang ?? "fr").slice(0, 2);
@@ -71,6 +130,13 @@ export default function SettingsSuiviTokens() {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchTokenUsageLogs>>["data"]>([]);
   const [dataEarliest, setDataEarliest] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState(ALL_PROVIDERS);
+  const [entityFilters, setEntityFilters] = useState<TokenEntityFilters>(EMPTY_TOKEN_ENTITY_FILTERS);
+  const [linkedFilterOptions, setLinkedFilterOptions] = useState<CostLinkedFilterOptions>(
+    EMPTY_COST_LINKED_FILTER_OPTIONS,
+  );
+  const [artworkCtx, setArtworkCtx] = useState<Record<string, TokenArtworkContext>>({});
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [tableSort, setTableSort] = useState<TokenTableSort>(DEFAULT_TOKEN_TABLE_SORT);
   const limitsRefetchRef = useRef<(() => void) | null>(null);
   const loadSeqRef = useRef(0);
 
@@ -135,6 +201,42 @@ export default function SettingsSuiviTokens() {
     });
   }, [canAccess]);
 
+  useEffect(() => {
+    if (!canAccess) return;
+    let cancelled = false;
+    void getCostLinkedFilterOptions(tokenEntityFiltersToCostFilters(entityFilters)).then((linked) => {
+      if (cancelled) return;
+      setLinkedFilterOptions(linked);
+      setEntityFilters((prev) => {
+        const sanitized = costFiltersToTokenEntity(
+          sanitizeCostFilters(tokenEntityFiltersToCostFilters(prev), linked),
+        );
+        const changed = (Object.keys(sanitized) as (keyof TokenEntityFilters)[]).some(
+          (k) => sanitized[k] !== prev[k],
+        );
+        return changed ? sanitized : prev;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [canAccess, entityFilters]);
+
+  useEffect(() => {
+    const ids = [...new Set(rows.map((r) => r.artwork_id?.trim()).filter((id): id is string => Boolean(id)))];
+    if (ids.length === 0) {
+      setArtworkCtx({});
+      return;
+    }
+    let cancelled = false;
+    void getTokenArtworkContextByIds(ids).then((ctx) => {
+      if (!cancelled) setArtworkCtx(ctx);
+    });
+    return () => { cancelled = true; };
+  }, [rows]);
+
+  const setEntityFilter = (key: keyof TokenEntityFilters, value: string) => {
+    setEntityFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
   const availableProviders = useMemo(() => listDistinctProviders(rows), [rows]);
 
   useEffect(() => {
@@ -151,9 +253,14 @@ export default function SettingsSuiviTokens() {
     [rows, providerFilter],
   );
 
+  const entityFilteredRows = useMemo(
+    () => filterTokenRowsByEntity(filteredRows, entityFilters, artworkCtx),
+    [filteredRows, entityFilters, artworkCtx],
+  );
+
   const periodRows = useMemo(
-    () => (period === "day" ? filterTokenRowsToAnchorDay(filteredRows, range.dateTo) : filteredRows),
-    [filteredRows, period, range.dateTo],
+    () => (period === "day" ? filterTokenRowsToAnchorDay(entityFilteredRows, range.dateTo) : entityFilteredRows),
+    [entityFilteredRows, period, range.dateTo],
   );
 
   const summary = useMemo(() => summarizeTokenUsage(periodRows), [periodRows]);
@@ -161,13 +268,13 @@ export default function SettingsSuiviTokens() {
   const byModel = useMemo(() => breakdownByModel(periodRows), [periodRows]);
   const ttsRecap = useMemo(() => summarizeTtsUsageRecap(periodRows), [periodRows]);
   const series = useMemo(
-    () => tokenTimeSeries(filteredRows, chartRange).map((p) => ({
+    () => tokenTimeSeries(entityFilteredRows, chartRange).map((p) => ({
       date: formatTokenChartDayLabel(p.date),
       total: p.totalTokens,
       prompt: p.promptTokens,
       completion: p.completionTokens,
     })),
-    [filteredRows, chartRange],
+    [entityFilteredRows, chartRange],
   );
 
   const xAxisInterval = series.length > 14 ? Math.max(0, Math.ceil(series.length / 8) - 1) : 0;
@@ -189,7 +296,26 @@ export default function SettingsSuiviTokens() {
     [byModel],
   );
 
-  const recentRows = useMemo(() => periodRows.slice(0, 25), [periodRows]);
+  const sortedPeriodRows = useMemo(
+    () => sortTokenUsageRows(periodRows, tableSort, artworkCtx),
+    [periodRows, tableSort, artworkCtx],
+  );
+
+  const recentRows = useMemo(() => sortedPeriodRows.slice(0, 25), [sortedPeriodRows]);
+
+  const handleTableSort = useCallback((column: TokenTableSortColumn) => {
+    setTableSort((prev) => nextTokenTableSort(column, prev));
+  }, []);
+
+  const handleExportCsv = useCallback(() => {
+    if (sortedPeriodRows.length === 0) return;
+    setExportingCsv(true);
+    try {
+      exportTokenUsageCsv(sortedPeriodRows, artworkCtx);
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [sortedPeriodRows, artworkCtx]);
 
   if (authLoading) {
     return (
@@ -488,19 +614,126 @@ export default function SettingsSuiviTokens() {
               <CardTitle className="text-sm font-medium">{t("tokens.table_title")}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
+              <div className="mb-3 flex flex-col gap-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {t("couts.filter_artwork")}
+                    </label>
+                    <select
+                      value={entityFilters.artworkId ?? ""}
+                      onChange={(e) => setEntityFilter("artworkId", e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="">{t("couts.filter_all")}</option>
+                      {linkedFilterOptions.artworks.map((item) => (
+                        <option key={item.id} value={item.id}>{item.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {t("couts.filter_expo")}
+                    </label>
+                    <select
+                      value={entityFilters.expoId ?? ""}
+                      onChange={(e) => setEntityFilter("expoId", e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="">{t("couts.filter_all")}</option>
+                      {linkedFilterOptions.expos.map((item) => (
+                        <option key={item.id} value={item.id}>{item.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {t("couts.filter_agency")}
+                    </label>
+                    <select
+                      value={entityFilters.agencyId ?? ""}
+                      onChange={(e) => setEntityFilter("agencyId", e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="">{t("couts.filter_all")}</option>
+                      {linkedFilterOptions.agencies.map((item) => (
+                        <option key={item.id} value={item.id}>{item.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {t("couts.filter_tool_type")}
+                    </label>
+                    <select
+                      value={entityFilters.toolType ?? ""}
+                      onChange={(e) => setEntityFilter("toolType", e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="">{t("couts.filter_all")}</option>
+                      {linkedFilterOptions.selectOptions.toolTypes.map((v) => (
+                        <option key={v} value={v}>{costToolTypeLabel(v, t)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {t("couts.filter_mediation_lang_count")}
+                    </label>
+                    <select
+                      value={entityFilters.mediationLangCount ?? ""}
+                      onChange={(e) => setEntityFilter("mediationLangCount", e.target.value)}
+                      className={filterSelectClass}
+                    >
+                      <option value="">{t("couts.filter_all")}</option>
+                      {linkedFilterOptions.mediationLangCounts.map((n) => (
+                        <option key={n} value={String(n)}>
+                          {t("couts.filter_mediation_lang_count_option", { count: n })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {periodRows.length.toLocaleString("fr-FR")} {t("tokens.table_rows_count")}
+                    {periodRows.length > recentRows.length && (
+                      <span className="text-muted-foreground/80">
+                        {" "}({t("tokens.table_preview_limit", { count: recentRows.length })})
+                      </span>
+                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 shrink-0"
+                    disabled={exportingCsv || periodRows.length === 0}
+                    onClick={handleExportCsv}
+                  >
+                    {exportingCsv
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      : <Download className="h-3.5 w-3.5" aria-hidden />}
+                    {t("tokens.btn_export_csv")}
+                  </Button>
+                </div>
+              </div>
+
               {recentRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">{t("tokens.empty")}</p>
               ) : (
-                <table className="w-full min-w-[640px] text-xs">
+                <table className="w-full min-w-[1100px] text-xs">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
-                      <th className="py-2 pr-3 font-medium">{t("tokens.col_date")}</th>
-                      <th className="py-2 pr-3 font-medium">{t("tokens.col_provider")}</th>
-                      <th className="py-2 pr-3 font-medium">{t("tokens.col_model")}</th>
-                      <th className="py-2 pr-3 font-medium">{t("tokens.col_operation")}</th>
-                      <th className="py-2 pr-3 font-medium text-right">{t("tokens.col_prompt")}</th>
-                      <th className="py-2 pr-3 font-medium text-right">{t("tokens.col_completion")}</th>
-                      <th className="py-2 font-medium text-right">{t("tokens.col_total")}</th>
+                      <SortableTh column="created_at" label={t("tokens.col_date")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="provider" label={t("tokens.col_provider")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="model_id" label={t("tokens.col_model")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="operation" label={t("tokens.col_operation")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="artwork_title" label={t("tokens.col_artwork")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="tool_type" label={t("tokens.col_tool_type")} sort={tableSort} onSort={handleTableSort} />
+                      <SortableTh column="prompt_tokens" label={t("tokens.col_tokens_in")} sort={tableSort} onSort={handleTableSort} align="right" />
+                      <SortableTh column="completion_tokens" label={t("tokens.col_tokens_out")} sort={tableSort} onSort={handleTableSort} align="right" />
+                      <SortableTh column="total_tokens" label={t("tokens.col_tokens_total")} sort={tableSort} onSort={handleTableSort} align="right" />
                     </tr>
                   </thead>
                   <tbody>
@@ -510,14 +743,19 @@ export default function SettingsSuiviTokens() {
                       const total = Number(r.total_tokens ?? 0) > 0
                         ? Number(r.total_tokens)
                         : prompt + completion;
+                      const artworkId = r.artwork_id?.trim() ?? "";
+                      const artworkTitle = artworkId ? (artworkCtx[artworkId]?.title ?? "—") : "—";
+                      const toolType = getTokenRowToolType(r);
                       return (
                         <tr key={r.id} className="border-b border-border/40">
                           <td className="py-2 pr-3 whitespace-nowrap tabular-nums">
                             {new Date(r.created_at).toLocaleString("fr-FR")}
                           </td>
                           <td className="py-2 pr-3">{usageProviderLabel(r.provider)}</td>
-                          <td className="py-2 pr-3 max-w-[180px] truncate" title={r.model_id}>{r.model_id}</td>
+                          <td className="py-2 pr-3 max-w-[140px] truncate" title={r.model_id}>{r.model_id}</td>
                           <td className="py-2 pr-3">{jobTypeLabel(r.metadata)}</td>
+                          <td className="py-2 pr-3 max-w-[160px] truncate" title={artworkTitle}>{artworkTitle}</td>
+                          <td className="py-2 pr-3">{toolType ? costToolTypeLabel(toolType, t) : "—"}</td>
                           <td className="py-2 pr-3 text-right tabular-nums">
                             {formatUsageTableCell(r.provider, "prompt", prompt, r)}
                           </td>

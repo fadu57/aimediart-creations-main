@@ -481,7 +481,7 @@ const Dashboard = () => {
   return (
     <div className="container min-w-0 max-w-full py-6 space-y-6 sm:py-8 sm:space-y-8">
       {/* En-tête */}
-      <div className="flex flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-center">
+      <div className="flex flex-row items-start justify-between gap-3 bg-[#121212]/95 pt-10 pb-2 backdrop-blur-sm md:items-center">
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h2 className="text-2xl font-serif font-bold text-white sm:text-3xl">
@@ -507,7 +507,7 @@ const Dashboard = () => {
             </div>
           ) : null}
         </div>
-        <BackofficeStickyAgencyLogoSlot className="flex-none lg:flex-1" />
+        <BackofficeStickyAgencyLogoSlot className="flex-none md:flex-1" />
       </div>
 
       {error && (
@@ -532,7 +532,7 @@ const Dashboard = () => {
           <div className="grid min-w-0 gap-6 lg:grid-cols-2">
             {/* Profil */}
             <Card className="glass-card min-w-0 overflow-hidden">
-              <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
+              <CardHeader className="px-4 pt-10 pb-1 sm:p-6 sm:pb-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <UserRound className="h-5 w-5 text-gold" />

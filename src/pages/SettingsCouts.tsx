@@ -26,10 +26,15 @@ import {
   getCostEvents, getCostSummary, getCostBreakdownByProvider,
   getCostTimeSeries, getCostLinkedFilterOptions, getAllFilteredCostEvents,
   getCostEventsTotals, exportCostsCsv, formatCost, formatUsdToEurHint,
-  getCostArtworkDisplayMetaByIds, getCostEventArtworkId,
+  getCostEventArtworkId, getCostEntityDisplayMetaForEvents,
+  getCostEventDisplayKey, getCostEventBioRowId, isCostBioEvent,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
   hasActiveCostFilters, fillKnownCostProvidersBreakdown,
   effectiveCostEstimatedUsd,
+  costEventTotalUnits,
+  costEventInputUnitKind,
+  costEventOutputUnitKind,
+  type CostUnitKind,
   sanitizeCostFilters, EMPTY_COST_LINKED_FILTER_OPTIONS,
   type CostEvent, type CostFilters, type CostSummary, type CostEventsTotals,
   type CostBreakdownItem, type CostTimeSeriesPoint, type CostSelectOptions,
@@ -363,20 +368,6 @@ function CostAmountCell({
           {eurHint}
         </span>
       ) : null}
-    </span>
-  );
-}
-
-function statusBadge(status: string, label: string) {
-  const classes: Record<string, string> = {
-    success: "bg-green-100 text-green-800",
-    error:   "bg-red-100 text-red-700",
-    partial: "bg-yellow-100 text-yellow-800",
-    timeout: "bg-orange-100 text-orange-700",
-  };
-  return (
-    <span className={`inline-flex items-center rounded px-1 py-0 text-[10px] font-medium leading-tight ${classes[status] ?? "bg-muted text-muted-foreground"}`}>
-      {label}
     </span>
   );
 }
@@ -1152,11 +1143,12 @@ const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[
 
 const COST_TABLE_STATIC_COLUMNS = [
   "couts.col_artwork",
+  "couts.col_expo",
+  "couts.col_agency",
   "couts.col_mediation_langs",
   "couts.col_units_in",
   "couts.col_units_out",
-  "couts.col_unit_type",
-  "couts.col_status",
+  "couts.col_tokens_total",
   "couts.col_source",
 ] as const;
 
@@ -1197,6 +1189,37 @@ function SortableTh({ label, column, sort, onSort }: SortableThProps) {
         <SortIcon className={cn("h-3 w-3 shrink-0", active ? "text-primary" : "opacity-40")} aria-hidden />
       </button>
     </th>
+  );
+}
+
+function costUnitKindClass(kind: CostUnitKind): string {
+  if (kind === "audio") return "text-violet-400";
+  if (kind === "text") return "text-sky-400";
+  if (kind === "characters") return "text-amber-500";
+  return "text-muted-foreground";
+}
+
+function CostUnitsCell({
+  value,
+  kind,
+  t,
+}: {
+  value: number | null | undefined;
+  kind: CostUnitKind;
+  t: (key: string) => string;
+}) {
+  if (value == null) return <>—</>;
+  const label = kind !== "unknown" ? t(`couts.units_kind_${kind}`) : null;
+  const tooltip = kind !== "unknown" ? t(`couts.units_tooltip_${kind}`) : undefined;
+  return (
+    <span className="inline-flex items-baseline justify-end gap-0.5" title={tooltip}>
+      <span>{value.toLocaleString("fr-FR")}</span>
+      {label ? (
+        <span className={cn("text-[9px] font-semibold leading-none", costUnitKindClass(kind))}>
+          {label}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -1397,8 +1420,11 @@ function CostsTable({
         </div>
       ) : (
         <>
+      <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
+        {t("couts.units_legend")}
+      </p>
       <div className="max-h-[540px] overflow-x-auto overflow-y-auto rounded-xl border border-border/50">
-        <table className="w-full min-w-[980px] table-fixed text-[12px]">
+        <table className="w-full min-w-[1100px] table-fixed text-[12px]">
           <colgroup>
             <col className="w-[96px]" />
             <col className="w-[60px]" />
@@ -1406,12 +1432,13 @@ function CostsTable({
             <col className="w-[80px]" />
             <col className="w-[92px]" />
             <col className="w-[84px]" />
-            <col className="w-[120px]" />
+            <col className="w-[100px]" />
+            <col className="w-[90px]" />
+            <col className="w-[90px]" />
             <col className="w-[52px]" />
             <col className="w-[46px]" />
             <col className="w-[46px]" />
-            <col className="w-[44px]" />
-            <col className="w-[56px]" />
+            <col className="w-[52px]" />
             <col className="w-[92px]" />
           </colgroup>
           <thead>
@@ -1426,22 +1453,33 @@ function CostsTable({
                 />
               ))}
               {COST_TABLE_STATIC_COLUMNS.map((labelKey) => {
-                if (labelKey === "couts.col_status") {
+                if (labelKey === "couts.col_artwork") {
                   return (
                     <SortableTh
                       key={labelKey}
-                      column="status"
+                      column="artwork_title"
                       label={t(labelKey)}
                       sort={sort}
                       onSort={handleSort}
                     />
                   );
                 }
-                if (labelKey === "couts.col_artwork") {
+                if (labelKey === "couts.col_expo") {
                   return (
                     <SortableTh
                       key={labelKey}
-                      column="artwork_title"
+                      column="expo_title"
+                      label={t(labelKey)}
+                      sort={sort}
+                      onSort={handleSort}
+                    />
+                  );
+                }
+                if (labelKey === "couts.col_agency") {
+                  return (
+                    <SortableTh
+                      key={labelKey}
+                      column="agency_title"
                       label={t(labelKey)}
                       sort={sort}
                       onSort={handleSort}
@@ -1484,28 +1522,43 @@ function CostsTable({
                   />
                 )}
               </td>
-              <td colSpan={2} />
+              <td colSpan={4} />
               <td className="px-1.5 py-1.5 text-right font-mono text-[12px] font-semibold whitespace-nowrap">
                 {loadingTotals ? "…" : (totals?.totalInputUnits ?? 0).toLocaleString("fr-FR")}
               </td>
               <td className="px-1.5 py-1.5 text-right font-mono text-[12px] font-semibold whitespace-nowrap">
                 {loadingTotals ? "…" : (totals?.totalOutputUnits ?? 0).toLocaleString("fr-FR")}
               </td>
-              <td colSpan={3} />
+              <td className="px-1.5 py-1.5 text-right font-mono text-[12px] font-semibold whitespace-nowrap">
+                {loadingTotals
+                  ? "…"
+                  : ((totals?.totalInputUnits ?? 0) + (totals?.totalOutputUnits ?? 0)).toLocaleString("fr-FR")}
+              </td>
+              <td />
             </tr>
           </thead>
           <tbody>
             {events.map((e, i) => {
+              const displayKey = getCostEventDisplayKey(e);
+              const entityMeta = displayKey ? artworkMetaById[displayKey] : undefined;
               const artworkId = getCostEventArtworkId(e);
-              const artworkMeta = artworkId ? artworkMetaById[artworkId] : undefined;
-              const artworkTitle =
-                artworkMeta?.title ??
+              const bioRowId = getCostEventBioRowId(e);
+              const entityTitle =
+                entityMeta?.title ??
                 (artworkId ? artworks.find((a) => a.id === artworkId)?.label : null);
+              const entityPending = Boolean(displayKey && !entityMeta);
+              const entityLabel =
+                entityTitle ??
+                (entityPending ? "…" : (isCostBioEvent(e) && bioRowId ? "…" : "—"));
 
               return (
               <tr
                 key={e.id}
-                className={`border-b border-border/30 transition-colors hover:bg-muted/20 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
+                className={cn(
+                  "border-b border-border/30 transition-colors hover:bg-muted/20",
+                  i % 2 !== 0 && "bg-muted/10",
+                  e.status === "partial" && "italic",
+                )}
               >
                 <td className="px-2 py-1 text-[12px] text-muted-foreground font-mono truncate leading-tight" title={frDate(e.created_at)}>
                   {frDate(e.created_at)}
@@ -1534,21 +1587,54 @@ function CostsTable({
                 </td>
                 <td
                   className="px-2 py-1 text-[12px] truncate leading-tight"
-                  title={artworkTitle ?? artworkId ?? undefined}
+                  title={entityTitle ?? entityMeta?.linkedEntityId ?? artworkId ?? bioRowId ?? undefined}
                 >
-                  {artworkTitle ?? (artworkId ? artworkId.slice(0, 8) : "—")}
+                  {entityLabel}
+                </td>
+                <td
+                  className="px-2 py-1 text-[12px] truncate leading-tight"
+                  title={entityMeta?.expoName ?? undefined}
+                >
+                  {entityMeta?.expoName ?? (entityPending ? "…" : "—")}
+                </td>
+                <td
+                  className="px-2 py-1 text-[12px] truncate leading-tight"
+                  title={entityMeta?.agencyName ?? undefined}
+                >
+                  {entityMeta?.agencyName ?? (entityPending ? "…" : "—")}
                 </td>
                 <td className="px-2 py-1 text-center text-[12px] tabular-nums leading-tight">
-                  {artworkMeta ? artworkMeta.mediationLangCount : artworkId ? "…" : "—"}
+                  {entityMeta && entityMeta.mediationLangCount >= 0
+                    ? entityMeta.mediationLangCount
+                    : isCostBioEvent(e)
+                      ? "—"
+                      : entityPending
+                        ? "…"
+                        : "—"}
                 </td>
                 <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
-                  {e.input_units != null ? e.input_units.toLocaleString("fr-FR") : "—"}
+                  <CostUnitsCell value={e.input_units} kind={costEventInputUnitKind(e)} t={t} />
                 </td>
                 <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
-                  {e.output_units != null ? e.output_units.toLocaleString("fr-FR") : "—"}
+                  <CostUnitsCell value={e.output_units} kind={costEventOutputUnitKind(e)} t={t} />
                 </td>
-                <td className="px-2 py-1 text-[12px] text-muted-foreground truncate leading-tight">{e.unit_type ?? "—"}</td>
-                <td className="px-2 py-1 truncate leading-tight">{statusBadge(e.status, costEventStatusLabel(e.status, t))}</td>
+                <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
+                  {(() => {
+                    const total = costEventTotalUnits(e);
+                    if (total == null) return "—";
+                    const inKind = costEventInputUnitKind(e);
+                    const outKind = costEventOutputUnitKind(e);
+                    const tooltip =
+                      inKind !== "unknown" && outKind !== "unknown"
+                        ? `${t(`couts.units_tooltip_${inKind}`)} + ${t(`couts.units_tooltip_${outKind}`)}`
+                        : undefined;
+                    return (
+                      <span className="font-medium" title={tooltip}>
+                        {total.toLocaleString("fr-FR")}
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td className="px-2 py-1 text-[12px] text-muted-foreground leading-tight">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate" title={e.source ?? undefined}>{e.source ?? "—"}</span>
@@ -3156,12 +3242,11 @@ export default function SettingsCouts() {
 
   useEffect(() => {
     let cancelled = false;
-    const ids = events.map(getCostEventArtworkId).filter((id): id is string => Boolean(id));
-    if (ids.length === 0) {
+    if (events.length === 0) {
       setArtworkMetaById({});
       return;
     }
-    void getCostArtworkDisplayMetaByIds(ids).then((map) => {
+    void getCostEntityDisplayMetaForEvents(events).then((map) => {
       if (!cancelled) setArtworkMetaById(map);
     });
     return () => { cancelled = true; };
@@ -3261,7 +3346,7 @@ export default function SettingsCouts() {
           toast.warning(t("couts.export_empty"));
           return;
         }
-        exportCostsCsv(data);
+        await exportCostsCsv(data);
         toast.success(t("couts.export_done", { count: data.length.toLocaleString("fr-FR") }));
       } catch (e) {
         toast.error(t("couts.export_error", { detail: String(e) }));

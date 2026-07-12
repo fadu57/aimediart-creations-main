@@ -2,8 +2,10 @@
   "page": {
     "title": "Ausstellungen",
     "search": "Ausstellung suchen...",
+    "search_label": "Ausstellung",
     "clearSearch": "Suche löschen",
     "searchOrg": "Nach Organisation suchen...",
+    "searchOrg_label": "Organisation",
     "clearSearchOrg": "Organisationsfilter löschen",
     "noOrgFound": "Keine Organisation gefunden.",
     "clear": "Löschen",

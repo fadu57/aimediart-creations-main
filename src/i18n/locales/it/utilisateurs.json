@@ -59,6 +59,7 @@
   "list": {
     "title": "Utenti",
     "search_placeholder": "Cerca un utente...",
+    "search_label": "utente",
     "clear_search": "Cancella la ricerca",
     "clear": "Cancella",
     "new_user": "+ Nuovo utente",

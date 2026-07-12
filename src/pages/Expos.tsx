@@ -1,9 +1,8 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Building2, BookOpen, Images, Plus, X } from "lucide-react";
+import { Building2, BookOpen, Images, Plus, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -822,14 +821,19 @@ const Expos = () => {
             </div>
             <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               {typeof role_id === "number" && role_id < 4 && (
-                <div className="relative w-full min-w-0 sm:w-[210px] sm:max-w-[210px]">
-                  <Input
+                <div className="relative flex h-9 w-full min-w-0 cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]">
+                  <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                  {!orgSearchTerm.trim() ? (
+                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t("page.searchOrg_label")}</span>
+                  ) : null}
+                  <input
                     type="text"
+                    autoComplete="off"
                     list="org-search-suggestions"
                     value={orgSearchTerm}
                     onChange={(e) => setOrgSearchTerm(e.target.value)}
-                    placeholder={t("page.searchOrg")}
-                    className="h-9 w-full min-w-0 bg-white pr-9 sm:!w-[210px]"
+                    aria-label={t("page.searchOrg")}
+                    className="min-w-0 flex-1 bg-transparent pr-6 text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
                   />
                   {orgSearchTerm.trim().length > 0 && (
                     <button
@@ -849,14 +853,19 @@ const Expos = () => {
                   </datalist>
                 </div>
               )}
-              <div className="relative w-full min-w-0 sm:w-[210px] sm:max-w-[210px]">
-                <Input
+              <div className="relative flex h-9 w-full min-w-0 cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]">
+                <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
+                {!searchTerm.trim() ? (
+                  <span className="shrink-0 text-sm font-medium text-neutral-900">{t("page.search_label")}</span>
+                ) : null}
+                <input
                   type="text"
+                  autoComplete="off"
                   list="expo-search-suggestions"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={t("page.search")}
-                  className="h-9 w-full min-w-0 bg-white pr-9 sm:!w-[210px]"
+                  aria-label={t("page.search")}
+                  className="min-w-0 flex-1 bg-transparent pr-6 text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
                 />
                 {searchTerm.trim().length > 0 && (
                   <button
@@ -967,7 +976,7 @@ const Expos = () => {
                     : undefined
                 }
               >
-                <div className="flex shrink-0 flex-col items-center gap-1">
+                <div className="flex w-full shrink-0 flex-row items-center gap-3 md:w-auto md:flex-col md:items-center md:gap-1">
                   <ExpoLogoThumb
                     key={`${ex.id}-${logoRaw ?? "no-logo"}`}
                     logoUrl={logoRaw}
@@ -975,7 +984,7 @@ const Expos = () => {
                     fallbackIcon={<Images className="h-12 w-12 text-muted-foreground" aria-hidden />}
                   />
                   {(sponsorLogosByExpoId[ex.id]?.length ?? 0) > 0 && (
-                    <>
+                    <div className="flex min-w-0 flex-1 flex-col items-center gap-1 md:flex-none">
                       <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground whitespace-nowrap">
                         Sponsors / Mécènes
                       </span>
@@ -983,7 +992,7 @@ const Expos = () => {
                         key={(sponsorLogosByExpoId[ex.id] ?? []).join("|")}
                         logos={sponsorLogosByExpoId[ex.id]}
                       />
-                    </>
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">

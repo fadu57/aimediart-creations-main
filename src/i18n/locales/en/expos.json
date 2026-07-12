@@ -2,8 +2,10 @@
   "page": {
     "title": "Exhibitions",
     "search": "Search an exhibition...",
+    "search_label": "exhibition",
     "clearSearch": "Clear search",
     "searchOrg": "Search by organisation...",
+    "searchOrg_label": "organisation",
     "clearSearchOrg": "Clear organisation filter",
     "noOrgFound": "No organisation found.",
     "clear": "Clear",

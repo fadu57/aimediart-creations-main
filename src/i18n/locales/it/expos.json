@@ -2,8 +2,10 @@
   "page": {
     "title": "Esposizioni",
     "search": "Cerca un'esposizione...",
+    "search_label": "esposizione",
     "clearSearch": "Cancella ricerca",
     "searchOrg": "Cerca per organizzazione...",
+    "searchOrg_label": "organizzazione",
     "clearSearchOrg": "Cancella filtro organizzazione",
     "noOrgFound": "Nessuna organizzazione trovata.",
     "clear": "Cancella",

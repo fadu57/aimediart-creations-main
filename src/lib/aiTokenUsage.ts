@@ -6,8 +6,13 @@ import i18n from "@/i18n/config";
 import { supabase } from "@/lib/supabase";
 import { usageAggregationKey } from "@/lib/aiUsageModelId";
 import { effectiveCostEstimatedUsd } from "@/lib/openAiTtsCost";
+import {
+  getCostArtworkDisplayMetaByIds,
+  type CostFilters,
+} from "@/lib/costs";
+import { getWakaPeriodRange, type WakaPeriod } from "@/lib/wakatimePeriod";
 
-export type TokenPeriod = "day" | "week" | "month";
+export type TokenPeriod = WakaPeriod;
 
 export type AiUsageLogRow = {
   id: string;
@@ -33,12 +38,136 @@ export const KNOWN_USAGE_PROVIDERS = [
   "openai",
 ] as const;
 
+export type TokenEntityFilters = {
+  artworkId?: string;
+  expoId?: string;
+  agencyId?: string;
+  toolType?: string;
+  mediationLangCount?: string;
+};
+
+export type TokenArtworkContext = {
+  artworkId: string;
+  expoId: string | null;
+  agencyId: string | null;
+  title: string | null;
+  mediationLangCount: number;
+};
+
+export const EMPTY_TOKEN_ENTITY_FILTERS: TokenEntityFilters = {
+  artworkId: "",
+  expoId: "",
+  agencyId: "",
+  toolType: "",
+  mediationLangCount: "",
+};
+
 export type TokenUsageFilters = {
   dateFrom: string;
   dateTo: string;
   provider?: string;
   modelId?: string;
 };
+
+/** Contexte œuvre (titre, expo, agence) pour filtres et tableau tokens. */
+export async function getTokenArtworkContextByIds(
+  artworkIds: string[],
+): Promise<Record<string, TokenArtworkContext>> {
+  const ids = [...new Set(artworkIds.map((id) => id.trim()).filter(Boolean))];
+  const result: Record<string, TokenArtworkContext> = {};
+  if (ids.length === 0) return result;
+
+  const [meta, refsRes] = await Promise.all([
+    getCostArtworkDisplayMetaByIds(ids),
+    supabase
+      .from("artworks")
+      .select("artwork_id, artwork_expo_id, artwork_agency_id")
+      .in("artwork_id", ids)
+      .is("artwork_deleted_at", null),
+  ]);
+
+  for (const row of (refsRes.data ?? []) as Array<{
+    artwork_id?: string | null;
+    artwork_expo_id?: string | null;
+    artwork_agency_id?: string | null;
+  }>) {
+    const id = row.artwork_id?.trim();
+    if (!id) continue;
+    const display = meta[id];
+    result[id] = {
+      artworkId: id,
+      expoId: row.artwork_expo_id?.trim() || null,
+      agencyId: row.artwork_agency_id?.trim() || null,
+      title: display?.title ?? null,
+      mediationLangCount: display?.mediationLangCount ?? 0,
+    };
+  }
+
+  return result;
+}
+
+export function getTokenRowToolType(row: AiUsageLogRow): string {
+  const tool = (row.tool_type ?? row.metadata?.tool_type ?? "").toString().trim();
+  if (tool) return tool;
+  const job = (row.metadata?.job_type ?? "").toString().trim();
+  if (job) return job;
+  return "";
+}
+
+export function filterTokenRowsByEntity(
+  rows: AiUsageLogRow[],
+  filters: TokenEntityFilters,
+  artworkCtx: Record<string, TokenArtworkContext>,
+): AiUsageLogRow[] {
+  const artworkId = filters.artworkId?.trim() ?? "";
+  const expoId = filters.expoId?.trim() ?? "";
+  const agencyId = filters.agencyId?.trim() ?? "";
+  const toolType = filters.toolType?.trim() ?? "";
+  const langRaw = filters.mediationLangCount?.trim() ?? "";
+  const langCount = langRaw ? Number.parseInt(langRaw, 10) : null;
+
+  return rows.filter((row) => {
+    const rowArtworkId = row.artwork_id?.trim() ?? "";
+    const ctx = rowArtworkId ? artworkCtx[rowArtworkId] : undefined;
+
+    if (artworkId && rowArtworkId !== artworkId) return false;
+    if (expoId && ctx?.expoId !== expoId) return false;
+    if (agencyId && ctx?.agencyId !== agencyId) return false;
+    if (toolType && getTokenRowToolType(row) !== toolType) return false;
+    if (langCount != null && Number.isFinite(langCount) && ctx?.mediationLangCount !== langCount) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export function tokenEntityFiltersToCostFilters(filters: TokenEntityFilters): CostFilters {
+  return {
+    dateFrom: "",
+    dateTo: "",
+    artworkId: filters.artworkId ?? "",
+    expoId: filters.expoId ?? "",
+    agencyId: filters.agencyId ?? "",
+    toolType: filters.toolType ?? "",
+    mediationLangCount: filters.mediationLangCount ?? "",
+    provider: "",
+    apiName: "",
+    modelName: "",
+    operationName: "",
+    status: "",
+    currency: "",
+  };
+}
+
+export function costFiltersToTokenEntity(filters: CostFilters): TokenEntityFilters {
+  return {
+    artworkId: filters.artworkId ?? "",
+    expoId: filters.expoId ?? "",
+    agencyId: filters.agencyId ?? "",
+    toolType: filters.toolType ?? "",
+    mediationLangCount: filters.mediationLangCount ?? "",
+  };
+}
 
 export type TokenUsageSummary = {
   callCount: number;
@@ -171,10 +300,25 @@ export type TtsUsageRecapItem = {
 
 function isTtsCharactersRow(r: AiUsageLogRow): boolean {
   const provider = (r.provider ?? "").trim();
-  const tool = (r.tool_type ?? r.metadata?.tool_type ?? "").toString().trim();
-  if (provider === "openai" && tool === "tts") return true;
+  const unitType = String(r.metadata?.unit_type ?? "").trim();
+  if (unitType === "tokens") return false;
+  if (unitType === "characters") return true;
   if (provider === "google_tts") return true;
   return false;
+}
+
+function artworkIdFromTtsEvent(
+  metadata: Record<string, unknown> | null | undefined,
+  operationName: string | null,
+): string | null {
+  const meta = metadata ?? {};
+  const artworkId = typeof meta.artwork_id === "string" ? meta.artwork_id.trim() : "";
+  if (artworkId) return artworkId;
+  const textId = typeof meta.text_id === "string" ? meta.text_id.trim() : "";
+  if (textId && (operationName === "mediation" || meta.text_type === "mediation")) {
+    return textId;
+  }
+  return null;
 }
 
 /** Lignes TTS depuis ai_usage_events (OpenAI, etc.). */
@@ -188,7 +332,7 @@ export async function fetchTtsUsageEvents(
     let q = supabase
       .from("ai_usage_events")
       .select(
-        "id, provider, tool_type, model_name, input_units, output_units, cost_estimated, created_at, metadata, operation_name",
+        "id, provider, tool_type, model_name, input_units, output_units, unit_type, cost_estimated, created_at, metadata, operation_name",
       )
       .eq("tool_type", "tts")
       .order("created_at", { ascending: false })
@@ -207,6 +351,7 @@ export async function fetchTtsUsageEvents(
       model_name: string | null;
       input_units: number | null;
       output_units: number | null;
+      unit_type: string | null;
       cost_estimated: number | null;
       created_at: string;
       metadata: Record<string, unknown> | null;
@@ -215,20 +360,27 @@ export async function fetchTtsUsageEvents(
 
     for (const e of batch) {
       const inputUnits = Math.max(0, Number(e.input_units ?? 0));
+      const outputUnits = Math.max(0, Number(e.output_units ?? 0));
+      const unitType = (e.unit_type ?? "").trim() || (e.provider === "google_tts" ? "characters" : "tokens");
+      const isCharUnits = unitType === "characters";
+
       all.push({
         id: e.id,
         model_id: (e.model_name ?? "tts").trim() || "tts",
         provider: e.provider,
-        prompt_tokens: 0,
-        completion_tokens: Math.max(0, Number(e.output_units ?? 0)),
-        total_tokens: inputUnits,
-        artwork_id: null,
+        prompt_tokens: inputUnits,
+        completion_tokens: outputUnits,
+        total_tokens: isCharUnits
+          ? (outputUnits > 0 ? outputUnits : inputUnits)
+          : inputUnits + outputUnits,
+        artwork_id: artworkIdFromTtsEvent(e.metadata, e.operation_name),
         created_at: e.created_at,
         metadata: {
           ...(e.metadata ?? {}),
           tool_type: e.tool_type,
           operation: e.operation_name,
           cost_estimated: e.cost_estimated,
+          unit_type: unitType,
         },
         tool_type: e.tool_type,
         cost_estimated: e.cost_estimated,
@@ -257,7 +409,9 @@ export function summarizeTtsUsageRecap(rows: AiUsageLogRow[]): TtsUsageRecapItem
     const provider = (r.provider ?? "—").trim() || "—";
     const tool = (r.tool_type ?? r.metadata?.tool_type ?? "tts").toString().trim() || "tts";
     const key = `${provider}::${tool}`;
-    const inputUnits = Math.max(0, Number(r.total_tokens ?? r.prompt_tokens ?? 0));
+    const inputUnits = isTtsCharactersRow(r)
+      ? Math.max(0, Number(r.completion_tokens ?? r.total_tokens ?? 0))
+      : Math.max(0, Number(r.prompt_tokens ?? 0));
     const cost = effectiveCostEstimatedUsd({
       provider,
       tool_type: tool,
@@ -292,43 +446,7 @@ export function getTokenPeriodRange(
   offset = 0,
   ref = new Date(),
 ): TokenPeriodRange {
-  const today = isoDateLocal(startOfLocalDay(ref));
-
-  if (period === "day") {
-    const anchor = addDaysIso(today, offset);
-    return {
-      dateFrom: anchor,
-      dateTo: anchor,
-      offset,
-      canGoNext: offset < 0,
-    };
-  }
-
-  if (period === "week") {
-    const weekEnd = addDaysIso(today, offset * 7);
-    const dateTo = weekEnd > today ? today : weekEnd;
-    const dateFrom = addDaysIso(dateTo, -6);
-    return {
-      dateFrom,
-      dateTo,
-      offset,
-      canGoNext: offset < 0,
-    };
-  }
-
-  const refDay = startOfLocalDay(ref);
-  const monthStart = new Date(refDay.getFullYear(), refDay.getMonth() + offset, 1);
-  const dateFrom = isoDateLocal(monthStart);
-  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-  let dateTo = isoDateLocal(monthEnd);
-  if (offset === 0 && dateTo > today) dateTo = today;
-
-  return {
-    dateFrom,
-    dateTo,
-    offset,
-    canGoNext: offset < 0,
-  };
+  return getWakaPeriodRange(period, offset, ref);
 }
 
 /** Première et dernière date avec des lignes dans `ai_usage_logs`. */
@@ -538,25 +656,28 @@ export function formatTokenCount(n: number): string {
   return String(Math.round(n));
 }
 
+/** Valeur entière sans abréviation (k / M) — pour le tableau détaillé. */
+export function formatTokenCountExact(n: number, locale = "fr-FR"): string {
+  if (!Number.isFinite(n) || n <= 0) return "0";
+  return Math.round(n).toLocaleString(locale);
+}
+
 export type UsageTableColumn = "prompt" | "completion" | "total";
 
-/** Affichage colonnes Entrée / Sortie / Total du tableau Derniers appels (TTS caractères). */
+/** Affichage colonnes Entrée / Sortie / Total du tableau Derniers appels. */
 export function formatUsageTableCell(
   provider: string,
   column: UsageTableColumn,
   value: number,
-  row?: Pick<AiUsageLogRow, "tool_type" | "metadata">,
+  row?: Pick<AiUsageLogRow, "provider" | "tool_type" | "metadata">,
 ): string {
-  const p = (provider ?? "").trim();
-  const tool = (row?.tool_type ?? row?.metadata?.tool_type ?? "").toString().trim();
-  const isCharBased =
-    p === "google_tts" || (p === "openai" && tool === "tts") || (p === "openai" && !tool);
+  const isCharBased = row ? isTtsCharactersRow(row as AiUsageLogRow) : false;
 
   if (isCharBased) {
     if (column === "prompt") return "—";
-    return `${formatTokenCount(Math.max(0, value))} ${i18n.t("tokens.unit_characters", { ns: "settings", defaultValue: "car." })}`;
+    return `${formatTokenCountExact(Math.max(0, value))} ${i18n.t("tokens.unit_characters", { ns: "settings", defaultValue: "car." })}`;
   }
-  return formatTokenCount(Math.max(0, value));
+  return formatTokenCountExact(Math.max(0, value));
 }
 
 export function usageProviderLabel(provider: string): string {
@@ -582,4 +703,152 @@ export function jobTypeLabel(metadata: Record<string, unknown> | null): string {
   }
 
   return "—";
+}
+
+function tokenRowOperationRaw(metadata: Record<string, unknown> | null): string {
+  const jt = metadata?.job_type;
+  if (typeof jt === "string" && jt.trim()) return jt.trim();
+  const op = metadata?.operation;
+  if (typeof op === "string" && op.trim()) return op.trim();
+  return "";
+}
+
+function tokenRowUnitsLabel(row: AiUsageLogRow): "characters" | "tokens" {
+  return isTtsCharactersRow(row) ? "characters" : "tokens";
+}
+
+/** Exporte toutes les lignes filtrées vers un CSV (BOM UTF-8). */
+export function exportTokenUsageCsv(
+  rows: AiUsageLogRow[],
+  artworkCtx: Record<string, TokenArtworkContext>,
+): void {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const headers = [
+    "created_at",
+    "provider",
+    "model_id",
+    "operation",
+    "artwork_id",
+    "artwork_title",
+    "tool_type",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "units",
+  ];
+
+  const csvRows = rows.map((r) => {
+    const prompt = Math.max(0, Number(r.prompt_tokens ?? 0));
+    const completion = Math.max(0, Number(r.completion_tokens ?? 0));
+    const total = Number(r.total_tokens ?? 0) > 0 ? Number(r.total_tokens) : prompt + completion;
+    const artworkId = r.artwork_id?.trim() ?? "";
+    const ctx = artworkId ? artworkCtx[artworkId] : undefined;
+
+    return [
+      r.created_at.slice(0, 19).replace("T", " "),
+      r.provider ?? "",
+      r.model_id ?? "",
+      tokenRowOperationRaw(r.metadata),
+      artworkId,
+      ctx?.title ?? "",
+      getTokenRowToolType(r),
+      prompt,
+      completion,
+      total,
+      tokenRowUnitsLabel(r),
+    ].map(esc).join(",");
+  });
+
+  const csv = [headers.map(esc).join(","), ...csvRows].join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tokens_ia_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export type TokenTableSortColumn =
+  | "created_at"
+  | "provider"
+  | "model_id"
+  | "operation"
+  | "artwork_title"
+  | "tool_type"
+  | "prompt_tokens"
+  | "completion_tokens"
+  | "total_tokens";
+
+export type TokenTableSort = {
+  column: TokenTableSortColumn;
+  ascending: boolean;
+};
+
+export const DEFAULT_TOKEN_TABLE_SORT: TokenTableSort = {
+  column: "created_at",
+  ascending: false,
+};
+
+export function nextTokenTableSort(column: TokenTableSortColumn, current: TokenTableSort): TokenTableSort {
+  if (current.column === column) {
+    return { column, ascending: !current.ascending };
+  }
+  const descFirst =
+    column === "created_at" ||
+    column === "prompt_tokens" ||
+    column === "completion_tokens" ||
+    column === "total_tokens";
+  return { column, ascending: !descFirst };
+}
+
+function tokenRowArtworkTitle(
+  row: AiUsageLogRow,
+  artworkCtx?: Record<string, TokenArtworkContext>,
+): string {
+  const artworkId = row.artwork_id?.trim() ?? "";
+  if (!artworkId) return "";
+  return artworkCtx?.[artworkId]?.title?.trim() ?? "";
+}
+
+/** Tri client du tableau Derniers appels (toutes les lignes filtrées). */
+export function sortTokenUsageRows(
+  rows: AiUsageLogRow[],
+  sort: TokenTableSort,
+  artworkCtx?: Record<string, TokenArtworkContext>,
+): AiUsageLogRow[] {
+  const dir = sort.ascending ? 1 : -1;
+
+  return [...rows].sort((a, b) => {
+    switch (sort.column) {
+      case "created_at":
+        return a.created_at.localeCompare(b.created_at) * dir;
+      case "provider":
+        return (a.provider ?? "").localeCompare(b.provider ?? "", "fr", { sensitivity: "base" }) * dir;
+      case "model_id":
+        return (a.model_id ?? "").localeCompare(b.model_id ?? "", "fr", { sensitivity: "base" }) * dir;
+      case "operation":
+        return tokenRowOperationRaw(a.metadata).localeCompare(
+          tokenRowOperationRaw(b.metadata),
+          "fr",
+          { sensitivity: "base" },
+        ) * dir;
+      case "artwork_title":
+        return tokenRowArtworkTitle(a, artworkCtx).localeCompare(
+          tokenRowArtworkTitle(b, artworkCtx),
+          "fr",
+          { sensitivity: "base" },
+        ) * dir;
+      case "tool_type":
+        return getTokenRowToolType(a).localeCompare(getTokenRowToolType(b), "fr", { sensitivity: "base" }) * dir;
+      case "prompt_tokens":
+        return (rowTokens(a).prompt - rowTokens(b).prompt) * dir;
+      case "completion_tokens":
+        return (rowTokens(a).completion - rowTokens(b).completion) * dir;
+      case "total_tokens":
+        return (rowTokens(a).total - rowTokens(b).total) * dir;
+      default:
+        return 0;
+    }
+  });
 }
