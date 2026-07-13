@@ -3,6 +3,8 @@ import { getOrCreateVisitorUuid, getStoredVisitorUuid } from "@/lib/visitorIdent
 
 /** Clé sessionStorage : une visite active par expo dans l'onglet courant. */
 const VISIT_STORAGE_PREFIX = "aimediart_visitor_expo_visit:";
+/** Œuvres scannées pendant la visite active (par expo). */
+const SCANNED_ARTWORKS_PREFIX = "aimediart_visitor_expo_scanned:";
 
 /** Inactivité au-delà de laquelle le RPC marque une visite comme abandoned (aligné migration SQL). */
 export const VISITOR_EXPO_VISIT_STALE_HOURS = 12;
@@ -24,6 +26,80 @@ function devWarn(tag: string, message: string): void {
 
 export function getVisitorExpoVisitStorageKey(expoId: string): string {
   return `${VISIT_STORAGE_PREFIX}${expoId.trim()}`;
+}
+
+export function getVisitorScannedArtworksStorageKey(expoId: string): string {
+  return `${SCANNED_ARTWORKS_PREFIX}${expoId.trim()}`;
+}
+
+/** Mémorise qu'une œuvre a été scannée / ouverte pendant la visite de l'expo. */
+export function markVisitorArtworkScanned(expoId: string, artworkId: string): void {
+  const expo = expoId.trim();
+  const art = artworkId.trim();
+  if (!expo || !art) return;
+  try {
+    const key = getVisitorScannedArtworksStorageKey(expo);
+    const raw = sessionStorage.getItem(key);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    const ids = new Set<string>(
+      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string" && id.trim().length > 0) : [],
+    );
+    ids.add(art);
+    sessionStorage.setItem(key, JSON.stringify([...ids]));
+  } catch {
+    /* quota / mode privé */
+  }
+}
+
+export function hasVisitorScannedArtworkInSession(expoId: string): boolean {
+  const expo = expoId.trim();
+  if (!expo) return false;
+  try {
+    const raw = sessionStorage.getItem(getVisitorScannedArtworksStorageKey(expo));
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as unknown;
+    return (
+      Array.isArray(parsed) &&
+      parsed.some((id) => typeof id === "string" && id.trim().length > 0)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function clearVisitorScannedArtworks(expoId: string): void {
+  const expo = expoId.trim();
+  if (!expo) return;
+  try {
+    sessionStorage.removeItem(getVisitorScannedArtworksStorageKey(expo));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Au moins une œuvre scannée pendant la visite courante ?
+ * Session (page œuvre / QR) puis repli feedback lié au visit_id actif.
+ */
+export async function resolveVisitorHasScannedArtwork(options: {
+  expoId: string;
+  visitorId?: string | null;
+}): Promise<boolean> {
+  const expo = options.expoId.trim();
+  if (!expo) return false;
+  if (hasVisitorScannedArtworkInSession(expo)) return true;
+
+  const visitId = getStoredVisitorExpoVisitId(expo);
+  const visitorId = options.visitorId?.trim();
+  if (!visitId || !visitorId) return false;
+
+  const { count, error } = await supabase
+    .from("visitor_feedback")
+    .select("id", { count: "exact", head: true })
+    .eq("visit_id", visitId)
+    .eq("visitor_id", visitorId);
+
+  return !error && (count ?? 0) > 0;
 }
 
 /** Expo(s) avec une visite encore active en sessionStorage (avant clôture). */
@@ -215,6 +291,7 @@ export async function endVisitorExpoVisit(
   const ok = data === true;
   if (ok) {
     clearStoredVisitorExpoVisitId(expo);
+    clearVisitorScannedArtworks(expo);
   }
   return ok;
 }

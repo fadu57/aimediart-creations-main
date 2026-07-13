@@ -44,7 +44,7 @@ import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AppleLogoIcon, GoogleLogoIcon } from "@/components/OAuthProviderIcons";
+import { GoogleLogoIcon } from "@/components/OAuthProviderIcons";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
@@ -174,7 +174,7 @@ const Register = () => {
   const [submitting, setSubmitting] = useState(false);
   const [emailDuplicateOpen, setEmailDuplicateOpen] = useState(false);
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [oauthProfileFlow, setOauthProfileFlow] = useState(false);
   const [postAuthHandled, setPostAuthHandled] = useState(false);
   const [returningProfile, setReturningProfile] = useState<VisitorAnonymousProfile | null>(null);
@@ -330,11 +330,11 @@ const Register = () => {
     }
   };
 
-  const handleOAuthSignIn = async (provider: "google" | "apple") => {
-    setOauthLoading(provider);
-    const { error } = await startVisitorOAuthSignIn(provider, expoIdFromUrl || undefined, agencyIdFromUrl || undefined);
+  const handleOAuthSignIn = async () => {
+    setOauthLoading(true);
+    const { error } = await startVisitorOAuthSignIn("google", expoIdFromUrl || undefined, agencyIdFromUrl || undefined);
     if (error) {
-      setOauthLoading(null);
+      setOauthLoading(false);
       toast.error(error.message || t("register_visitor.toast_oauth_failed"));
     }
   };
@@ -719,10 +719,10 @@ const Register = () => {
                 type="button"
                 variant="outline"
                 className={oauthButtonClassName}
-                disabled={oauthLoading != null}
-                onClick={() => void handleOAuthSignIn("google")}
+                disabled={oauthLoading}
+                onClick={() => void handleOAuthSignIn()}
               >
-                {oauthLoading === "google" ? (
+                {oauthLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     {t("register_visitor.oauth_google_loading")}
@@ -731,26 +731,6 @@ const Register = () => {
                   <>
                     <GoogleLogoIcon />
                     {t("register_visitor.oauth_google")}
-                  </>
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className={oauthButtonClassName}
-                disabled={oauthLoading != null}
-                onClick={() => void handleOAuthSignIn("apple")}
-              >
-                {oauthLoading === "apple" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("register_visitor.oauth_apple_loading")}
-                  </>
-                ) : (
-                  <>
-                    <AppleLogoIcon className="text-foreground" />
-                    {t("register_visitor.oauth_apple")}
                   </>
                 )}
               </Button>

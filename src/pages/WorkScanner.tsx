@@ -7,6 +7,7 @@ import type { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { resolveScanTargetFromQr } from "@/lib/oeuvrePublicUrl";
+import { markVisitorArtworkScanned } from "@/lib/visitorExpoVisit";
 import {
   buildQrScannerCameraConfig,
   createHtml5QrcodeReader,
@@ -96,6 +97,10 @@ const WorkScanner = () => {
       if (scanTarget.kind === "expo") {
         navigate(`/scan?expo_id=${encodeURIComponent(scanTarget.expoId)}`);
         return;
+      }
+
+      if (expoId) {
+        markVisitorArtworkScanned(expoId, scanTarget.artworkId);
       }
 
       const target = expoId

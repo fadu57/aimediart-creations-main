@@ -236,14 +236,16 @@ export function VisitorPoolAvatarPicker({
   };
 
   const renderAvatarSlide = (avatar: VisitorPoolAvatar) => (
-    <div className="flex flex-col items-center gap-1">
+    <div className="relative z-10 flex flex-col items-center gap-1">
       <AvatarCircleContent
         avatar={avatar}
         loading={false}
         emptyLabel={t("pool_avatar_empty")}
         alt={t("pool_avatar_alt", { pseudo: avatar.pseudo })}
       />
-      <p className="max-w-[120px] truncate text-center text-xs font-semibold text-foreground">{avatar.pseudo}</p>
+      <p className="relative z-20 w-[170px] text-center text-xs font-semibold leading-snug text-foreground">
+        {avatar.pseudo}
+      </p>
     </div>
   );
 
@@ -254,19 +256,19 @@ export function VisitorPoolAvatarPicker({
       </div>
     ) : poolAvatarProposalCount > 1 ? (
       <Carousel
-        className={cn("w-full", showSelfie ? "max-w-[140px]" : "max-w-[280px]")}
+        className={cn("relative w-full", showSelfie ? "max-w-[140px]" : "max-w-[280px]")}
         opts={{ startIndex: selectedPoolAvatarIndex, watchDrag: true }}
         setApi={setPoolAvatarCarouselApi}
       >
         <CarouselContent className="-ml-2">
           {poolAvatarProposals.map((avatar) => (
-            <CarouselItem key={avatar.objectPath} className="basis-full pl-2">
+            <CarouselItem key={avatar.objectPath} className="relative z-10 basis-full pl-2">
               {renderAvatarSlide(avatar)}
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious className="left-0 top-[48px] h-6 w-6 -translate-y-1/2 border-border/80 bg-background/90" />
-        <CarouselNext className="right-0 top-[48px] h-6 w-6 -translate-y-1/2 border-border/80 bg-background/90" />
+        <CarouselPrevious className="z-0 left-0 top-[48px] h-6 w-6 -translate-y-1/2 border-border/80 bg-background/90" />
+        <CarouselNext className="z-0 right-0 top-[48px] h-6 w-6 -translate-y-1/2 border-border/80 bg-background/90" />
         <div
           className="mt-1 flex justify-center gap-1.5"
           role="tablist"

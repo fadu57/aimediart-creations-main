@@ -3,6 +3,17 @@ import type { Provider, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 export const VISITOR_REGISTER_OAUTH_FLAG = "visitor_register_oauth";
+export const VISITOR_DIARY_OAUTH_FLAG = "visitor_diary_oauth";
+
+export function getDiaryOAuthRedirectUrl(): string {
+  const base =
+    import.meta.env.VITE_PUBLIC_SITE_URL?.trim() ||
+    (typeof window !== "undefined" ? window.location.origin : "");
+  if (typeof window === "undefined") return `${base.replace(/\/$/, "")}/scan`;
+  const url = new URL(window.location.href);
+  url.searchParams.set("diary_oauth", "1");
+  return url.toString();
+}
 
 export function getRegisterOAuthRedirectUrl(expoId?: string, agencyId?: string): string {
   const base =
@@ -64,6 +75,30 @@ export async function startVisitorOAuthSignIn(
 
   if (error && typeof window !== "undefined") {
     sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
+    return { error };
+  }
+
+  return { error: null };
+}
+
+export async function startDiaryRegistrationOAuth(): Promise<{ error: Error | null }> {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(VISITOR_DIARY_OAUTH_FLAG, "1");
+  }
+
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: getDiaryOAuthRedirectUrl(),
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error && typeof window !== "undefined") {
+    sessionStorage.removeItem(VISITOR_DIARY_OAUTH_FLAG);
     return { error };
   }
 

@@ -809,18 +809,6 @@ const VisitorWelcomeCore = () => {
           <div className="ml-auto flex shrink-0 flex-col gap-1.5">
             <Button
               type="button"
-              className="h-8 w-[120px] px-3 text-[10px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
-              disabled={quickVisitBusy}
-              onClick={() => void handleQuickVisitStart()}
-            >
-              {quickVisitBusy ? (
-                <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-              ) : (
-                t("visitor_gate.btn_quick")
-              )}
-            </Button>
-            <Button
-              type="button"
               variant="outline"
               className="h-8 w-[120px] px-3 text-[10px] !shadow-none"
               asChild
@@ -922,8 +910,20 @@ const VisitorWelcomeCore = () => {
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
                 <span>{t("visitor_gate.benefit_profile")}</span>
               </li>
-              <p className="text-[10px] text-muted-foreground">{t("visitor_gate.benefit_profile_wip")}</p>
             </ul>
+            <Button
+              type="button"
+              className="mt-2 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={() => {
+                markVisitorExpoGateDone();
+                getOrCreateVisitorUuid();
+                setReturningProfile(null);
+                setAvatarChangeFromProfile(null);
+                setStep("avatar");
+              }}
+            >
+              {t("visitor_gate.btn_start_visit")}
+            </Button>
           </div>
 
           <p className="text-center text-[11px] text-muted-foreground">

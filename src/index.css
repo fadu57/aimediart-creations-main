@@ -1284,6 +1284,12 @@
   --diary-h: min(840px, calc(100dvh - 9rem));
 }
 
+.travel-diary-root--miniature-ref {
+  --diary-h: 490px;
+  pointer-events: none;
+  user-select: none;
+}
+
 .travel-diary-root {
   /* header 64px + pagination + marge */
   --diary-h: min(840px, calc(100dvh - 11rem));
@@ -1489,4 +1495,57 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='100' viewBox='0 0 180 100'%3E%3Cg transform='rotate(-45 90 50)'%3E%3Ctext x='-30' y='28' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3Ctext x='38' y='28' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3Ctext x='106' y='28' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3Ctext x='4' y='68' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3Ctext x='72' y='68' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3Ctext x='140' y='68' fill='%23ffffff' fill-opacity='0.30' font-family='system-ui,sans-serif' font-size='10' font-weight='500'%3EAIMEDIArt %C2%A9%3C/text%3E%3C/g%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 180px 100px;
+}
+
+/* Éclat « cadeau » sur la modale de fin de visite */
+.visitor-exit-gift-burst {
+  position: absolute;
+  top: -37px;
+  left: -10px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  padding: 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  background: radial-gradient(circle at 50% 40%, #ff6b6b 0%, #e63946 55%, #c1121f 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(230, 57, 70, 0.45);
+  transform: rotate(-30deg);
+  clip-path: polygon(
+    50% 0%,
+    63% 13%,
+    80% 8%,
+    82% 27%,
+    100% 35%,
+    87% 50%,
+    100% 65%,
+    82% 73%,
+    80% 92%,
+    63% 87%,
+    50% 100%,
+    37% 87%,
+    20% 92%,
+    18% 73%,
+    0% 65%,
+    13% 50%,
+    0% 35%,
+    18% 27%,
+    20% 8%,
+    37% 13%
+  );
+  pointer-events: none;
+}
+
+.visitor-exit-gift-burst-label {
+  display: inline-block;
+  transform: rotate(30deg);
 }

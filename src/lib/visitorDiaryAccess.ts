@@ -7,6 +7,7 @@ export type DiaryProfileSnapshot = {
   email: string;
   zipCode: string;
   city: string;
+  countryCode: string;
 };
 
 export function diaryUnlockStorageKey(expoId?: string | null): string {
@@ -44,6 +45,7 @@ export function isDiaryProfileComplete(
     last_name?: string | null;
     zip_code?: string | null;
     city?: string | null;
+    country_code?: string | null;
   } | null | undefined,
   email?: string | null,
 ): boolean {
@@ -51,6 +53,7 @@ export function isDiaryProfileComplete(
   const last = profile?.last_name?.trim() ?? "";
   const zip = profile?.zip_code?.trim() ?? "";
   const city = profile?.city?.trim() ?? "";
+  const countryCode = profile?.country_code?.trim() ?? "";
   const mail = email?.trim() ?? "";
-  return Boolean(first && last && mail && zip && city);
+  return Boolean(first && last && mail && zip && city && countryCode);
 }

@@ -12,11 +12,25 @@ import {
 } from "@/lib/visitorTravelDiary";
 import { cn } from "@/lib/utils";
 
+/** Hauteur affichée de la miniature dans le formulaire d'inscription. */
+const MINIATURE_MAX_HEIGHT = 150;
+/** Hauteur naturelle du carnet avant scale. */
+const MINIATURE_REF_HEIGHT = 490;
+/** Largeur de référence du carnet avant scale. */
+const MINIATURE_REF_WIDTH = 312;
+/** Décalage vertical pour cadrer la couverture dans la fenêtre miniature. */
+const MINIATURE_OFFSET_TOP = -40;
+const MINIATURE_SCALE = MINIATURE_MAX_HEIGHT / MINIATURE_REF_HEIGHT;
+const MINIATURE_DISPLAY_WIDTH = Math.round(MINIATURE_REF_WIDTH * MINIATURE_SCALE);
+
 type Props = {
   expoId?: string | null;
   visitorFirstName?: string;
   visitorLastName?: string;
   className?: string;
+  /** Masque le texte d’aide au feuilletage (aperçu miniature dans le formulaire). */
+  showHint?: boolean;
+  variant?: "full" | "miniature";
 };
 
 export function TravelDiaryPreviewFlipbook({
@@ -24,6 +38,8 @@ export function TravelDiaryPreviewFlipbook({
   visitorFirstName = "",
   visitorLastName = "",
   className = "",
+  showHint = true,
+  variant = "full",
 }: Props) {
   const { t, i18n } = useTranslation("visitor");
   const { session } = useAuthUser();
@@ -71,25 +87,64 @@ export function TravelDiaryPreviewFlipbook({
 
   if (loading) {
     return (
-      <div className={cn("flex min-h-[320px] items-center justify-center", className)}>
-        <Loader2 className="h-8 w-8 animate-spin text-[#E63946]" aria-label={t("diary.loading")} />
+      <div
+        className={cn(
+          "flex items-center justify-center",
+          variant === "miniature" ? "h-[150px]" : "min-h-[320px]",
+          className,
+        )}
+      >
+        <Loader2
+          className={cn("animate-spin text-[#E63946]", variant === "miniature" ? "h-5 w-5" : "h-8 w-8")}
+          aria-label={t("diary.loading")}
+        />
       </div>
     );
   }
 
   if (!diary) return null;
 
+  const isMiniature = variant === "miniature";
+  const notebook = (
+    <TravelDiaryNotebook
+      diary={diary}
+      showToolbar={false}
+      syncUrl={false}
+      className={isMiniature ? "travel-diary-root--miniature-ref" : "travel-diary-root--preview"}
+    />
+  );
+
+  if (isMiniature) {
+    return (
+      <div
+        className={cn("pointer-events-none relative mx-auto shrink-0 overflow-hidden", className)}
+        style={{ width: MINIATURE_DISPLAY_WIDTH, height: MINIATURE_MAX_HEIGHT }}
+        aria-hidden
+      >
+        <div
+          className="absolute left-1/2 top-0"
+          style={{
+            width: MINIATURE_REF_WIDTH,
+            height: MINIATURE_REF_HEIGHT,
+            marginTop: MINIATURE_OFFSET_TOP,
+            transform: `translateX(-50%) scale(${MINIATURE_SCALE})`,
+            transformOrigin: "top center",
+          }}
+        >
+          {notebook}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("w-full min-w-0", className)}>
-      <p className="mb-3 text-center text-xs leading-relaxed text-[#F0F0F0]/75">
-        {t("diary.registration_preview_swipe_hint")}
-      </p>
-      <TravelDiaryNotebook
-        diary={diary}
-        showToolbar={false}
-        syncUrl={false}
-        className="travel-diary-root--preview"
-      />
+      {showHint ? (
+        <p className="mb-3 text-center text-xs leading-relaxed text-[#F0F0F0]/75">
+          {t("diary.registration_preview_swipe_hint")}
+        </p>
+      ) : null}
+      {notebook}
     </div>
   );
 }

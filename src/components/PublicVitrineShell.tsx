@@ -21,7 +21,11 @@ export const AIMEDIART_WORD_RED = "text-[#E63946]";
 function LogoMark({ compact }: { compact?: boolean }) {
   const { t } = useTranslation("home");
   return (
-    <div className="flex items-center gap-3.5">
+    <Link
+      to="/"
+      className="flex items-center gap-3.5 rounded-md outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[#E63946]/40"
+      aria-label={t("nav.anchor_accueil")}
+    >
       <div
         className={`flex shrink-0 items-center justify-center rounded-[17%] shadow-[0_6px_18px_rgba(0,0,0,0.1)] ${compact ? "h-[3.25rem] w-[3.25rem]" : "h-[3.75rem] w-[3.75rem]"}`}
         style={{ backgroundColor: BRAND_RED }}
@@ -40,7 +44,7 @@ function LogoMark({ compact }: { compact?: boolean }) {
           {t("brand.baseline")}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

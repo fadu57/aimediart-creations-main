@@ -54,7 +54,9 @@ import {
 import {
   getStoredVisitorExpoVisitId,
   endVisitorExpoVisit,
+  markVisitorArtworkScanned,
   resolveCurrentVisitIdForExpo,
+  resolveVisitorHasScannedArtwork,
   startVisitorExpoVisit,
   touchVisitorExpoVisit,
 } from "@/lib/visitorExpoVisit";
@@ -262,6 +264,7 @@ const VisitorViewCore = () => {
   const [isDiaryRegistrationOpen, setIsDiaryRegistrationOpen] = useState(false);
   const [diaryProfileZip, setDiaryProfileZip] = useState("");
   const [diaryProfileCity, setDiaryProfileCity] = useState("");
+  const [diaryProfileCountryCode, setDiaryProfileCountryCode] = useState("FR");
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
   const [pendingCommentText, setPendingCommentText] = useState("");
@@ -939,6 +942,13 @@ const VisitorViewCore = () => {
   }, [isAuthenticated, language, session?.user?.id, session?.user?.user_metadata]);
   const expoId = searchParams.get("expo_id")?.trim() || "";
 
+  useEffect(() => {
+    const expo = effectiveExpoId.trim();
+    const art = artworkId?.trim() || "";
+    if (!expo || !art || loadingArtwork) return;
+    markVisitorArtworkScanned(expo, art);
+  }, [artworkId, effectiveExpoId, loadingArtwork]);
+
   // Historisation visite expo : repli si le welcome n'a pas encore démarré la session (QR œuvre seul, etc.)
   useEffect(() => {
     const expo = effectiveExpoId.trim();
@@ -1187,12 +1197,25 @@ const VisitorViewCore = () => {
   };
 
   const handleExitExpo = () => {
-    setIsValidationPopupOpen(false);
-    const expo = (effectiveExpoId || expoId).trim();
-    if (expo) {
-      void endVisitorExpoVisit({ expoId: expo });
-    }
-    setIsExitPopupOpen(true);
+    void (async () => {
+      setIsValidationPopupOpen(false);
+      const expo = (effectiveExpoId || expoId).trim();
+      const visitorId = resolveFeedbackVisitorId(session?.user?.id?.trim() || null);
+      const hasScannedArtwork = expo
+        ? await resolveVisitorHasScannedArtwork({ expoId: expo, visitorId })
+        : Boolean(artworkId?.trim());
+
+      if (expo) {
+        void endVisitorExpoVisit({ expoId: expo });
+      }
+
+      if (!hasScannedArtwork) {
+        navigate("/");
+        return;
+      }
+
+      setIsExitPopupOpen(true);
+    })();
   };
 
   const navigateToTravelDiary = () => {
@@ -1212,7 +1235,7 @@ const VisitorViewCore = () => {
     if (authUserId) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("first_name, last_name, zip_code, city")
+        .select("first_name, last_name, zip_code, city, country_code")
         .eq("id", authUserId)
         .maybeSingle();
       const row = profile as {
@@ -1220,9 +1243,11 @@ const VisitorViewCore = () => {
         last_name?: string | null;
         zip_code?: string | null;
         city?: string | null;
+        country_code?: string | null;
       } | null;
       setDiaryProfileZip(row?.zip_code?.trim() || "");
       setDiaryProfileCity(row?.city?.trim() || "");
+      setDiaryProfileCountryCode(row?.country_code?.trim() || "FR");
       if (isDiaryProfileComplete(row, email)) {
         markDiaryUnlocked(expo);
         navigateToTravelDiary();
@@ -2215,6 +2240,7 @@ const VisitorViewCore = () => {
         initialLastName={authLastName || ""}
         initialZipCode={diaryProfileZip}
         initialCity={diaryProfileCity}
+        initialCountryCode={diaryProfileCountryCode}
         isAuthenticated={Boolean(session?.user?.id)}
         onClose={() => setIsDiaryRegistrationOpen(false)}
         onSuccess={handleDiaryRegistrationSuccess}
