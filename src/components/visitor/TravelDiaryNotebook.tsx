@@ -655,10 +655,10 @@ export function TravelDiaryNotebook({
   const statsPageConfigs = useMemo(() => buildStatsPageConfigs(diary.stats), [diary.stats]);
   const slideCount = slideDescriptors.length;
 
-  const startPage = useMemo(
-    () => (syncUrl ? parseDiaryPageParam(searchParams.get("page"), slideCount) : 0),
-    [searchParams, slideCount, syncUrl],
-  );
+  const startPage = useMemo(() => {
+    if (!syncUrl || shareToken?.trim()) return 0;
+    return parseDiaryPageParam(searchParams.get("page"), slideCount);
+  }, [searchParams, shareToken, slideCount, syncUrl]);
 
   const syncPageInUrl = useCallback(
     (pageIndex: number) => {
@@ -669,8 +669,10 @@ export function TravelDiaryNotebook({
         next.delete("expo_id");
         next.delete("visitor_id");
         next.delete("admin");
+        next.delete("page");
+      } else {
+        next.set("page", String(pageIndex + 1));
       }
-      next.set("page", String(pageIndex + 1));
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams, syncUrl, shareToken],
@@ -708,7 +710,7 @@ export function TravelDiaryNotebook({
         return;
       }
 
-      const shareUrl = buildTravelDiaryShareUrl(link.token, activeIndex);
+      const shareUrl = buildTravelDiaryShareUrl(link.token);
       const shareTitle = diary.cover.expoName?.trim() || t("diary.share_default_title");
       const shareNotice = t("diary.toolbar_share_public_notice");
       const shareText = `${t("diary.share_text")} — ${shareNotice}`;
@@ -731,7 +733,7 @@ export function TravelDiaryNotebook({
     } finally {
       setSharingLink(false);
     }
-  }, [activeIndex, diary.cover.expoName, expoId, shareToken, t, visitorId]);
+  }, [diary.cover.expoName, expoId, shareToken, t, visitorId]);
 
   const handleDownloadPdf = useCallback(async () => {
     const host = bookHostRef.current;
