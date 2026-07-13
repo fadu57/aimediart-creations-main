@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, Download, Heart, Loader2, Share2 } from "luc
 import "page-flip/src/Style/stPageFlip.css";
 
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
+import { AIMEDIART_WEBSITE_URL } from "@/lib/aimediartBrandLogo";
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { Button } from "@/components/ui/button";
 import {
@@ -212,7 +213,16 @@ function DiaryPageFooter() {
           </Button>
         </div>
       ) : null}
-      <p className="text-center text-[10px] text-neutral-400">AIMEDIArt.com</p>
+      <p className="text-center text-[10px]">
+        <a
+          href={AIMEDIART_WEBSITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline underline-offset-2 transition-colors hover:text-blue-800"
+        >
+          AIMEDIArt.com
+        </a>
+      </p>
     </div>
   );
 }
@@ -221,7 +231,7 @@ function CoverSponsorLogos({ logos }: { logos: string[] }) {
   if (logos.length === 0) return null;
 
   return (
-    <div className="mb-3 flex w-full max-w-[360px] justify-center">
+    <div className="mb-2 flex w-full max-w-[360px] shrink-0 justify-center self-center">
       <div className="flex w-full flex-wrap justify-center gap-1.5 rounded-[7px] p-1.5">
         {logos.map((logoUrl, index) => (
           <div
@@ -248,9 +258,13 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
 
   return (
     <div className="travel-diary-page-inner flex h-full flex-col overflow-hidden px-4 py-4 text-center sm:px-6 sm:py-6">
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-        <AimediartBrandLogoBlock size="sm" className="shrink-0 opacity-90" />
+      <AimediartBrandLogoBlock
+        size="sm"
+        href={AIMEDIART_WEBSITE_URL}
+        className="mx-auto shrink-0 opacity-90"
+      />
 
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
         <div className="flex flex-col items-center gap-4">
           <div className="flex w-full flex-col items-center gap-4">
             {cover.expoName ? (
@@ -282,9 +296,9 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
             ) : null}
           </div>
         </div>
-
-        <CoverSponsorLogos logos={cover.sponsorLogoUrls} />
       </div>
+
+      <CoverSponsorLogos logos={cover.sponsorLogoUrls} />
       <DiaryPageFooter />
     </div>
   );

@@ -34,6 +34,7 @@ export default function Summary() {
   const isBackofficeDiaryViewer = typeof role_id === "number" && role_id >= 1 && role_id <= 6;
   const canAccessAsAdmin = isAdminPreview && isBackofficeDiaryViewer && Boolean(visitorIdParam);
   const isSharedView = Boolean(shareToken && shareAccess?.valid);
+  const isShareLinkView = Boolean(shareToken);
 
   const visitorAllowed = useMemo(() => isDiaryUnlocked(expoId), [expoId]);
 
@@ -187,8 +188,8 @@ export default function Summary() {
   ]);
 
   if (!authLoading && !shareResolving && shareToken && shareAccess && !shareAccess.valid) {
-    return (
-      <VisitorPageShell contentClassName="px-4">
+  return (
+    <VisitorPageShell hideHeader={isShareLinkView} contentClassName="px-4">
         <div className="rounded-2xl border border-white/10 bg-[#1e1e1e] p-6 text-center">
           <p className="font-serif text-lg text-[#F0F0F0]">{t("diary.share_expired_title")}</p>
           <p className="mt-2 text-sm text-[#F0F0F0]/70">{t("diary.share_expired_desc")}</p>
@@ -202,7 +203,7 @@ export default function Summary() {
   }
 
   return (
-    <VisitorPageShell contentClassName="px-4">
+    <VisitorPageShell hideHeader={isShareLinkView} contentClassName="px-4">
       {loading ? (
         <div className="flex flex-col items-center gap-3 py-16 text-[#F0F0F0]/80">
           <Loader2 className="h-8 w-8 animate-spin text-[#E63946]" aria-hidden />
@@ -223,6 +224,7 @@ export default function Summary() {
           visitorId={diaryOwnerVisitorId ?? resolvedVisitorId}
           expoId={resolvedExpoId}
           shareToken={isSharedView ? shareToken : null}
+          showToolbar={!isShareLinkView}
           secondaryAction={
             canAccessAsAdmin ? (
               <Button

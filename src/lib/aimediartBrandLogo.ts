@@ -1,5 +1,6 @@
 /** Marque AIMEDIArt — alignée sur le bloc logo du Header (161×40 px desktop). */
 export const AIMEDIART_LOGO_RED = "#ca2b2b";
+export const AIMEDIART_WEBSITE_URL = "https://www.aimediart.com";
 
 export const AIMEDIART_BRAND_LOGO = {
   /** Largeur calculée depuis les bbox Inter (évite la troncature à droite). */

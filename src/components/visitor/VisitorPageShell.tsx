@@ -43,6 +43,8 @@ type Props = {
   contentClassName?: string;
   /** Réduit le padding haut quand une barre d’action est affichée sous le header fixe. */
   compactTopPadding?: boolean;
+  /** Masque le header visiteur (lien de partage carnet). */
+  hideHeader?: boolean;
   languageOptions?: LanguageOption[];
 };
 
@@ -51,6 +53,7 @@ export function VisitorPageShell({
   className,
   contentClassName,
   compactTopPadding = false,
+  hideHeader = false,
   languageOptions = UI_LANGUAGE_OPTIONS,
 }: Props) {
   const { t } = useTranslation("visitor");
@@ -231,7 +234,13 @@ export function VisitorPageShell({
 
   const closeProfilePopup = () => setIsProfilePopupOpen(false);
 
-  const contentTopPadding = isEmbedded ? "pt-[58px]" : compactTopPadding ? "pt-[68px]" : "pt-[64px]";
+  const contentTopPadding = hideHeader
+    ? "pt-4"
+    : isEmbedded
+      ? "pt-[58px]"
+      : compactTopPadding
+        ? "pt-[68px]"
+        : "pt-[64px]";
 
   return (
     <div
@@ -241,6 +250,7 @@ export function VisitorPageShell({
         className,
       )}
     >
+      {!hideHeader ? (
       <div className={cn("œuvre-fixed-header overflow-visible border-b border-white/10", isEmbedded ? "py-1" : "py-1.5")}>
         <div className="flex min-w-0 w-full items-center justify-between gap-1 px-2 sm:px-[15px]">
           <div className="flex min-w-0 basis-auto shrink items-center gap-1.5 overflow-hidden sm:gap-2">
@@ -418,6 +428,7 @@ export function VisitorPageShell({
           </div>
         </div>
       </div>
+      ) : null}
 
       <div className={cn("œuvre-page-container space-y-0 pb-6", contentTopPadding, contentClassName)}>{children}</div>
 

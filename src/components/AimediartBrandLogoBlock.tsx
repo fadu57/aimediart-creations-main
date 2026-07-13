@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Heart } from "lucide-react";
 
 import { AIMEDIART_LOGO_RED } from "@/lib/aimediartBrandLogo";
@@ -15,6 +16,8 @@ export type AimediartBrandLogoBlockProps = {
   animateHeart?: boolean;
   /** Fond semi-transparent (scanner, cartes visiteur). */
   backdrop?: boolean;
+  /** Lien externe (ex. site vitrine). */
+  href?: string;
 };
 
 const SIZE = {
@@ -42,6 +45,7 @@ export function AimediartBrandLogoBlock({
   hideTextBelowSm = false,
   animateHeart = false,
   backdrop = false,
+  href = undefined,
 }: AimediartBrandLogoBlockProps) {
   const resolvedSize = size ?? (compact ? "sm" : "md");
   const tokens = SIZE[resolvedSize];
@@ -89,13 +93,30 @@ export function AimediartBrandLogoBlock({
 
   const rowClassName = cn("flex min-w-0 items-center", tokens.gap, backdrop && "px-1 py-0.5");
 
-  if (backdrop) {
+  const row = <div className={rowClassName}>{content}</div>;
+
+  const wrapLinked = (node: ReactNode) => {
+    const targetHref = href?.trim() || "";
+    if (!targetHref) return node;
+
     return (
-      <div className={cn("inline-flex rounded bg-background/80 backdrop-blur-sm", className)}>
-        <div className={rowClassName}>{content}</div>
-      </div>
+      <a
+        href={targetHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex no-underline transition-opacity hover:opacity-90"
+        aria-label="AIMEDIArt.com"
+      >
+        {node}
+      </a>
+    );
+  };
+
+  if (backdrop) {
+    return wrapLinked(
+      <div className={cn("inline-flex rounded bg-background/80 backdrop-blur-sm", className)}>{row}</div>,
     );
   }
 
-  return <div className={cn(rowClassName, className)}>{content}</div>;
+  return wrapLinked(<div className={cn("inline-flex", className)}>{row}</div>);
 }
