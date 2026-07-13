@@ -19,7 +19,9 @@ const MINIATURE_REF_HEIGHT = 490;
 /** Largeur de référence du carnet avant scale. */
 const MINIATURE_REF_WIDTH = 312;
 /** Décalage vertical pour cadrer la couverture dans la fenêtre miniature. */
-const MINIATURE_OFFSET_TOP = -40;
+const MINIATURE_OFFSET_TOP = 0;
+/** Décalage horizontal pour cadrer la couverture dans la fenêtre miniature. */
+const MINIATURE_OFFSET_LEFT = 0;
 const MINIATURE_SCALE = MINIATURE_MAX_HEIGHT / MINIATURE_REF_HEIGHT;
 const MINIATURE_DISPLAY_WIDTH = Math.round(MINIATURE_REF_WIDTH * MINIATURE_SCALE);
 
@@ -122,13 +124,14 @@ export function TravelDiaryPreviewFlipbook({
         aria-hidden
       >
         <div
-          className="absolute left-1/2 top-0"
+          className="absolute top-0"
           style={{
+            left: MINIATURE_OFFSET_LEFT,
             width: MINIATURE_REF_WIDTH,
             height: MINIATURE_REF_HEIGHT,
             marginTop: MINIATURE_OFFSET_TOP,
-            transform: `translateX(-50%) scale(${MINIATURE_SCALE})`,
-            transformOrigin: "top center",
+            transform: `scale(${MINIATURE_SCALE})`,
+            transformOrigin: "top left",
           }}
         >
           {notebook}

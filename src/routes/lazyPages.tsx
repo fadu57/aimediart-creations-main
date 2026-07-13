@@ -62,5 +62,6 @@ export const ExpoCastPage = lazy(() => import("@/pages/ExpoCastPage"));
 export const OeuvresArtiste = lazy(() => import("@/pages/OeuvresArtiste"));
 export const WelcomeLanding = lazy(() => import("@/pages/WelcomeLanding"));
 export const VisitorWelcome = lazy(() => import("@/pages/visitor/VisitorWelcome"));
+export const VisitorFormPreview = lazy(() => import("@/pages/dev/VisitorFormPreview"));
 export const ExposVisitorAudioMonitor = lazy(() => import("@/pages/ExposVisitorAudioMonitor"));
 export const LegalStaticPage = lazy(() => import("@/pages/LegalStaticPage"));

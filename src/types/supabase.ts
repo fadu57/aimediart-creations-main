@@ -725,6 +725,13 @@ export interface Database {
         };
         Returns: boolean;
       };
+      patch_visitor_feedback_age: {
+        Args: {
+          p_visitor_id: string;
+          p_visitor_age: number;
+        };
+        Returns: undefined;
+      };
       sync_auth_user_ip_on_login: {
         Args: {
           p_ip_address: string;

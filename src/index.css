@@ -1287,6 +1287,8 @@
 
 .travel-diary-root--miniature-ref {
   --diary-h: 490px;
+  position: absolute;
+  left: -125px;
   pointer-events: none;
   user-select: none;
 }

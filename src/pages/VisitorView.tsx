@@ -46,6 +46,7 @@ import {
   resolveReturningAnonymousVisitor,
 } from "@/lib/registerAnonymousVisitorSession";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import { getStoredVisitorAge } from "@/lib/visitorAgeStorage";
 import {
   getVisitorDefaultPromptStyleId,
   loadVisitorDefaultPromptStyleFromServer,
@@ -1096,9 +1097,14 @@ const VisitorViewCore = () => {
       emotion_id: emotionId,
       heart_rating: heartRating,
       expo_id: validExpoId,
+      language,
     };
     if (trimmedComment) {
       payload.comment_text = trimmedComment;
+    }
+    const storedAge = getStoredVisitorAge();
+    if (storedAge != null) {
+      payload.visitor_age = storedAge;
     }
     const activeVisitId = validExpoId ? resolveCurrentVisitIdForExpo(validExpoId) : null;
     if (activeVisitId) {

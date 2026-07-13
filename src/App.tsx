@@ -253,6 +253,9 @@ const AppRoutes = () => (
         <Route path="register" element={<Pages.VisitorRegister />} />
         <Route path="register_visitor" element={<Pages.RegisterVisitor />} />
         <Route path="visitor" element={<Pages.VisitorWelcome />} />
+        {import.meta.env.DEV ? (
+          <Route path="dev/visitor-form" element={<Pages.VisitorFormPreview />} />
+        ) : null}
         <Route element={<OeuvrePageAccessGuard />}>
           <Route element={<ArtworkEntryGate />}>
             <Route path="artworks" element={<ArtworksListRedirect />} />

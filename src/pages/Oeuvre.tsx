@@ -8,6 +8,7 @@ import {
   ensureVisitorSessionBeforeFeedback,
   resolveFeedbackVisitorId,
 } from "@/lib/registerAnonymousVisitorSession";
+import { getStoredVisitorAge } from "@/lib/visitorAgeStorage";
 import { getCurrentExpoId, setCurrentExpoId } from "@/lib/expoContext";
 import aimediartLogoUrl from "@/assets/aimediart-logo.png";
 import { isImageAnalysisPromptStyleRow } from "@/lib/inferPromptStyleKey";
@@ -419,6 +420,9 @@ const Oeuvre = () => {
         throw new Error(t("oeuvre.visitor_id_unavailable"));
       }
 
+      const feedbackLanguage = i18n.language.trim().toLowerCase().slice(0, 2);
+      const storedAge = getStoredVisitorAge();
+
       const { error } = await supabase.from("visitor_feedback").insert({
         artwork_id: artworkId,
         emotion_id: emotionSelectionnee,
@@ -426,6 +430,8 @@ const Oeuvre = () => {
         expo_id: expoId,
         agency_id: agencyId,
         visitor_id: visitorId,
+        language: feedbackLanguage,
+        ...(storedAge != null ? { visitor_age: storedAge } : {}),
       });
 
       if (error) {
