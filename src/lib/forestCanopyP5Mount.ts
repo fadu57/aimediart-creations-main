@@ -1,17 +1,9 @@
 import p5 from "p5";
 
-const CANVAS_HEIGHT = 150;
-const STRIP_MAX_WIDTH = 850;
-const NUM_PARTICLES = 600;
-/** Intervalle entre rafales d’éléments flottants (mots / cœurs) — plus court = plus vivant */
-const OVERLAY_SPAWN_INTERVAL_MS = 1100;
-/** Probabilité qu’un spawn soit un mot (le reste = cœur) — plus bas = plus de cœurs */
-const OVERLAY_WORD_CHANCE = 0.42;
-/** Combien d’éléments par rafale : bandeau 1–2, plein écran 3–4 pour une canopée plus « bavarde » */
-function overlayBurstCount(isStrip: boolean): number {
-  if (isStrip) return Math.random() < 0.65 ? 2 : 1;
-  return 3 + (Math.random() < 0.45 ? 1 : 0);
-}
+import {
+  DEFAULT_RESOLVED_FOREST_CANOPY_CONFIG,
+  type ResolvedForestCanopyConfig,
+} from "@/lib/forestCanopySettings";
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
@@ -34,12 +26,30 @@ export type ForestCanopyMountOptions = ForestCanopyStripOptions | ForestCanopyFu
  * Monte la canopée p5 dans `mount` (bandeau ou plein écran cast).
  * Chaque instance a sa propre liste de mots (pas de tableau global partagé).
  */
-export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMountOptions): () => void {
+export function mountForestCanopyP5(
+  mount: HTMLElement,
+  options: ForestCanopyMountOptions,
+  config: ResolvedForestCanopyConfig = DEFAULT_RESOLVED_FOREST_CANOPY_CONFIG,
+): () => void {
+  const cfg = config;
   const isStrip = options.mode === "strip";
   const stripEl = isStrip ? options.widthElement : mount;
   const wordsFromDB: string[] = [];
   /** Debounce redimensionnement (hors draw) — évite rafales resize sur TV. */
   let resizeDebounceId: ReturnType<typeof setTimeout> | null = null;
+
+  const overlayBurstCount = (strip: boolean): number => {
+    if (strip) {
+      const min = cfg.overlayBurstStripMin;
+      const max = cfg.overlayBurstStripMax;
+      if (min >= max) return min;
+      return min + Math.floor(Math.random() * (max - min + 1));
+    }
+    const min = cfg.overlayBurstFullscreenMin;
+    const max = cfg.overlayBurstFullscreenMax;
+    if (min >= max) return min;
+    return min + Math.floor(Math.random() * (max - min + 1));
+  };
 
   async function fetchEmotions(): Promise<void> {
     wordsFromDB.length = 0;
@@ -80,13 +90,13 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
     let canvasReady = false;
     const floatingElements: FloatingElement[] = [];
 
-    const stripCanvasWidth = () => Math.min(STRIP_MAX_WIDTH, Math.max(stripEl.clientWidth, 320));
+    const stripCanvasWidth = () => Math.min(cfg.stripMaxWidth, Math.max(stripEl.clientWidth, cfg.stripMinWidth));
 
     /** Taille de texte des mots liée à la largeur du canvas (p.width stable après resize). */
     const adaptiveWordFontSize = () =>
-      p.constrain(p.map(p.width, 320, 2560, 20, 50), 20, 50);
+      p.constrain(p.map(p.width, 320, 2560, cfg.wordFontMin, cfg.wordFontMax), cfg.wordFontMin, cfg.wordFontMax);
     const adaptiveHeartFontSize = () =>
-      p.constrain(p.map(p.width, 320, 2560, 24, 54), 22, 58);
+      p.constrain(p.map(p.width, 320, 2560, cfg.heartFontMin, cfg.heartFontMax), cfg.heartFontMin, cfg.heartFontMax);
 
     const overlayTextFont = () =>
       isStrip ? "system-ui, -apple-system, 'Segoe UI', sans-serif" : "Helvetica, Arial, sans-serif";
@@ -124,8 +134,8 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
         this.kind = kind;
         this.x = x;
         this.y = y;
-        /* px/s : même vitesse apparente quel que soit le framerate ou la densité de pixels */
-        this.vyPps = kind === "word" ? p.random(10, 22) : p.random(14, 26);
+        this.vyPps =
+          kind === "word" ? p.random(cfg.wordVyMin, cfg.wordVyMax) : p.random(cfg.heartVyMin, cfg.heartVyMax);
         this.opacity = 255;
         this.textStr = textStr;
         this.fontSize = fontSize;
@@ -144,8 +154,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
         const dtSec =
           typeof p.deltaTime === "number" && p.deltaTime > 0 ? p.deltaTime / 1000 : 1 / 60;
         this.y -= this.vyPps * dtSec;
-        /* Fade lié au temps (~63 / ~99 α·s⁻¹ à l’équivalent 60 Hz) */
-        const opacityPerSec = this.kind === "word" ? 63 : 99;
+        const opacityPerSec = this.kind === "word" ? cfg.wordFadePerSec : cfg.heartFadePerSec;
         this.opacity -= opacityPerSec * dtSec;
       }
 
@@ -158,7 +167,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
         if (this.kind === "heart") {
           p.noStroke();
           p.textAlign(p.CENTER, p.CENTER);
-          p.textSize(Math.max(22, this.fontSize));
+          p.textSize(Math.max(cfg.heartFontMin, this.fontSize));
           p.fill(225, 35, 55, a);
           p.text("❤️", this.x, this.y);
         } else {
@@ -186,7 +195,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       const padY = p.max(20, h * 0.02);
       const x = p.random(padX, Math.max(padX + 1, w - padX));
       const y = p.random(padY, Math.max(padY + 1, h - padY));
-      const useWord = p.random() < OVERLAY_WORD_CHANCE;
+      const useWord = p.random() < cfg.overlayWordChance;
       if (useWord) {
         const idx = Math.floor(p.random(wordsFromDB.length));
         const word = wordsFromDB[idx];
@@ -196,7 +205,9 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
           return;
         }
       }
-      floatingElements.push(new FloatingElement("heart", x, y, "", adaptiveHeartFontSize() * p.random(0.92, 1.08)));
+      floatingElements.push(
+        new FloatingElement("heart", x, y, "", adaptiveHeartFontSize() * p.random(0.92, 1.08)),
+      );
     };
 
     const spawnOverlayBurst = () => {
@@ -222,11 +233,11 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
         this.x = p.random(w);
         this.y = p.random(h);
         const areaScale = p.constrain(Math.sqrt(w * h) / 520, 0.72, 3.2);
-        this.baseSize = p.random(12, 40) * areaScale;
-        this.r = p.random(18, 48);
-        this.g = p.random(80, 160);
-        this.b = p.random(30, 60);
-        this.alpha = 150;
+        this.baseSize = p.random(cfg.leafSizeMin, cfg.leafSizeMax) * areaScale;
+        this.r = p.random(cfg.leafRMin, cfg.leafRMax);
+        this.g = p.random(cfg.leafGMin, cfg.leafGMax);
+        this.b = p.random(cfg.leafBMin, cfg.leafBMax);
+        this.alpha = cfg.leafAlpha;
         this.currentSize = this.baseSize;
       }
 
@@ -248,7 +259,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
 
     const resetParticles = () => {
       particles = [];
-      for (let i = 0; i < NUM_PARTICLES; i++) {
+      for (let i = 0; i < cfg.numParticles; i++) {
         particles.push(new LeafParticle());
       }
     };
@@ -259,7 +270,6 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       displayDensity?: () => number;
     };
 
-    /** DPR natif (1 sur écran standard, 2 sur Retina / beaucoup de 4K) — pas de forçage artificiel. */
     const applyPixelDensity = () => {
       let raw = 1;
       if (typeof pAny.displayDensity === "function") {
@@ -273,7 +283,6 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       }
     };
 
-    /** Pas de scaling CSS sur le canvas : seul le flag agrandissement sans flou navigateur (TV). */
     const applyCanvasPixelatedRendering = () => {
       const canvasEl = p.canvas as HTMLCanvasElement | undefined;
       if (!canvasEl || isStrip) return;
@@ -286,14 +295,13 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       canvasEl.style.removeProperty("image-rendering");
     };
 
-    /** Redimensionnement effectif : une seule fois après debounce (pas dans draw). */
     const commitCanvasResize = () => {
       if (!canvasReady) return;
       if (isStrip) {
         const w = Math.floor(stripCanvasWidth());
         if (w <= 0) return;
-        if (p.width === w && p.height === CANVAS_HEIGHT) return;
-        p.resizeCanvas(w, CANVAS_HEIGHT);
+        if (p.width === w && p.height === cfg.canvasHeight) return;
+        p.resizeCanvas(w, cfg.canvasHeight);
         applyPixelDensity();
         p.smooth();
         clearCanvasPixelatedRendering();
@@ -331,7 +339,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
 
       if (isStrip) {
         const w = Math.floor(stripCanvasWidth());
-        p.createCanvas(w, CANVAS_HEIGHT);
+        p.createCanvas(w, cfg.canvasHeight);
       } else {
         p.createCanvas(Math.floor(window.outerWidth), Math.floor(window.outerHeight));
       }
@@ -349,7 +357,7 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       void fetchEmotions();
       spawnIntervalId = setInterval(() => {
         spawnOverlayBurst();
-      }, OVERLAY_SPAWN_INTERVAL_MS);
+      }, cfg.overlaySpawnIntervalMs);
     };
 
     if (isStrip) {
@@ -367,8 +375,8 @@ export function mountForestCanopyP5(mount: HTMLElement, options: ForestCanopyMou
       } else {
         p.cursor(p.ARROW);
       }
-      p.background(5, 20, 10, 80);
-      const pulse = p.sin(p.frameCount * 0.02) * 20;
+      p.background(cfg.backgroundR, cfg.backgroundG, cfg.backgroundB, cfg.backgroundA);
+      const pulse = p.sin(p.frameCount * cfg.pulseSpeed) * cfg.pulseAmplitude;
       for (const part of particles) {
         part.update(pulse);
         part.display();

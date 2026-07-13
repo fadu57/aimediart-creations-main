@@ -30,7 +30,7 @@ import {
   getCostEventDisplayKey, getCostEventBioRowId, isCostBioEvent,
   DEFAULT_COST_SORT, KNOWN_COST_PROVIDER_KEYS, costProviderDisplayName, costProviderChartColor,
   hasActiveCostFilters, fillKnownCostProvidersBreakdown,
-  effectiveCostEstimatedUsd,
+  costAmountInUsd, sumCostEventsUsd,
   costEventTotalUnits,
   costEventInputUnitKind,
   costEventOutputUnitKind,
@@ -1579,8 +1579,8 @@ function CostsTable({
                 </td>
                 <td className="px-2 py-1 font-mono text-[12px] font-semibold text-primary leading-tight">
                   <CostAmountCell
-                    value={effectiveCostEstimatedUsd(e)}
-                    currency={e.currency}
+                    value={costAmountInUsd(e, usdEurRate)}
+                    currency="USD"
                     usdEurRate={usdEurRate}
                     showEurHint={false}
                   />
@@ -3267,21 +3267,57 @@ export default function SettingsCouts() {
     void fetchVerifiedCostKpi(filters, usdEurRate)
       .then(async ({ data, error }) => {
         if (cancelled) return;
+        const { data: allEvents, error: allEventsError } = await getAllFilteredCostEvents(
+          filters,
+          DEFAULT_COST_SORT,
+        );
+        if (cancelled) return;
+
+        const clientTotalUsd = sumCostEventsUsd(allEvents, usdEurRate);
+        const clientCallCount = allEvents.length;
+
         if (error || !data) {
           setKpiError(error ?? t("couts.kpi_error_fallback"));
           setKpiIntegrity(null);
-          setSummary(null);
-          setByProvider([]);
-          setEventsTotals(null);
+          if (allEventsError) {
+            setSummary(null);
+            setByProvider([]);
+            setEventsTotals(null);
+          } else {
+            setSummary({
+              totalCost: clientTotalUsd,
+              callCount: clientCallCount,
+              avgCostPerCall: clientCallCount > 0 ? clientTotalUsd / clientCallCount : 0,
+              totalInputUnits: allEvents.reduce((s, e) => s + (Number(e.input_units) || 0), 0),
+              totalOutputUnits: allEvents.reduce((s, e) => s + (Number(e.output_units) || 0), 0),
+              topProvider: null,
+              topTool: null,
+              currency: "USD",
+            });
+            setByProvider([]);
+            setEventsTotals({
+              totalCost: clientTotalUsd,
+              totalInputUnits: allEvents.reduce((s, e) => s + (Number(e.input_units) || 0), 0),
+              totalOutputUnits: allEvents.reduce((s, e) => s + (Number(e.output_units) || 0), 0),
+              currency: "USD",
+            });
+          }
           const ts = await getCostTimeSeries(filters, { usdToEurRate: usdEurRate });
           if (!cancelled) setTimeSeries(ts);
           return;
         }
         setKpiError(null);
-        setSummary(data.summary);
+        const alignedTotalUsd = clientTotalUsd;
+        const alignedCallCount = clientCallCount;
+        setSummary({
+          ...data.summary,
+          totalCost: alignedTotalUsd,
+          callCount: alignedCallCount,
+          avgCostPerCall: alignedCallCount > 0 ? alignedTotalUsd / alignedCallCount : 0,
+        });
         setByProvider(data.byProvider);
         setEventsTotals({
-          totalCost: data.summary.totalCost,
+          totalCost: alignedTotalUsd,
           totalInputUnits: data.summary.totalInputUnits ?? 0,
           totalOutputUnits: data.summary.totalOutputUnits ?? 0,
           currency: data.summary.currency,
@@ -3346,7 +3382,7 @@ export default function SettingsCouts() {
           toast.warning(t("couts.export_empty"));
           return;
         }
-        await exportCostsCsv(data);
+        await exportCostsCsv(data, usdEurRate);
         toast.success(t("couts.export_done", { count: data.length.toLocaleString("fr-FR") }));
       } catch (e) {
         toast.error(t("couts.export_error", { detail: String(e) }));
@@ -3354,7 +3390,7 @@ export default function SettingsCouts() {
         setExportingCsv(false);
       }
     })();
-  }, [filters, sort, t]);
+  }, [filters, sort, t, usdEurRate]);
 
   // ---- KPI cards ----
   const currency = summary?.currency ?? "EUR";

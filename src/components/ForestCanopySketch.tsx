@@ -25,13 +25,20 @@ export function ForestCanopySketch({ className }: { className?: string }) {
     };
 
     const mountP5 = () => {
-      void import("@/lib/forestCanopyP5Mount").then(({ mountForestCanopyP5 }) => {
+      void import("@/lib/forestCanopyP5Mount").then(async ({ mountForestCanopyP5 }) => {
         if (cancelled || !wrapRef.current) return;
-        cleanup = mountForestCanopyP5(wrapRef.current, {
-          mode: "strip",
-          widthElement: wrapRef.current,
-          onCanvasClickOpenCast: openExpo,
-        });
+        const { fetchForestCanopySettings } = await import("@/lib/forestCanopySettings");
+        const { resolved } = await fetchForestCanopySettings();
+        if (cancelled || !wrapRef.current) return;
+        cleanup = mountForestCanopyP5(
+          wrapRef.current,
+          {
+            mode: "strip",
+            widthElement: wrapRef.current,
+            onCanvasClickOpenCast: openExpo,
+          },
+          resolved,
+        );
       });
     };
 

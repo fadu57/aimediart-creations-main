@@ -226,6 +226,8 @@
     "badge_rayonner": "Irradiare",
     "badge_zenith": "Incantare",
     "gratuit": "PROVA GRATUITA DI UN MESE",
+    "gratuit_trial_one": "PROVA GRATUITA DI {{count}} GIORNO",
+    "gratuit_trial_many": "PROVA GRATUITA DI {{count}} GIORNI",
     "sur_devis": "Su Preventivo",
     "plan_desc_etincelle": "Offerta d'ingresso, ideale per testare la mediazione dialogata.",
     "plan_desc_atelier": "Per artisti e strutture con catalogo fisso.",
@@ -239,6 +241,7 @@
     "capacity_visitors": "{{count}} visitatori max",
     "capacity_oeuvres_block": "{{count}} opere registrate al massimo",
     "capacity_visitors_block": "{{count}} visitatori al mese al massimo",
+    "capacity_visitors_block_trial": "{{count}} visitatori",
     "capacity_suffix_one_month": " - 1 mese max",
     "option_standby": "Piano veglia",
     "option_languages": "Lingue",
@@ -246,6 +249,8 @@
     "option_usage": "Utilizzo",
     "usage_none": "—",
     "usage_limited_one_month": "Limitato a 1 mese",
+    "usage_limited_trial_one": "Limitato a {{count}} giorno",
+    "usage_limited_trial_many": "Limitato a {{count}} giorni",
     "usage_no_limit": "Nessun limite di utilizzo",
     "usage_network": "Reti ed esposizioni permanenti",
     "usage_custom_event": "Grande evento culturale su misura",
@@ -257,7 +262,7 @@
     "languages_extra_none": "—",
     "languages_custom": "Su misura",
     "audio_none": "No",
-    "audio_included_one": "1 lingua inclusa",
+    "audio_included_one": "{{count}} lingua inclusa",
     "audio_included_many": "{{count}} lingue incluse",
     "audio_extra": "+{{price}}/lingua aggiuntiva",
     "standby_price": "{{price}}/mese",
@@ -293,7 +298,8 @@
     "essentials_title": "Da ricordare",
     "essentials_items": [
       "Il piano standby è fatturato mensilmente.",
-      "Il passaggio in standby decorre dalla tua prossima scadenza.",
+      "Il passaggio in standby decorre dalla prossima scadenza mensile.",
+      "Massimo 6 mesi di piano standby all'anno.",
       "I tuoi dati e il tuo back-office restano accessibili.",
       "Puoi riattivare il tuo piano attivo quando vuoi."
     ],
@@ -308,10 +314,10 @@
       "Per conservare serenamente catalogo e impostazioni senza impegno attivo"
     ],
     "eligibility_title": "Condizioni di idoneità",
-    "eligibility_intro": "Il piano standby è riservato agli abbonamenti mensili Atelier e Horizon.",
+    "eligibility_intro": "Il piano standby è riservato agli abbonamenti mensili Atelier, Horizon ed Envergure.",
     "eligibility_items": [
-      "Disponibile solo sui piani Atelier e Horizon con pagamento mensile",
-      "Non disponibile su Étincelle",
+      "Disponibile solo sui piani Atelier, Horizon ed Envergure con pagamento mensile",
+      "Massimo 6 mesi su un periodo mobile di 1 anno",
       "Non disponibile sugli abbonamenti annuali",
       "Lo sconto «1 mese e mezzo offerto» è riservato agli abbonamenti annuali attivi"
     ],
@@ -367,10 +373,8 @@
       }
     ],
     "pricing_title": "Tariffe standby",
-    "pricing_current": "{{plan}}: {{price}}/mese in standby",
-    "pricing_note": "Il piano standby si applica alla formula mensile che hai già scelto (Atelier o Horizon). Non sostituisce un abbonamento principale: garantisce la continuità tra due periodi attivi.",
-    "pricing_atelier": "Atelier — piano standby: 19 €/mese",
-    "pricing_horizon": "Horizon — piano standby: 49 €/mese",
+    "pricing_plan_line": "{{plan}} — piano standby: {{price}}/mese",
+    "pricing_note": "Il piano standby si applica alla formula mensile che hai già scelto (Atelier, Horizon o Envergure). Non sostituisce un abbonamento principale: garantisce la continuità tra due periodi attivi.",
     "pricing_etincelle": "Étincelle — nessun piano standby (offerta di prova limitata, senza opzione standby)",
     "pricing_rayonnement": "Rayonnement — su misura secondo contratto",
     "reactivation_title": "Riattivazione",
@@ -381,7 +385,7 @@
     "request_success": "La tua richiesta di piano standby è stata registrata. Puoi annullarla entro 24 h dal tuo profilo.",
     "request_error": "Impossibile registrare la richiesta di piano standby.",
     "error_role": "Il piano standby è riservato agli utenti di livello inferiore a 6.",
-    "error_not_eligible": "Il tuo abbonamento attuale non consente il passaggio al piano standby (richiesto Atelier o Horizon mensile).",
+    "error_not_eligible": "Il tuo abbonamento attuale non consente il passaggio al piano standby (richiesto Atelier, Horizon o Envergure mensile).",
     "error_already_pending": "Una richiesta di piano standby è già attiva."
   },
   "access": {

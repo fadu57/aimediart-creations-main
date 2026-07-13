@@ -89,15 +89,20 @@ type CostEventLike = UsageEventLike & {
   currency?: string | null;
 };
 
+/** Coût affiché / agrégé : recalcule OpenAI TTS legacy, sinon cost_estimated en base. */
+export function effectiveCostEstimatedUsd(event: CostEventLike): number {
+  if (event.provider === "openai" && event.tool_type === "tts") {
+    return recalculateOpenAiTtsEventCostUsd(event);
+  }
+  return Number(event.cost_estimated) || 0;
+}
+
 /** Coût normalisé USD pour agrégation KPI. */
 export function costAmountInUsd(
   event: CostEventLike,
   usdToEurRate: number | null = null,
 ): number {
-  let amount = Number(event.cost_estimated) || 0;
-  if (event.provider === "openai" && event.tool_type === "tts") {
-    amount = recalculateOpenAiTtsEventCostUsd(event);
-  }
+  const amount = effectiveCostEstimatedUsd(event);
   const currency = (event.currency ?? "USD").toUpperCase();
   if (currency === "EUR" && usdToEurRate != null && usdToEurRate > 0) {
     return amount / usdToEurRate;

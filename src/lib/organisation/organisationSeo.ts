@@ -15,6 +15,13 @@ export const ORGANISATION_OG_IMAGE_PATH = "/landing-hero-new.png";
 
 export const ORGANISATION_LCP_IMAGE_PATH = ORGANISATION_OG_IMAGE_PATH;
 export const ORGANISATION_LCP_WEBP_PATH = ORGANISATION_LCP_IMAGE_PATH.replace(/\.png$/i, ".webp");
+export const ORGANISATION_LCP_PRELOAD_LINK_ID = "organisation-lcp-preload";
+
+/** Preload hero LCP uniquement sur /organisation sans ancre ou avec #accueil. */
+export function shouldPreloadOrganisationLcp(hash: string): boolean {
+  const anchorId = hash.replace(/^#/, "").trim();
+  return anchorId === "" || anchorId === "accueil";
+}
 
 export const ORGANISATION_KEYWORDS =
   "médiation exposition, art-médiation, QR code musée, visite virtuelle, émotions visiteurs, galerie, musée, IA culturelle, AIMEDIArt";
@@ -126,18 +133,42 @@ export function escapeHtmlAttribute(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+/** Synchronise le preload LCP hero selon l'ancre vitrine (navigation client). */
+export function syncOrganisationLcpPreload(hash: string): void {
+  if (typeof document === "undefined") return;
+
+  const shouldPreload = shouldPreloadOrganisationLcp(hash);
+  const existing = document.getElementById(ORGANISATION_LCP_PRELOAD_LINK_ID) as HTMLLinkElement | null;
+
+  if (!shouldPreload) {
+    existing?.remove();
+    return;
+  }
+
+  if (existing) return;
+
+  const link = document.createElement("link");
+  link.id = ORGANISATION_LCP_PRELOAD_LINK_ID;
+  link.rel = "preload";
+  link.as = "image";
+  link.type = "image/webp";
+  link.href = `${window.location.origin}${ORGANISATION_LCP_WEBP_PATH}`;
+  link.setAttribute("fetchpriority", "high");
+  document.head.appendChild(link);
+}
+
 /** Injecte / remplace les balises <head> SEO pour dist/organisation/index.html */
 export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload): string {
   const jsonLd = JSON.stringify(buildOrganisationJsonLd(seo)).replace(/</g, "\\u003c");
   const lcpWebpUrl = `${seo.siteOrigin}${ORGANISATION_LCP_WEBP_PATH}`;
   const preloadLcp = !seo.pageUrl.includes("#") || /#accueil(?:$|[?&])/.test(seo.pageUrl);
+  const organisationLcpPreloadScript = preloadLcp
+    ? `<script>(function(){var h=location.hash.replace(/^#/,"");if(!h||h==="accueil"){var l=document.createElement("link");l.id="${ORGANISATION_LCP_PRELOAD_LINK_ID}";l.rel="preload";l.as="image";l.type="image/webp";l.href="${escapeHtmlAttribute(lcpWebpUrl)}";l.setAttribute("fetchpriority","high");document.head.appendChild(l);}})();</script>`
+    : "";
   const performanceHints = `
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />${
-      preloadLcp
-        ? `
-    <link rel="preload" as="image" type="image/webp" href="${escapeHtmlAttribute(lcpWebpUrl)}" fetchpriority="high" />`
-        : ""
+      preloadLcp ? `\n    ${organisationLcpPreloadScript}` : ""
     }`;
   const headBlock = `
     <title>${escapeHtmlAttribute(seo.title)}</title>

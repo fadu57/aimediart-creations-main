@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Check, MoonStar, Sparkles, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -15,9 +15,12 @@ import {
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { canUseStandbyPlanFeatures } from "@/lib/organisationStandby";
 import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
+import { fetchPricingByPlanCode, type PricingRow } from "@/lib/organisation/publicHomeData";
 import { cn } from "@/lib/utils";
 
 export type StandbyPlanCode = "ATELIER" | "HORIZON";
+
+const STANDBY_PRICING_PLAN_CODES: StandbyPlanCode[] = ["ATELIER", "HORIZON"];
 
 type StandbyPlanModalProps = {
   open: boolean;
@@ -69,12 +72,39 @@ export function StandbyPlanModal({
   const { session, role_id } = useAuthUser();
   const { state, requestStandby } = useOrganisationStandby();
   const [submitting, setSubmitting] = useState(false);
+  const [standbyPricingRows, setStandbyPricingRows] = useState<PricingRow[]>([]);
   const ns = "standby_modal";
-  const priceLabel = new Intl.NumberFormat(i18n.language, {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(monthlyPriceEur);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      const rows = await Promise.all(
+        STANDBY_PRICING_PLAN_CODES.map((code) => fetchPricingByPlanCode(code)),
+      );
+      if (!cancelled) {
+        setStandbyPricingRows(rows.filter((row): row is PricingRow => row != null));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const formatStandbyPrice = (value: number) =>
+    new Intl.NumberFormat(i18n.language, {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 0,
+    }).format(value);
+
+  const standbyPlanLineLabel = (row: PricingRow): string | null => {
+    const price = row.standby_monthly_price_ttc_eur;
+    if (typeof price !== "number" || price <= 0) return null;
+    const planName =
+      row.display_name?.trim() || row.pricing_plan?.trim() || row.plan_code?.trim() || "—";
+    return t(`${ns}.pricing_plan_line`, { plan: planName, price: formatStandbyPrice(price) });
+  };
 
   const whenItems = t(`${ns}.when_items`, { returnObjects: true }) as string[];
   const essentialsItems = t(`${ns}.essentials_items`, { returnObjects: true }) as string[];
@@ -233,13 +263,13 @@ export function StandbyPlanModal({
           </ModalSection>
 
           <ModalSection title={t(`${ns}.pricing_title`)} className="border-amber-200/70 bg-amber-50/50">
-            <p className="text-base font-semibold text-[#1f1f1f]">
-              {t(`${ns}.pricing_current`, { plan: planDisplayName, price: priceLabel })}
-            </p>
-            <p className="mt-2 text-sm text-foreground/75">{t(`${ns}.pricing_note`)}</p>
+            <p className="text-sm text-foreground/75">{t(`${ns}.pricing_note`)}</p>
             <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-              <li>{t(`${ns}.pricing_atelier`)}</li>
-              <li>{t(`${ns}.pricing_horizon`)}</li>
+              {standbyPricingRows.map((row) => {
+                const label = standbyPlanLineLabel(row);
+                if (!label) return null;
+                return <li key={row.plan_code ?? row.pricing_id ?? label}>{label}</li>;
+              })}
               <li>{t(`${ns}.pricing_etincelle`)}</li>
               <li>{t(`${ns}.pricing_rayonnement`)}</li>
             </ul>

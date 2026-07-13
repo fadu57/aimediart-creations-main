@@ -226,6 +226,8 @@
     "badge_rayonner": "Irradiar",
     "badge_zenith": "Deslumbrar",
     "gratuit": "PRUEBA GRATUITA DE UN MES",
+    "gratuit_trial_one": "PRUEBA GRATUITA DE {{count}} DÍA",
+    "gratuit_trial_many": "PRUEBA GRATUITA DE {{count}} DÍAS",
     "sur_devis": "Bajo Presupuesto",
     "plan_desc_etincelle": "Oferta de entrada, ideal para probar la mediación dialogada.",
     "plan_desc_atelier": "Para artistas y estructuras con catálogo fijo.",
@@ -239,6 +241,7 @@
     "capacity_visitors": "{{count}} visitantes máx.",
     "capacity_oeuvres_block": "{{count}} obras registradas como máximo",
     "capacity_visitors_block": "{{count}} visitantes por mes como máximo",
+    "capacity_visitors_block_trial": "{{count}} visitantes",
     "capacity_suffix_one_month": " - 1 mes máx.",
     "option_standby": "Plan en reposo",
     "option_languages": "Idiomas",
@@ -246,6 +249,8 @@
     "option_usage": "Uso",
     "usage_none": "—",
     "usage_limited_one_month": "Limitado a 1 mes",
+    "usage_limited_trial_one": "Limitado a {{count}} día",
+    "usage_limited_trial_many": "Limitado a {{count}} días",
     "usage_no_limit": "Sin límite de uso",
     "usage_network": "Redes y exposiciones permanentes",
     "usage_custom_event": "Gran evento cultural a medida",
@@ -257,7 +262,7 @@
     "languages_extra_none": "—",
     "languages_custom": "A medida",
     "audio_none": "No",
-    "audio_included_one": "1 idioma incluido",
+    "audio_included_one": "{{count}} idioma incluido",
     "audio_included_many": "{{count}} idiomas incluidos",
     "audio_extra": "+{{price}}/idioma adicional",
     "standby_price": "{{price}}/mes",
@@ -293,7 +298,8 @@
     "essentials_title": "Para recordar",
     "essentials_items": [
       "El plan en espera se factura mensualmente.",
-      "El paso a espera entra en vigor en su próximo vencimiento.",
+      "El paso a espera entra en vigor en su próximo vencimiento mensual.",
+      "Máximo 6 meses de plan en espera al año.",
       "Sus datos y su back-office siguen accesibles.",
       "Puede reactivar su plan activo cuando lo desee."
     ],
@@ -308,10 +314,10 @@
       "Para conservar con tranquilidad el catálogo y la configuración sin compromiso activo"
     ],
     "eligibility_title": "Condiciones de elegibilidad",
-    "eligibility_intro": "El plan en espera está reservado a las suscripciones mensuales Atelier y Horizon.",
+    "eligibility_intro": "El plan en espera está reservado a las suscripciones mensuales Atelier, Horizon y Envergure.",
     "eligibility_items": [
-      "Disponible únicamente en los planes Atelier y Horizon con pago mensual",
-      "No disponible en Étincelle",
+      "Disponible únicamente en los planes Atelier, Horizon y Envergure con pago mensual",
+      "Un máximo de 6 meses en un período móvil de 1 año",
       "No disponible en las suscripciones anuales",
       "El descuento «1 mes y medio gratis» está reservado a las suscripciones anuales activas"
     ],
@@ -367,10 +373,8 @@
       }
     ],
     "pricing_title": "Tarifas en espera",
-    "pricing_current": "{{plan}}: {{price}}/mes en espera",
-    "pricing_note": "El plan en espera se aplica al plan mensual que ya ha elegido (Atelier u Horizon). No sustituye a una suscripción principal: garantiza la continuidad entre dos periodos activos.",
-    "pricing_atelier": "Atelier — plan en espera: 19 €/mes",
-    "pricing_horizon": "Horizon — plan en espera: 49 €/mes",
+    "pricing_plan_line": "{{plan}} — plan en espera: {{price}}/mes",
+    "pricing_note": "El plan en espera se aplica al plan mensual que ya ha elegido (Atelier, Horizon o Envergure). No sustituye a una suscripción principal: garantiza la continuidad entre dos periodos activos.",
     "pricing_etincelle": "Étincelle — sin plan en espera (oferta de prueba limitada, sin opción de espera)",
     "pricing_rayonnement": "Rayonnement — a medida según contrato",
     "reactivation_title": "Reactivación",
@@ -381,7 +385,7 @@
     "request_success": "Su solicitud de plan en espera se ha registrado. Puede cancelarla durante 24 h desde su perfil.",
     "request_error": "No se pudo registrar la solicitud de plan en espera.",
     "error_role": "El plan en espera está reservado a los usuarios de nivel inferior a 6.",
-    "error_not_eligible": "Su suscripción actual no permite pasar al plan en espera (se requiere Atelier u Horizon mensual).",
+    "error_not_eligible": "Su suscripción actual no permite pasar al plan en espera (se requiere Atelier, Horizon o Envergure mensual).",
     "error_already_pending": "Ya hay una solicitud de plan en espera activa."
   },
   "access": {

@@ -27,9 +27,10 @@ export function StandbyPlanTrigger({
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "group flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-400/90",
-          "bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 px-0.5 py-2.5",
-          "text-sm font-bold tracking-wide text-amber-950 shadow-[0_4px_14px_rgba(245,158,11,0.22)]",
+          "standby-plan-trigger group flex w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/90",
+          "bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 px-2 py-2.5",
+          "text-center text-[11px] font-bold leading-tight tracking-wide text-amber-950",
+          "shadow-[0_4px_14px_rgba(245,158,11,0.22)]",
           "transition hover:border-amber-500 hover:from-amber-100 hover:to-amber-100/80",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2",
           className,
@@ -40,9 +41,9 @@ export function StandbyPlanTrigger({
           className="h-4 w-4 shrink-0 fill-amber-500 text-amber-500 transition group-hover:scale-110"
           aria-hidden
         />
-        <span className="flex min-w-0 flex-col items-center leading-snug">
-          <span className="whitespace-nowrap">{t("standby_modal.trigger_label_line1")}</span>
-          <span className="whitespace-nowrap text-xs font-semibold normal-case tracking-normal">
+        <span className="flex min-w-0 max-w-full flex-col items-center gap-0.5">
+          <span className="max-w-full break-words text-balance">{t("standby_modal.trigger_label_line1")}</span>
+          <span className="max-w-full break-words text-[10px] font-semibold normal-case tracking-normal text-balance">
             {t("standby_modal.trigger_label_line2")}
           </span>
         </span>

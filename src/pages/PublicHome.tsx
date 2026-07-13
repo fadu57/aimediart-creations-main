@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, lazy, Suspense, type CSSProperties, type ReactNode } from "react";
+﻿import { useEffect, useLayoutEffect, useMemo, useRef, useState, lazy, Suspense, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import type { Swiper as SwiperClass } from "swiper";
@@ -8,7 +8,13 @@ import "swiper/css/effect-coverflow";
 import "swiper/css/navigation";
 import {
   fetchPublicHomeData,
+  findPricingOption,
   getOrganisationInitialData,
+  hasStandbyOffer,
+  optionUnitPriceFromRow,
+  pricingMaxOeuvres,
+  pricingMaxVisitors,
+  resolveStandbyPrice,
   type PricingRow,
   type PublicHomeInitialData,
 } from "@/lib/organisation/publicHomeData";
@@ -63,6 +69,7 @@ import accessibiliteWebp from "@/assets/accessibilite.webp";
 import contactPhoto from "@/assets/contact.png";
 import contactWebp from "@/assets/contact.webp";
 import { scrollToVitrineAnchor } from "@/lib/vitrineAnchorScroll";
+import { shouldPreloadOrganisationLcp, syncOrganisationLcpPreload } from "@/lib/organisation/organisationSeo";
 import { AIMEDIART_CONTACT_MAILTO } from "@/lib/aimediartContact";
 
 const ForestCanopySketch = lazy(() =>
@@ -163,13 +170,25 @@ function formatEurAuto(value: number | null | undefined, locale: string): string
   }).format(value);
 }
 
-/** Mensuel TTC : 0 → GRATUIT, NULL → Sur Devis, sinon montant + €/mois. */
-function formatMonthlyTtcDisplay(value: number | null | undefined, t: TFunction, locale: string): string {
+/** Mensuel TTC : 0 → essai gratuit (jours depuis pricing), NULL → Sur Devis, sinon montant + €/mois. */
+function formatMonthlyTtcDisplay(
+  value: number | null | undefined,
+  t: TFunction,
+  locale: string,
+  trialDurationDays?: number | null,
+): string {
   if (value === null || value === undefined) return t("tarifs.sur_devis");
-  if (value === 0) return t("tarifs.gratuit");
   const n = typeof value === "number" && !Number.isNaN(value) ? value : Number(value);
   if (!Number.isFinite(n)) return t("tarifs.sur_devis");
-  if (n === 0) return t("tarifs.gratuit");
+  if (n === 0) {
+    const days = trialDurationDays;
+    if (typeof days === "number" && days > 0) {
+      return days === 1
+        ? t("tarifs.gratuit_trial_one", { count: days })
+        : t("tarifs.gratuit_trial_many", { count: days });
+    }
+    return t("tarifs.gratuit");
+  }
   return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n)}\u00a0${t("tarifs.per_month")}`;
 }
 
@@ -261,9 +280,18 @@ function planCodeFromRow(row: PricingRow): string {
   return planNameAsciiUpper(row.pricing_plan);
 }
 
+function capacityVisitorsBlockLabel(row: PricingRow, t: TFunction): string | null {
+  const maxVisitors = pricingMaxVisitors(row);
+  if (typeof maxVisitors !== "number" || maxVisitors <= 0) return null;
+  if (planCodeFromRow(row).includes("ETINCELLE")) {
+    return t("tarifs.capacity_visitors_block_trial", { count: maxVisitors });
+  }
+  return t("tarifs.capacity_visitors_block", { count: maxVisitors });
+}
+
 function capacityLabel(row: PricingRow, t: TFunction): string {
-  const maxOeuvres = row.pricing_max_oeuvres;
-  const maxVisitors = row.princing_max_visitors;
+  const maxOeuvres = pricingMaxOeuvres(row);
+  const maxVisitors = pricingMaxVisitors(row);
   const hasConcreteLimits =
     (typeof maxOeuvres === "number" && maxOeuvres > 0) ||
     (typeof maxVisitors === "number" && maxVisitors > 0);
@@ -271,10 +299,14 @@ function capacityLabel(row: PricingRow, t: TFunction): string {
   const oeuvresPart =
     typeof maxOeuvres === "number" && maxOeuvres > 0
       ? t("tarifs.capacity_oeuvres", { count: maxOeuvres })
-      : "Œuvres sur mesure";
+      : row.pricing_is_unlimited
+        ? t("tarifs.capacity_oeuvres_unlimited")
+        : "Œuvres sur mesure";
   const visitorsPart =
     typeof maxVisitors === "number" && maxVisitors > 0
-      ? t("tarifs.capacity_visitors", { count: maxVisitors })
+      ? planCodeFromRow(row).includes("ETINCELLE")
+        ? t("tarifs.capacity_visitors_block_trial", { count: maxVisitors })
+        : t("tarifs.capacity_visitors", { count: maxVisitors })
       : "Visiteurs sur mesure";
   const base = `${oeuvresPart} · ${visitorsPart}`;
   if (planCodeFromRow(row).includes("ETINCELLE")) {
@@ -284,43 +316,41 @@ function capacityLabel(row: PricingRow, t: TFunction): string {
 }
 
 function CapacityBlockSummary({ row, t }: { row: PricingRow; t: TFunction }) {
-  const maxOeuvres = row.pricing_max_oeuvres;
-  const maxVisitors = row.princing_max_visitors;
-  const hasConcreteLimits =
-    (typeof maxOeuvres === "number" && maxOeuvres > 0) ||
-    (typeof maxVisitors === "number" && maxVisitors > 0);
+  const maxOeuvres = pricingMaxOeuvres(row);
+  const maxVisitors = pricingMaxVisitors(row);
 
-  if (row.pricing_is_unlimited && !hasConcreteLimits) {
-    return <div className="text-sm font-semibold leading-snug">{t("tarifs.capacity_unlimited")}</div>;
+  const oeuvresLine =
+    typeof maxOeuvres === "number" && maxOeuvres > 0
+      ? t("tarifs.capacity_oeuvres_block", { count: maxOeuvres })
+      : row.pricing_is_unlimited
+        ? t("tarifs.capacity_oeuvres_unlimited")
+        : null;
+
+  const visitorsLine = capacityVisitorsBlockLabel(row, t);
+
+  if (!oeuvresLine && !visitorsLine) {
+    if (row.pricing_is_unlimited) {
+      return <div className="text-sm font-semibold leading-snug">{t("tarifs.capacity_unlimited")}</div>;
+    }
+    return null;
   }
-
-  const oeuvresUnlimited = Boolean(row.pricing_is_unlimited) && !(typeof maxOeuvres === "number" && maxOeuvres > 0);
 
   return (
     <div className="text-sm font-semibold leading-snug">
-      {oeuvresUnlimited ? (
-        <div>{t("tarifs.capacity_oeuvres_unlimited")}</div>
-      ) : typeof maxOeuvres === "number" && maxOeuvres > 0 ? (
-        <div>{t("tarifs.capacity_oeuvres_block", { count: maxOeuvres })}</div>
-      ) : null}
-      {typeof maxVisitors === "number" && maxVisitors > 0 ? (
-        <div>{t("tarifs.capacity_visitors_block", { count: maxVisitors })}</div>
-      ) : null}
+      {oeuvresLine ? <div>{oeuvresLine}</div> : null}
+      {visitorsLine ? <div>{visitorsLine}</div> : null}
     </div>
   );
 }
 
 function shouldHideStandbyDetailRow(row: PricingRow, hideStandbyRow: boolean): boolean {
   if (hideStandbyRow) return true;
-  const code = planCodeFromRow(row);
-  return code.includes("ETINCELLE") || code.includes("RAYONNEMENT") || code.includes("ZENITH");
+  const price = resolveStandbyPrice(row);
+  return typeof price !== "number" || price <= 0;
 }
 
 function optionUnitPrice(row: PricingRow, optionCode: string): number | null {
-  const fromOptions = row.pricing_options.find((o) => o.option_code === optionCode)?.unit_price_ttc_eur;
-  if (typeof fromOptions === "number") return fromOptions;
-  if (optionCode === "STANDBY") return row.standby_monthly_price_ttc_eur;
-  return null;
+  return optionUnitPriceFromRow(row, optionCode);
 }
 
 function formatCompactEur(value: number | null | undefined, locale: string): string {
@@ -337,56 +367,94 @@ function planStandbyLabel(row: PricingRow, t: TFunction, locale: string): string
   return t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
 }
 
+function formatExtraOptionSuffix(
+  row: PricingRow,
+  optionCode: string,
+  t: TFunction,
+  locale: string,
+  pricedKey: "languages_extra" | "audio_extra",
+): string | null {
+  const opt = findPricingOption(row, optionCode);
+  if (!opt) return null;
+  const price = opt.unit_price_ttc_eur;
+  if (typeof price === "number" && price > 0) {
+    return t(`tarifs.${pricedKey}`, { price: formatCompactEur(price, locale) });
+  }
+  if (opt.billing_mode === "on_quote" || price === null) {
+    return t("tarifs.languages_extra_on_quote");
+  }
+  return null;
+}
+
 function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): string {
   if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
   const min = row.included_mediation_langs_min;
-  const max = row.included_mediation_langs_max ?? min;
-  const extraPrice = optionUnitPrice(row, "EXTRA_MEDIATION_LANG");
-  let included = "";
-  if (min === 1 && max === 1) included = t("tarifs.languages_included_one", { count: 1 });
-  else if (typeof min === "number" && typeof max === "number" && min !== max) {
-    included = t("tarifs.languages_included_range", { min, max });
-  } else if (typeof max === "number" && max > 1) {
-    included = t("tarifs.languages_included_many", { count: max });
-  } else if (typeof min === "number") {
-    included = t("tarifs.languages_included_one", { count: min });
-  } else {
+  const max = row.included_mediation_langs_max;
+  if (typeof min !== "number" || Number.isNaN(min)) {
+    if (typeof max === "number" && !Number.isNaN(max)) {
+      const included =
+        max === 1
+          ? t("tarifs.languages_included_one", { count: max })
+          : t("tarifs.languages_included_many", { count: max });
+      const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra");
+      return extraSuffix ? `${included} · ${extraSuffix}` : included;
+    }
     return t("tarifs.usage_none");
   }
-  if (planCodeFromRow(row).includes("RAYONNEMENT")) {
-    return `${included} ${t("tarifs.languages_extra_on_quote")}`;
-  }
-  if (typeof extraPrice !== "number") return included;
-  return `${included} · ${t("tarifs.languages_extra", { price: formatCompactEur(extraPrice, locale) })}`;
+
+  const maxVal = typeof max === "number" && !Number.isNaN(max) ? max : min;
+  const included =
+    min === maxVal
+      ? min === 1
+        ? t("tarifs.languages_included_one", { count: min })
+        : t("tarifs.languages_included_many", { count: min })
+      : t("tarifs.languages_included_range", { min, max: maxVal });
+
+  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra");
+  return extraSuffix ? `${included} · ${extraSuffix}` : included;
 }
 
 function planAudioLabel(row: PricingRow, t: TFunction, locale: string): string {
   if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
-  const audioLangs = row.included_audio_langs ?? 0;
-  const extraPrice = optionUnitPrice(row, "EXTRA_AUDIO_LANG");
-  if (audioLangs <= 0) return t("tarifs.audio_none");
-  const included =
-    audioLangs === 1 ? t("tarifs.audio_included_one") : t("tarifs.audio_included_many", { count: audioLangs });
-  if (planCodeFromRow(row).includes("RAYONNEMENT")) {
-    return `${included} ${t("tarifs.languages_extra_on_quote")}`;
+  const audioLangs = row.included_audio_langs;
+  if (typeof audioLangs !== "number" || Number.isNaN(audioLangs) || audioLangs <= 0) {
+    return t("tarifs.audio_none");
   }
-  if (typeof extraPrice !== "number") return included;
-  return `${included} · ${t("tarifs.audio_extra", { price: formatCompactEur(extraPrice, locale) })}`;
+  const included =
+    audioLangs === 1
+      ? t("tarifs.audio_included_one", { count: audioLangs })
+      : t("tarifs.audio_included_many", { count: audioLangs });
+  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_AUDIO_LANG", t, locale, "audio_extra");
+  return extraSuffix ? `${included} · ${extraSuffix}` : included;
 }
 
 function planUsageLabel(row: PricingRow, t: TFunction): string {
   const code = planCodeFromRow(row);
   if (code.includes("ZENITH")) return t("tarifs.usage_custom_event");
   if (code.includes("RAYONNEMENT")) return t("tarifs.usage_network");
-  if (code.includes("ETINCELLE") || row.trial_duration_days === 30) return t("tarifs.usage_limited_one_month");
+  const trialDays = row.trial_duration_days;
+  if (typeof trialDays === "number" && trialDays > 0) {
+    return trialDays === 1
+      ? t("tarifs.usage_limited_trial_one", { count: trialDays })
+      : t("tarifs.usage_limited_trial_many", { count: trialDays });
+  }
   return t("tarifs.usage_no_limit");
 }
 
-function standbyPlanCodeFromDisplay(displayPlan: string): StandbyPlanCode | null {
-  const upper = planNameAsciiUpper(displayPlan);
-  if (upper.includes("ATELIER")) return "ATELIER";
-  if (upper.includes("HORIZON")) return "HORIZON";
+function standbyPlanCodeFromRow(row: PricingRow): StandbyPlanCode | null {
+  const code = planCodeFromRow(row);
+  if (code.includes("ATELIER")) return "ATELIER";
+  if (code.includes("HORIZON")) return "HORIZON";
   return null;
+}
+
+function planArtworksPackLine(row: PricingRow, t: TFunction, locale: string): string | null {
+  const opt = findPricingOption(row, "EXTRA_ARTWORKS_PACK");
+  const label = opt?.description?.trim();
+  const price = opt?.unit_price_ttc_eur;
+  if (!label || typeof price !== "number" || price <= 0) return null;
+  const amount = t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
+  return `${label} : ${amount}`;
 }
 
 function PlanPricingDetails({
@@ -405,6 +473,7 @@ function PlanPricingDetails({
   const hideStandby = shouldHideStandbyDetailRow(row, hideStandbyRow);
   const usageValue = planUsageLabel(row, t);
   const showUsageRow = usageValue !== t("tarifs.usage_no_limit");
+  const artworksPackLine = planArtworksPackLine(row, t, locale);
   const rows = [
     ...(!hideStandby ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale) }] : []),
     ...(!isQuoteOnly
@@ -418,6 +487,9 @@ function PlanPricingDetails({
 
   return (
     <div className="mt-2 space-y-1 border-t border-neutral-200 pt-2 text-xs leading-relaxed text-muted-foreground">
+      {artworksPackLine ? (
+        <div className="text-foreground/80">{artworksPackLine}</div>
+      ) : null}
       {rows.map((item) => (
         <div key={item.label} className="flex flex-wrap gap-x-1">
           <span className="font-medium text-foreground/80">{item.label} :</span>
@@ -679,6 +751,10 @@ function Section({
 export default function PublicHome({ initialData: initialDataProp }: PublicHomeProps = {}) {
   const { t, i18n } = useTranslation("home");
   const location = useLocation();
+  const isHeroLcpTarget = useMemo(
+    () => shouldPreloadOrganisationLcp(location.hash),
+    [location.hash],
+  );
   const resolvedInitialData = useMemo(
     () => initialDataProp ?? getOrganisationInitialData(),
     [initialDataProp],
@@ -711,6 +787,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
     });
   };
 
+  useLayoutEffect(() => {
+    if (location.pathname !== "/organisation") return;
+    syncOrganisationLcpPreload(location.hash);
+  }, [location.hash, location.pathname]);
+
   useEffect(() => {
     const anchorId = location.hash.replace(/^#/, "").trim();
     if (!anchorId || location.pathname !== "/organisation") return;
@@ -726,19 +807,21 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
   }, [location.hash, location.pathname]);
 
   useEffect(() => {
-    if (resolvedInitialData) return;
-
     let cancelled = false;
     const run = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
       if (!supabaseUrl || !anonKey) {
-        setPricingError("Configuration Supabase manquante.");
-        setPricingLoading(false);
+        if (!resolvedInitialData) {
+          setPricingError("Configuration Supabase manquante.");
+          setPricingLoading(false);
+        }
         return;
       }
 
-      setPricingLoading(true);
+      if (!resolvedInitialData) {
+        setPricingLoading(true);
+      }
       setPricingError(null);
       try {
         const data = await fetchPublicHomeData(supabaseUrl, anonKey);
@@ -747,11 +830,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
         setPromptIcons(data.promptIcons);
       } catch (err: unknown) {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : "Chargement des tarifs impossible.";
-        setPricingError(message);
-        setPricingRows([]);
+        if (!resolvedInitialData) {
+          const message = err instanceof Error ? err.message : "Chargement des tarifs impossible.";
+          setPricingError(message);
+          setPricingRows([]);
+        }
       } finally {
-        if (!cancelled) setPricingLoading(false);
+        if (!cancelled && !resolvedInitialData) setPricingLoading(false);
       }
     };
     void run();
@@ -781,11 +866,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
       const aUnlimited = Boolean(a.pricing_is_unlimited);
       const bUnlimited = Boolean(b.pricing_is_unlimited);
       if (aUnlimited !== bUnlimited) return aUnlimited ? 1 : -1; // illimité en dernier
-      const aOeuvres = typeof a.pricing_max_oeuvres === "number" ? a.pricing_max_oeuvres : 0;
-      const bOeuvres = typeof b.pricing_max_oeuvres === "number" ? b.pricing_max_oeuvres : 0;
+      const aOeuvres = pricingMaxOeuvres(a) ?? 0;
+      const bOeuvres = pricingMaxOeuvres(b) ?? 0;
       if (aOeuvres !== bOeuvres) return aOeuvres - bOeuvres;
-      const aVis = typeof a.princing_max_visitors === "number" ? a.princing_max_visitors : 0;
-      const bVis = typeof b.princing_max_visitors === "number" ? b.princing_max_visitors : 0;
+      const aVis = pricingMaxVisitors(a) ?? 0;
+      const bVis = pricingMaxVisitors(b) ?? 0;
       return aVis - bVis;
     });
 
@@ -845,7 +930,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   src={UNSPLASH_HERO_IMAGE}
                   alt={t("hero.image_alt")}
                   className="h-48 w-full object-cover object-center sm:h-60"
-                  priority
+                  priority={isHeroLcpTarget}
                   width={1060}
                   height={360}
                 />
@@ -1522,7 +1607,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     return (
                       <SwiperSlide
                         key={planKey}
-                        className="ph-pricing-slide !h-auto !w-[180px] sm:!w-[210px] lg:!w-[230px]"
+                        className="ph-pricing-slide !h-auto !w-[275px]"
                       >
                       <div className="ph-pricing-slide-inner h-full">
                       {topRank ? (
@@ -1590,19 +1675,19 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                           ) : null}
 
                           {selectedVariant ? (
-                            <div className="flex flex-1 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
-                              <div className="flex flex-1 flex-col gap-3">
+                            <div className="flex min-w-0 flex-1 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
+                              <div className="flex min-w-0 flex-1 flex-col gap-3">
                                 <div className="flex items-center justify-between gap-3">
                                   <div>
                                     <CapacityBlockSummary row={selectedVariant} t={t} />
                                   </div>
                                 </div>
                                 {(() => {
-                                  const standbyCode = standbyPlanCodeFromDisplay(displayPlan);
-                                  const standbyPrice = standbyCode
-                                    ? optionUnitPrice(selectedVariant, "STANDBY")
-                                    : null;
-                                  if (!standbyCode || typeof standbyPrice !== "number") return null;
+                                  const standbyCode = standbyPlanCodeFromRow(selectedVariant);
+                                  const standbyPrice = resolveStandbyPrice(selectedVariant);
+                                  const showStandbyTrigger =
+                                    billingPeriod !== "annual" && hasStandbyOffer(selectedVariant);
+                                  if (!showStandbyTrigger || !standbyCode || typeof standbyPrice !== "number") return null;
                                   return (
                                     <StandbyPlanTrigger
                                       planCode={standbyCode}
@@ -1616,7 +1701,9 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                   t={t}
                                   locale={i18n.language}
                                   isQuoteOnly={isQuoteOnlyCard}
-                                  hideStandbyRow={Boolean(standbyPlanCodeFromDisplay(displayPlan))}
+                                  hideStandbyRow={
+                                    billingPeriod !== "annual" && hasStandbyOffer(selectedVariant)
+                                  }
                                 />
                                 {!isQuoteOnlyCard ? (() => {
                                   const effectivePeriod =
@@ -1647,7 +1734,12 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                                     : "whitespace-nowrap",
                                                 )}
                                               >
-                                                {formatMonthlyTtcDisplay(selectedVariant.pricing_monthly_ttc_eur, t, i18n.language)}
+                                                {formatMonthlyTtcDisplay(
+                                                  selectedVariant.pricing_monthly_ttc_eur,
+                                                  t,
+                                                  i18n.language,
+                                                  selectedVariant.trial_duration_days,
+                                                )}
                                               </div>
                                               {typeof selectedVariant.pricing_monthly_ttc_eur === "number" &&
                                               selectedVariant.pricing_monthly_ttc_eur > 0 ? (
@@ -1704,7 +1796,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   {zenithPlan ? (
                     <SwiperSlide
                       key="zenith"
-                      className="ph-pricing-slide !h-auto !w-[180px] sm:!w-[210px] lg:!w-[230px]"
+                      className="ph-pricing-slide !h-auto !w-[275px]"
                     >
                       <div className="ph-pricing-slide-inner h-full">
                       <article aria-labelledby="plan-title-zenith" className="h-full">

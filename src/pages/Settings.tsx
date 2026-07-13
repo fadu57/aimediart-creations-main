@@ -36,8 +36,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
-import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Bell, Users, Activity } from "lucide-react";
+import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Bell, Users, Activity, Trees } from "lucide-react";
 import PresenceThresholdSettings from "@/components/settings/PresenceThresholdSettings";
+import ForestCanopySettings from "@/components/settings/ForestCanopySettings";
 import { AimediartDocumentsPanel } from "@/components/settings/AimediartDocumentsPanel";
 
 type SettingSection = {
@@ -92,6 +93,12 @@ export default function SettingsPage() {
       title: t("section_notifications_title"),
       description: t("section_notifications_desc"),
       icon: Bell,
+    },
+    {
+      id: "forest-canopy",
+      title: t("section_forest_canopy_title"),
+      description: t("section_forest_canopy_desc"),
+      icon: Trees,
     },
   ], [t]);
 
@@ -170,6 +177,9 @@ export default function SettingsPage() {
       : sectionsCatalog.filter((s) => s.id !== "general");
     if (role_id !== 1) {
       base = base.filter((s) => s.id !== "presence-seuils");
+    }
+    if (!canAccessGeneralSettings) {
+      base = base.filter((s) => s.id !== "forest-canopy");
     }
     const q = search.trim().toLowerCase();
     if (!q) return base;
@@ -765,6 +775,8 @@ export default function SettingsPage() {
                       renderVisitorsContent()
                     ) : section.id === "notifications" ? (
                       renderNotificationsContent()
+                    ) : section.id === "forest-canopy" ? (
+                      <ForestCanopySettings canAccess={canAccessGeneralSettings} />
                     ) : section.id === "presence-seuils" ? (
                       <PresenceThresholdSettings roleId={role_id} />
                     ) : (

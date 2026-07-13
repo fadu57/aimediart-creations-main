@@ -26,6 +26,7 @@ import {
 } from "@/lib/organisation/planLimits";
 import {
   fetchPricingByPlanCode,
+  optionUnitPriceFromRow,
   toPricingNumber,
   type PricingRow,
 } from "@/lib/organisation/publicHomeData";
@@ -194,14 +195,6 @@ function formatMediationLangsIncluded(
 function formatAudioLangsIncluded(count: number | null | undefined, t: TFunction): string {
   if (count == null || count <= 0) return t("engagement.no");
   return t("engagement.langs_count", { count });
-}
-
-function optionUnitPrice(row: PricingRow | null, optionCode: string): number | null {
-  if (!row) return null;
-  const fromOptions = row.pricing_options.find((o) => o.option_code === optionCode)?.unit_price_ttc_eur;
-  if (typeof fromOptions === "number") return fromOptions;
-  if (optionCode === "STANDBY") return row.standby_monthly_price_ttc_eur;
-  return null;
 }
 
 function toggleExtraLang(current: MediationUiLang[], lang: MediationUiLang): MediationUiLang[] {
@@ -574,13 +567,19 @@ export default function OrganisationEngagement() {
   const { monthly, maxVisitors } = useMemo(() => resolveEngagementPrices(pricing), [pricing]);
 
   const extraMediationUnitPrice = useMemo(
-    () => optionUnitPrice(pricing, "EXTRA_MEDIATION_LANG"),
+    () => (pricing ? optionUnitPriceFromRow(pricing, "EXTRA_MEDIATION_LANG") : null),
     [pricing],
   );
 
-  const extraAudioUnitPrice = useMemo(() => optionUnitPrice(pricing, "EXTRA_AUDIO_LANG"), [pricing]);
+  const extraAudioUnitPrice = useMemo(
+    () => (pricing ? optionUnitPriceFromRow(pricing, "EXTRA_AUDIO_LANG") : null),
+    [pricing],
+  );
 
-  const standbyMonthlyPrice = useMemo(() => optionUnitPrice(pricing, "STANDBY"), [pricing]);
+  const standbyMonthlyPrice = useMemo(
+    () => (pricing ? optionUnitPriceFromRow(pricing, "STANDBY") : null),
+    [pricing],
+  );
 
   const includedExtraMediationSlots = useMemo(
     () => includedExtraMediationLangSlots(pricing),

@@ -232,6 +232,8 @@
     "badge_rayonner": "Radiate",
     "badge_zenith": "Dazzle",
     "gratuit": "ONE MONTH FREE TRIAL",
+    "gratuit_trial_one": "{{count}}-DAY FREE TRIAL",
+    "gratuit_trial_many": "{{count}}-DAY FREE TRIAL",
     "sur_devis": "On Request",
     "plan_desc_etincelle": "Entry offer, ideal for testing dialogue-based mediation.",
     "plan_desc_atelier": "For artists and organisations with a fixed catalogue.",
@@ -245,6 +247,7 @@
     "capacity_visitors": "{{count}} visitors max",
     "capacity_oeuvres_block": "{{count}} artworks registered at most",
     "capacity_visitors_block": "{{count}} visitors per month at most",
+    "capacity_visitors_block_trial": "{{count}} visitors",
     "capacity_suffix_one_month": " - 1 month max",
     "option_standby": "Standby plan",
     "option_languages": "Languages",
@@ -252,6 +255,8 @@
     "option_usage": "Usage",
     "usage_none": "—",
     "usage_limited_one_month": "Limited to 1 month",
+    "usage_limited_trial_one": "Limited to {{count}} day",
+    "usage_limited_trial_many": "Limited to {{count}} days",
     "usage_no_limit": "No usage limit",
     "usage_network": "Networks and permanent exhibitions",
     "usage_custom_event": "Major tailor-made cultural event",
@@ -263,7 +268,7 @@
     "languages_extra_none": "—",
     "languages_custom": "Tailored",
     "audio_none": "No",
-    "audio_included_one": "1 language included",
+    "audio_included_one": "{{count}} language included",
     "audio_included_many": "{{count}} languages included",
     "audio_extra": "+{{price}}/extra language",
     "standby_price": "{{price}}/month",
@@ -298,7 +303,8 @@
     "essentials_title": "Key points",
     "essentials_items": [
       "The standby plan is billed monthly.",
-      "Switching to standby takes effect at your next billing date.",
+      "Switching to standby takes effect at your next monthly billing date.",
+      "Maximum of 6 months on standby per year.",
       "Your data and back office remain accessible.",
       "You can reactivate your active plan whenever you wish."
     ],
@@ -313,10 +319,10 @@
       "To keep catalogue and settings without a full active subscription"
     ],
     "eligibility_title": "Eligibility",
-    "eligibility_intro": "Standby is available for monthly Studio and Horizon subscriptions only.",
+    "eligibility_intro": "Standby is available for monthly Studio, Horizon and Envergure subscriptions only.",
     "eligibility_items": [
-      "Available only for Studio and Horizon on monthly billing",
-      "Not available on Spark",
+      "Available only for Studio, Horizon and Envergure plans on monthly billing",
+      "Maximum of 6 months over a rolling 12-month period",
       "Not available on annual subscriptions",
       "The “1½ months free” discount applies to active annual subscriptions only"
     ],
@@ -372,10 +378,8 @@
       }
     ],
     "pricing_title": "Standby pricing",
-    "pricing_current": "{{plan}}: {{price}}/month on standby",
-    "pricing_note": "Standby applies to your current monthly plan (Studio or Horizon). It is not a main subscription — it ensures continuity between active periods.",
-    "pricing_atelier": "Studio — standby: €19/month",
-    "pricing_horizon": "Horizon — standby: €49/month",
+    "pricing_plan_line": "{{plan}} — standby plan: {{price}}/month",
+    "pricing_note": "Standby applies to your current monthly plan (Studio, Horizon or Envergure). It is not a main subscription — it ensures continuity between active periods.",
     "pricing_etincelle": "Spark — no standby plan (limited trial)",
     "pricing_rayonnement": "Radiance — tailored per contract",
     "reactivation_title": "Reactivation",
@@ -386,7 +390,7 @@
     "request_success": "Your standby plan request has been recorded. You can cancel it within 24 h from your profile.",
     "request_error": "Unable to record the standby plan request.",
     "error_role": "The standby plan is reserved for users below level 6.",
-    "error_not_eligible": "Your current subscription is not eligible for the standby plan (monthly Atelier or Horizon required).",
+    "error_not_eligible": "Your current subscription is not eligible for the standby plan (monthly Studio, Horizon or Envergure required).",
     "error_already_pending": "A standby plan request is already active."
   },
   "access": {

@@ -1177,11 +1177,12 @@
   will-change: transform, opacity;
 }
 
-/* Flash promo "Top 1/2/3" en sticker d'angle (starburst) */
+/* Flash promo "Top 1/2/3" — éclaté centré en haut de la carte */
 .ph-top-flash {
   position: absolute;
   top: -10px;
-  right: -6px;
+  left: 50%;
+  right: auto;
   z-index: 6;
   display: inline-flex;
   align-items: center;
@@ -1199,7 +1200,7 @@
   background: radial-gradient(circle at 50% 40%, #ffe07a 0%, #f5c518 70%);
   border: 2px solid #ffffff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-  transform: rotate(-14deg);
+  transform: translateX(-50%) rotate(0deg);
   clip-path: polygon(
     50% 0%, 63% 13%, 80% 8%, 82% 27%, 100% 35%, 87% 50%, 100% 65%,
     82% 73%, 80% 92%, 63% 87%, 50% 100%, 37% 87%, 20% 92%, 18% 73%,
@@ -1209,8 +1210,8 @@
 }
 
 @keyframes ph-top-flash-pulse {
-  0%, 100% { transform: rotate(-14deg) scale(1); }
-  50% { transform: rotate(-14deg) scale(1.08); }
+  0%, 100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+  50% { transform: translateX(-50%) rotate(0deg) scale(1.08); }
 }
 
 @media (prefers-reduced-motion: reduce) {

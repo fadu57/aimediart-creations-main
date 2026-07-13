@@ -631,6 +631,18 @@ export function costAmountInUsd(
   return amount;
 }
 
+/** Somme normalisée USD (même logique que KPI / tableau). */
+export function sumCostEventsUsd(
+  events: Array<Parameters<typeof costAmountInUsd>[0]>,
+  usdToEurRate: number | null = null,
+): number {
+  let total = 0;
+  for (const event of events) {
+    total += costAmountInUsd(event, usdToEurRate);
+  }
+  return total;
+}
+
 async function resolveUsdToEurRate(options?: CostAggregationOptions): Promise<number | null> {
   if (options?.usdToEurRate != null && options.usdToEurRate > 0) {
     return options.usdToEurRate;
@@ -2143,7 +2155,10 @@ export async function getCostTotalsByExpoIds(expoIds: string[]): Promise<Record<
 // ---------------------------------------------------------------------------
 
 /** Exporte les événements courants vers un fichier CSV (BOM UTF-8), aligné sur le tableau détaillé. */
-export async function exportCostsCsv(events: CostEvent[]): Promise<void> {
+export async function exportCostsCsv(
+  events: CostEvent[],
+  usdToEurRate: number | null = null,
+): Promise<void> {
   const artworkMetaById = await getCostEntityDisplayMetaForEvents(events);
 
   const headers = [
@@ -2152,8 +2167,9 @@ export async function exportCostsCsv(events: CostEvent[]): Promise<void> {
     "provider",
     "model_name",
     "operation_name",
-    "cost_estimated_usd",
-    "currency",
+    "cost_normalized_usd",
+    "currency_original",
+    "cost_estimated_original",
     "artwork_id",
     "artwork_title",
     "expo_name",
@@ -2182,8 +2198,9 @@ export async function exportCostsCsv(events: CostEvent[]): Promise<void> {
       e.provider,
       e.model_name ?? "",
       e.operation_name ?? "",
-      effectiveCostEstimatedUsd(e).toFixed(8),
+      costAmountInUsd(e, usdToEurRate).toFixed(8),
       e.currency,
+      (Number(e.cost_estimated) || 0).toFixed(8),
       entityMeta?.linkedEntityId ?? artworkId ?? bioRowId ?? "",
       entityMeta?.title ?? "",
       entityMeta?.expoName ?? "",
@@ -2201,7 +2218,32 @@ export async function exportCostsCsv(events: CostEvent[]): Promise<void> {
     ].map(esc).join(",");
   });
 
-  const csv = [headers.map(esc).join(","), ...rows].join("\n");
+  const totalUsd = sumCostEventsUsd(events, usdToEurRate);
+  const totalRow = [
+    "TOTAL",
+    "",
+    "",
+    "",
+    "",
+    totalUsd.toFixed(8),
+    "USD",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ].map(esc).join(",");
+
+  const csv = [headers.map(esc).join(","), ...rows, totalRow].join("\n");
   const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

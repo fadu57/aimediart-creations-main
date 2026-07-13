@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 
-import { mountForestCanopyP5 } from "@/lib/forestCanopyP5Mount";
-
 /**
  * Page projection plein écran (cast Chromecast, navigateur TV, projecteur).
  * Canopée : taille = outerWidth/outerHeight, pixelDensity = displayDensity(), pas de scaling CSS, image-rendering pixelated.
@@ -49,7 +47,19 @@ export default function ExpoCastPage() {
   useEffect(() => {
     const host = canvasHostRef.current;
     if (!host) return;
-    return mountForestCanopyP5(host, { mode: "fullscreen" });
+    let cleanup: (() => void) | undefined;
+    let cancelled = false;
+    void (async () => {
+      const { mountForestCanopyP5 } = await import("@/lib/forestCanopyP5Mount");
+      const { fetchForestCanopySettings } = await import("@/lib/forestCanopySettings");
+      const { resolved } = await fetchForestCanopySettings();
+      if (cancelled || !canvasHostRef.current) return;
+      cleanup = mountForestCanopyP5(host, { mode: "fullscreen" }, resolved);
+    })();
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
   }, []);
 
   return (

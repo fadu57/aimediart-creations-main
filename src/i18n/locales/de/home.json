@@ -226,6 +226,8 @@
     "badge_rayonner": "Ausstrahlen",
     "badge_zenith": "Faszinieren",
     "gratuit": "KOSTENLOSER MONAT TEST",
+    "gratuit_trial_one": "KOSTENLOSER TEST · {{count}} TAG",
+    "gratuit_trial_many": "KOSTENLOSER TEST · {{count}} TAGE",
     "sur_devis": "Auf Anfrage",
     "plan_desc_etincelle": "Einsteigendes Angebot, ideal zum Testen dialogbasierter Mediation.",
     "plan_desc_atelier": "Für Künstler und Einrichtungen mit festem Katalog.",
@@ -239,6 +241,7 @@
     "capacity_visitors": "{{count}} Besucher max.",
     "capacity_oeuvres_block": "{{count}} Kunstwerke maximal registriert",
     "capacity_visitors_block": "{{count}} Besucher pro Monat maximal",
+    "capacity_visitors_block_trial": "{{count}} Besucher",
     "capacity_suffix_one_month": " - max. 1 Monat",
     "option_standby": "Ruheplan",
     "option_languages": "Sprachen",
@@ -246,6 +249,8 @@
     "option_usage": "Nutzung",
     "usage_none": "—",
     "usage_limited_one_month": "Begrenzt auf 1 Monat",
+    "usage_limited_trial_one": "Begrenzt auf {{count}} Tag",
+    "usage_limited_trial_many": "Begrenzt auf {{count}} Tage",
     "usage_no_limit": "Keine Nutzungsbegrenzung",
     "usage_network": "Netzwerke und Dauerausstellungen",
     "usage_custom_event": "Großes maßgeschneidertes Kulturereignis",
@@ -257,7 +262,7 @@
     "languages_extra_none": "—",
     "languages_custom": "Maßgeschneidert",
     "audio_none": "Nein",
-    "audio_included_one": "1 Sprache inklusive",
+    "audio_included_one": "{{count}} Sprache inklusive",
     "audio_included_many": "{{count}} Sprachen inklusive",
     "audio_extra": "+{{price}}/zusätzliche Sprache",
     "standby_price": "{{price}}/Monat",
@@ -293,7 +298,8 @@
     "essentials_title": "Zum Merken",
     "essentials_items": [
       "Der Standby-Plan wird monatlich abgerechnet.",
-      "Der Wechsel in den Standby-Modus wird zu Ihrer nächsten Fälligkeit wirksam.",
+      "Der Wechsel in den Standby-Modus wird zur nächsten monatlichen Fälligkeit wirksam.",
+      "Maximal 6 Monate Standby pro Jahr.",
       "Ihre Daten und Ihr Back-Office bleiben zugänglich.",
       "Sie können Ihren aktiven Plan jederzeit wieder aktivieren."
     ],
@@ -308,10 +314,10 @@
       "Um Katalog und Einstellungen unbesorgt ohne aktives Engagement zu bewahren"
     ],
     "eligibility_title": "Voraussetzungen",
-    "eligibility_intro": "Der Standby-Plan ist den monatlichen Abonnements Atelier und Horizon vorbehalten.",
+    "eligibility_intro": "Der Standby-Plan ist den monatlichen Abonnements Atelier, Horizon und Envergure vorbehalten.",
     "eligibility_items": [
-      "Nur bei den Tarifen Atelier und Horizon mit monatlicher Zahlung verfügbar",
-      "Nicht verfügbar bei Étincelle",
+      "Nur bei den Tarifen Atelier, Horizon und Envergure mit monatlicher Zahlung verfügbar",
+      "Maximal 6 Monate innerhalb eines gleitenden Jahreszeitraums",
       "Nicht verfügbar bei Jahresabonnements",
       "Der Rabatt „1,5 Monate gratis“ ist aktiven Jahresabonnements vorbehalten"
     ],
@@ -367,10 +373,8 @@
       }
     ],
     "pricing_title": "Standby-Tarife",
-    "pricing_current": "{{plan}}: {{price}}/Monat im Standby",
-    "pricing_note": "Der Standby-Plan gilt für den bereits gewählten Monatstarif (Atelier oder Horizon). Er ersetzt kein Hauptabonnement: Er sichert die Kontinuität zwischen zwei aktiven Zeiträumen.",
-    "pricing_atelier": "Atelier — Standby-Plan: 19 €/Monat",
-    "pricing_horizon": "Horizon — Standby-Plan: 49 €/Monat",
+    "pricing_plan_line": "{{plan}} — Standby-Plan: {{price}}/Monat",
+    "pricing_note": "Der Standby-Plan gilt für den bereits gewählten Monatstarif (Atelier, Horizon oder Envergure). Er ersetzt kein Hauptabonnement: Er sichert die Kontinuität zwischen zwei aktiven Zeiträumen.",
     "pricing_etincelle": "Étincelle — kein Standby-Plan (begrenztes Testangebot, ohne Standby-Option)",
     "pricing_rayonnement": "Rayonnement — maßgeschneidert laut Vertrag",
     "reactivation_title": "Reaktivierung",
@@ -381,7 +385,7 @@
     "request_success": "Ihre Anfrage für den Standby-Plan wurde gespeichert. Sie können sie innerhalb von 24 Stunden in Ihrem Profil stornieren.",
     "request_error": "Die Anfrage für den Standby-Plan konnte nicht gespeichert werden.",
     "error_role": "Der Standby-Plan ist Benutzern unter Stufe 6 vorbehalten.",
-    "error_not_eligible": "Ihr aktuelles Abonnement erlaubt keinen Wechsel in den Standby-Plan (monatliches Atelier oder Horizon erforderlich).",
+    "error_not_eligible": "Ihr aktuelles Abonnement erlaubt keinen Wechsel in den Standby-Plan (monatliches Atelier, Horizon oder Envergure erforderlich).",
     "error_already_pending": "Eine Anfrage für den Standby-Plan ist bereits aktiv."
   },
   "access": {
