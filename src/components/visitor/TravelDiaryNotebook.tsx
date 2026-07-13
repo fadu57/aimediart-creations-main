@@ -268,7 +268,7 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
         <div className="flex flex-col items-center gap-4">
           <div className="flex w-full flex-col items-center gap-4">
             {cover.expoName ? (
-              <h2 className="font-serif text-xl font-bold text-neutral-900">{cover.expoName}</h2>
+              <h2 className="font-serif text-lg font-bold text-neutral-900">{cover.expoName}</h2>
             ) : null}
             {cover.expoLogoUrl ? (
               <img
@@ -285,15 +285,17 @@ function CoverPage({ diary }: { diary: TravelDiaryPackage }) {
           </div>
 
           <div className="flex flex-col items-center space-y-2">
+            {visitorName ? (
+              <p className="font-serif text-lg font-bold italic text-neutral-900">{visitorName}</p>
+            ) : null}
             <h1 className="travel-diary-cover-title-box grid place-content-center rounded-[7px] border border-black font-sans text-2xl font-bold leading-tight text-neutral-900">
               {t("diary.cover_title_line1")}
               <br />
               {t("diary.cover_title_line2")}
             </h1>
-            <p className="font-serif text-lg font-semibold text-[#E63946]">{cover.visitDateLabel || "—"}</p>
-            {visitorName ? (
-              <p className="font-serif text-2xl font-bold italic text-neutral-900">{visitorName}</p>
-            ) : null}
+            <p className="font-serif text-lg font-semibold italic text-[#E63946]">
+              {t("diary.cover_visit_date_line", { date: cover.visitDateLabel || "—" })}
+            </p>
           </div>
         </div>
       </div>
