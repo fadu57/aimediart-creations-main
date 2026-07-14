@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
-import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
@@ -331,9 +331,6 @@ const VisitorWelcomeCore = () => {
     setRecoveryCodeInput(formatVisitorRecoveryCodeDisplay(norm));
     setStep("recover");
   }, [searchParams]);
-
-  const benefitClass =
-    "flex gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground";
 
   const handleQuickVisitStart = async () => {
     markVisitorExpoGateDone();
@@ -820,7 +817,9 @@ const VisitorWelcomeCore = () => {
         {/* Header fixe : logo AIMEDIArt + boutons d'action */}
         <header className="sticky top-0 z-20 flex w-full max-w-[360px] items-center gap-3 border-b border-border/40 bg-[#121212]/95 px-4 py-2 backdrop-blur-md">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <AimediartBrandLogoBlock size="sm" animateHeart backdrop />
+            <Link to="/" className="inline-flex min-w-0 no-underline transition-opacity hover:opacity-90">
+              <AimediartBrandLogoBlock size="sm" animateHeart backdrop />
+            </Link>
             <Link
               to={`/login${qs}`}
               className="pl-1 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
@@ -912,41 +911,22 @@ const VisitorWelcomeCore = () => {
               ) : null}
 
               <CardTitle className="mt-0 text-left font-serif text-sm leading-snug">{t("visitor_gate.aha")}</CardTitle>
-              <CardDescription className="text-center text-sm">{t("visitor_gate.lead")}</CardDescription>
+              <CardDescription className="whitespace-pre-line text-center text-sm">{t("visitor_gate.lead")}</CardDescription>
             </CardHeader>
         <CardContent className="space-y-5 px-4 pb-4">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {t("visitor_gate.benefits_title")}
-            </p>
-            <ul className="space-y-2">
-              <li className={benefitClass}>
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                <span>{t("visitor_gate.benefit_summary")}*</span>
-              </li>
-              <li className={benefitClass}>
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                <span>{t("visitor_gate.benefit_artist")}*</span>
-              </li>
-              <li className={benefitClass}>
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
-                <span>{t("visitor_gate.benefit_profile")}</span>
-              </li>
-            </ul>
-            <Button
-              type="button"
-              className="mt-2 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={() => {
-                markVisitorExpoGateDone();
-                getOrCreateVisitorUuid();
-                setReturningProfile(null);
-                setAvatarChangeFromProfile(null);
-                setStep("avatar");
-              }}
-            >
-              {t("visitor_gate.btn_start_visit")}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+            onClick={() => {
+              markVisitorExpoGateDone();
+              getOrCreateVisitorUuid();
+              setReturningProfile(null);
+              setAvatarChangeFromProfile(null);
+              setStep("avatar");
+            }}
+          >
+            {t("visitor_gate.btn_start_visit")}
+          </Button>
 
           <p className="text-center text-[11px] text-muted-foreground">
             <Link to="/organisation" className="underline underline-offset-2 hover:text-foreground">
