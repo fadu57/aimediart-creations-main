@@ -80,6 +80,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+import { openVisitorExpoPresentation } from "@/lib/visitorExpoPresentationUrl";
 /** Extrait bucket + chemin objet depuis une URL publique Supabase Storage. */
 function parseSupabasePublicStorageUrl(
   fullUrl: string,
@@ -1120,6 +1121,18 @@ const Expos = () => {
                   </Button>
                   <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
+                    className={EXPO_CARD_BTN}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openVisitorExpoPresentation(ex.id);
+                    }}
+                  >
+                    {t("card.previewPresentation")}
+                  </Button>
+                  <Button
+                    type="button"
                     variant="default"
                     size="sm"
                     className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
@@ -1201,6 +1214,17 @@ const Expos = () => {
             <p className="text-sm font-semibold text-gray-900">
               {t("panel.chooseFormat")}
             </p>
+            <Button
+              type="button"
+              variant="default"
+              className="mt-4 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={() => {
+                openVisitorExpoPresentation(panelFormatExpo.id);
+                setPanelFormatExpo(null);
+              }}
+            >
+              {t("panel.previewPresentation")}
+            </Button>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Button
                 type="button"

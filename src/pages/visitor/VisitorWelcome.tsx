@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Trans, useTranslation } from "react-i18next";
-import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
@@ -114,6 +114,7 @@ const VisitorWelcomeCore = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expoId = useMemo(() => searchParams.get("expo_id")?.trim() ?? "", [searchParams]);
+  const previewGate = searchParams.get("preview_gate") === "1";
   const artworkId = useMemo(
     () => searchParams.get("artwork_id")?.trim() ?? searchParams.get("artworkId")?.trim() ?? "",
     [searchParams],
@@ -187,6 +188,10 @@ const VisitorWelcomeCore = () => {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
+      if (previewGate) {
+        if (!cancelled) setAutoDetecting(false);
+        return;
+      }
       try {
         // 1. Vérifier une session Supabase Auth active
         const { data: { session } } = await supabase.auth.getSession();
@@ -265,7 +270,7 @@ const VisitorWelcomeCore = () => {
     void run();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasExpoLandingContext, artworkId, expoId, navigate]);
+  }, [hasExpoLandingContext, artworkId, expoId, navigate, previewGate]);
 
   // Charger les infos de l'exposition (QR expo ou QR œuvre)
   useEffect(() => {
@@ -783,15 +788,32 @@ const VisitorWelcomeCore = () => {
         />
         <Dialog open={descriptionPopupOpen} onOpenChange={setDescriptionPopupOpen}>
           <DialogContent
-            className="max-h-[80vh] w-[calc(100vw-2rem)] max-w-[360px] overflow-y-auto"
+            className="z-[10050] flex h-[min(90dvh,750px)] w-[min(100vw-0.5rem,360px)] max-w-none translate-x-[-50%] flex-col gap-0 overflow-hidden rounded-lg p-0 max-sm:top-[max(0.5rem,env(safe-area-inset-top,0px))] max-sm:translate-y-0 sm:top-[50%] sm:h-auto sm:max-h-[min(85dvh,750px)] sm:w-[min(calc(100vw-2rem),360px)] sm:translate-y-[-50%]"
+            overlayClassName="z-[10050]"
             aria-describedby={undefined}
           >
-            <DialogTitle className="font-serif text-lg">
-              {expoInfo?.expo_name?.trim() || t("visitor_gate.description_popup_title")}
-            </DialogTitle>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-              {fullExpoDescription}
-            </p>
+            <header className="sticky top-0 z-10 flex shrink-0 items-start justify-between gap-2 border-b border-gray-200/70 bg-white/80 px-3 py-0 backdrop-blur-sm sm:px-4">
+              <DialogTitle className="min-w-0 flex-1 py-2 pr-1 font-serif text-base leading-snug sm:text-lg">
+                {expoInfo?.expo_name?.trim() || t("visitor_gate.description_popup_title")}
+              </DialogTitle>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDescriptionPopupOpen(false);
+                }}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10"
+                aria-label={t("visitor_gate.btn_close")}
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-0">
+              <p className="whitespace-pre-wrap break-words px-3 text-sm leading-5 text-muted-foreground sm:px-4 sm:text-[0.9375rem]">
+                {fullExpoDescription}
+              </p>
+            </div>
           </DialogContent>
         </Dialog>
 

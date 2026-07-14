@@ -125,6 +125,7 @@ function AppShell() {
     /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
+    normalizedPathname.startsWith("/dev/visitor") ||
     normalizedPathname === "/scan" ||
     normalizedPathname.startsWith("/scan/") ||
     normalizedPathname === "/scan-work1" ||
@@ -167,6 +168,7 @@ function buildVisitorLandingPath(searchParams: URLSearchParams): string | null {
   const qs = new URLSearchParams();
   if (expoId) qs.set("expo_id", expoId);
   if (artworkId) qs.set("artwork_id", artworkId);
+  if (searchParams.get("preview_gate") === "1") qs.set("preview_gate", "1");
   const query = qs.toString();
   return query ? `/visitor?${query}` : "/visitor";
 }
@@ -254,7 +256,10 @@ const AppRoutes = () => (
         <Route path="register_visitor" element={<Pages.RegisterVisitor />} />
         <Route path="visitor" element={<Pages.VisitorWelcome />} />
         {import.meta.env.DEV ? (
-          <Route path="dev/visitor-form" element={<Pages.VisitorFormPreview />} />
+          <>
+            <Route path="dev/visitor-form" element={<Pages.VisitorFormPreview />} />
+            <Route path="dev/visitor-expo" element={<Pages.VisitorExpoPreview />} />
+          </>
         ) : null}
         <Route element={<OeuvrePageAccessGuard />}>
           <Route element={<ArtworkEntryGate />}>

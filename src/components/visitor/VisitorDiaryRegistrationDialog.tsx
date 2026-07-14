@@ -235,15 +235,18 @@ export function VisitorDiaryRegistrationDialog({
           aria-modal="true"
           aria-label={t("diary.registration_title")}
         >
-          <header className="z-10 flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
+          <header className="relative z-20 flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
             <p className="min-w-0 flex-1 text-sm font-bold leading-[19px] text-neutral-600">
               {t("diary.registration_desc_line1")}
             </p>
             <button
               type="button"
-              onClick={onClose}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose();
+              }}
               disabled={submitting}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10 disabled:opacity-50"
+              className="relative z-20 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10 disabled:opacity-50"
               aria-label={t("btn_close")}
             >
               <X className="h-5 w-5" aria-hidden />

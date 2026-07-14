@@ -28,19 +28,27 @@ function isMobile(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 }
 
+function configureVideoForInlinePlayback(video: HTMLVideoElement): void {
+  video.setAttribute("playsinline", "true");
+  video.setAttribute("webkit-playsinline", "true");
+  video.playsInline = true;
+  video.muted = true;
+  video.autoplay = true;
+}
+
 async function openCameraStream(): Promise<MediaStream> {
   const mobile = isMobile();
   const attempts: MediaStreamConstraints[] = [
     {
-      video: {
-        facingMode: mobile ? { ideal: "environment" } : { ideal: "user" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
+      video: mobile ? { facingMode: { ideal: "environment" } } : { facingMode: { ideal: "user" } },
       audio: false,
     },
     {
-      video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: {
+        facingMode: mobile ? { ideal: "environment" } : { ideal: "user" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
       audio: false,
     },
     { video: true, audio: false },
@@ -77,16 +85,30 @@ export async function startNativeCameraQrScanner(
   container.replaceChildren();
 
   const video = document.createElement("video");
-  video.setAttribute("playsinline", "true");
-  video.setAttribute("muted", "true");
-  video.muted = true;
-  video.autoplay = true;
+  configureVideoForInlinePlayback(video);
   video.className = "h-full w-full object-cover";
   container.appendChild(video);
 
   const stream = await openCameraStream();
   video.srcObject = stream;
-  await video.play();
+  try {
+    await video.play();
+  } catch (playError) {
+    // iOS : parfois play() échoue malgré playsinline — retenter après chargement.
+    await new Promise<void>((resolve, reject) => {
+      const onReady = () => {
+        video.removeEventListener("loadedmetadata", onReady);
+        void video.play().then(resolve).catch(reject);
+      };
+      if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        void video.play().then(resolve).catch(reject);
+      } else {
+        video.addEventListener("loadedmetadata", onReady, { once: true });
+      }
+    }).catch(() => {
+      throw playError instanceof Error ? playError : new Error("Lecture vidéo impossible.");
+    });
+  }
 
   const stopScanLoop = startNativeQrVideoScanLoop(video, onDecoded);
 

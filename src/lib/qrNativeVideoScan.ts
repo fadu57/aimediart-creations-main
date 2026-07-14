@@ -14,7 +14,17 @@ function getBarcodeDetectorCtor(): BarcodeDetectorCtor | null {
   return g.BarcodeDetector ?? null;
 }
 
+/** iPhone / iPad (y compris iPadOS « MacIntel »). */
+export function isAppleMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+/** BarcodeDetector natif — Chrome/Edge/Android ; pas iOS (flux html5-qrcode plus fiable). */
 export function isNativeQrScanSupported(): boolean {
+  if (isAppleMobileDevice()) return false;
   return getBarcodeDetectorCtor() !== null;
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChevronsUpDown, Languages, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, ExternalLink, Languages, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import {
@@ -52,6 +52,7 @@ import {
 } from "@/lib/expoFormUtils";
 import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import { cn } from "@/lib/utils";
+import { openVisitorExpoPresentation } from "@/lib/visitorExpoPresentationUrl";
 import { toast } from "sonner";
 import type { TFunction } from "i18next";
 import { SponsorDialog, type Sponsor, type SponsorLogoEntry } from "@/components/SponsorDialog";
@@ -965,21 +966,35 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                           ({descriptLang})
                         </span>
                       </Label>
-                      {canTriggerTranslation && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-xs shrink-0"
-                          disabled={translating || !displayText.trim()}
-                          onClick={() => void triggerExpoTranslation(displayText, descriptLang)}
-                        >
-                          {translating
-                            ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                            : <Languages className="h-3 w-3" aria-hidden />}
-                          {t("form.translate_button", { targets: translateTargets })}
-                        </Button>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {mode === "edit" && expoId ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1 px-2 text-xs"
+                            onClick={() => openVisitorExpoPresentation(expoId)}
+                          >
+                            <ExternalLink className="h-3 w-3" aria-hidden />
+                            {t("form.preview_presentation")}
+                          </Button>
+                        ) : null}
+                        {canTriggerTranslation && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 gap-1 px-2 text-xs shrink-0"
+                            disabled={translating || !displayText.trim()}
+                            onClick={() => void triggerExpoTranslation(displayText, descriptLang)}
+                          >
+                            {translating
+                              ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                              : <Languages className="h-3 w-3" aria-hidden />}
+                            {t("form.translate_button", { targets: translateTargets })}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Textarea
                       id="expo-field-expo_descript_i18n"

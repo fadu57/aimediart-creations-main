@@ -469,7 +469,13 @@ export function AudioPlayer({
 
   if (loading) {
 
-    if (playOnly) return null;
+    if (playOnly) {
+      return (
+        <div className={cn("flex shrink-0 items-center gap-1", className)} aria-busy="true" aria-label={t("audio_player.loading")}>
+          <Loader2 className={cn(compact ? "h-3 w-3" : "h-3.5 w-3.5", "animate-spin opacity-70")} aria-hidden />
+        </div>
+      );
+    }
 
     return (
 
@@ -633,9 +639,9 @@ export function AudioPlayer({
 
             className={cn(
 
-              "inline-flex items-center rounded-full border font-semibold transition-colors",
+              "inline-flex touch-manipulation items-center rounded-full border font-semibold transition-colors",
 
-              compact ? "gap-1 px-2 py-0.5 text-[10px]" : "gap-1.5 px-2.5 py-1 text-[11px]",
+              compact ? "min-h-[28px] gap-1 px-2 py-1 text-xs leading-none" : "min-h-[28px] gap-1.5 px-2.5 py-1 text-xs leading-none",
 
               btnClass,
 

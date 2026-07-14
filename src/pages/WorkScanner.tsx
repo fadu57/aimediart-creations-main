@@ -14,6 +14,7 @@ import {
   safeStopQrScanner,
   scanQrFromImageFile,
   QrScannerAbortedError,
+  requiresCameraUserGesture,
   startQrWebcamScanner,
 } from "@/lib/qrCodeScanFriendly";
 import {
@@ -44,12 +45,15 @@ const WorkScanner = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
-  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(true);
+  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(
+    () => !requiresCameraUserGesture(),
+  );
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [showAssistHint, setShowAssistHint] = useState(false);
   const hasScannedRef = useRef(false);
-  const qrRef = useRef<Html5Qrcode | null>(null);
+  const cameraQrRef = useRef<Html5Qrcode | null>(null);
+  const fileQrRef = useRef<Html5Qrcode | null>(null);
   const assistTimeoutRef = useRef<number | null>(null);
   const startingCameraRef = useRef(false);
   const autostartAttemptedRef = useRef(false);
@@ -111,14 +115,24 @@ const WorkScanner = () => {
     [expoId, navigate, t],
   );
 
+  const getOrCreateCameraQrReader = useCallback(() => {
+    if (!document.getElementById(QR_READER_ELEMENT_ID)) {
+      throw new Error("Zone scanner introuvable.");
+    }
+    if (!cameraQrRef.current) {
+      cameraQrRef.current = createHtml5QrcodeReader(QR_READER_ELEMENT_ID);
+    }
+    return cameraQrRef.current;
+  }, []);
+
   const getOrCreateFileQrReader = useCallback(() => {
     if (!document.getElementById(QR_FILE_READER_ID)) {
       throw new Error("Zone scanner fichier introuvable.");
     }
-    if (!qrRef.current) {
-      qrRef.current = createHtml5QrcodeReader(QR_FILE_READER_ID);
+    if (!fileQrRef.current) {
+      fileQrRef.current = createHtml5QrcodeReader(QR_FILE_READER_ID);
     }
-    return qrRef.current;
+    return fileQrRef.current;
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -135,7 +149,7 @@ const WorkScanner = () => {
         cameraSessionRef.current = session;
         setTorchSupported(session.torchSupported);
       } else {
-        const qr = getOrCreateFileQrReader();
+        const qr = getOrCreateCameraQrReader();
         await safeStopQrScanner(qr);
         await startQrWebcamScanner(
           qr,
@@ -204,7 +218,7 @@ const WorkScanner = () => {
       startingCameraRef.current = false;
       setStartingCamera(false);
     }
-  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded, t]);
+  }, [cameraReady, getOrCreateCameraQrReader, handleQrDecoded, t]);
 
   const handleQrImageFile = useCallback(
     async (file: File | undefined) => {
@@ -238,9 +252,12 @@ const WorkScanner = () => {
         window.clearTimeout(assistTimeoutRef.current);
         assistTimeoutRef.current = null;
       }
-      const qr = qrRef.current;
-      qrRef.current = null;
-      if (qr) void safeStopQrScanner(qr);
+      const cameraQr = cameraQrRef.current;
+      const fileQr = fileQrRef.current;
+      cameraQrRef.current = null;
+      fileQrRef.current = null;
+      if (cameraQr) void safeStopQrScanner(cameraQr);
+      if (fileQr) void safeStopQrScanner(fileQr);
     };
   }, []);
 
@@ -273,9 +290,9 @@ const WorkScanner = () => {
       }
       return;
     }
-    if (!qrRef.current) return;
+    if (!cameraQrRef.current) return;
     try {
-      await qrRef.current.applyVideoConstraints({
+      await cameraQrRef.current.applyVideoConstraints({
         advanced: [{ torch: nextTorchValue } as MediaTrackConstraintSet],
       });
       setTorchOn(nextTorchValue);

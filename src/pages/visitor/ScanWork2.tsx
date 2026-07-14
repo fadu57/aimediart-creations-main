@@ -13,6 +13,7 @@ import {
   safeStopQrScanner,
   scanQrFromImageFile,
   QrScannerAbortedError,
+  requiresCameraUserGesture,
   startQrWebcamScanner,
 } from "@/lib/qrCodeScanFriendly";
 import {
@@ -48,7 +49,9 @@ export default function ScanWork2() {
   const [cameraReady, setCameraReady] = useState(false);
   const [startingCamera, setStartingCamera] = useState(false);
   /** Tente le démarrage au montage (après autorisation une fois, localStorage accélère les visites suivantes). */
-  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(true);
+  const [cameraAutoStartEnabled, setCameraAutoStartEnabled] = useState(
+    () => !requiresCameraUserGesture(),
+  );
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [showAssistHint, setShowAssistHint] = useState(false);
@@ -60,7 +63,8 @@ export default function ScanWork2() {
     agencyThanksName: hasAgencyName ? agencyName : null,
   });
   const hasScannedRef = useRef(false);
-  const qrRef = useRef<Html5Qrcode | null>(null);
+  const cameraQrRef = useRef<Html5Qrcode | null>(null);
+  const fileQrRef = useRef<Html5Qrcode | null>(null);
   const assistTimeoutRef = useRef<number | null>(null);
   const startingCameraRef = useRef(false);
   const autostartAttemptedRef = useRef(false);
@@ -198,14 +202,24 @@ export default function ScanWork2() {
     [expoId, navigate, t],
   );
 
+  const getOrCreateCameraQrReader = useCallback(() => {
+    if (!document.getElementById(QR_READER_ELEMENT_ID)) {
+      throw new Error("Zone scanner introuvable.");
+    }
+    if (!cameraQrRef.current) {
+      cameraQrRef.current = createHtml5QrcodeReader(QR_READER_ELEMENT_ID);
+    }
+    return cameraQrRef.current;
+  }, []);
+
   const getOrCreateFileQrReader = useCallback(() => {
     if (!document.getElementById(QR_FILE_READER_ID)) {
       throw new Error("Zone scanner fichier introuvable.");
     }
-    if (!qrRef.current) {
-      qrRef.current = createHtml5QrcodeReader(QR_FILE_READER_ID);
+    if (!fileQrRef.current) {
+      fileQrRef.current = createHtml5QrcodeReader(QR_FILE_READER_ID);
     }
-    return qrRef.current;
+    return fileQrRef.current;
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -222,7 +236,7 @@ export default function ScanWork2() {
         cameraSessionRef.current = session;
         setTorchSupported(session.torchSupported);
       } else {
-        const qr = getOrCreateFileQrReader();
+        const qr = getOrCreateCameraQrReader();
         await safeStopQrScanner(qr);
         await startQrWebcamScanner(
           qr,
@@ -291,7 +305,7 @@ export default function ScanWork2() {
       startingCameraRef.current = false;
       setStartingCamera(false);
     }
-  }, [cameraReady, getOrCreateFileQrReader, handleQrDecoded, t]);
+  }, [cameraReady, getOrCreateCameraQrReader, handleQrDecoded, t]);
 
   const handleQrImageFile = useCallback(
     async (file: File | undefined) => {
@@ -325,9 +339,12 @@ export default function ScanWork2() {
         window.clearTimeout(assistTimeoutRef.current);
         assistTimeoutRef.current = null;
       }
-      const qr = qrRef.current;
-      qrRef.current = null;
-      if (qr) void safeStopQrScanner(qr);
+      const cameraQr = cameraQrRef.current;
+      const fileQr = fileQrRef.current;
+      cameraQrRef.current = null;
+      fileQrRef.current = null;
+      if (cameraQr) void safeStopQrScanner(cameraQr);
+      if (fileQr) void safeStopQrScanner(fileQr);
     };
   }, []);
 
@@ -360,9 +377,9 @@ export default function ScanWork2() {
       }
       return;
     }
-    if (!qrRef.current) return;
+    if (!cameraQrRef.current) return;
     try {
-      await qrRef.current.applyVideoConstraints({
+      await cameraQrRef.current.applyVideoConstraints({
         advanced: [{ torch: nextTorchValue } as MediaTrackConstraintSet],
       });
       setTorchOn(nextTorchValue);

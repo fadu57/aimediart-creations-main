@@ -46,6 +46,11 @@ function isLikelyMobileDevice(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry/i.test(navigator.userAgent);
 }
 
+/** Safari iOS bloque getUserMedia sans geste utilisateur (tap). */
+export function requiresCameraUserGesture(): boolean {
+  return isLikelyMobileDevice();
+}
+
 function scanErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -207,6 +212,11 @@ export async function buildQrScannerCameraAttempts(): Promise<CameraStartConfig[
   const mobile = isLikelyMobileDevice();
   const attempts: CameraStartConfig[] = [];
 
+  if (mobile) {
+    // iOS Safari : facingMode simple, caméra arrière en priorité (sans résolution HD).
+    attempts.push({ facingMode: { ideal: "environment" } });
+  }
+
   try {
     const cameras = await Html5Qrcode.getCameras();
     const back = cameras.find((c) => /back|rear|environment|arrière/i.test(c.label));
@@ -219,8 +229,12 @@ export async function buildQrScannerCameraAttempts(): Promise<CameraStartConfig[
     /* getCameras sans permission */
   }
 
-  attempts.push({ facingMode: "user" });
-  if (mobile) attempts.push({ facingMode: "environment" });
+  if (!mobile) {
+    attempts.push({ facingMode: "user" });
+  }
+  if (mobile) {
+    attempts.push({ facingMode: "user" });
+  }
 
   return attempts.slice(0, 3);
 }

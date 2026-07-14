@@ -5,6 +5,22 @@ import { supabase } from "@/lib/supabase";
 
 const STORAGE_KEY = "visitor_default_prompt_style_id";
 
+/** Comparaison stable des prompt_style.id (UUID, casse, espaces). */
+export function normalizeVisitorPromptStyleId(id: string | null | undefined): string | null {
+  const raw = id?.trim();
+  if (!raw) return null;
+  return raw.toLowerCase();
+}
+
+export function visitorPromptStyleIdsMatch(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  const left = normalizeVisitorPromptStyleId(a);
+  const right = normalizeVisitorPromptStyleId(b);
+  return !!left && !!right && left === right;
+}
+
 function cacheVisitorDefaultPromptStyleId(promptStyleId: string | null): void {
   if (typeof window === "undefined") return;
   const id = promptStyleId?.trim();
@@ -72,9 +88,10 @@ async function persistVisitorDefaultPersonaToServer(promptStyleId: string | null
 
     await registerAnonymousVisitorSession();
 
+    const normalizedPersona = normalizeVisitorPromptStyleId(promptStyleId);
     const { error } = await supabase.rpc("set_visitor_persona_defaut", {
       p_visitor_client_id: visitorUuid,
-      p_persona_defaut: promptStyleId?.trim() || null,
+      p_persona_defaut: normalizedPersona,
     });
 
     if (error && import.meta.env.DEV) {

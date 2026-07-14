@@ -50,7 +50,9 @@ import { getStoredVisitorAge } from "@/lib/visitorAgeStorage";
 import {
   getVisitorDefaultPromptStyleId,
   loadVisitorDefaultPromptStyleFromServer,
+  normalizeVisitorPromptStyleId,
   setVisitorDefaultPromptStyleId,
+  visitorPromptStyleIdsMatch,
 } from "@/lib/visitorDefaultPersona";
 import {
   getStoredVisitorExpoVisitId,
@@ -284,6 +286,7 @@ const VisitorViewCore = () => {
   const sameArtistNavRef = useRef<HTMLDivElement | null>(null);
   const emotionSectionRef = useRef<HTMLDivElement | null>(null);
   const mediationMainSwiperRef = useRef<SwiperInstance | null>(null);
+  const suppressMediationSlideChangeRef = useRef(false);
   const artistPhotoCloseTimerRef = useRef<number | null>(null);
   const quickFeedbackTimerRef = useRef<number | null>(null);
   const visitEntryTouchedRef = useRef(false);
@@ -716,50 +719,77 @@ const VisitorViewCore = () => {
     if (main && !main.destroyed && mediationSlideCount > 1) main.slideNext();
   }, [mediationSlideCount]);
 
+  const syncMediationSwiperToPersona = useCallback(
+    (promptStyleId: string) => {
+      const target = normalizeVisitorPromptStyleId(promptStyleId);
+      if (!target) return;
+      const idx = aiSlides.findIndex(
+        (slide) => normalizeVisitorPromptStyleId(slide.sid) === target,
+      );
+      if (idx < 0) return;
+
+      const swiper = mediationMainSwiperRef.current;
+      if (!swiper || swiper.destroyed) return;
+
+      suppressMediationSlideChangeRef.current = true;
+      if (mediationSwiperLoop) {
+        swiper.slideToLoop(idx, 0);
+      } else {
+        swiper.slideTo(idx, 0);
+      }
+      window.setTimeout(() => {
+        suppressMediationSlideChangeRef.current = false;
+      }, 120);
+    },
+    [aiSlides, mediationSwiperLoop],
+  );
+
   useEffect(() => {
     if (!aiSlides.length) return;
     let cancelled = false;
 
+    const ids = new Set(aiSlides.map((slide) => normalizeVisitorPromptStyleId(slide.sid)));
+    const applyStoredDefault = (storedDefault: string | null) => {
+      const normalizedStored = normalizeVisitorPromptStyleId(storedDefault);
+      setDefaultPromptStyleId(storedDefault);
+      if (normalizedStored && ids.has(normalizedStored) && storedDefault) {
+        setSelectedPromptStyleId(storedDefault);
+        syncMediationSwiperToPersona(storedDefault);
+        return;
+      }
+      const firstSlideId = aiSlides[0]?.sid;
+      if (firstSlideId) {
+        setSelectedPromptStyleId(firstSlideId);
+        syncMediationSwiperToPersona(firstSlideId);
+      }
+    };
+
+    applyStoredDefault(getVisitorDefaultPromptStyleId());
+
     void (async () => {
       const storedDefault = await loadVisitorDefaultPromptStyleFromServer();
       if (cancelled) return;
-
-      const ids = new Set(aiSlides.map((s) => s.sid));
-      const preferred =
-        storedDefault && ids.has(storedDefault) ? storedDefault : aiSlides[0].sid;
-      setSelectedPromptStyleId(preferred);
-      setDefaultPromptStyleId(storedDefault && ids.has(storedDefault) ? storedDefault : null);
+      applyStoredDefault(storedDefault);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [aiSlides, artwork?.artwork_id]);
-
-  useEffect(() => {
-    if (!selectedPromptStyleId || !aiSlides.length) return;
-    const idx = aiSlides.findIndex((s) => s.sid === selectedPromptStyleId);
-    if (idx < 0) return;
-    const swiper = mediationMainSwiperRef.current;
-    if (!swiper || swiper.destroyed) return;
-    if (mediationSwiperLoop) {
-      swiper.slideToLoop(idx, 0);
-    } else {
-      swiper.slideTo(idx, 0);
-    }
-  }, [selectedPromptStyleId, aiSlides, artwork?.artwork_id, mediationSwiperLoop]);
+  }, [aiSlides, artwork?.artwork_id, syncMediationSwiperToPersona]);
 
   const toggleDefaultPersona = useCallback((promptStyleId: string, checked: boolean) => {
     if (checked) {
       setVisitorDefaultPromptStyleId(promptStyleId);
       setDefaultPromptStyleId(promptStyleId);
+      setSelectedPromptStyleId(promptStyleId);
+      syncMediationSwiperToPersona(promptStyleId);
       return;
     }
-    if (getVisitorDefaultPromptStyleId() === promptStyleId) {
+    if (visitorPromptStyleIdsMatch(getVisitorDefaultPromptStyleId(), promptStyleId)) {
       setVisitorDefaultPromptStyleId(null);
       setDefaultPromptStyleId(null);
     }
-  }, []);
+  }, [syncMediationSwiperToPersona]);
 
   useEffect(() => {
     return () => {
@@ -1755,11 +1785,15 @@ const VisitorViewCore = () => {
                   <ChevronLeft className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 </button>
 
-                <div className="min-w-0 px-8">
+                <div className="min-w-0 px-4 sm:px-8">
                   <Swiper
                     key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
                     onSwiper={(swiper) => {
                       mediationMainSwiperRef.current = swiper;
+                      const storedDefault = getVisitorDefaultPromptStyleId();
+                      if (storedDefault) {
+                        syncMediationSwiperToPersona(storedDefault);
+                      }
                     }}
                     loop={mediationSwiperLoop}
                     loopAdditionalSlides={2}
@@ -1770,6 +1804,7 @@ const VisitorViewCore = () => {
                     spaceBetween={10}
                     className="px-0"
                     onSlideChange={(swiper) => {
+                      if (suppressMediationSlideChangeRef.current) return;
                       const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
                       const active = resolveLogicalSlide(raw);
                       if (active) setSelectedPromptStyleId(active.sid);
@@ -1780,8 +1815,8 @@ const VisitorViewCore = () => {
                       return (
                         <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
                           <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-left text-sm leading-5 text-[#F0F0F0]/90 w-full">
-                            <div className="mb-2 flex items-center justify-between gap-1.5">
-                              <div className="flex items-center gap-1.5">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-x-1.5 gap-y-2">
+                              <div className="flex min-w-0 max-w-full items-center gap-1.5">
                                 {slide.icon ? (
                                   <span
                                     className={`shrink-0 text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
@@ -1790,25 +1825,27 @@ const VisitorViewCore = () => {
                                     {slide.icon}
                                   </span>
                                 ) : null}
-                                <span className="inline whitespace-nowrap rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-5 text-white">
+                                <span className="inline max-w-full truncate rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-5 text-white">
                                   {slide.label}
                                 </span>
                               </div>
                               {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
-                                <AudioPlayer
-                                  text_id={artwork.artwork_id}
-                                  text_type="mediation"
-                                  lang={language}
-                                  prompt_style_id={slide.sid}
-                                  playOnly
-                                  compact
-                                />
+                                <div className="ml-auto shrink-0">
+                                  <AudioPlayer
+                                    text_id={artwork.artwork_id}
+                                    text_type="mediation"
+                                    lang={language}
+                                    prompt_style_id={slide.sid}
+                                    playOnly
+                                    compact
+                                  />
+                                </div>
                               ) : null}
                             </div>
                             {!slide.sid.startsWith("code:") ? (
                               <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs text-[#F0F0F0]/75">
                                 <Checkbox
-                                  checked={defaultPromptStyleId === slide.sid}
+                                  checked={visitorPromptStyleIdsMatch(defaultPromptStyleId, slide.sid)}
                                   onCheckedChange={(value) =>
                                     toggleDefaultPersona(slide.sid, value === true)
                                   }
@@ -2015,14 +2052,18 @@ const VisitorViewCore = () => {
 
       {isArtistPhotoOpen && (
         <div
-          className={`fixed inset-0 z-[100] flex justify-center bg-black/70 px-0 ${
-            isEmbedded ? "items-start pt-[58px]" : "items-center"
+          className={`fixed inset-0 z-[10050] flex justify-center bg-black/70 px-0 ${
+            isEmbedded
+              ? "items-start pt-[58px]"
+              : hasTopVisitorBar
+                ? "items-start pt-[68px] sm:items-center sm:pt-0"
+                : "items-start pt-[92px] sm:items-center sm:pt-0"
           }`}
           onClick={closeArtistPhotoModal}
           role="presentation"
         >
           <div
-            className={`mx-auto w-full max-w-[320px] rounded-lg bg-white p-2 ${
+            className={`relative mx-auto flex w-full max-w-[320px] flex-col overflow-hidden rounded-lg bg-white ${
               isArtistPhotoClosing
                 ? "animate-out zoom-out-75 fade-out duration-500"
                 : "animate-in zoom-in-75 fade-in duration-500"
@@ -2032,6 +2073,21 @@ const VisitorViewCore = () => {
             aria-modal="true"
             aria-label={t("aria_artist_dialog")}
           >
+            <header className="flex shrink-0 items-center justify-end border-b border-gray-200/70 bg-white/80 px-2 py-0 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeArtistPhotoModal();
+                }}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10"
+                aria-label={t("btn_close")}
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </button>
+            </header>
+            <div className="p-2">
             {canShowArtistPhoto ? (
               <div className="relative w-full overflow-hidden rounded shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
                 <img
@@ -2041,17 +2097,22 @@ const VisitorViewCore = () => {
                   onError={() => setArtistPhotoError(true)}
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-black/45 px-3 py-2">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <p className="min-w-0 truncate text-sm font-semibold text-white">{artistDisplayName}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5">
+                    <p className="min-w-0 max-w-full flex-1 truncate text-sm font-semibold text-white">
+                      {artistDisplayName}
+                    </p>
                     {artistBioAudioTarget && bioPromptStyleId ? (
-                      <AudioPlayer
-                        text_id={artistBioAudioTarget.text_id}
-                        text_type="bio"
-                        lang={artistBioAudioTarget.lang}
-                        prompt_style_id={bioPromptStyleId}
-                        variant="onDark"
-                        playOnly
-                      />
+                      <div className="ml-auto shrink-0">
+                        <AudioPlayer
+                          text_id={artistBioAudioTarget.text_id}
+                          text_type="bio"
+                          lang={artistBioAudioTarget.lang}
+                          prompt_style_id={bioPromptStyleId}
+                          variant="onDark"
+                          playOnly
+                          compact
+                        />
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -2071,22 +2132,12 @@ const VisitorViewCore = () => {
                 ) : null}
               </div>
             )}
-            <div className="mt-3 max-h-[220px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-[15px]">
+            <div className="mt-3 max-h-[260px] overflow-y-auto rounded border border-gray-200 bg-gray-50 p-[15px]">
               <p className="text-xs leading-relaxed text-gray-700 break-words [word-wrap:break-word]">
                 {artistBioText || t("artist_bio_unavailable")}
               </p>
             </div>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-md border border-border px-3 py-2 text-sm text-black transition-colors duration-150 hover:border-primary hover:bg-primary/15 hover:text-black"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                closeArtistPhotoModal();
-              }}
-            >
-              {t("btn_close")}
-            </button>
+            </div>
           </div>
         </div>
       )}

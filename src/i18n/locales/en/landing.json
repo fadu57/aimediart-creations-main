@@ -16,6 +16,7 @@
     "btn_profile": "Create my profile",
     "welcome_expo": "Welcome to « {{expo_name}} »",
     "read_more": "Read more…",
+    "btn_close": "Close",
     "description_popup_title": "Exhibition description",
     "benefits_title": "Why create a profile?",
     "benefit_summary": "Visit summary and history of your paths",
