@@ -77,6 +77,9 @@ import deSponsors from "./locales/de/sponsors.json";
 import esSponsors from "./locales/es/sponsors.json";
 import itSponsors from "./locales/it/sponsors.json";
 
+import frArtworkGroups from "./locales/fr/artworkGroups.json";
+import enArtworkGroups from "./locales/en/artworkGroups.json";
+
 import frDashboard from "./locales/fr/dashboard.json";
 import enDashboard from "./locales/en/dashboard.json";
 import deDashboard from "./locales/de/dashboard.json";
@@ -97,6 +100,7 @@ type AppResourceBundle = {
   settings: typeof frSettings;
   sponsors: typeof frSponsors;
   dashboard: typeof frDashboard;
+  artworkGroups: typeof frArtworkGroups;
 };
 
 export const appResources: Record<SupportedLang, AppResourceBundle> = {
@@ -114,6 +118,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     settings: frSettings,
     sponsors: frSponsors,
     dashboard: frDashboard,
+    artworkGroups: frArtworkGroups,
   },
   en: {
     catalogue: enCatalogue,
@@ -129,6 +134,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     settings: enSettings,
     sponsors: enSponsors,
     dashboard: enDashboard,
+    artworkGroups: enArtworkGroups,
   },
   de: {
     catalogue: deCatalogue,
@@ -144,6 +150,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     settings: deSettings,
     sponsors: deSponsors,
     dashboard: deDashboard,
+    artworkGroups: frArtworkGroups,
   },
   es: {
     catalogue: esCatalogue,
@@ -159,6 +166,7 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     settings: esSettings,
     sponsors: esSponsors,
     dashboard: esDashboard,
+    artworkGroups: frArtworkGroups,
   },
   it: {
     catalogue: itCatalogue,
@@ -174,5 +182,6 @@ export const appResources: Record<SupportedLang, AppResourceBundle> = {
     settings: itSettings,
     sponsors: itSponsors,
     dashboard: itDashboard,
+    artworkGroups: frArtworkGroups,
   },
 };

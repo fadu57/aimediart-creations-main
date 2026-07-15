@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Building2, BookOpen, Images, Plus, Search, X } from "lucide-react";
+import { Building2, BookOpen, Images, Layers, Plus, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ExpoFormDialog } from "@/components/ExpoFormDialog";
+import { ExpoArtworkGroupsPanel } from "@/components/expo/ExpoArtworkGroupsPanel";
 import { ExpoTravelDiaryPickerDialog } from "@/components/backoffice/ExpoTravelDiaryPickerDialog";
 import { SponsorDialog, type SponsorLogoEntry } from "@/components/SponsorDialog";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -51,6 +52,9 @@ const EXPO_TOOLBAR_BTN_GOLD =
 /** Boutons d'action sur chaque carte expo. */
 const EXPO_CARD_BTN =
   "h-auto min-h-9 w-full min-w-0 flex-wrap items-center justify-center whitespace-normal px-2 py-2 text-center text-xs leading-snug sm:text-sm";
+/** Rangée de 3 boutons principaux (visiteurs, sponsors, catalogue). */
+const EXPO_CARD_BTN_ROW =
+  "h-auto min-h-9 min-w-0 flex-1 basis-0 flex-wrap items-center justify-center whitespace-normal px-2 py-2 text-center text-xs leading-snug sm:text-sm";
 
 type ExpoRow = {
   id: string;
@@ -242,6 +246,7 @@ const Expos = () => {
   const [panelFormatExpo, setPanelFormatExpo] = useState<ExpoRow | null>(null);
   const [sponsorExpo, setSponsorExpo] = useState<{ id: string; name: string } | null>(null);
   const [diaryPickerExpo, setDiaryPickerExpo] = useState<{ id: string; name: string } | null>(null);
+  const [groupsExpo, setGroupsExpo] = useState<{ id: string; name: string; agencyId: string } | null>(null);
   const [sponsorLogosByExpoId, setSponsorLogosByExpoId] = useState<Record<string, string[]>>({});
   const [visitorCountByExpoId, setVisitorCountByExpoId] = useState<Record<string, number>>({});
   const [artworkCountByExpoId, setArtworkCountByExpoId] = useState<Record<string, number>>({});
@@ -569,6 +574,18 @@ const Expos = () => {
     }
     return result;
   }, [sorted, searchTerm, orgSearchTerm, agencyNameById]);
+
+  const expoGroupOptions = useMemo(
+    () =>
+      sorted
+        .filter((ex) => ex.id?.trim() && (ex.agency_id ?? "").trim())
+        .map((ex) => ({
+          id: ex.id.trim(),
+          name: expoTitle(ex),
+          agencyId: (ex.agency_id ?? "").trim(),
+        })),
+    [sorted],
+  );
 
   const filteredExpoRefs = useMemo(() => {
     const refs = new Set<string>();
@@ -1043,6 +1060,47 @@ const Expos = () => {
                       />
                     </p>
                   ) : null}
+                  <div
+                    className="mt-3 flex w-full flex-row flex-wrap gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      className={cn(EXPO_CARD_BTN_ROW, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
+                      asChild
+                    >
+                      <Link
+                        to={`/expos/visitors?expo_id=${encodeURIComponent(ex.id)}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {t("card.cardVisitors", { count: visitorCountByExpoId[ex.id] ?? 0 })}
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className={cn(EXPO_CARD_BTN_ROW, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSponsorExpo({ id: ex.id, name: expoTitle(ex) });
+                      }}
+                    >
+                      {t("card.sponsors", "Sponsors / Mécènes")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className={cn(EXPO_CARD_BTN_ROW, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
+                      asChild
+                    >
+                      <Link to={`/catalogue?expo=${encodeURIComponent(ex.id)}`} onClick={(e) => e.stopPropagation()}>
+                        {t("card.viewCatalogue")}
+                      </Link>
+                    </Button>
+                  </div>
                   {(() => {
                     const raw = ex.expo_descript_i18n;
                     if (!raw) return null;
@@ -1096,19 +1154,6 @@ const Expos = () => {
                   </Button>
                   <Button
                     type="button"
-                    size="sm"
-                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
-                    asChild
-                  >
-                    <Link
-                      to={`/expos/visitors?expo_id=${encodeURIComponent(ex.id)}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {t("card.cardVisitors", { count: visitorCountByExpoId[ex.id] ?? 0 })}
-                    </Link>
-                  </Button>
-                  <Button
-                    type="button"
                     variant="outline"
                     size="sm"
                     className={EXPO_CARD_BTN}
@@ -1133,26 +1178,25 @@ const Expos = () => {
                   </Button>
                   <Button
                     type="button"
-                    variant="default"
+                    variant="outline"
                     size="sm"
-                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
+                    className={cn(
+                      EXPO_CARD_BTN,
+                      "flex-nowrap items-center justify-start gap-2 text-left",
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSponsorExpo({ id: ex.id, name: expoTitle(ex) });
+                      setGroupsExpo({
+                        id: ex.id,
+                        name: expoTitle(ex),
+                        agencyId: (ex.agency_id ?? "").trim(),
+                      });
                     }}
                   >
-                    {t("card.sponsors", "Sponsors / Mécènes")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className={cn(EXPO_CARD_BTN, "gradient-gold gradient-gold-hover-bg text-primary-foreground")}
-                    asChild
-                  >
-                    <Link to={`/catalogue?expo=${encodeURIComponent(ex.id)}`} onClick={(e) => e.stopPropagation()}>
-                      {t("card.viewCatalogue")}
-                    </Link>
+                    <Layers className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 line-clamp-2 leading-snug">
+                      {t("card.artworkGroups", "Regroupements")}
+                    </span>
                   </Button>
                 </div>
               </CardContent>
@@ -1160,6 +1204,17 @@ const Expos = () => {
           );
         })}
       </div>
+
+      {groupsExpo !== null ? (
+        <ExpoArtworkGroupsPanel
+          open
+          onOpenChange={(o) => {
+            if (!o) setGroupsExpo(null);
+          }}
+          expoId={groupsExpo.id}
+          expoOptions={expoGroupOptions}
+        />
+      ) : null}
 
       {diaryPickerExpo !== null && (
         <ExpoTravelDiaryPickerDialog

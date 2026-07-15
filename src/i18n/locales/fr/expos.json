@@ -35,6 +35,7 @@
     "cardVisitors": "Visiteurs de l'expo",
     "printPanel": "Print panneau expo",
     "viewCatalogue": "Catalogue des œuvres",
+    "artworkGroups": "Regroupements d'œuvres",
     "travelDiary": "Carnet visiteur",
     "curatorLabel": "Commissaire : {{name}}",
     "dateRange": "Du {{from}} au {{to}}",

@@ -121,7 +121,7 @@ function AppShell() {
     .replace(/Œ/g, "oe");
   const hideGlobalHeader =
     normalizedPathname === "/" ||
-    /(^|\/)(oeuvre|artworks|artwork)(\/|$)/.test(normalizedPathname) ||
+    /(^|\/)(oeuvre|artworks|artwork|artwork-group)(\/|$)/.test(normalizedPathname) ||
     /(^|\/)(oeuvres_artiste|artworks_artist)(\/|$)/.test(normalizedPathname) ||
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
@@ -267,6 +267,7 @@ const AppRoutes = () => (
             <Route path="artworks/:artworkId" element={<OeuvreToArtworkRedirect />} />
             <Route path="artwork" element={<Pages.ArtworkDetail />} />
             <Route path="artwork/:artworkId" element={<Pages.ArtworkDetail />} />
+            <Route path="artwork-group/:groupId" element={<Pages.ArtworkGroupEntry />} />
             <Route path="visitor/:artworkId" element={<Pages.ArtworkDetail />} />
           </Route>
           <Route path="artworks_artist" element={<Pages.OeuvresArtiste />} />

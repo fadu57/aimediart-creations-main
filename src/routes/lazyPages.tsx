@@ -39,6 +39,7 @@ export const Users = lazy(() => import("@/pages/Users"));
 export const Utilisateurs = lazy(() => import("@/pages/Utilisateurs"));
 export const UtilisateursCorbeille = lazy(() => import("@/pages/UtilisateursCorbeille"));
 export const ArtworkDetail = lazy(() => import("@/pages/visitor/ArtworkDetail"));
+export const ArtworkGroupEntry = lazy(() => import("@/pages/visitor/ArtworkGroupEntry"));
 export const Intro = lazy(() => import("@/pages/visitor/Intro"));
 export const ScanWork2 = lazy(() => import("@/pages/visitor/ScanWork2"));
 export const Summary = lazy(() => import("@/pages/visitor/Summary"));

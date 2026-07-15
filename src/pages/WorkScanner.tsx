@@ -103,6 +103,14 @@ const WorkScanner = () => {
         return;
       }
 
+      if (scanTarget.kind === "artwork_group") {
+        const target = expoId
+          ? `/artwork-group/${encodeURIComponent(scanTarget.groupId)}?expo_id=${encodeURIComponent(expoId)}`
+          : `/artwork-group/${encodeURIComponent(scanTarget.groupId)}`;
+        navigate(target);
+        return;
+      }
+
       if (expoId) {
         markVisitorArtworkScanned(expoId, scanTarget.artworkId);
       }

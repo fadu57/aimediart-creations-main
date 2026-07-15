@@ -310,6 +310,67 @@ export interface Database {
         };
         Relationships: [];
       };
+      artwork_groups: {
+        Row: {
+          id: string;
+          expo_id: string;
+          agency_id: string;
+          group_type: "artist" | "theme";
+          group_label: string;
+          group_display_number: string | null;
+          group_artist_id: string | null;
+          group_qr_code_url: string | null;
+          group_qrcode_image: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          expo_id: string;
+          agency_id: string;
+          group_type: "artist" | "theme";
+          group_label: string;
+          group_display_number?: string | null;
+          group_artist_id?: string | null;
+          group_qr_code_url?: string | null;
+          group_qrcode_image?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          expo_id?: string;
+          agency_id?: string;
+          group_type?: "artist" | "theme";
+          group_label?: string;
+          group_display_number?: string | null;
+          group_artist_id?: string | null;
+          group_qr_code_url?: string | null;
+          group_qrcode_image?: string | null;
+          sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      artwork_group_members: {
+        Row: {
+          group_id: string;
+          artwork_id: string;
+          sort_order: number;
+        };
+        Insert: {
+          group_id: string;
+          artwork_id: string;
+          sort_order?: number;
+        };
+        Update: {
+          group_id?: string;
+          artwork_id?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
       artist_agency_details: {
         Row: {
           artist_id: string;

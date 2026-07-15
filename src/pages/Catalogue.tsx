@@ -33,6 +33,12 @@ import { cartelExplorationLines } from "@/lib/cartelExplorationText";
 import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
 import { CartelFormatDialog } from "@/components/CartelFormatDialog";
 import { cn } from "@/lib/utils";
+import { CatalogueArtworkGroupDeck } from "@/components/catalogue/CatalogueArtworkGroupDeck";
+import {
+  CATALOGUE_CARD_HEIGHT_CLASS,
+  CATALOGUE_GRID_ROW_CLASS,
+} from "@/lib/catalogueCardLayout";
+import { fetchArtworkGroupsForExpo, type ArtworkGroupWithMembers } from "@/lib/artworkGroupFetch";
 import { EntityCostLabel } from "@/components/EntityCostLabel";
 import { getCostTotalsByArtworkIds, resolveEntityCostDisplay } from "@/lib/costs";
 import { getUsdToEurRate } from "@/lib/fxRates";
@@ -133,6 +139,30 @@ function artworkMatchesExpoFilter(
   return legacy !== "" && raw === legacy;
 }
 
+function artworkArtistLabel(aw: Pick<ArtworkRow, "artists">): string {
+  const artist = artworkArtistFromRow(aw);
+  return `${artist?.artist_firstname ?? artist?.artist_prenom ?? ""} ${artist?.artist_lastname ?? artist?.artist_name ?? ""}`.trim();
+}
+
+function artworkMatchesSearchQuery(aw: Pick<ArtworkRow, "artwork_title" | "artists">, q: string): boolean {
+  const normalized = q.trim().toLowerCase();
+  if (!normalized) return true;
+  const title = (aw.artwork_title ?? "").toLowerCase();
+  const artistLabel = artworkArtistLabel(aw).toLowerCase();
+  return title.includes(normalized) || artistLabel.includes(normalized);
+}
+
+function resolveExpoIdForArtwork(
+  aw: Pick<ArtworkRow, "artwork_expo_id" | "expo_id">,
+  options: ExpoOption[],
+): string | null {
+  const raw = artworkExpoRef(aw);
+  if (!raw) return null;
+  const match =
+    options.find((o) => o.id === raw) ?? options.find((o) => (o.expo_id ?? "").trim() === raw);
+  return match?.id ?? null;
+}
+
 /** Largeur commune des badges IA (image, médiations, voix) en bas de carte. */
 const CATALOG_IA_BADGE_WIDTH_CLASS = "w-full sm:w-[14.5rem]";
 const catalogIaBadgeClass =
@@ -168,6 +198,7 @@ const Catalogue = () => {
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
   const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
+  const [expoArtworkGroups, setExpoArtworkGroups] = useState<ArtworkGroupWithMembers[]>([]);
   const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
   const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
@@ -708,35 +739,135 @@ const Catalogue = () => {
       if (selectedExpoFilter !== "all" && !artworkMatchesExpoFilter(aw, selectedExpoFilter, expoOptions)) {
         return false;
       }
-      const artist = artworkArtistFromRow(aw);
-      const q = search.toLowerCase();
-      const title = (aw.artwork_title ?? "").toLowerCase();
-      const artistLabel = `${artist?.artist_firstname ?? artist?.artist_prenom ?? ""} ${artist?.artist_lastname ?? artist?.artist_name ?? ""}`.trim().toLowerCase();
-      return title.includes(q) || artistLabel.includes(q);
+      return artworkMatchesSearchQuery(aw, search);
     });
   }, [artworks, search, selectedExpoFilter, expoOptions]);
+
+  const artworksScopedByExpo = useMemo(() => {
+    if (selectedExpoFilter === "all") return artworks;
+    return artworks.filter((aw) => artworkMatchesExpoFilter(aw, selectedExpoFilter, expoOptions));
+  }, [artworks, selectedExpoFilter, expoOptions]);
+
+  const expoOptionsScopedBySearch = useMemo(() => {
+    const q = search.trim();
+    if (!q) return expoOptions;
+    const matchingExpoIds = new Set<string>();
+    for (const aw of artworks) {
+      if (!artworkMatchesSearchQuery(aw, q)) continue;
+      const expoId = resolveExpoIdForArtwork(aw, expoOptions);
+      if (expoId) matchingExpoIds.add(expoId);
+    }
+    return expoOptions.filter((expo) => matchingExpoIds.has(expo.id));
+  }, [artworks, search, expoOptions]);
+
+  useEffect(() => {
+    if (selectedExpoFilter === "all") {
+      setExpoArtworkGroups([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchArtworkGroupsForExpo(selectedExpoFilter)
+      .then((groups) => {
+        if (!cancelled) setExpoArtworkGroups(groups);
+      })
+      .catch((e) => {
+        console.warn("[Catalogue] artwork groups:", e);
+        if (!cancelled) setExpoArtworkGroups([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedExpoFilter]);
+
+  const artworkGroupDisplayInfo = useMemo(() => {
+    const byArtwork = new Map<
+      string,
+      { group: ArtworkGroupWithMembers; isFirst: boolean; orderedIds: string[] }
+    >();
+    for (const group of expoArtworkGroups) {
+      const ordered = [...group.members].sort((a, b) => a.sort_order - b.sort_order);
+      const orderedIds = ordered.map((m) => m.artwork_id);
+      ordered.forEach((m, index) => {
+        byArtwork.set(m.artwork_id, { group, isFirst: index === 0, orderedIds });
+      });
+    }
+    return byArtwork;
+  }, [expoArtworkGroups]);
+
+  const filteredArtworkById = useMemo(() => {
+    const map = new Map<string, ArtworkRow>();
+    for (const aw of filtered) map.set(aw.artwork_id, aw);
+    return map;
+  }, [filtered]);
+
+  type CatalogueGridEntry =
+    | { kind: "group"; groupInfo: { group: ArtworkGroupWithMembers; orderedIds: string[] } }
+    | { kind: "single"; artwork: ArtworkRow };
+
+  const catalogueGridEntries = useMemo((): CatalogueGridEntry[] => {
+    const units: CatalogueGridEntry[] = [];
+    for (const aw of filtered) {
+      const groupInfo = artworkGroupDisplayInfo.get(aw.artwork_id);
+      if (groupInfo) {
+        if (!groupInfo.isFirst) continue;
+        units.push({ kind: "group", groupInfo });
+      } else {
+        units.push({ kind: "single", artwork: aw });
+      }
+    }
+
+    const output: CatalogueGridEntry[] = [];
+    const pairedSingleIds = new Set<string>();
+    let i = 0;
+
+    while (i < units.length) {
+      const unit = units[i];
+      if (unit.kind === "group") {
+        output.push(unit);
+        let paired = 0;
+        for (let j = i + 1; j < units.length && paired < 2; j++) {
+          const next = units[j];
+          if (next.kind === "single" && !pairedSingleIds.has(next.artwork.artwork_id)) {
+            output.push(next);
+            pairedSingleIds.add(next.artwork.artwork_id);
+            paired++;
+          }
+        }
+        i++;
+        continue;
+      }
+
+      if (!pairedSingleIds.has(unit.artwork.artwork_id)) {
+        output.push(unit);
+        pairedSingleIds.add(unit.artwork.artwork_id);
+      }
+      i++;
+    }
+
+    return output;
+  }, [filtered, artworkGroupDisplayInfo]);
+
   const searchSuggestions = useMemo(
     () =>
       [
         ...new Set(
-          artworks.flatMap((aw) => {
-            const artist = artworkArtistFromRow(aw);
-            const artistLabel = `${artist?.artist_firstname ?? artist?.artist_prenom ?? ""} ${artist?.artist_lastname ?? artist?.artist_name ?? ""}`.trim();
+          artworksScopedByExpo.flatMap((aw) => {
             const title = (aw.artwork_title ?? "").trim();
+            const artistLabel = artworkArtistLabel(aw);
             return [title, artistLabel].filter(Boolean);
           }),
         ),
       ],
-    [artworks],
+    [artworksScopedByExpo],
   );
   // Sentinel supprimée : le placeholder n'est plus injecté comme option datalist.
   // La réinitialisation du filtre se fait uniquement via le bouton X ou en vidant le champ.
   const expoFilterSuggestions = useMemo(
     () =>
-      [...new Set(expoOptions.map((expo) => expo.name.trim()).filter(Boolean))].sort((a, b) =>
+      [...new Set(expoOptionsScopedBySearch.map((expo) => expo.name.trim()).filter(Boolean))].sort((a, b) =>
         a.localeCompare(b, "fr"),
       ),
-    [expoOptions],
+    [expoOptionsScopedBySearch],
   );
   const filteredSearchSuggestions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -756,22 +887,39 @@ const Catalogue = () => {
     setExpoFilterInput(matchedExpo?.name ?? selectedExpoFilter);
   }, [selectedExpoFilter, expoOptions]);
 
+  const syncExpoFilterFromArtworkLabel = useCallback(
+    (label: string) => {
+      const matching = artworksScopedByExpo.filter((aw) => {
+        const title = (aw.artwork_title ?? "").trim();
+        return title === label || artworkArtistLabel(aw) === label;
+      });
+      const expoIds = new Set(
+        matching.map((aw) => resolveExpoIdForArtwork(aw, expoOptions)).filter((id): id is string => Boolean(id)),
+      );
+      if (expoIds.size === 1) {
+        setSelectedExpoFilter([...expoIds][0]!);
+      }
+    },
+    [artworksScopedByExpo, expoOptions],
+  );
+
   const handleExpoFilterInputChange = (value: string) => {
     setExpoFilterInput(value);
     const normalized = value.trim().toLowerCase();
+    const scopedExpoOptions = expoOptionsScopedBySearch;
 
     if (!normalized) {
       setSelectedExpoFilter("all");
       return;
     }
 
-    const exactByName = expoOptions.find((expo) => expo.name.trim().toLowerCase() === normalized);
+    const exactByName = scopedExpoOptions.find((expo) => expo.name.trim().toLowerCase() === normalized);
     if (exactByName) {
       setSelectedExpoFilter(exactByName.id);
       return;
     }
 
-    const exactById = expoOptions.find((expo) => expo.id.trim().toLowerCase() === normalized);
+    const exactById = scopedExpoOptions.find((expo) => expo.id.trim().toLowerCase() === normalized);
     if (exactById) {
       setSelectedExpoFilter(exactById.id);
     }
@@ -1043,6 +1191,7 @@ const Catalogue = () => {
                           className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
                           onClick={() => {
                             setSearch(label);
+                            syncExpoFilterFromArtworkLabel(label);
                             setArtworkFilterOpen(false);
                           }}
                         >
@@ -1191,330 +1340,297 @@ const Catalogue = () => {
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={cn("grid grid-cols-1 items-stretch gap-4 md:grid-cols-2", CATALOGUE_GRID_ROW_CLASS)}>
         {loading && <p className="col-span-full text-sm text-muted-foreground text-center py-12">{t("loading_catalogue")}</p>}
         {filtered.length === 0 && !showScopeHint && !error && (
           <p className="col-span-full text-sm text-muted-foreground text-center py-12">
             {t("empty_search")}
           </p>
         )}
-        {filtered.map((aw) => {
-          const artist = artworkArtistFromRow(aw);
-          const currentExpoRaw = (aw.expo_id ?? aw.artwork_expo_id ?? "").trim();
-          const artworkAgencyId = aw.artwork_agency_id ?? null;
-          const availableExpoOptions = expoOptions.filter((expo) => {
-            if (!artworkAgencyId) return true;
-            return (expo.agency_id ?? null) === artworkAgencyId;
-          });
-          const selectedExpoOption =
-            availableExpoOptions.find((expo) => expo.id === currentExpoRaw) ??
-            availableExpoOptions.find((expo) => (expo.expo_id ?? "") === currentExpoRaw) ??
-            null;
-          const selectedExpoValue = selectedExpoOption?.id || "__none__";
-          const artistLabel =
-            [artist?.artist_firstname ?? artist?.artist_prenom, artist?.artist_lastname ?? artist?.artist_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim() || t("artist_unknown");
-          const artworkImage = aw.artwork_image_url || aw.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
-          const currentStatusRaw = (aw.artwork_status ?? "").trim();
-          const isArtworkActive = currentStatusRaw.toLowerCase() === "active";
-          const isArtworkDraft = currentStatusRaw.toLowerCase() === "draft";
-          const statusLabel = artworkStatusLabel(currentStatusRaw, t);
-          const hasImageAnalysis = (aw.artwork_source_material ?? "").trim().length > 0;
-          const generatedTextsCount = countMaxMediationStylesAcrossLangs(aw.artwork_description_i18n);
-          const hasGeneratedMediation = generatedTextsCount > 0;
-          const mediationLangsLabel = getMediationFilledUiLangs(aw.artwork_description_i18n)
-            .map((lang) => lang.toUpperCase())
-            .join(" - ");
-          const voiceSummary = voiceSummaryByArtwork[aw.artwork_id] ?? {
-            readyCount: 0,
-            expectedCount: 0,
-            generatingCount: 0,
-            langsLabel: "",
-            isComplete: false,
-            isGenerating: false,
-          };
-          const hasExpectedVoices = voiceSummary.expectedCount > 0;
-          const voiceIsGenerating =
-            voiceSummary.isGenerating || pendingAudioArtworkIds.has(aw.artwork_id);
-          const voiceBadgeComplete = voiceSummary.isComplete && !voiceIsGenerating;
-          const voiceBadgePartial =
-            hasExpectedVoices &&
-            !voiceIsGenerating &&
-            voiceSummary.readyCount > 0 &&
-            voiceSummary.readyCount < voiceSummary.expectedCount;
+        {catalogueGridEntries.map((entry) => {
+          const buildCard = (row: ArtworkRow) => {
+            const rowArtist = artworkArtistFromRow(row);
+            const rowExpoRaw = (row.expo_id ?? row.artwork_expo_id ?? "").trim();
+            const rowAgencyId = row.artwork_agency_id ?? null;
+            const rowExpoOptions = expoOptions.filter((expo) => {
+              if (!rowAgencyId) return true;
+              return (expo.agency_id ?? null) === rowAgencyId;
+            });
+            const rowSelectedExpo =
+              rowExpoOptions.find((expo) => expo.id === rowExpoRaw) ??
+              rowExpoOptions.find((expo) => (expo.expo_id ?? "") === rowExpoRaw) ??
+              null;
+            const rowSelectedExpoValue = rowSelectedExpo?.id || "__none__";
+            const rowArtistLabel =
+              [rowArtist?.artist_firstname ?? rowArtist?.artist_prenom, rowArtist?.artist_lastname ?? rowArtist?.artist_name]
+                .filter(Boolean)
+                .join(" ")
+                .trim() || t("artist_unknown");
+            const rowImage =
+              row.artwork_image_url || row.artwork_photo_url || "https://images.unsplash.com/photo-1635776062043-223faf322554";
+            const rowStatusRaw = (row.artwork_status ?? "").trim();
+            const rowIsActive = rowStatusRaw.toLowerCase() === "active";
+            const rowIsDraft = rowStatusRaw.toLowerCase() === "draft";
+            const rowStatusLabel = artworkStatusLabel(rowStatusRaw, t);
+            const rowHasImageAnalysis = (row.artwork_source_material ?? "").trim().length > 0;
+            const rowTextsCount = countMaxMediationStylesAcrossLangs(row.artwork_description_i18n);
+            const rowHasMediation = rowTextsCount > 0;
+            const rowMediationLangs = getMediationFilledUiLangs(row.artwork_description_i18n)
+              .map((lang) => lang.toUpperCase())
+              .join(" - ");
+            const rowVoice = voiceSummaryByArtwork[row.artwork_id] ?? {
+              readyCount: 0,
+              expectedCount: 0,
+              generatingCount: 0,
+              langsLabel: "",
+              isComplete: false,
+              isGenerating: false,
+            };
+            const rowHasVoices = rowVoice.expectedCount > 0;
+            const rowVoiceGenerating = rowVoice.isGenerating || pendingAudioArtworkIds.has(row.artwork_id);
+            const rowVoiceComplete = rowVoice.isComplete && !rowVoiceGenerating;
+            const rowVoicePartial =
+              rowHasVoices &&
+              !rowVoiceGenerating &&
+              rowVoice.readyCount > 0 &&
+              rowVoice.readyCount < rowVoice.expectedCount;
 
-          return (
-            <Card key={aw.artwork_id} className="glass-card hover:shadow-lg transition-all duration-300 overflow-hidden">
-              <CardContent
-                className="relative p-4 flex flex-col sm:flex-row items-stretch gap-4 cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() => openEditArtwork(aw.artwork_id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openEditArtwork(aw.artwork_id);
-                  }
-                }}
+            return (
+              <Card
+                key={row.artwork_id}
+                className={cn(
+                  "flex flex-col overflow-hidden border-border bg-card/80 shadow-none backdrop-blur-xl hover:shadow-none",
+                  CATALOGUE_CARD_HEIGHT_CLASS,
+                )}
               >
-                <div className="mx-auto flex w-full max-w-[150px] shrink-0 flex-col items-center gap-2 sm:mx-0 sm:w-[150px] sm:min-w-[150px]">
-                  <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
-                    <img
-                      src={artworkImage}
-                      alt={aw.artwork_title ?? "œuvre"}
-                      className="h-[150px] w-[150px] rounded-xl object-cover shrink-0"
-                    />
-                  </div>
-                  <div
-                    className="flex w-full max-w-[150px] flex-col gap-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <span className="text-[10px] leading-tight text-muted-foreground text-center">
-                      {t("expo_selector_move_label")}
-                    </span>
-                    <Select
-                      value={selectedExpoValue}
-                      onValueChange={(value) => {
-                        requestExpoMove(
-                          aw.artwork_id,
-                          aw.artwork_title,
-                          selectedExpoOption?.id ?? null,
-                          value === "__none__" ? null : value,
-                        );
-                      }}
-                      disabled={isAssigningExpo}
-                    >
-                      <SelectTrigger
-                        className="h-7 w-full max-w-[150px] px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate"
-                      >
-                        <SelectValue placeholder={t("expo_selector_placeholder")} />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-none shadow-none z-[60]">
-                        <SelectItem value="__none__" className="text-xs">
-                          <span className="italic">{t("expo_selector_none")}</span>
-                        </SelectItem>
-                        {availableExpoOptions.length > 0 ? (
-                          availableExpoOptions.map((expo) => (
-                            <SelectItem key={expo.id} value={expo.id} className="text-xs">
-                              {expo.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="__empty__" disabled className="text-xs">
-                            {t("expo_selector_empty")}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {expoUndoByArtwork[aw.artwork_id] !== undefined ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-6 w-full gap-1 px-1.5 text-[10px]"
-                        disabled={isAssigningExpo}
-                        aria-label={t("expo_move_undo_aria")}
-                        onClick={() => void undoExpoMove(aw.artwork_id)}
-                      >
-                        <Undo2 className="h-3 w-3 shrink-0" aria-hidden />
-                        {t("expo_move_undo")}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="relative flex min-w-0 flex-1 flex-col gap-3 sm:min-h-[156px] sm:gap-0">
-                  <div className="flex min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20">
-                    <h3 className="min-w-0 w-full truncate font-serif font-bold text-lg">
-                      {aw.artwork_title ?? t("artwork_untitled")}
-                    </h3>
-                    <p className="min-w-0 w-full truncate text-sm text-primary italic">{artistLabel}</p>
+                <CardContent
+                  className="relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-4 overflow-hidden p-4 sm:flex-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openEditArtwork(row.artwork_id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openEditArtwork(row.artwork_id);
+                    }
+                  }}
+                >
+                  <div className="mx-auto flex w-full max-w-[150px] shrink-0 flex-col items-center gap-2 sm:mx-0 sm:w-[150px] sm:min-w-[150px]">
+                    <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
+                      <img
+                        src={rowImage}
+                        alt={row.artwork_title ?? "œuvre"}
+                        className="h-[150px] w-[150px] rounded-xl object-cover shrink-0"
+                      />
+                    </div>
                     <div
-                      className="pointer-events-auto mt-2 inline-flex min-w-0 max-w-full items-center gap-2"
+                      className="flex w-full max-w-[150px] flex-col gap-1"
                       onClick={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
                     >
-                      <label className="inline-flex items-center gap-2 text-xs text-foreground">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 accent-[#E63946]"
-                          checked={isArtworkActive}
-                          disabled={updatingArtworkStatusId === aw.artwork_id || isArtworkDraft}
-                          onChange={(e) => {
-                            void updateArtworkStatus(aw.artwork_id, e.target.checked);
-                          }}
-                        />
-                      </label>
-                      <span className="min-w-0 truncate text-xs font-semibold text-foreground">{statusLabel}</span>
+                      <span className="text-[10px] leading-tight text-muted-foreground text-center">
+                        {t("expo_selector_move_label")}
+                      </span>
+                      <Select
+                        value={rowSelectedExpoValue}
+                        onValueChange={(value) => {
+                          requestExpoMove(
+                            row.artwork_id,
+                            row.artwork_title,
+                            rowSelectedExpo?.id ?? null,
+                            value === "__none__" ? null : value,
+                          );
+                        }}
+                        disabled={isAssigningExpo}
+                      >
+                        <SelectTrigger className="h-7 w-full max-w-[150px] px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate">
+                          <SelectValue placeholder={t("expo_selector_placeholder")} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-none shadow-none z-[60]">
+                          <SelectItem value="__none__" className="text-xs">
+                            <span className="italic">{t("expo_selector_none")}</span>
+                          </SelectItem>
+                          {rowExpoOptions.length > 0 ? (
+                            rowExpoOptions.map((expo) => (
+                              <SelectItem key={expo.id} value={expo.id} className="text-xs">
+                                {expo.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="__empty__" disabled className="text-xs">
+                              {t("expo_selector_empty")}
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {expoUndoByArtwork[row.artwork_id] !== undefined ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 w-full gap-1 px-1.5 text-[10px]"
+                          disabled={isAssigningExpo}
+                          aria-label={t("expo_move_undo_aria")}
+                          onClick={() => void undoExpoMove(row.artwork_id)}
+                        >
+                          <Undo2 className="h-3 w-3 shrink-0" aria-hidden />
+                          {t("expo_move_undo")}
+                        </Button>
+                      ) : (
+                        <span className="block h-6 shrink-0" aria-hidden />
+                      )}
                     </div>
                   </div>
 
-                  <div className="relative z-0 flex w-full min-w-0 flex-col gap-3 sm:min-h-[156px] sm:flex-1 sm:gap-0">
-                    <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-[180px] sm:max-w-full sm:pt-[35px]">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-center"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openCartelFormatDialog(aw);
-                      }}
-                    >
-                      {t("btn_print_cartel")}
-                    </Button>
-                    <Button
-                      type="button"
-                      className="w-full justify-center gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void (async () => {
-                          const ex = (aw.expo_id ?? aw.artwork_expo_id)?.trim();
-                          const origin = await fetchQrPublicSiteOriginFromSettings();
-                          const pub = buildOeuvreQrUrl(aw.artwork_id, origin || undefined, ex ?? undefined);
-                          if (!pub) return;
-                          const u = new URL(pub);
-                          navigate(`${u.pathname}${u.search}`);
-                        })();
-                      }}
-                    >
-                      {t("btn_visitor_visual")}
-                    </Button>
+                  <div className="relative flex min-w-0 flex-1 flex-col gap-3 sm:min-h-[156px] sm:gap-0">
+                    <div className="flex min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20">
+                      <h3 className="min-w-0 w-full truncate font-serif text-lg font-bold">
+                        {row.artwork_title ?? t("artwork_untitled")}
+                      </h3>
+                      <p className="min-w-0 w-full truncate text-sm italic text-primary">{rowArtistLabel}</p>
+                      <div
+                        className="pointer-events-auto mt-2 inline-flex min-w-0 max-w-full items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-[#E63946]"
+                            checked={rowIsActive}
+                            disabled={updatingArtworkStatusId === row.artwork_id || rowIsDraft}
+                            onChange={(e) => {
+                              void updateArtworkStatus(row.artwork_id, e.target.checked);
+                            }}
+                          />
+                        </label>
+                        <span className="min-w-0 truncate text-xs font-semibold text-foreground">{rowStatusLabel}</span>
+                      </div>
                     </div>
-                    <div
-                      className={cn(
-                        "flex w-full shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:mt-auto sm:pt-3",
-                        CATALOG_IA_BADGE_WIDTH_CLASS,
-                      )}
-                    >
-                    <span
-                      className={cn(
-                        catalogIaBadgeClass,
-                        hasImageAnalysis
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                          : "border-[#E63946] bg-[#E63946] text-white",
-                      )}
-                    >
-                      {t(hasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
-                    </span>
-                    <span
-                      className={cn(
-                        catalogIaBadgeClass,
-                        hasGeneratedMediation
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                          : "border-[#E63946] bg-[#E63946] text-white",
-                      )}
-                    >
-                      {t("badge_ia_mediation", {
-                        count: generatedTextsCount,
-                        langs: mediationLangsLabel,
-                      })}
-                    </span>
-                    <span
-                      role={hasExpectedVoices ? "button" : undefined}
-                      tabIndex={hasExpectedVoices ? 0 : undefined}
-                      className={cn(
-                        catalogIaBadgeClass,
-                        !hasExpectedVoices
-                          ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
-                          : voiceIsGenerating
-                            ? "border-amber-400 bg-amber-50 text-amber-900"
-                            : voiceBadgeComplete
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                              : voiceBadgePartial
-                                ? "border-amber-300 bg-amber-50 text-amber-800"
-                                : "border-[#E63946] bg-[#E63946] text-white",
-                        hasExpectedVoices &&
-                          "cursor-pointer justify-between gap-1.5 transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60",
-                      )}
-                      aria-label={
-                        hasExpectedVoices
-                          ? voiceIsGenerating
-                            ? t("badge_ia_voice_generating_aria")
-                            : t("badge_ia_voice_open_aria")
-                          : undefined
-                      }
-                      onClick={
-                        hasExpectedVoices
-                          ? (e) => {
-                              e.stopPropagation();
-                              openArtworkVoicesModal(aw.artwork_id);
-                            }
-                          : undefined
-                      }
-                      onKeyDown={
-                        hasExpectedVoices
-                          ? (e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openArtworkVoicesModal(aw.artwork_id);
-                              }
-                            }
-                          : undefined
-                      }
-                    >
-                      <span className="min-w-0 truncate">
-                        {!hasExpectedVoices
-                          ? t("badge_ia_voice_none")
-                          : voiceIsGenerating
-                            ? voiceSummary.readyCount > 0
-                              ? t("badge_ia_voice_generating_partial", {
-                                  ready: voiceSummary.readyCount,
-                                  expected: voiceSummary.expectedCount,
-                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
-                                })
-                              : t("badge_ia_voice_generating")
-                            : voiceBadgePartial
-                              ? t("badge_ia_voice_partial", {
-                                  ready: voiceSummary.readyCount,
-                                  expected: voiceSummary.expectedCount,
-                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
-                                })
-                              : t("badge_ia_voice", {
-                                  count: voiceSummary.readyCount,
-                                  langs: voiceSummary.langsLabel || mediationLangsLabel,
-                                })}
-                      </span>
-                      {voiceIsGenerating || hasExpectedVoices ? (
-                        <span className="ml-1 flex shrink-0 items-center gap-1">
-                          {voiceIsGenerating ? (
-                            <Loader2 className="h-3 w-3 animate-spin opacity-80" aria-hidden />
-                          ) : null}
-                          {hasExpectedVoices ? (
-                            <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </span>
-                    {isGlobalCostViewer ? (
-                      <span
+
+                    <div className="relative z-0 flex w-full min-w-0 flex-col gap-3 sm:min-h-[156px] sm:flex-1 sm:gap-0">
+                      <div
+                        className="flex w-full flex-col gap-2 sm:ml-auto sm:w-[120px] sm:max-w-full sm:pt-[35px]"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCartelFormatDialog(row);
+                          }}
+                        >
+                          {t("btn_print_cartel")}
+                        </Button>
+                        <Button
+                          type="button"
+                          className="w-full justify-center gap-2 px-4 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void (async () => {
+                              const ex = (row.expo_id ?? row.artwork_expo_id)?.trim();
+                              const origin = await fetchQrPublicSiteOriginFromSettings();
+                              const pub = buildOeuvreQrUrl(row.artwork_id, origin || undefined, ex ?? undefined);
+                              if (!pub) return;
+                              const u = new URL(pub);
+                              navigate(`${u.pathname}${u.search}`);
+                            })();
+                          }}
+                        >
+                          {t("btn_visitor_visual")}
+                        </Button>
+                      </div>
+                      <div
                         className={cn(
-                          catalogIaBadgeClass,
-                          "border-destructive/30 bg-destructive/5 tabular-nums",
+                          "flex w-full shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:mt-auto sm:pt-3",
+                          CATALOG_IA_BADGE_WIDTH_CLASS,
                         )}
                       >
-                        <EntityCostLabel
-                          display={resolveEntityCostDisplay(
-                            costsReady ? costByArtworkId[aw.artwork_id] : undefined,
-                            costsReady,
-                            usdToEurRate,
+                        <span className={cn(catalogIaBadgeClass, rowHasImageAnalysis ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white")}>
+                          {t(rowHasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
+                        </span>
+                        <span className={cn(catalogIaBadgeClass, rowHasMediation ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white")}>
+                          {t("badge_ia_mediation", { count: rowTextsCount, langs: rowMediationLangs })}
+                        </span>
+                        <span
+                          role={rowHasVoices ? "button" : undefined}
+                          tabIndex={rowHasVoices ? 0 : undefined}
+                          className={cn(
+                            catalogIaBadgeClass,
+                            !rowHasVoices
+                              ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
+                              : rowVoiceGenerating
+                                ? "border-amber-400 bg-amber-50 text-amber-900"
+                                : rowVoiceComplete
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                  : rowVoicePartial
+                                    ? "border-amber-300 bg-amber-50 text-amber-800"
+                                    : "border-[#E63946] bg-[#E63946] text-white",
+                            rowHasVoices && "cursor-pointer justify-between gap-1.5 transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60",
                           )}
-                          unavailableLabel={t("badge_artwork_cost_unavailable")}
-                          prefixLabel={t("badge_artwork_cost_prefix")}
-                        />
-                      </span>
-                    ) : null}
+                          onClick={
+                            rowHasVoices
+                              ? (e) => {
+                                  e.stopPropagation();
+                                  openArtworkVoicesModal(row.artwork_id);
+                                }
+                              : undefined
+                          }
+                        >
+                          <span className="min-w-0 truncate">
+                            {!rowHasVoices
+                              ? t("badge_ia_voice_none")
+                              : rowVoiceGenerating
+                                ? t("badge_ia_voice_generating")
+                                : t("badge_ia_voice", { count: rowVoice.readyCount, langs: rowVoice.langsLabel || rowMediationLangs })}
+                          </span>
+                        </span>
+                        {isGlobalCostViewer ? (
+                          <span className={cn(catalogIaBadgeClass, "border-destructive/30 bg-destructive/5 tabular-nums")}>
+                            <EntityCostLabel
+                              display={resolveEntityCostDisplay(
+                                costsReady ? costByArtworkId[row.artwork_id] : undefined,
+                                costsReady,
+                                usdToEurRate,
+                              )}
+                              unavailableLabel={t("badge_artwork_cost_unavailable")}
+                              prefixLabel={t("badge_artwork_cost_prefix")}
+                            />
+                          </span>
+                        ) : (
+                          <span className="block h-8 shrink-0" aria-hidden />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
+                </CardContent>
+              </Card>
+            );
+          };
+
+          if (entry.kind === "group") {
+            return (
+              <CatalogueArtworkGroupDeck
+                key={entry.groupInfo.group.id}
+                group={entry.groupInfo.group}
+                artworks={entry.groupInfo.orderedIds
+                  .map((id) => filteredArtworkById.get(id))
+                  .filter((row): row is ArtworkRow => Boolean(row))}
+                renderCard={buildCard}
+                onOrderChange={() => {
+                  if (selectedExpoFilter === "all") return;
+                  void fetchArtworkGroupsForExpo(selectedExpoFilter).then(setExpoArtworkGroups);
+                }}
+              />
+            );
+          }
+
+          return buildCard(entry.artwork);
         })}
       </div>
 

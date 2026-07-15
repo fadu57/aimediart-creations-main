@@ -34,6 +34,7 @@
     "previewPresentation": "View visitor presentation",
     "printPanel": "Print expo panel",
     "viewCatalogue": "Artwork catalogue",
+    "artworkGroups": "Artwork groups",
     "travelDiary": "Visitor diary",
     "curatorLabel": "Curator: {{name}}",
     "dateRange": "From {{from}} to {{to}}",

@@ -36,6 +36,10 @@ import {
   mediationCarouselLogicalIndex,
   type MediationCarouselSlide,
 } from "@/lib/mediationSwiperLoop";
+import {
+  fetchArtworkGroupForVisitor,
+  type ArtworkGroupWithMembers,
+} from "@/lib/artworkGroupFetch";
 import { parseArtworkIdFromInput } from "@/lib/oeuvrePublicUrl";
 import { fetchExpoRowForVisitor, readExpoScanSequenceNavigation } from "@/lib/visitorExpoFetch";
 import { getStyleLabelFromDb, type PromptStyleLabelFields } from "@/lib/promptStyleLabel";
@@ -210,6 +214,7 @@ const VisitorViewCore = () => {
   const [searchParams] = useSearchParams();
   const isEmbedded = searchParams.get("embed") === "1";
   const navModeFromQuery = searchParams.get("nav_mode")?.trim() || "";
+  const groupIdFromQuery = searchParams.get("group_id")?.trim() || "";
   const [œuvresNavigationMode, setOeuvresNavigationMode] = useState("");
   const [expoScanSequenceNav, setExpoScanSequenceNav] = useState<boolean | null>(null);
   const expoIdFromQuery = searchParams.get("expo_id")?.trim() || "";
@@ -227,15 +232,20 @@ const VisitorViewCore = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [artwork, setArtwork] = useState<ArtworkRow | null>(null);
   const effectiveExpoId = expoIdFromQuery || artwork?.artwork_expo_id?.trim() || "";
+  const isGroupNavigation = useMemo(
+    () => navModeFromQuery === "artwork_group" || Boolean(groupIdFromQuery),
+    [navModeFromQuery, groupIdFromQuery],
+  );
   const isSameArtistNavigation = useMemo(() => {
+    if (isGroupNavigation) return false;
     if (navModeFromQuery === "same_artist_all_works") return true;
     if (navModeFromQuery === "single_scan_sequence") return false;
     if (effectiveExpoId && expoScanSequenceNav !== null) {
       return !expoScanSequenceNav;
     }
     return œuvresNavigationMode === "same_artist_all_works";
-  }, [navModeFromQuery, effectiveExpoId, expoScanSequenceNav, œuvresNavigationMode]);
-  const showScanAnotherNav = !isEmbedded && !isSameArtistNavigation;
+  }, [isGroupNavigation, navModeFromQuery, effectiveExpoId, expoScanSequenceNav, œuvresNavigationMode]);
+  const showScanAnotherNav = !isEmbedded && !isSameArtistNavigation && !isGroupNavigation;
   const [artist, setArtist] = useState<ArtistRow | null>(null);
   const [artistBioByLang, setArtistBioByLang] = useState<Record<string, string>>({});
   const [artistBioIdByLang, setArtistBioIdByLang] = useState<Record<string, string>>({});
@@ -275,6 +285,8 @@ const VisitorViewCore = () => {
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [sameArtistArtworkIds, setSameArtistArtworkIds] = useState<string[]>([]);
+  const [groupArtworkIds, setGroupArtworkIds] = useState<string[]>([]);
+  const [artworkGroupMeta, setArtworkGroupMeta] = useState<ArtworkGroupWithMembers | null>(null);
   const [quickFeedbackHint, setQuickFeedbackHint] = useState<QuickFeedbackHint | null>(null);
   const [headerAvatarUrl, setHeaderAvatarUrl] = useState<string | null>(null);
   const [anonymousProfile, setAnonymousProfile] = useState<VisitorAnonymousProfile | null>(() =>
@@ -345,6 +357,38 @@ const VisitorViewCore = () => {
       cancelled = true;
     };
   }, [isSameArtistNavigation, artwork?.artwork_artist_id, artwork?.artwork_artisi_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadGroupArtworks = async () => {
+      if (!isGroupNavigation || !groupIdFromQuery) {
+        setGroupArtworkIds([]);
+        setArtworkGroupMeta(null);
+        return;
+      }
+      try {
+        const group = await fetchArtworkGroupForVisitor(groupIdFromQuery);
+        if (cancelled) return;
+        if (!group) {
+          setGroupArtworkIds([]);
+          setArtworkGroupMeta(null);
+          return;
+        }
+        setArtworkGroupMeta(group);
+        setGroupArtworkIds(group.members.map((m) => m.artwork_id));
+      } catch {
+        if (!cancelled) {
+          setGroupArtworkIds([]);
+          setArtworkGroupMeta(null);
+        }
+      }
+    };
+
+    void loadGroupArtworks();
+    return () => {
+      cancelled = true;
+    };
+  }, [isGroupNavigation, groupIdFromQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1323,6 +1367,26 @@ const VisitorViewCore = () => {
     navigate(`/artwork/${encodeURIComponent(nextArtworkId)}${query}`);
   };
 
+  const navigateGroupArtwork = (direction: -1 | 1) => {
+    if (!isGroupNavigation || groupArtworkIds.length === 0 || !groupIdFromQuery) return;
+    const currentId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
+    const currentIndex = groupArtworkIds.findIndex((id) => id === currentId);
+    if (currentIndex < 0) return;
+
+    const nextIndex = (currentIndex + direction + groupArtworkIds.length) % groupArtworkIds.length;
+    const nextArtworkId = groupArtworkIds[nextIndex];
+    if (!nextArtworkId) return;
+
+    const ex = effectiveExpoId || expoIdFromQuery;
+    if (ex) markVisitorArtworkScanned(ex, nextArtworkId);
+
+    const qs = new URLSearchParams();
+    if (ex) qs.set("expo_id", ex);
+    qs.set("group_id", groupIdFromQuery);
+    qs.set("nav_mode", "artwork_group");
+    navigate(`/artwork/${encodeURIComponent(nextArtworkId)}?${qs.toString()}`);
+  };
+
   const sameArtistNavMeta = useMemo(() => {
     if (!isSameArtistNavigation || sameArtistArtworkIds.length === 0) return null;
     const currentId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
@@ -1334,8 +1398,77 @@ const VisitorViewCore = () => {
     };
   }, [isSameArtistNavigation, sameArtistArtworkIds, artwork?.artwork_id, artworkId]);
 
+  const groupNavMeta = useMemo(() => {
+    if (!isGroupNavigation || groupArtworkIds.length === 0) return null;
+    const currentId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
+    const index = groupArtworkIds.findIndex((id) => id === currentId);
+    const safeIndex = index >= 0 ? index : 0;
+    return {
+      current: safeIndex + 1,
+      total: groupArtworkIds.length,
+      type: artworkGroupMeta?.group_type ?? "theme",
+      label: artworkGroupMeta?.group_label ?? "",
+      number: artworkGroupMeta?.group_display_number ?? "",
+    };
+  }, [
+    isGroupNavigation,
+    groupArtworkIds,
+    artworkGroupMeta,
+    artwork?.artwork_id,
+    artworkId,
+  ]);
+
+  const canContinueSeriesNavigation = useMemo(() => {
+    if (isGroupNavigation && groupNavMeta && groupNavMeta.total > 1) return true;
+    if (isSameArtistNavigation && sameArtistNavMeta && sameArtistNavMeta.total > 1) return true;
+    return false;
+  }, [isGroupNavigation, isSameArtistNavigation, groupNavMeta, sameArtistNavMeta]);
+
+  /** Après validation du ressenti — enchaîner sur l'œuvre suivante (même artiste ou regroupement). */
+  const handleContinueToNextArtworkInSeries = () => {
+    setIsValidationPopupOpen(false);
+    handleResetFeedbackSelection();
+    if (isEmbedded && isSameArtistNavigation) {
+      window.parent?.postMessage({ type: "artworks-artist-next" }, window.location.origin);
+      return;
+    }
+    if (isGroupNavigation) {
+      navigateGroupArtwork(1);
+      return;
+    }
+    if (isSameArtistNavigation) {
+      navigateSameArtistArtwork(1);
+    }
+  };
+
+  const navigateOutOfSeriesNavigation = () => {
+    const currentId = artwork?.artwork_id?.trim() || artworkId?.trim() || "";
+    if (!currentId) return;
+
+    const qs = new URLSearchParams();
+    const ex = effectiveExpoId || expoIdFromQuery;
+    if (ex) qs.set("expo_id", ex);
+    qs.set("nav_mode", "single_scan_sequence");
+    if (isEmbedded) qs.set("embed", "1");
+
+    navigate(`/artwork/${encodeURIComponent(currentId)}?${qs.toString()}`);
+  };
+
+  /** Quitter le regroupement ou le parcours même artiste sans quitter l'expo. */
+  const handleLeaveSeriesNavigation = () => {
+    setIsValidationPopupOpen(false);
+    handleResetFeedbackSelection();
+    navigateOutOfSeriesNavigation();
+  };
+
+  const leaveSeriesButtonLabelKey = isGroupNavigation ? "btn_leave_artwork_group" : "btn_leave_artist_series";
+  const nextSeriesButtonLabelKey = isGroupNavigation ? "btn_next_artwork_in_group" : "btn_next_artwork_same_artist";
+
   const hasTopVisitorBar =
-    !isEmbedded && ((isSameArtistNavigation && Boolean(sameArtistNavMeta)) || showScanAnotherNav);
+    !isEmbedded &&
+    ((isSameArtistNavigation && Boolean(sameArtistNavMeta)) ||
+      (isGroupNavigation && Boolean(groupNavMeta)) ||
+      showScanAnotherNav);
 
   const quickFeedbackHintMessageKey = useMemo((): string | null => {
     if (!quickFeedbackHint) return null;
@@ -1370,9 +1503,25 @@ const VisitorViewCore = () => {
 
   const handleSameArtistNavigationClick = (direction: -1 | 1) => {
     if (!assertFeedbackBeforeLeavingArtwork()) return;
+    setIsValidationPopupOpen(false);
     handleResetFeedbackSelection();
     navigateSameArtistArtwork(direction);
   };
+
+  const handleGroupNavigationClick = (direction: -1 | 1) => {
+    if (!assertFeedbackBeforeLeavingArtwork()) return;
+    setIsValidationPopupOpen(false);
+    handleResetFeedbackSelection();
+    navigateGroupArtwork(direction);
+  };
+
+  const groupNavHubLabel = useMemo(() => {
+    if (!groupNavMeta) return "";
+    if (groupNavMeta.type === "artist") {
+      return t("group_nav_artist_hub", { label: groupNavMeta.label });
+    }
+    return t("group_nav_theme_hub", { label: groupNavMeta.label });
+  }, [groupNavMeta, t]);
 
   const updateArtworkZoomOrigin = (clientX: number, clientY: number, rect: DOMRect) => {
     const x = ((clientX - rect.left) / rect.width) * 100;
@@ -1665,6 +1814,62 @@ const VisitorViewCore = () => {
               >
                 <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-[#F0F0F0]/85">
                   {t("same_artist_nav_next_short")}
+                </span>
+                <ChevronRight
+                  className="h-5 w-5 shrink-0 text-[#E63946] transition-transform group-hover:translate-x-0.5"
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+              </button>
+            </div>
+          </div>
+        )}
+        {isGroupNavigation && groupNavMeta && (
+          <div className="œuvre-full-width-box mb-3 mt-0 px-4">
+            <div className="flex overflow-hidden rounded-2xl border border-white/10 bg-[#181818] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <button
+                type="button"
+                aria-label={t("aria_prev_artwork")}
+                title={t("group_nav_prev_title")}
+                className="group flex min-w-0 flex-1 items-center gap-2 border-r border-white/10 px-3 py-3 text-left transition-colors hover:bg-white/[0.04] active:bg-[#E63946]/15"
+                onClick={() => handleGroupNavigationClick(-1)}
+              >
+                <ChevronLeft
+                  className="h-5 w-5 shrink-0 text-[#E63946] transition-transform group-hover:-translate-x-0.5"
+                  strokeWidth={2.5}
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-[#F0F0F0]/85">
+                  {t("group_nav_prev_short")}
+                </span>
+              </button>
+
+              <div className="flex shrink-0 flex-col items-center justify-center px-3 py-2.5 sm:px-4">
+                <span className="text-sm font-bold tabular-nums leading-none text-[#E63946]">
+                  {t("group_nav_position", {
+                    current: groupNavMeta.current,
+                    total: groupNavMeta.total,
+                  })}
+                </span>
+                {groupNavMeta.number ? (
+                  <span className="mt-0.5 text-[9px] font-semibold tabular-nums text-[#F0F0F0]/55">
+                    {t("group_nav_number", { number: groupNavMeta.number })}
+                  </span>
+                ) : null}
+                <span className="mt-1 max-w-[120px] truncate text-center text-[8px] font-semibold uppercase tracking-[0.1em] text-[#F0F0F0]/40">
+                  {groupNavHubLabel}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                aria-label={t("aria_next_artwork")}
+                title={t("group_nav_next_title")}
+                className="group flex min-w-0 flex-1 items-center justify-end gap-2 border-l border-white/10 px-3 py-3 text-right transition-colors hover:bg-white/[0.04] active:bg-[#E63946]/15"
+                onClick={() => handleGroupNavigationClick(1)}
+              >
+                <span className="min-w-0 truncate text-[10px] font-semibold leading-tight text-[#F0F0F0]/85">
+                  {t("group_nav_next_short")}
                 </span>
                 <ChevronRight
                   className="h-5 w-5 shrink-0 text-[#E63946] transition-transform group-hover:translate-x-0.5"
@@ -2216,7 +2421,10 @@ const VisitorViewCore = () => {
             aria-label={t("aria_validation_dialog")}
           >
             <p className="text-sm font-semibold leading-relaxed text-gray-900" style={{ whiteSpace: "pre-line" }}>
-              {t("validation_thanks", { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) })}
+              {t(
+                canContinueSeriesNavigation ? "validation_thanks_series" : "validation_thanks",
+                { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) },
+              )}
             </p>
             {communityInsightLoading ? (
               <div className="mt-4 flex justify-center py-2" aria-busy="true">
@@ -2231,10 +2439,20 @@ const VisitorViewCore = () => {
               <Button
                 type="button"
                 className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
-                onClick={handleScanAnotherArtwork}
+                onClick={canContinueSeriesNavigation ? handleContinueToNextArtworkInSeries : handleScanAnotherArtwork}
               >
-                {t("btn_scan_another")}
+                {t(canContinueSeriesNavigation ? nextSeriesButtonLabelKey : "btn_scan_another")}
               </Button>
+              {canContinueSeriesNavigation ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
+                  onClick={handleLeaveSeriesNavigation}
+                >
+                  {t(leaveSeriesButtonLabelKey)}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"

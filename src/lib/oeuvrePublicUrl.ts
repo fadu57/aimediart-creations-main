@@ -103,13 +103,68 @@ export function parseArtworkIdFromInput(raw: string | null | undefined): string 
 
 export type QrScanTarget =
   | { kind: "artwork"; artworkId: string }
+  | { kind: "artwork_group"; groupId: string }
   | { kind: "expo"; expoId: string };
 
-/** Interprète le contenu d'un QR (œuvre, expo, UUID seul, URL absolue ou relative). */
-export function resolveScanTargetFromQr(raw: string | null | undefined): QrScanTarget | null {
-  const artworkId = parseArtworkIdFromInput(raw);
-  if (artworkId) return { kind: "artwork", artworkId };
+/** Extrait l'UUID d'un regroupement depuis une URL ou un UUID seul. */
+export function parseArtworkGroupIdFromInput(raw: string | null | undefined): string {
+  let t = (raw ?? "").trim();
+  if (!t) return "";
+  try {
+    t = decodeURIComponent(t);
+  } catch {
+    /* garder tel quel */
+  }
 
+  if (UUID_RE.test(t)) return t;
+
+  const parseFromUrl = (u: URL): string => {
+    const fromQuery =
+      u.searchParams.get("group_id")?.trim() ||
+      u.searchParams.get("groupId")?.trim() ||
+      "";
+    if (fromQuery && UUID_RE.test(fromQuery)) return fromQuery;
+
+    const parts = u.pathname.split("/").filter(Boolean);
+    const groupIdx = parts.findIndex((p) =>
+      ["artwork-group", "artwork_group", "artworkgroup"].includes(p.toLowerCase()),
+    );
+    if (groupIdx >= 0 && parts[groupIdx + 1]) {
+      const seg = decodeURIComponent(parts[groupIdx + 1]);
+      if (UUID_RE.test(seg)) return seg;
+    }
+    return "";
+  };
+
+  if (t.startsWith("/")) {
+    try {
+      const base =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "https://local.invalid";
+      const fromPath = parseFromUrl(new URL(t, base));
+      if (fromPath) return fromPath;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (/^https?:\/\//i.test(t)) {
+    try {
+      const u = new URL(t);
+      const fromUrl = parseFromUrl(u);
+      if (fromUrl) return fromUrl;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const m = t.match(UUID_IN_TEXT_RE);
+  return m ? m[0] : "";
+}
+
+/** Interprète le contenu d'un QR (œuvre, groupe, expo, UUID seul, URL absolue ou relative). */
+export function resolveScanTargetFromQr(raw: string | null | undefined): QrScanTarget | null {
   let t = (raw ?? "").trim();
   if (!t) return null;
 
@@ -126,17 +181,32 @@ export function resolveScanTargetFromQr(raw: string | null | undefined): QrScanT
     }
   }
 
-  if (!/^https?:\/\//i.test(href)) return null;
+  if (/^https?:\/\//i.test(href)) {
+    try {
+      const u = new URL(href);
+      const groupId = parseArtworkGroupIdFromInput(u.href);
+      if (groupId) return { kind: "artwork_group", groupId };
 
-  try {
-    const u = new URL(href);
-    if (/\/scan(-work\d*)?(\/|$)/i.test(u.pathname)) {
-      const ex = u.searchParams.get("expo_id")?.trim() || "";
-      if (ex && UUID_RE.test(ex)) return { kind: "expo", expoId: ex };
+      const artworkId = parseArtworkIdFromInput(u.href);
+      if (artworkId) return { kind: "artwork", artworkId };
+
+      if (/\/scan(-work\d*)?(\/|$)/i.test(u.pathname)) {
+        const ex = u.searchParams.get("expo_id")?.trim() || "";
+        if (ex && UUID_RE.test(ex)) return { kind: "expo", expoId: ex };
+      }
+    } catch {
+      return null;
     }
-  } catch {
     return null;
   }
+
+  const groupId = parseArtworkGroupIdFromInput(t);
+  if (groupId && (/\/artwork-group\//i.test(t) || /group_id=/i.test(t))) {
+    return { kind: "artwork_group", groupId };
+  }
+
+  const artworkId = parseArtworkIdFromInput(t);
+  if (artworkId) return { kind: "artwork", artworkId };
 
   return null;
 }
@@ -160,6 +230,26 @@ export function buildOeuvreQrUrl(
   const origin = resolveQrSiteOrigin(originOverride);
   if (!id) return "";
   const base = `${origin}/artwork/${encodeURIComponent(id)}`;
+  const ex = (expoId ?? "").trim();
+  if (ex && UUID_RE.test(ex)) {
+    return `${base}?expo_id=${encodeURIComponent(ex)}`;
+  }
+  return base;
+}
+
+/**
+ * URL absolue encodée dans les QR regroupement :
+ * `{préfixe}/artwork-group/{group_id}` puis `?expo_id={uuid}` si fourni.
+ */
+export function buildArtworkGroupQrUrl(
+  groupId: string | null | undefined,
+  originOverride?: string | null,
+  expoId?: string | null,
+): string {
+  const id = parseArtworkGroupIdFromInput(groupId);
+  const origin = resolveQrSiteOrigin(originOverride);
+  if (!id) return "";
+  const base = `${origin}/artwork-group/${encodeURIComponent(id)}`;
   const ex = (expoId ?? "").trim();
   if (ex && UUID_RE.test(ex)) {
     return `${base}?expo_id=${encodeURIComponent(ex)}`;

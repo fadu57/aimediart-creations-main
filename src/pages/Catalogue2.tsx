@@ -182,7 +182,7 @@ export default function Catalogue2() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-4 py-6 space-y-4">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pt-[70px] pb-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/catalogue")}>{t("tableau_back")}</Button>
         <Button type="button" variant="outline" asChild>
