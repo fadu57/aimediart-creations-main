@@ -130,7 +130,12 @@
     "desc": "Monitoraggio di tutte le voci per persona e lingua.",
     "close": "Chiudi",
     "fill_missing": "Completa voci mancanti",
+    "generate_voices": "Genera le voci audio",
     "all_voices_ready": "Tutte le voci sono state generate",
+    "progress_aria": "Progresso audio globale {{percent}} %",
+    "progress_running": "{{ready}} / {{total}} voci pronte · {{active}} in corso",
+    "progress_idle": "{{ready}} / {{total}} voci pronte",
+    "progress_done": "{{ready}} / {{total}} voci pronte",
     "background_hint": "Puoi chiudere: la generazione continuerà in background."
   },
   "qr_warn_no_expo": "Nessuna mostra assegnata — il QR funzionerà ma senza contesto della mostra per il visitatore.",

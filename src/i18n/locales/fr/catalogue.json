@@ -40,6 +40,8 @@
   "btn_open": "Ouvrir",
   "btn_test_qr": "Tester le QR-Code",
   "btn_print_cartel": "Imprimer cartel",
+  "btn_print_cartel_group_line1": "Imprimer cartel",
+  "btn_print_cartel_group_line2": "du groupement",
   "btn_visitor_visual": "Visuel visiteurs",
   "artwork_untitled": "Œuvre sans titre",
   "artist_unknown": "Artiste inconnu",

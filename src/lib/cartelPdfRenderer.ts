@@ -126,13 +126,15 @@ function renderCartelInSlot(
   const logoX = slotX + slotW - margin - logoW;
   const logoY = slotY + slotH - 6 * sw - logoH;
 
-  const { lines: titleLines, fontSize: titleFontSize, lineHeight: titleLineHeight } = computePdfTitleUpToTwoLines(
-    pdf,
-    titleText,
-    maxTextWidth,
-    15 * sw,
-    Math.max(7, 9 * sw),
-  );
+  const { lines: titleLines, fontSize: titleFontSize, lineHeight: titleLineHeight } = titleText.trim()
+    ? computePdfTitleUpToTwoLines(
+        pdf,
+        titleText,
+        maxTextWidth,
+        15 * sw,
+        Math.max(7, 9 * sw),
+      )
+    : { lines: [] as string[], fontSize: 0, lineHeight: 0 };
 
   const artistFontSize = 12 * sw;
   const artistLineHeight = 4.6 * sw;
@@ -140,8 +142,8 @@ function renderCartelInSlot(
   pdf.setFontSize(artistFontSize);
   const artistLines = pdf.splitTextToSize(artistText, maxTextWidth) as string[];
 
-  const gapQrToTitle = 7 * sw;
-  const gapTitleToArtist = 2.5 * sw;
+  const gapQrToTitle = titleLines.length > 0 ? 7 * sw : 5 * sw;
+  const gapTitleToArtist = titleLines.length > 0 ? 2.5 * sw : 0;
   const textBlockH =
     gapQrToTitle +
     titleLines.length * titleLineHeight +
@@ -161,10 +163,12 @@ function renderCartelInSlot(
 
   let textY = blockTop + qrSize + gapQrToTitle;
   pdf.setTextColor(0, 0, 0);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(titleFontSize);
-  pdf.text(titleLines, centerX, textY, { align: "center" });
-  textY += titleLines.length * titleLineHeight + gapTitleToArtist;
+  if (titleLines.length > 0) {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(titleFontSize);
+    pdf.text(titleLines, centerX, textY, { align: "center" });
+    textY += titleLines.length * titleLineHeight + gapTitleToArtist;
+  }
 
   pdf.setFont("helvetica", "italic");
   pdf.setFontSize(artistFontSize);

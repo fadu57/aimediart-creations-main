@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowDown, ArrowUp, ChevronLeft, Layers, Loader2, Plus, QrCode, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, ChevronLeft, Layers, Loader2, Plus, QrCode, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -19,6 +20,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +47,9 @@ import {
 } from "@/lib/artworkGroupFetch";
 import { generateAndSaveArtworkGroupQrCode } from "@/lib/artworkGroupQr";
 import { ArtworkGroupStackPreview } from "@/components/expo/ArtworkGroupStackPreview";
+import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
 import { cn } from "@/lib/utils";
+
 type ExpoArtworkRow = {
   artwork_id: string;
   artwork_title: string | null;
@@ -57,6 +69,11 @@ type ExpoArtworkRow = {
   }[] | null;
 };
 
+type ExpoArtistOption = {
+  id: string;
+  label: string;
+};
+
 export type ExpoGroupOption = {
   id: string;
   name: string;
@@ -72,6 +89,12 @@ export type ExpoArtworkGroupsPanelProps = {
   expoOptions: ExpoGroupOption[];
 };
 
+function artistIdFromRow(row: ExpoArtworkRow): string {
+  const a = row.artists;
+  const artist = Array.isArray(a) ? a[0] : a;
+  return (artist?.artist_id ?? row.artwork_artist_id ?? "").trim();
+}
+
 function artistLabelFromRow(row: ExpoArtworkRow): string {
   const a = row.artists;
   const artist = Array.isArray(a) ? a[0] : a;
@@ -79,6 +102,20 @@ function artistLabelFromRow(row: ExpoArtworkRow): string {
     .filter(Boolean)
     .join(" ")
     .trim() || (artist?.artist_nickname ?? "").trim();
+}
+
+function buildExpoArtistOptions(rows: ExpoArtworkRow[]): ExpoArtistOption[] {
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const id = artistIdFromRow(row);
+    if (!id) continue;
+    if (!map.has(id)) {
+      map.set(id, artistLabelFromRow(row) || id);
+    }
+  }
+  return [...map.entries()]
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
 }
 
 function inferArtistLabel(rows: ExpoArtworkRow[], selectedIds: string[]): string {
@@ -89,7 +126,7 @@ function inferArtistLabel(rows: ExpoArtworkRow[], selectedIds: string[]): string
 
 function inferArtistId(rows: ExpoArtworkRow[], selectedIds: string[]): string | null {
   const selected = rows.filter((r) => selectedIds.includes(r.artwork_id));
-  const ids = [...new Set(selected.map((r) => r.artwork_artist_id?.trim() || "").filter(Boolean))];
+  const ids = [...new Set(selected.map((r) => artistIdFromRow(r)).filter(Boolean))];
   return ids.length === 1 ? ids[0]! : null;
 }
 
@@ -121,6 +158,8 @@ export function ExpoArtworkGroupsPanel({
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [groupType, setGroupType] = useState<ArtworkGroupType>("theme");
   const [groupLabel, setGroupLabel] = useState("");
+  const [selectedArtistId, setSelectedArtistId] = useState<string | null>(null);
+  const [artistPickerOpen, setArtistPickerOpen] = useState(false);
   const [displayNumber, setDisplayNumber] = useState("");
   const [selectedArtworkIds, setSelectedArtworkIds] = useState<string[]>([]);
   const [memberOrder, setMemberOrder] = useState<string[]>([]);
@@ -157,24 +196,74 @@ export function ExpoArtworkGroupsPanel({
     return map;
   }, [groups, editingGroupId]);
 
+  const expoArtists = useMemo(() => buildExpoArtistOptions(artworks), [artworks]);
+
   const filteredArtworks = useMemo(() => {
+    let list = artworks;
+    if (groupType === "artist" && selectedArtistId) {
+      list = list.filter((aw) => artistIdFromRow(aw) === selectedArtistId);
+    }
     const q = artworkSearch.trim().toLowerCase();
-    if (!q) return artworks;
-    return artworks.filter((aw) => {
+    if (!q) return list;
+    return list.filter((aw) => {
       const title = (aw.artwork_title ?? "").toLowerCase();
       const artist = artistLabelFromRow(aw).toLowerCase();
       return title.includes(q) || artist.includes(q);
     });
-  }, [artworks, artworkSearch]);
+  }, [artworks, artworkSearch, groupType, selectedArtistId]);
 
   const resetEditor = () => {
     setEditingGroupId(null);
     setGroupType("theme");
     setGroupLabel("");
+    setSelectedArtistId(null);
+    setArtistPickerOpen(false);
     setDisplayNumber("");
     setSelectedArtworkIds([]);
     setMemberOrder([]);
     setShowEditor(false);
+  };
+
+  const applyArtistSelection = useCallback((artistId: string | null, artists = expoArtists) => {
+    setSelectedArtistId(artistId);
+    if (!artistId) {
+      setGroupLabel("");
+      return;
+    }
+    const match = artists.find((a) => a.id === artistId);
+    setGroupLabel(match?.label ?? "");
+    setSelectedArtworkIds((prev) => {
+      const next = prev.filter((id) => {
+        const aw = artworks.find((row) => row.artwork_id === id);
+        return aw ? artistIdFromRow(aw) === artistId : false;
+      });
+      return next;
+    });
+    setMemberOrder((prev) => {
+      const next = prev.filter((id) => {
+        const aw = artworks.find((row) => row.artwork_id === id);
+        return aw ? artistIdFromRow(aw) === artistId : false;
+      });
+      return next;
+    });
+  }, [expoArtists, artworks]);
+
+  const switchGroupType = (next: ArtworkGroupType) => {
+    setGroupType(next);
+    setArtistPickerOpen(false);
+    if (next === "theme") {
+      setSelectedArtistId(null);
+      return;
+    }
+    if (expoArtists.length === 1) {
+      applyArtistSelection(expoArtists[0]!.id);
+      return;
+    }
+    if (selectedArtistId && expoArtists.some((a) => a.id === selectedArtistId)) {
+      applyArtistSelection(selectedArtistId);
+      return;
+    }
+    applyArtistSelection(null);
   };
 
   const loadData = useCallback(async () => {
@@ -237,6 +326,17 @@ export function ExpoArtworkGroupsPanel({
     const ids = group.members.map((m) => m.artwork_id);
     setSelectedArtworkIds(ids);
     setMemberOrder(ids);
+    if (group.group_type === "artist") {
+      const fromGroup = (group.group_artist_id ?? "").trim();
+      const inferred = fromGroup || inferArtistId(artworks, ids);
+      setSelectedArtistId(inferred);
+      if (inferred) {
+        const match = buildExpoArtistOptions(artworks).find((a) => a.id === inferred);
+        if (match?.label) setGroupLabel(match.label);
+      }
+    } else {
+      setSelectedArtistId(null);
+    }
     setShowEditor(true);
   };
 
@@ -268,17 +368,44 @@ export function ExpoArtworkGroupsPanel({
 
   useEffect(() => {
     if (!showEditor || groupType !== "artist") return;
-    const inferred = inferArtistLabel(artworks, selectedArtworkIds);
-    if (inferred && !groupLabel.trim()) setGroupLabel(inferred);
-  }, [showEditor, groupType, selectedArtworkIds, artworks, groupLabel]);
+    if (expoArtists.length === 1 && selectedArtistId !== expoArtists[0]!.id) {
+      applyArtistSelection(expoArtists[0]!.id, expoArtists);
+    }
+  }, [showEditor, groupType, expoArtists, selectedArtistId, applyArtistSelection]);
+
+  useEffect(() => {
+    if (!showEditor || groupType !== "artist" || selectedArtistId) return;
+    const inferredId = inferArtistId(artworks, selectedArtworkIds);
+    if (inferredId) applyArtistSelection(inferredId);
+    else {
+      const inferredLabel = inferArtistLabel(artworks, selectedArtworkIds);
+      if (inferredLabel && !groupLabel.trim()) setGroupLabel(inferredLabel);
+    }
+  }, [
+    showEditor,
+    groupType,
+    selectedArtistId,
+    selectedArtworkIds,
+    artworks,
+    groupLabel,
+    applyArtistSelection,
+  ]);
 
   const handleSave = async () => {
     if (!activeExpoId || !activeAgencyId) {
       toast.error(t("toast_need_expo"));
       return;
     }
-    if (!groupLabel.trim()) {
+    const label =
+      groupType === "artist"
+        ? (expoArtists.find((a) => a.id === selectedArtistId)?.label ?? groupLabel).trim()
+        : groupLabel.trim();
+    if (!label) {
       toast.error(t("toast_need_label"));
+      return;
+    }
+    if (groupType === "artist" && !selectedArtistId) {
+      toast.error(t("toast_need_artist"));
       return;
     }
     if (memberOrder.length === 0) {
@@ -294,7 +421,10 @@ export function ExpoArtworkGroupsPanel({
 
     setSaving(true);
     try {
-      const artistId = groupType === "artist" ? inferArtistId(artworks, memberOrder) : null;
+      const artistId =
+        groupType === "artist"
+          ? selectedArtistId ?? inferArtistId(artworks, memberOrder)
+          : null;
       let groupId = editingGroupId;
 
       if (groupId) {
@@ -302,7 +432,7 @@ export function ExpoArtworkGroupsPanel({
           .from("artwork_groups")
           .update({
             group_type: groupType,
-            group_label: groupLabel.trim(),
+            group_label: label,
             group_display_number: displayNumber.trim() || null,
             group_artist_id: artistId,
           })
@@ -317,7 +447,7 @@ export function ExpoArtworkGroupsPanel({
             expo_id: activeExpoId,
             agency_id: activeAgencyId,
             group_type: groupType,
-            group_label: groupLabel.trim(),
+            group_label: label,
             group_display_number: displayNumber.trim() || null,
             group_artist_id: artistId,
           })
@@ -375,40 +505,55 @@ export function ExpoArtworkGroupsPanel({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="fixed left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-3xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border">
-          <div className="shrink-0 border-b bg-gradient-to-br from-primary/8 via-background to-amber-500/5 px-4 py-4 sm:px-6 sm:py-5">
-            <div className="flex items-start gap-3 sm:gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary sm:h-11 sm:w-11">
-                <Layers className="h-5 w-5" aria-hidden />
+        <DialogContent
+          hideCloseButton
+          className="fixed left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[90dvh] sm:w-[calc(100vw-2rem)] sm:max-w-3xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border"
+        >
+          <header className="z-20 flex shrink-0 items-center justify-between gap-3 border-b bg-background px-4 py-3 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <Layers className="h-4 w-4" aria-hidden />
               </div>
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="text-lg font-serif sm:text-xl">{t("panel_title")}</DialogTitle>
-                <DialogDescription className="mt-1 text-xs sm:text-sm">{t("panel_desc")}</DialogDescription>
-                {expoOptions.length > 0 ? (
-                  <div className="mt-3 flex flex-col gap-1.5">
-                    <Label htmlFor="expo-filter">{t("expo_filter_label")}</Label>
-                    <Select
-                      value={activeExpoId || undefined}
-                      onValueChange={handleExpoChange}
-                      disabled={expoOptions.length === 1}
-                    >
-                      <SelectTrigger id="expo-filter" className="bg-background">
-                        <SelectValue placeholder={t("expo_filter_placeholder")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {expoOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-amber-700">{t("no_expo_available")}</p>
-                )}
-              </div>
+              <DialogTitle className="truncate text-base font-serif sm:text-lg">{t("panel_title")}</DialogTitle>
             </div>
+            <DialogClose asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label={t("close")}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </Button>
+            </DialogClose>
+          </header>
+
+          <div className="shrink-0 border-b bg-gradient-to-br from-primary/8 via-background to-amber-500/5 px-4 py-3 sm:px-6 sm:py-4">
+            <DialogDescription className="text-xs sm:text-sm">{t("panel_desc")}</DialogDescription>
+            {expoOptions.length > 0 ? (
+              <div className="mt-3 flex flex-col gap-1.5">
+                <Label htmlFor="expo-filter">{t("expo_filter_label")}</Label>
+                <Select
+                  value={activeExpoId || undefined}
+                  onValueChange={handleExpoChange}
+                  disabled={expoOptions.length === 1}
+                >
+                  <SelectTrigger id="expo-filter" className="bg-background">
+                    <SelectValue placeholder={t("expo_filter_placeholder")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expoOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-amber-700">{t("no_expo_available")}</p>
+            )}
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
@@ -432,7 +577,7 @@ export function ExpoArtworkGroupsPanel({
                   size="sm"
                   className="w-full sm:w-auto"
                   variant={groupType === "artist" ? "default" : "outline"}
-                  onClick={() => setGroupType("artist")}
+                  onClick={() => switchGroupType("artist")}
                 >
                   {t("type_artist")}
                 </Button>
@@ -441,21 +586,79 @@ export function ExpoArtworkGroupsPanel({
                   size="sm"
                   className="w-full sm:w-auto"
                   variant={groupType === "theme" ? "default" : "outline"}
-                  onClick={() => setGroupType("theme")}
+                  onClick={() => switchGroupType("theme")}
                 >
                   {t("type_theme")}
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="group-label">{t("label")}</Label>
-                <Input
-                  id="group-label"
-                  value={groupLabel}
-                  onChange={(e) => setGroupLabel(e.target.value)}
-                  placeholder={t("label_placeholder")}
-                />
-              </div>
+              {groupType === "theme" ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="group-label">{t("label")}</Label>
+                  <Input
+                    id="group-label"
+                    value={groupLabel}
+                    onChange={(e) => setGroupLabel(e.target.value)}
+                    placeholder={t("label_placeholder")}
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="group-artist">{t("select_artist")}</Label>
+                  {expoArtists.length === 0 ? (
+                    <p className="text-sm text-amber-700">{t("select_artist_empty")}</p>
+                  ) : (
+                    <Popover open={artistPickerOpen} onOpenChange={setArtistPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="group-artist"
+                          type="button"
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={artistPickerOpen}
+                          className="w-full justify-between font-normal shadow-none"
+                        >
+                          <span className="truncate">
+                            {selectedArtistId
+                              ? (expoArtists.find((a) => a.id === selectedArtistId)?.label ??
+                                t("select_artist_placeholder"))
+                              : t("select_artist_placeholder")}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" aria-hidden />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder={t("select_artist_search")} className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>{t("select_artist_empty")}</CommandEmpty>
+                            <CommandGroup>
+                              {expoArtists.map((artist) => (
+                                <CommandItem
+                                  key={artist.id}
+                                  value={`${artist.id} ${artist.label}`}
+                                  onSelect={() => {
+                                    applyArtistSelection(artist.id);
+                                    setArtistPickerOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedArtistId === artist.id ? "opacity-100" : "opacity-0",
+                                    )}
+                                  />
+                                  {artist.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="group-number">{t("display_number")}</Label>
@@ -465,6 +668,7 @@ export function ExpoArtworkGroupsPanel({
                   onChange={(e) => setDisplayNumber(e.target.value)}
                   placeholder={t("display_number_placeholder")}
                 />
+                <p className="text-xs text-muted-foreground">{t("display_number_hint")}</p>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -476,28 +680,57 @@ export function ExpoArtworkGroupsPanel({
                   placeholder={t("artwork_search_placeholder")}
                   aria-label={t("artwork_search_placeholder")}
                 />
-                <ul className="max-h-[min(38dvh,12rem)] space-y-2 overflow-y-auto rounded-md border p-2 sm:max-h-48">
+                <ul className="grid max-h-[min(48dvh,22rem)] grid-cols-1 gap-2 overflow-y-auto rounded-md border p-2 sm:max-h-72 sm:grid-cols-2">
                   {filteredArtworks.length === 0 ? (
-                    <li className="py-4 text-center text-sm text-muted-foreground">{t("no_artworks_match")}</li>
+                    <li className="col-span-full py-4 text-center text-sm text-muted-foreground">
+                      {t("no_artworks_match")}
+                    </li>
                   ) : (
                     filteredArtworks.map((aw) => {
                       const blocked = groupedArtworkMap.has(aw.artwork_id);
                       const checked = selectedArtworkIds.includes(aw.artwork_id);
+                      const orderIndex = memberOrder.indexOf(aw.artwork_id);
+                      const orderNumber = orderIndex >= 0 ? orderIndex + 1 : null;
+                      const thumb = (aw.artwork_image_url || aw.artwork_photo_url || "").trim();
                       return (
-                        <li key={aw.artwork_id} className="flex items-start gap-2">
+                        <li key={aw.artwork_id} className="flex items-center gap-2.5 rounded-md border border-transparent px-1 py-1 hover:bg-muted/40">
                           <Checkbox
                             checked={checked}
                             disabled={blocked}
                             onCheckedChange={(v) => toggleArtwork(aw.artwork_id, v === true)}
                             aria-label={aw.artwork_title ?? aw.artwork_id}
                           />
+                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md border bg-muted">
+                            {thumb ? (
+                              <ImageWithSkeleton
+                                src={thumb}
+                                alt={aw.artwork_title ?? ""}
+                                wrapperClassName="h-full w-full"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                                —
+                              </div>
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium leading-snug sm:truncate">{aw.artwork_title ?? "—"}</p>
-                            <p className="text-xs text-muted-foreground sm:truncate">{artistLabelFromRow(aw)}</p>
+                            <p className="text-sm font-medium leading-snug line-clamp-2">{aw.artwork_title ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground truncate">{artistLabelFromRow(aw)}</p>
                             {blocked ? (
                               <p className="text-[10px] text-amber-700">{t("already_grouped")}</p>
                             ) : null}
                           </div>
+                          {orderNumber != null ? (
+                            <span
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold tabular-nums text-primary-foreground"
+                              aria-label={t("selection_order_aria", { number: orderNumber })}
+                            >
+                              {orderNumber}
+                            </span>
+                          ) : (
+                            <span className="h-8 w-8 shrink-0" aria-hidden />
+                          )}
                         </li>
                       );
                     })

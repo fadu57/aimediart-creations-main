@@ -40,6 +40,8 @@
   "btn_open": "Open",
   "btn_test_qr": "Test QR Code",
   "btn_print_cartel": "Print label",
+  "btn_print_cartel_group_line1": "Print group",
+  "btn_print_cartel_group_line2": "label",
   "btn_visitor_visual": "Visitor view",
   "artwork_untitled": "Untitled artwork",
   "artist_unknown": "Unknown artist",

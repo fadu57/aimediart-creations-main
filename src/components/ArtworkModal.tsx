@@ -10,10 +10,11 @@ import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
 import {
   buildPlanEnabledMediationLangSet,
-  isAdminGeneralMediationOverride,
+  isGlobalStaffMediationLangUnlock,
   isMediationLangEnabledForPlan,
   planMediationAllLanguagesUnlocked,
   planMediationAllowsOptionalLang,
+  resolvePlanMaxAudioLangs,
   resolvePlanMaxMediationLangs,
   resolvePlanMediationGenerationLangs,
   resolveWorkflowOptionalLangMax,
@@ -30,6 +31,8 @@ import {
   mediationLangNeedsAudioGeneration,
   triggerMediationAudioForLang,
   fetchMediationVoiceFillState,
+  hasPendingAudioForArtwork,
+  subscribeAudioQueue,
   type MediationVoiceFillState,
 } from "@/services/audioService";
 import { AudioPlayer } from "@/components/AudioPlayer";
@@ -568,6 +571,10 @@ export function ArtworkModal({
   const { t, i18n } = useTranslation("artwork_modal");
   const { role_id, agency_id, expo_id, agency_role_id, global_role_id } = useAuthUser();
   const isVisitorLocked = role_id === 7;
+  /** Admins SaaS (1–3) : choix libre agence + expo, même si un agency_id est présent au profil. */
+  const isGlobalStaff =
+    (typeof global_role_id === "number" && global_role_id >= 1 && global_role_id <= 3) ||
+    (typeof role_id === "number" && role_id >= 1 && role_id <= 3);
   const {
     primaryLang: mediationPrimaryLang,
     optionalLang: mediationOptionalLang,
@@ -582,32 +589,46 @@ export function ArtworkModal({
   const [artistId, setArtistId] = useState("");
   const [artworkExpoId, setArtworkExpoId] = useState("");
   const [artworkAgencyId, setArtworkAgencyId] = useState("");
-  const isAgencyBound = Boolean(agency_id?.trim());
-  const canPickAgency = !isAgencyBound && typeof role_id === "number" && role_id < 4;
-  const canPickExpo = isAgencyBound
-    ? agency_role_id === 4 ||
-      agency_role_id === 5 ||
-      role_id === 4 ||
-      role_id === 5
-    : typeof role_id === "number" && (role_id === 4 || role_id === 5);
+  const isAgencyBound = Boolean(agency_id?.trim()) && !isGlobalStaff;
+  const canPickAgency = isGlobalStaff || (!isAgencyBound && typeof role_id === "number" && role_id < 4);
+  const canPickExpo = isGlobalStaff
+    ? true
+    : isAgencyBound
+      ? agency_role_id === 4 ||
+        agency_role_id === 5 ||
+        role_id === 4 ||
+        role_id === 5
+      : typeof role_id === "number" && (role_id === 4 || role_id === 5);
   const expoAgencyId = isAgencyBound
     ? agency_id!.trim()
-    : artworkAgencyId.trim() || agency_id?.trim() || "";
+    : artworkAgencyId.trim() || (!isGlobalStaff ? agency_id?.trim() || "" : "");
   const { limits: planLimits } = useOrganisationPlanLimits(expoAgencyId || null);
   const isEtincellePlan = planLimits?.isEtincelle ?? false;
-  const planMaxMediationLangs = useMemo(
-    () =>
-      resolvePlanMaxMediationLangs({
-        includedMax: planLimits?.includedMediationLangsMax,
-        includedMin: planLimits?.includedMediationLangsMin,
-        isEtincelle: isEtincellePlan,
-      }),
-    [planLimits?.includedMediationLangsMax, planLimits?.includedMediationLangsMin, isEtincellePlan],
-  );
+  const globalStaffLangUnlock = isGlobalStaffMediationLangUnlock(global_role_id);
+  const planMaxMediationLangs = useMemo(() => {
+    if (globalStaffLangUnlock) return MEDIATION_UI_LANGS.length;
+    return resolvePlanMaxMediationLangs({
+      includedMax: planLimits?.includedMediationLangsMax,
+      includedMin: planLimits?.includedMediationLangsMin,
+      isEtincelle: isEtincellePlan,
+    });
+  }, [
+    globalStaffLangUnlock,
+    planLimits?.includedMediationLangsMax,
+    planLimits?.includedMediationLangsMin,
+    isEtincellePlan,
+  ]);
+  const planMaxAudioLangs = useMemo(() => {
+    if (globalStaffLangUnlock) return MEDIATION_UI_LANGS.length;
+    return resolvePlanMaxAudioLangs({
+      includedAudioLangs: planLimits?.includedAudioLangs ?? null,
+      mediationLangsMax: planMaxMediationLangs,
+    });
+  }, [globalStaffLangUnlock, planLimits?.includedAudioLangs, planMaxMediationLangs]);
   const planAllowsOptionalLang = planMediationAllowsOptionalLang(planMaxMediationLangs);
   const planAllLanguagesMode = planMediationAllLanguagesUnlocked(planMaxMediationLangs);
   const adminGeneralMediationOverride =
-    isAdminGeneralMediationOverride(global_role_id) && experimentalWorkflow;
+    globalStaffLangUnlock && experimentalWorkflow;
   const maxOptionalMediationLangs = resolveWorkflowOptionalLangMax({
     globalRoleId: global_role_id,
     planMaxLangs: planMaxMediationLangs,
@@ -616,6 +637,9 @@ export function ArtworkModal({
   const showOptionalLangPicker =
     adminGeneralMediationOverride || planAllowsOptionalLang || planMaxMediationLangs <= 1;
   const [workflowOptionalLangs, setWorkflowOptionalLangs] = useState<MediationUiLang[]>([]);
+  /** Langues sélectionnées pour la génération de textes (pas les audios). */
+  const [mediationGenerateLangs, setMediationGenerateLangs] = useState<MediationUiLang[]>([]);
+  const maxMediationGenerateLangs = planMaxMediationLangs;
   const planGenerationLangs = useMemo(
     () =>
       resolvePlanMediationGenerationLangs({
@@ -645,6 +669,41 @@ export function ArtworkModal({
   const effectivePlanGenerationLangs = experimentalWorkflow
     ? workflowPlanGenerationLangs
     : planGenerationLangs;
+
+  useEffect(() => {
+    if (!experimentalWorkflow) return;
+    setMediationGenerateLangs((prev) => {
+      const capped = prev
+        .filter((lng, index, arr) => arr.indexOf(lng) === index)
+        .slice(0, maxMediationGenerateLangs);
+      if (capped.length > 0) return capped;
+      const fallback =
+        effectivePlanGenerationLangs.length > 0
+          ? effectivePlanGenerationLangs
+          : [mediationPrimaryLang];
+      return fallback.slice(0, maxMediationGenerateLangs);
+    });
+  }, [
+    experimentalWorkflow,
+    maxMediationGenerateLangs,
+    effectivePlanGenerationLangs,
+    mediationPrimaryLang,
+  ]);
+
+  const langsToGenerateMediations = useMemo(() => {
+    if (!experimentalWorkflow) return effectivePlanGenerationLangs;
+    const selected = mediationGenerateLangs.filter((lng, index, arr) => arr.indexOf(lng) === index);
+    if (selected.length > 0) return selected.slice(0, maxMediationGenerateLangs);
+    return effectivePlanGenerationLangs.length > 0
+      ? effectivePlanGenerationLangs
+      : [mediationPrimaryLang];
+  }, [
+    experimentalWorkflow,
+    mediationGenerateLangs,
+    maxMediationGenerateLangs,
+    effectivePlanGenerationLangs,
+    mediationPrimaryLang,
+  ]);
   const planEnabledLangSet = useMemo(
     () =>
       buildPlanEnabledMediationLangSet({
@@ -690,6 +749,7 @@ export function ArtworkModal({
   const [mediationEditLang, setMediationEditLang] = useState<MediationUiLang>("fr");
   const [audioStatusRefreshKey, setAudioStatusRefreshKey] = useState(0);
   const [audioOptimisticCells, setAudioOptimisticCells] = useState<string[]>([]);
+  const [audioQueuePending, setAudioQueuePending] = useState(false);
   const [mediationAudioDialogOpen, setMediationAudioDialogOpen] = useState(false);
   const [styleTabs, setStyleTabs] = useState<StyleTabEntry[]>(DEFAULT_STYLE_TABS);
   const [activeTab, setActiveTab] = useState<DescriptionKey>("enfant");
@@ -857,6 +917,8 @@ export function ArtworkModal({
       });
       setAnalyzeProgress(null);
       setMediationAudioDialogOpen(false);
+      setAudioQueuePending(false);
+      setAudioOptimisticCells([]);
       return;
     }
     setMediationEditLang(mediationPrimaryLang);
@@ -1127,8 +1189,8 @@ export function ArtworkModal({
       setArtistId("");
       setArtistSearch("");
       setShowArtistSuggestions(false);
-      setArtworkExpoId(expo_id ?? "");
-      setArtworkAgencyId(agency_id ?? "");
+      setArtworkExpoId(isGlobalStaff ? "" : (expo_id ?? ""));
+      setArtworkAgencyId(isGlobalStaff ? "" : (agency_id ?? ""));
       setImageUrl("");
       setArtworkQrImageUrl("");
       setSourceMaterialByLang(createEmptySourceMaterialByLang());
@@ -1143,8 +1205,8 @@ export function ArtworkModal({
       const initialSnapshot = buildDraftSnapshot({
         title: "",
         artistId: "",
-        artworkExpoId: expo_id ?? "",
-        artworkAgencyId: agency_id ?? "",
+        artworkExpoId: isGlobalStaff ? "" : (expo_id ?? ""),
+        artworkAgencyId: isGlobalStaff ? "" : (agency_id ?? ""),
         imageUrl: "",
         sourceMaterialByLang: createEmptySourceMaterialByLang(),
         descriptionsByLang: emptyMed,
@@ -1155,7 +1217,7 @@ export function ArtworkModal({
     return () => {
       cancelled = true;
     };
-  }, [open, artworkId, agency_id, expo_id, onOpenChange, i18n.language]);
+  }, [open, artworkId, agency_id, expo_id, onOpenChange, i18n.language, isGlobalStaff]);
 
   useEffect(() => {
     if (!open || !fingerprint || !artistId || !title.trim()) {
@@ -1262,7 +1324,9 @@ export function ArtworkModal({
           );
         }
         toast.success(t("toast_artwork_updated"));
-        triggerMediationAudioOnChanges(persistedArtworkId, descriptionsByLang);
+        if (!experimentalWorkflow) {
+          triggerMediationAudioOnChanges(persistedArtworkId, descriptionsByLang);
+        }
         updateMediationBaseline(descriptionsByLang);
         setInitialDraftSignature(
           serializeDraftSnapshot(
@@ -1300,7 +1364,9 @@ export function ArtworkModal({
         newArtworkId = (inserted as { artwork_id: string } | null)?.artwork_id ?? null;
         if (newArtworkId) {
           setEditingArtworkId(newArtworkId);
-          triggerMediationAudioOnChanges(newArtworkId, descriptionsByLang);
+          if (!experimentalWorkflow) {
+            triggerMediationAudioOnChanges(newArtworkId, descriptionsByLang);
+          }
           updateMediationBaseline(descriptionsByLang);
           setInitialDraftSignature(
             serializeDraftSnapshot(
@@ -1464,6 +1530,16 @@ export function ArtworkModal({
     return imageAnalysisDone ? effectivePlanGenerationLangs : [];
   }, [effectivePlanGenerationLangs, descriptionsByLang, imageAnalysisDone]);
 
+  /** Langues audio plafonnées par l'abonnement (sauf staff SaaS 1–3). */
+  const audioGenerationLangs = useMemo(() => {
+    const withContent = mediationLangsWithContent(descriptionsByLang);
+    if (withContent.length === 0) return [] as MediationUiLang[];
+    const preferred = mediationGenerateLangs.filter((lng) => withContent.includes(lng));
+    const rest = withContent.filter((lng) => !preferred.includes(lng));
+    const ordered = [...preferred, ...rest];
+    return ordered.slice(0, Math.max(0, planMaxAudioLangs));
+  }, [descriptionsByLang, mediationGenerateLangs, planMaxAudioLangs]);
+
   const activeMediationLangSet = useMemo(
     () => new Set(activeMediationLangs),
     [activeMediationLangs],
@@ -1493,7 +1569,7 @@ export function ArtworkModal({
         key: tab.key,
         promptStyleId: tab.promptStyleId,
       })),
-      languages: activeMediationLangs,
+      languages: audioGenerationLangs,
       descriptionsByLang: descriptionsByLang as Record<string, Record<string, string>>,
     }).then((state) => {
       if (!cancelled) setWorkflowVoiceFillState(state);
@@ -1506,7 +1582,7 @@ export function ArtworkModal({
     persistedArtworkId,
     hasMediations,
     styleTabs,
-    activeMediationLangs,
+    audioGenerationLangs,
     descriptionsByLang,
     audioStatusRefreshKey,
   ]);
@@ -1540,6 +1616,16 @@ export function ArtworkModal({
   ]);
 
   const mediationLangHelp = useMemo(() => {
+    if (experimentalWorkflow) {
+      const selected =
+        mediationGenerateLangs.length > 0
+          ? mediationGenerateLangs.map((lng) => lng.toUpperCase()).join(", ")
+          : mediationPrimaryLang.toUpperCase();
+      return t("mediation_lang_help_select", {
+        langs: selected,
+        max: maxMediationGenerateLangs,
+      });
+    }
     if (adminGeneralMediationOverride) {
       return t("mediation_lang_help_admin_general", {
         primary: mediationPrimaryLang.toUpperCase(),
@@ -1559,6 +1645,9 @@ export function ArtworkModal({
     }
     return t("mediation_lang_help_single", { lang: mediationPrimaryLang.toUpperCase() });
   }, [
+    experimentalWorkflow,
+    mediationGenerateLangs,
+    maxMediationGenerateLangs,
     adminGeneralMediationOverride,
     planAllLanguagesMode,
     planMaxMediationLangs,
@@ -1613,7 +1702,7 @@ export function ArtworkModal({
         void triggerMissingMediationVoices({
           artworkId: persistedArtworkId,
           personas: [{ key: tab.key, promptStyleId: tab.promptStyleId }],
-          languages: activeMediationLangs,
+          languages: audioGenerationLangs,
           descriptionsByLang,
         }).then(({ jobCount, cellKeys }) => {
           if (jobCount <= 0 || cellKeys.length === 0) return;
@@ -1626,7 +1715,7 @@ export function ArtworkModal({
         });
       }
     },
-    [persistedArtworkId, descriptionsByLang, activeMediationLangs],
+    [persistedArtworkId, descriptionsByLang, audioGenerationLangs],
   );
 
   const handleFillMissingMediationVoices = useCallback(async () => {
@@ -1638,7 +1727,7 @@ export function ArtworkModal({
     const { jobCount, cellKeys } = await triggerMissingMediationVoices({
       artworkId: persistedArtworkId,
       personas,
-      languages: activeMediationLangs,
+      languages: audioGenerationLangs,
       descriptionsByLang,
     });
     if (jobCount > 0 && cellKeys.length > 0) {
@@ -1649,7 +1738,7 @@ export function ArtworkModal({
       });
       setAudioStatusRefreshKey((k) => k + 1);
     }
-  }, [persistedArtworkId, styleTabs, activeMediationLangs, descriptionsByLang]);
+  }, [persistedArtworkId, styleTabs, audioGenerationLangs, descriptionsByLang]);
 
   const mediationStyleMap = useMemo(
     () => buildMediationStylePromptStyleMap(styleTabs ?? []),
@@ -1678,6 +1767,24 @@ export function ArtworkModal({
 
   const isAiBusy =
     generatingMediation || regeneratingMediationStyleKey !== null || analyzingImage;
+
+  const isAudioBusy =
+    audioQueuePending ||
+    audioOptimisticCells.length > 0 ||
+    workflowVoiceFillState.inProgressCount > 0;
+
+  /** Fermeture interdite tant qu'une génération texte / analyse / audio tourne. */
+  const isCloseBlocked = isAiBusy || isAudioBusy;
+
+  useEffect(() => {
+    if (!open || !persistedArtworkId) {
+      setAudioQueuePending(false);
+      return;
+    }
+    const sync = () => setAudioQueuePending(hasPendingAudioForArtwork(persistedArtworkId));
+    sync();
+    return subscribeAudioQueue(sync);
+  }, [open, persistedArtworkId]);
 
   const checkMediationAudioForLang = useCallback(
     async (lng: MediationUiLang) => {
@@ -1722,7 +1829,10 @@ export function ArtworkModal({
     !workflowAudioBlocked;
 
   const requestCloseModal = () => {
-    if (isAiBusy) return;
+    if (isCloseBlocked) {
+      toast.info(t("toast_close_blocked_generation"));
+      return;
+    }
     if (hasUnsavedChanges) {
       setShowCloseConfirm(true);
       return;
@@ -1871,6 +1981,7 @@ export function ArtworkModal({
     base: ReturnType<typeof createEmptyDescriptionsByLang>,
     successToastKey: string,
     toastParams?: Record<string, string | number>,
+    options?: { skipAudio?: boolean },
   ) => {
     if (persistedArtworkId) {
       const serializedMediation = serializeMediationDescriptionsByLang(base);
@@ -1894,7 +2005,10 @@ export function ArtworkModal({
     toast.success(t(successToastKey, toastParams));
 
     if (persistedArtworkId) {
-      triggerMediationAudioOnChanges(persistedArtworkId, base);
+      // Workflow expérimental : textes seuls ici — les audios se lancent depuis l'onglet AUDIO.
+      if (!experimentalWorkflow && !options?.skipAudio) {
+        triggerMediationAudioOnChanges(persistedArtworkId, base);
+      }
       updateMediationBaseline(base);
     }
 
@@ -2007,7 +2121,7 @@ export function ArtworkModal({
       await persistMediationToArtwork(base, "toast_mediation_lang_generated", {
         lang: langCodeForProgress(lang),
         count: stylesToRun.length,
-      });
+      }, { skipAudio: true });
       setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
       await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {
@@ -2021,6 +2135,11 @@ export function ArtworkModal({
 
   const handleMediationLangSelect = (lng: MediationUiLang) => {
     if (lng === mediationEditLang) return;
+    // Workflow : sélection de langue = affichage uniquement (génération via le bouton dédié).
+    if (experimentalWorkflow) {
+      setMediationEditLang(lng);
+      return;
+    }
     if (isVisitorLocked || isAiBusy) {
       setMediationEditLang(lng);
       return;
@@ -2041,6 +2160,26 @@ export function ArtworkModal({
     ).length;
     setMediationEditLang(lng);
     setLangGeneratePrompt({ lang: lng, emptyPersonaCount });
+  };
+
+  const handleMediationGenerateLangToggle = (lng: MediationUiLang) => {
+    if (planMaxMediationLangs <= 1 && lng !== mediationPrimaryLang) {
+      setMediationEditLang(lng);
+      return;
+    }
+    setMediationGenerateLangs((prev) => {
+      let next: MediationUiLang[];
+      if (prev.includes(lng)) {
+        next = prev.length <= 1 ? prev : prev.filter((item) => item !== lng);
+      } else if (prev.length >= maxMediationGenerateLangs) {
+        next = [...prev.slice(1), lng];
+      } else {
+        next = [...prev, lng];
+      }
+      setWorkflowOptionalLangs(next.filter((item) => item !== mediationPrimaryLang));
+      return next;
+    });
+    setMediationEditLang(lng);
   };
 
   const handleGenerateMediations = async () => {
@@ -2085,7 +2224,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = effectivePlanGenerationLangs;
+      const langsToGenerate = langsToGenerateMediations;
       const totalSteps = langsToGenerate.length;
       const missingSlots: string[] = [];
 
@@ -2140,10 +2279,15 @@ export function ArtworkModal({
         percent: MEDIATION_GENERATION_PROGRESS.save.start,
         detail: t("mediation_progress_save"),
       });
-      await persistMediationToArtwork(base, "toast_mediation_generated", {
-        personas: stylesPayload.length,
-        langs: langsToGenerate.map(langCodeForProgress).join(" - "),
-      });
+      await persistMediationToArtwork(
+        base,
+        "toast_mediation_generated",
+        {
+          personas: stylesPayload.length,
+          langs: langsToGenerate.map(langCodeForProgress).join(" - "),
+        },
+        { skipAudio: true },
+      );
       if (experimentalWorkflow && persistedArtworkId) {
         await supabase
           .from("artworks")
@@ -2219,7 +2363,7 @@ export function ArtworkModal({
         }
       }
 
-      const langsToGenerate = effectivePlanGenerationLangs;
+      const langsToGenerate = langsToGenerateMediations;
       for (let i = 0; i < langsToGenerate.length; i++) {
         const lang = langsToGenerate[i];
         const langDetail = t("mediation_progress_lang", {
@@ -2255,10 +2399,15 @@ export function ArtworkModal({
         detail: t("mediation_progress_save"),
       });
 
-      await persistMediationToArtwork(base, "toast_mediation_style_regenerated", {
-        label: tab.label,
-        count: langsToGenerate.length,
-      });
+      await persistMediationToArtwork(
+        base,
+        "toast_mediation_style_regenerated",
+        {
+          label: tab.label,
+          count: langsToGenerate.length,
+        },
+        { skipAudio: true },
+      );
       setMediationProgress({ percent: 100, detail: t("mediation_progress_done") });
       await new Promise((resolve) => window.setTimeout(resolve, 450));
     } catch (e) {
@@ -2287,7 +2436,10 @@ export function ArtworkModal({
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
-          if (isAiBusy || artistDialogOpen) return;
+          if (isCloseBlocked || artistDialogOpen) {
+            if (isCloseBlocked) toast.info(t("toast_close_blocked_generation"));
+            return;
+          }
           if (nestedTextEditOpen) return;
           if (hasUnsavedChanges) {
             setShowCloseConfirm(true);
@@ -2303,9 +2455,13 @@ export function ArtworkModal({
             e.preventDefault();
             return;
           }
-          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
+          if (isCloseBlocked || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
+            if (isCloseBlocked) {
+              toast.info(t("toast_close_blocked_generation"));
+              return;
+            }
+            if (hasUnsavedChanges && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
@@ -2315,9 +2471,13 @@ export function ArtworkModal({
             e.preventDefault();
             return;
           }
-          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
+          if (isCloseBlocked || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
+            if (isCloseBlocked) {
+              toast.info(t("toast_close_blocked_generation"));
+              return;
+            }
+            if (hasUnsavedChanges && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
@@ -2327,9 +2487,13 @@ export function ArtworkModal({
             e.preventDefault();
             return;
           }
-          if (isAiBusy || artistDialogOpen || hasUnsavedChanges) {
+          if (isCloseBlocked || artistDialogOpen || hasUnsavedChanges) {
             e.preventDefault();
-            if (hasUnsavedChanges && !isAiBusy && !artistDialogOpen) {
+            if (isCloseBlocked) {
+              toast.info(t("toast_close_blocked_generation"));
+              return;
+            }
+            if (hasUnsavedChanges && !artistDialogOpen) {
               setShowCloseConfirm(true);
             }
           }
@@ -2392,6 +2556,7 @@ export function ArtworkModal({
               isLoading={isLoading}
               isSubmitting={isSubmitting}
               isAiBusy={isAiBusy}
+              isCloseBlocked={isCloseBlocked}
               canSave={Boolean(canSaveWorkflow)}
               canAnalyze={canAnalyzeImage}
               canGenerateMediations={canGenerateMediationsEffective}
@@ -2422,6 +2587,8 @@ export function ArtworkModal({
               }}
               mediationEditLang={mediationEditLang}
               onMediationLangSelect={(lng) => handleMediationLangSelect(lng)}
+              mediationGenerateLangs={mediationGenerateLangs}
+              onMediationGenerateLangToggle={handleMediationGenerateLangToggle}
               mediationLangHelp={mediationLangHelp}
               planMaxMediationLangs={planMaxMediationLangs}
               mediationPrimaryLang={mediationPrimaryLang}
@@ -2464,7 +2631,7 @@ export function ArtworkModal({
               voiceReadyCount={workflowVoiceFillState.readyCount}
               voiceExpectedCount={workflowVoiceFillState.totalExpected}
               voiceLangsLabel={modalVoiceLangsLabel}
-              activeMediationLangs={activeMediationLangs}
+              activeMediationLangs={audioGenerationLangs}
               audioOptimisticCells={audioOptimisticCells}
               onAudioOptimisticCellDone={(cellKey) =>
                 setAudioOptimisticCells((prev) => prev.filter((key) => key !== cellKey))
@@ -2521,10 +2688,13 @@ export function ArtworkModal({
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 shrink-0 rounded-md text-white hover:bg-white/20 hover:text-white"
-                disabled={isAiBusy || artistDialogOpen}
+                disabled={isCloseBlocked || artistDialogOpen}
                 aria-label={t("btn_close_aria")}
                 onClick={() => {
-                  if (isAiBusy || artistDialogOpen) return;
+                  if (isCloseBlocked || artistDialogOpen) {
+                    if (isCloseBlocked) toast.info(t("toast_close_blocked_generation"));
+                    return;
+                  }
                   if (hasUnsavedChanges) {
                     setShowCloseConfirm(true);
                     return;
@@ -3225,7 +3395,16 @@ export function ArtworkModal({
           </>
         )}
 
-        <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+        <AlertDialog
+          open={showCloseConfirm}
+          onOpenChange={(next) => {
+            if (next && isCloseBlocked) {
+              toast.info(t("toast_close_blocked_generation"));
+              return;
+            }
+            setShowCloseConfirm(next);
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t("dialog_close_title")}</AlertDialogTitle>
@@ -3238,6 +3417,10 @@ export function ArtworkModal({
               <AlertDialogAction
                 className="bg-red-600 text-white hover:bg-red-700"
                 onClick={() => {
+                  if (isCloseBlocked) {
+                    toast.info(t("toast_close_blocked_generation"));
+                    return;
+                  }
                   setShowCloseConfirm(false);
                   onOpenChange(false);
                 }}
@@ -3265,7 +3448,7 @@ export function ArtworkModal({
           label: tab.label,
           promptStyleId: tab.promptStyleId,
         }))}
-        languages={activeMediationLangs}
+        languages={audioGenerationLangs}
         descriptionsByLang={descriptionsByLang}
         refreshKey={audioStatusRefreshKey}
         optimisticCells={audioOptimisticCells}

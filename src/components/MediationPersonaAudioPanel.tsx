@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { MediationAllVoicesStatus } from "@/components/MediationAllVoicesStatus";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import type { MediationUiLang } from "@/lib/artworkDescriptionI18n";
 import { cn } from "@/lib/utils";
 import {
@@ -95,14 +96,34 @@ export function MediationPersonaAudioPanel({
 
   const generationsInProgress = queueActive || optimisticCells.length > 0;
   const allReady = fillState?.allReady ?? false;
-  const hasExpectedVoices = (fillState?.totalExpected ?? 0) > 0;
+  const totalExpected = fillState?.totalExpected ?? 0;
+  const readyCount = fillState?.readyCount ?? 0;
+  const inProgressCount = fillState?.inProgressCount ?? 0;
+  const hasExpectedVoices = totalExpected > 0;
   const canFillMissing = hasExpectedVoices && !allReady && (fillState?.missingCount ?? 0) > 0;
+  const nothingGeneratedYet = canFillMissing && readyCount === 0;
 
   const buttonLabel = allReady
     ? t("audio_generate_dialog.all_voices_ready")
-    : t("audio_generate_dialog.fill_missing");
+    : nothingGeneratedYet
+      ? t("audio_generate_dialog.generate_voices")
+      : t("audio_generate_dialog.fill_missing");
 
   const buttonDisabled = !hasExpectedVoices || allReady || !canFillMissing || generationsInProgress;
+
+  const showOverallProgress =
+    hasExpectedVoices && (generationsInProgress || (readyCount > 0 && !allReady) || allReady);
+  const progressPercent =
+    totalExpected > 0 ? Math.max(0, Math.min(100, Math.round((readyCount / totalExpected) * 100))) : 0;
+  const progressDetail = allReady
+    ? t("audio_generate_dialog.progress_done", { ready: readyCount, total: totalExpected })
+    : generationsInProgress || inProgressCount > 0
+      ? t("audio_generate_dialog.progress_running", {
+          ready: readyCount,
+          total: totalExpected,
+          active: Math.max(inProgressCount, optimisticCells.length),
+        })
+      : t("audio_generate_dialog.progress_idle", { ready: readyCount, total: totalExpected });
 
   const isInline = variant === "inline";
 
@@ -144,6 +165,24 @@ export function MediationPersonaAudioPanel({
             {buttonLabel}
           </Button>
         </div>
+
+        {showOverallProgress ? (
+          <div className="mt-3 space-y-1.5" role="status" aria-live="polite">
+            <Progress
+              value={progressPercent}
+              className={cn("h-2", generationsInProgress && "animate-pulse")}
+              aria-label={t("audio_generate_dialog.progress_aria", {
+                percent: progressPercent,
+              })}
+            />
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <span className="min-w-0 truncate">{progressDetail}</span>
+              <span className="shrink-0 tabular-nums font-medium text-foreground">
+                {progressPercent} %
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className={cn("min-h-0 flex-1 overflow-y-auto", isInline ? "px-3 py-3 sm:px-4" : "px-5 py-4")}>

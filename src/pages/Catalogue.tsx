@@ -26,7 +26,7 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { Plus, Search, Loader2, X, Undo2, ExternalLink, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
+import { buildArtworkGroupQrUrl, buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { generateCartelPdf } from "@/lib/cartelPdfRenderer";
 import { cartelExplorationLines } from "@/lib/cartelExplorationText";
@@ -48,6 +48,7 @@ import {
 } from "@/lib/artworkDescriptionI18n";
 import {
   buildArtworkVoiceCatalogMap,
+  fetchMediationAudioFilesForArtworks,
   type ArtworkVoiceCatalogSummary,
 } from "@/lib/artworkVoiceCatalog";
 import { useTranslation } from "react-i18next";
@@ -189,6 +190,8 @@ const Catalogue = () => {
   const [expoFilterInput, setExpoFilterInput] = useState<string>("");
   const [artworkFilterOpen, setArtworkFilterOpen] = useState(false);
   const [expoFilterOpen, setExpoFilterOpen] = useState(false);
+  const artworkSearchInputRef = useRef<HTMLInputElement>(null);
+  const expoFilterInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [artworkModalOpen, setArtworkModalOpen] = useState(false);
@@ -200,6 +203,7 @@ const Catalogue = () => {
   const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
   const [expoArtworkGroups, setExpoArtworkGroups] = useState<ArtworkGroupWithMembers[]>([]);
   const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
+  const [cartelGroup, setCartelGroup] = useState<ArtworkGroupWithMembers | null>(null);
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
   const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
   const { scope, loading: authLoading } = useDataScope();
@@ -486,18 +490,8 @@ const Catalogue = () => {
       const artworkIds = rows.map((r) => r.artwork_id).filter(Boolean);
       if (artworkIds.length === 0) return {};
 
-      const { data: audioRows, error: audioError } = await supabase
-        .from("audio_files")
-        .select("text_id, lang, status, storage_path")
-        .eq("text_type", "mediation")
-        .in("text_id", artworkIds);
-
-      if (audioError) {
-        console.error("[Catalogue] audio_files:", audioError);
-        return {};
-      }
-
-      return buildArtworkVoiceCatalogMap(rows, audioRows ?? []);
+      const audioRows = await fetchMediationAudioFilesForArtworks(artworkIds);
+      return buildArtworkVoiceCatalogMap(rows, audioRows);
     },
     [],
   );
@@ -634,10 +628,13 @@ const Catalogue = () => {
   /** Met à jour les badges voix pendant la génération audio (file client + polling). */
   useEffect(() => {
     const VOICE_POLL_MS = 2500;
+    const CATCHUP_DELAYS_MS = [1200, 3500, 7000] as const;
     let debounceId: ReturnType<typeof setTimeout> | null = null;
     let pollId: ReturnType<typeof setInterval> | null = null;
+    const catchupIds: ReturnType<typeof setTimeout>[] = [];
 
     const hasInProgressVoices = () => {
+      if (getArtworkIdsWithPendingAudio().size > 0) return true;
       if (Object.values(getPendingAudioJobsByLang()).some((count) => count > 0)) return true;
       return Object.values(voiceSummaryRef.current).some((summary) => summary.isGenerating);
     };
@@ -646,6 +643,24 @@ const Catalogue = () => {
       if (pollId !== null) {
         clearInterval(pollId);
         pollId = null;
+      }
+    };
+
+    const clearCatchups = () => {
+      while (catchupIds.length > 0) {
+        const id = catchupIds.pop();
+        if (id !== undefined) clearTimeout(id);
+      }
+    };
+
+    const scheduleCatchupRefreshes = () => {
+      clearCatchups();
+      for (const delay of CATCHUP_DELAYS_MS) {
+        catchupIds.push(
+          setTimeout(() => {
+            void refreshVoiceSummaries();
+          }, delay),
+        );
       }
     };
 
@@ -661,6 +676,8 @@ const Catalogue = () => {
       } else if (pollId !== null) {
         stopPolling();
         void refreshVoiceSummaries();
+        // La file client peut se vider avant le commit DB « ready » → rattrapage.
+        scheduleCatchupRefreshes();
       }
     };
 
@@ -669,8 +686,9 @@ const Catalogue = () => {
       debounceId = setTimeout(() => {
         debounceId = null;
         setPendingAudioArtworkIds(new Set(getArtworkIdsWithPendingAudio()));
-        void refreshVoiceSummaries();
-        syncPolling();
+        void refreshVoiceSummaries().then(() => {
+          syncPolling();
+        });
       }, 350);
     };
 
@@ -682,6 +700,7 @@ const Catalogue = () => {
       unsubscribe();
       if (debounceId !== null) clearTimeout(debounceId);
       stopPolling();
+      clearCatchups();
     };
   }, [refreshVoiceSummaries]);
 
@@ -782,14 +801,14 @@ const Catalogue = () => {
   const artworkGroupDisplayInfo = useMemo(() => {
     const byArtwork = new Map<
       string,
-      { group: ArtworkGroupWithMembers; isFirst: boolean; orderedIds: string[] }
+      { group: ArtworkGroupWithMembers; orderedIds: string[] }
     >();
     for (const group of expoArtworkGroups) {
       const ordered = [...group.members].sort((a, b) => a.sort_order - b.sort_order);
       const orderedIds = ordered.map((m) => m.artwork_id);
-      ordered.forEach((m, index) => {
-        byArtwork.set(m.artwork_id, { group, isFirst: index === 0, orderedIds });
-      });
+      for (const m of ordered) {
+        byArtwork.set(m.artwork_id, { group, orderedIds });
+      }
     }
     return byArtwork;
   }, [expoArtworkGroups]);
@@ -800,17 +819,41 @@ const Catalogue = () => {
     return map;
   }, [filtered]);
 
+  const artworkByIdScoped = useMemo(() => {
+    const map = new Map<string, ArtworkRow>();
+    for (const aw of artworksScopedByExpo) map.set(aw.artwork_id, aw);
+    return map;
+  }, [artworksScopedByExpo]);
+
   type CatalogueGridEntry =
-    | { kind: "group"; groupInfo: { group: ArtworkGroupWithMembers; orderedIds: string[] } }
+    | {
+        kind: "group";
+        groupInfo: {
+          group: ArtworkGroupWithMembers;
+          orderedIds: string[];
+          focusArtworkId?: string;
+        };
+      }
     | { kind: "single"; artwork: ArtworkRow };
 
   const catalogueGridEntries = useMemo((): CatalogueGridEntry[] => {
     const units: CatalogueGridEntry[] = [];
+    const seenGroupIds = new Set<string>();
+
     for (const aw of filtered) {
       const groupInfo = artworkGroupDisplayInfo.get(aw.artwork_id);
       if (groupInfo) {
-        if (!groupInfo.isFirst) continue;
-        units.push({ kind: "group", groupInfo });
+        // Afficher le deck dès qu'un membre matche le filtre (pas seulement le 1er du groupe).
+        if (seenGroupIds.has(groupInfo.group.id)) continue;
+        seenGroupIds.add(groupInfo.group.id);
+        units.push({
+          kind: "group",
+          groupInfo: {
+            group: groupInfo.group,
+            orderedIds: groupInfo.orderedIds,
+            focusArtworkId: aw.artwork_id,
+          },
+        });
       } else {
         units.push({ kind: "single", artwork: aw });
       }
@@ -1089,8 +1132,61 @@ const Catalogue = () => {
     }
   };
 
+  const handleGenerateGroupPDF = async (group: ArtworkGroupWithMembers, formatId: CartelFormatId) => {
+    const groupId = group.id?.trim();
+    if (!groupId) {
+      toast.error(t("pdf_error_no_id"));
+      return;
+    }
+
+    try {
+      const originOverride = await fetchQrPublicSiteOriginFromSettings();
+      const targetUrl = buildArtworkGroupQrUrl(groupId, originOverride, group.expo_id);
+      if (!targetUrl) {
+        toast.error(t("pdf_error_no_qr_url"));
+        return;
+      }
+
+      const label = (group.group_label ?? "").trim() || t("group_deck_badge");
+      const number = (group.group_display_number ?? "").trim();
+      const artistText = number ? `${label} · ${t("group_deck_number", { number })}` : label;
+
+      const blobUrl = await generateCartelPdf({
+        formatId,
+        titleText: "",
+        artistText,
+        explorationLines: cartelExplorationLines(œuvresNavigationType, t),
+        qrTargetUrl: targetUrl,
+      });
+
+      navigate(catalogueFiltersPath(), { replace: true });
+
+      const pdfLink = document.createElement("a");
+      pdfLink.href = blobUrl;
+      pdfLink.target = "_blank";
+      pdfLink.rel = "noopener noreferrer";
+      document.body.appendChild(pdfLink);
+      pdfLink.click();
+      document.body.removeChild(pdfLink);
+      window.focus();
+
+      if (getCartelFormat(formatId).landscapeDuplex) {
+        toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("pdf_error_generate"));
+    }
+  };
+
   const openCartelFormatDialog = (aw: ArtworkRow) => {
+    setCartelGroup(null);
     setCartelArtwork(aw);
+    setCartelFormatDialogOpen(true);
+  };
+
+  const openGroupCartelFormatDialog = (group: ArtworkGroupWithMembers) => {
+    setCartelArtwork(null);
+    setCartelGroup(group);
     setCartelFormatDialogOpen(true);
   };
 
@@ -1121,15 +1217,22 @@ const Catalogue = () => {
                   aria-expanded={artworkFilterOpen}
                   aria-controls="catalogue-artwork-suggestions"
                   className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                  onMouseDown={(e) => {
+                    if ((e.target as HTMLElement).closest("button")) return;
+                    e.preventDefault();
+                    artworkSearchInputRef.current?.focus();
+                    setArtworkFilterOpen(true);
+                    setExpoFilterOpen(false);
+                  }}
                 >
                   <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
-                  {!search.trim() ? (
-                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t("filter_label_artworks")}</span>
-                  ) : null}
                   <input
+                    ref={artworkSearchInputRef}
                     id="catalogue-artwork-search"
                     type="text"
                     value={search}
+                    placeholder={t("filter_label_artworks")}
+                    autoComplete="off"
                     onChange={(e) => {
                       setSearch(e.target.value);
                       setArtworkFilterOpen(true);
@@ -1142,7 +1245,7 @@ const Catalogue = () => {
                     aria-label={t("search_placeholder")}
                     aria-autocomplete="list"
                     aria-controls="catalogue-artwork-suggestions"
-                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-neutral-900 placeholder:font-medium"
                   />
                   {search.trim().length > 0 && (
                     <button
@@ -1150,6 +1253,7 @@ const Catalogue = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setSearch("");
+                        artworkSearchInputRef.current?.focus();
                       }}
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-neutral-500 hover:text-neutral-900"
                       aria-label={t("search_clear_aria")}
@@ -1164,8 +1268,10 @@ const Catalogue = () => {
                     aria-label={t("search_placeholder")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setArtworkFilterOpen((open) => !open);
+                      const next = !artworkFilterOpen;
+                      setArtworkFilterOpen(next);
                       setExpoFilterOpen(false);
+                      if (next) artworkSearchInputRef.current?.focus();
                     }}
                   >
                     <ChevronDown className="h-4 w-4" strokeWidth={2.5} aria-hidden />
@@ -1216,15 +1322,22 @@ const Catalogue = () => {
                   aria-expanded={expoFilterOpen}
                   aria-controls="catalogue-expo-suggestions"
                   className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                  onMouseDown={(e) => {
+                    if ((e.target as HTMLElement).closest("button")) return;
+                    e.preventDefault();
+                    expoFilterInputRef.current?.focus();
+                    setExpoFilterOpen(true);
+                    setArtworkFilterOpen(false);
+                  }}
                 >
                   <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
-                  {!expoFilterInput.trim() && selectedExpoFilter === "all" ? (
-                    <span className="shrink-0 text-sm font-medium text-neutral-900">{t("filter_label_expo")}</span>
-                  ) : null}
                   <input
+                    ref={expoFilterInputRef}
                     id="catalogue-expo-filter"
                     type="text"
                     value={expoFilterInput}
+                    placeholder={t("filter_label_expo")}
+                    autoComplete="off"
                     onChange={(e) => {
                       handleExpoFilterInputChange(e.target.value);
                       setExpoFilterOpen(true);
@@ -1237,7 +1350,7 @@ const Catalogue = () => {
                     aria-label={t("expo_filter_placeholder")}
                     aria-autocomplete="list"
                     aria-controls="catalogue-expo-suggestions"
-                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-transparent"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 caret-neutral-900 outline-none placeholder:text-neutral-900 placeholder:font-medium"
                   />
                   {(expoFilterInput.trim().length > 0 || selectedExpoFilter !== "all") && (
                     <button
@@ -1246,6 +1359,7 @@ const Catalogue = () => {
                         e.stopPropagation();
                         setExpoFilterInput("");
                         setSelectedExpoFilter("all");
+                        expoFilterInputRef.current?.focus();
                       }}
                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-neutral-500 hover:text-neutral-900"
                       aria-label={t("expo_filter_clear_aria")}
@@ -1260,8 +1374,10 @@ const Catalogue = () => {
                     aria-label={t("expo_filter_placeholder")}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setExpoFilterOpen((open) => !open);
+                      const next = !expoFilterOpen;
+                      setExpoFilterOpen(next);
                       setArtworkFilterOpen(false);
+                      if (next) expoFilterInputRef.current?.focus();
                     }}
                   >
                     <ChevronDown className="h-4 w-4" strokeWidth={2.5} aria-hidden />
@@ -1348,7 +1464,7 @@ const Catalogue = () => {
           </p>
         )}
         {catalogueGridEntries.map((entry) => {
-          const buildCard = (row: ArtworkRow) => {
+          const buildCard = (row: ArtworkRow, deck?: { index: number; total: number }) => {
             const rowArtist = artworkArtistFromRow(row);
             const rowExpoRaw = (row.expo_id ?? row.artwork_expo_id ?? "").trim();
             const rowAgencyId = row.artwork_agency_id ?? null;
@@ -1392,8 +1508,29 @@ const Catalogue = () => {
             const rowVoicePartial =
               rowHasVoices &&
               !rowVoiceGenerating &&
-              rowVoice.readyCount > 0 &&
-              rowVoice.readyCount < rowVoice.expectedCount;
+              !rowVoiceComplete &&
+              rowVoice.readyCount > 0;
+            const rowVoiceLangsLabel = rowVoice.langsLabel || rowMediationLangs;
+            const rowVoiceBadgeLabel = !rowHasVoices
+              ? t("badge_ia_voice_none")
+              : rowVoiceGenerating
+                ? rowVoice.readyCount > 0
+                  ? t("badge_ia_voice_generating_partial", {
+                      ready: rowVoice.readyCount,
+                      expected: rowVoice.expectedCount,
+                      langs: rowVoiceLangsLabel,
+                    })
+                  : t("badge_ia_voice_generating")
+                : rowVoiceComplete
+                  ? t("badge_ia_voice", {
+                      count: rowVoice.readyCount,
+                      langs: rowVoiceLangsLabel,
+                    })
+                  : t("badge_ia_voice_partial", {
+                      ready: rowVoice.readyCount,
+                      expected: rowVoice.expectedCount,
+                      langs: rowVoiceLangsLabel,
+                    });
 
             return (
               <Card
@@ -1515,6 +1652,20 @@ const Catalogue = () => {
                         onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
+                        {deck && deck.total > 1 ? (
+                          <span
+                            className="text-center text-sm font-semibold tabular-nums text-amber-300"
+                            aria-label={t("group_deck_position", {
+                              current: deck.index + 1,
+                              total: deck.total,
+                            })}
+                          >
+                            {t("group_deck_position", {
+                              current: deck.index + 1,
+                              total: deck.total,
+                            })}
+                          </span>
+                        ) : null}
                         <Button
                           type="button"
                           variant="outline"
@@ -1583,11 +1734,7 @@ const Catalogue = () => {
                           }
                         >
                           <span className="min-w-0 truncate">
-                            {!rowHasVoices
-                              ? t("badge_ia_voice_none")
-                              : rowVoiceGenerating
-                                ? t("badge_ia_voice_generating")
-                                : t("badge_ia_voice", { count: rowVoice.readyCount, langs: rowVoice.langsLabel || rowMediationLangs })}
+                            {rowVoiceBadgeLabel}
                           </span>
                         </span>
                         {isGlobalCostViewer ? (
@@ -1619,9 +1766,11 @@ const Catalogue = () => {
                 key={entry.groupInfo.group.id}
                 group={entry.groupInfo.group}
                 artworks={entry.groupInfo.orderedIds
-                  .map((id) => filteredArtworkById.get(id))
+                  .map((id) => artworkByIdScoped.get(id) ?? filteredArtworkById.get(id))
                   .filter((row): row is ArtworkRow => Boolean(row))}
+                focusArtworkId={entry.groupInfo.focusArtworkId}
                 renderCard={buildCard}
+                onPrintCartel={() => openGroupCartelFormatDialog(entry.groupInfo.group)}
                 onOrderChange={() => {
                   if (selectedExpoFilter === "all") return;
                   void fetchArtworkGroupsForExpo(selectedExpoFilter).then(setExpoArtworkGroups);
@@ -1675,10 +1824,17 @@ const Catalogue = () => {
 
       <CartelFormatDialog
         open={cartelFormatDialogOpen}
-        onOpenChange={setCartelFormatDialogOpen}
-        artworkTitle={cartelArtwork?.artwork_title}
+        onOpenChange={(open) => {
+          setCartelFormatDialogOpen(open);
+          if (!open) {
+            setCartelArtwork(null);
+            setCartelGroup(null);
+          }
+        }}
+        artworkTitle={cartelGroup?.group_label ?? cartelArtwork?.artwork_title}
         onConfirm={(formatId) => {
-          if (cartelArtwork) void handleGeneratePDF(cartelArtwork, formatId);
+          if (cartelGroup) void handleGenerateGroupPDF(cartelGroup, formatId);
+          else if (cartelArtwork) void handleGeneratePDF(cartelArtwork, formatId);
         }}
       />
 
@@ -1688,7 +1844,11 @@ const Catalogue = () => {
           setArtworkModalOpen(next);
           if (!next) {
             setVoicesEntryFromCatalogue(false);
-            void loadCatalogue();
+            void loadCatalogue().then(() => {
+              // Rattrapage si des audio_files passent à « ready » juste après la fermeture.
+              window.setTimeout(() => void refreshVoiceSummaries(), 1500);
+              window.setTimeout(() => void refreshVoiceSummaries(), 4000);
+            });
             navigate(catalogueFiltersPath(), { replace: true });
           }
         }}
@@ -1696,7 +1856,9 @@ const Catalogue = () => {
         openMediationAudioOnLoad={voicesEntryFromCatalogue}
         closeOnMediationAudioClose={voicesEntryFromCatalogue}
         onSuccess={() => {
-          void loadCatalogue();
+          void loadCatalogue().then(() => {
+            window.setTimeout(() => void refreshVoiceSummaries(), 1500);
+          });
           void loadExpoOptions();
         }}
       />

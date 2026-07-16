@@ -23,7 +23,7 @@ import { clampLocalDay, coerceFormDate, computeArtistAgeYears, parseDateOnlyStri
 import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { removeSupabaseStorageObjectByPublicUrl } from "@/lib/supabaseStorage";
-import { uploadCatalogArtistPhoto } from "@/lib/storagePaths";
+import { uploadCatalogArtistPhoto, withStorageCacheBust } from "@/lib/storagePaths";
 import { ARTIST_PHOTO_PLACEHOLDER } from "@/lib/artistAssets";
 import {
   ARTIST_BIO_LANGUAGES,
@@ -974,7 +974,7 @@ export function AddArtistDialog({
         throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
       }
       const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(objectPath);
-      return pub.publicUrl;
+      return withStorageCacheBust(pub.publicUrl);
     }
   };
 

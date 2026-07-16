@@ -1,10 +1,16 @@
 import { MEDIATION_UI_LANGS, type MediationUiLang } from "@/lib/artworkDescriptionI18n";
 
-/** Privilège réservé à l'admin général (global_role_id 1) : langues optionnelles en fiche œuvre. */
+/** Nb max de langues optionnelles pour staff SaaS (1–3) en plus de la langue primaire. */
 export const ADMIN_GENERAL_MAX_OPTIONAL_MEDIATION_LANGS = 4;
 
+/** Privilège SaaS global (role_id 1–3) : pas de plafond abonnement sur les langues. */
+export function isGlobalStaffMediationLangUnlock(globalRoleId: number | null | undefined): boolean {
+  return typeof globalRoleId === "number" && globalRoleId >= 1 && globalRoleId <= 3;
+}
+
+/** @deprecated Préférer isGlobalStaffMediationLangUnlock — conservé pour les appels existants (role 1). */
 export function isAdminGeneralMediationOverride(globalRoleId: number | null | undefined): boolean {
-  return globalRoleId === 1;
+  return isGlobalStaffMediationLangUnlock(globalRoleId);
 }
 
 export function resolveWorkflowOptionalLangMax(params: {
@@ -12,7 +18,7 @@ export function resolveWorkflowOptionalLangMax(params: {
   planMaxLangs: number;
   experimentalWorkflow: boolean;
 }): number {
-  if (isAdminGeneralMediationOverride(params.globalRoleId) && params.experimentalWorkflow) {
+  if (isGlobalStaffMediationLangUnlock(params.globalRoleId) && params.experimentalWorkflow) {
     return ADMIN_GENERAL_MAX_OPTIONAL_MEDIATION_LANGS;
   }
   return Math.max(0, params.planMaxLangs - 1);
@@ -40,8 +46,17 @@ export function resolvePlanMaxMediationLangs(input: {
   includedMin: number | null | undefined;
   isEtincelle?: boolean;
 }): number {
-  const raw = input.includedMax ?? input.includedMin ?? (input.isEtincelle ? 1 : MEDIATION_UI_LANGS.length);
+  // Sans donnée pricing : 1 langue (sécurité quota). Les rôles SaaS 1–3 débloquent à part.
+  const raw = input.includedMax ?? input.includedMin ?? 1;
   return Math.min(MEDIATION_UI_LANGS.length, Math.max(1, raw));
+}
+
+export function resolvePlanMaxAudioLangs(input: {
+  includedAudioLangs: number | null | undefined;
+  mediationLangsMax: number;
+}): number {
+  const raw = input.includedAudioLangs ?? input.mediationLangsMax;
+  return Math.min(MEDIATION_UI_LANGS.length, Math.max(0, raw));
 }
 
 export function planMediationAllowsOptionalLang(maxLangs: number): boolean {

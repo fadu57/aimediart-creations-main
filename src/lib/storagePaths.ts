@@ -34,6 +34,20 @@ export function publicUrlForStorageObject(bucket: string, objectPath: string): s
   return data.publicUrl || "";
 }
 
+/** Force le rechargement navigateur après upsert sur le même chemin storage. */
+export function withStorageCacheBust(url: string, version: number | string = Date.now()): string {
+  const raw = (url ?? "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    parsed.searchParams.set("v", String(version));
+    return parsed.toString();
+  } catch {
+    const base = raw.split("?")[0] ?? raw;
+    return `${base}?v=${version}`;
+  }
+}
+
 type UploadOptions = {
   upsert?: boolean;
   cacheControl?: string;
@@ -62,7 +76,12 @@ export async function uploadCatalogArtistPhoto(
 ): Promise<string> {
   const ext = fileName ? extensionFromFileName(fileName) : "webp";
   const path = buildPhotoObjectPath("artists", artistId, ext);
-  return uploadToStorageBucket(STORAGE_BUCKET_PHOTOS, path, file, { upsert: true });
+  const url = await uploadToStorageBucket(STORAGE_BUCKET_PHOTOS, path, file, {
+    upsert: true,
+    // Court : le fichier est souvent réécrit sous le même chemin.
+    cacheControl: "60",
+  });
+  return withStorageCacheBust(url);
 }
 
 export async function uploadBackofficeUserPhoto(userId: string, file: File | Blob, fileName?: string): Promise<string> {

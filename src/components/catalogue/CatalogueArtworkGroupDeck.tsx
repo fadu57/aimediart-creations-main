@@ -25,11 +25,20 @@ import {
 import { cn } from "@/lib/utils";
 import type { ArtworkGroupWithMembers } from "@/lib/artworkGroupFetch";
 
+export type CatalogueDeckCardMeta = {
+  /** Index 0-based dans le carrousel du regroupement. */
+  index: number;
+  total: number;
+};
+
 type CatalogueArtworkGroupDeckProps<T extends { artwork_id: string; artwork_image_url?: string | null; artwork_photo_url?: string | null }> = {
   group: ArtworkGroupWithMembers;
   artworks: T[];
-  renderCard: (artwork: T) => ReactNode;
+  renderCard: (artwork: T, deck?: CatalogueDeckCardMeta) => ReactNode;
   onOrderChange?: () => void;
+  onPrintCartel?: () => void;
+  /** Positionne le carrousel sur cette œuvre (ex. résultat de recherche). */
+  focusArtworkId?: string;
 };
 
 function artworkThumbUrl<T extends { artwork_image_url?: string | null; artwork_photo_url?: string | null }>(
@@ -43,6 +52,8 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
   artworks,
   renderCard,
   onOrderChange,
+  onPrintCartel,
+  focusArtworkId,
 }: CatalogueArtworkGroupDeckProps<T>) {
   const { t } = useTranslation("catalogue");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -76,6 +87,13 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
       setActiveIndex(safeIndex);
     }
   }, [safeIndex, activeIndex, count]);
+
+  useEffect(() => {
+    const focusId = (focusArtworkId ?? "").trim();
+    if (!focusId || reorderMode || count === 0) return;
+    const idx = displayedArtworks.findIndex((aw) => aw.artwork_id === focusId);
+    if (idx >= 0) setActiveIndex(idx);
+  }, [focusArtworkId, displayedArtworks, reorderMode, count]);
 
   const go = (direction: -1 | 1) => {
     if (count <= 1 || reorderMode) return;
@@ -201,7 +219,7 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
             size="sm"
             className="shrink-0"
           />
-          <div className="min-w-0 flex-1">
+          <div className={cn("relative min-w-0 flex-1", onPrintCartel && !reorderMode && "pr-[7.25rem]")}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">
                 <Layers className="h-3 w-3 shrink-0" aria-hidden />
@@ -231,6 +249,18 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
                 ? t("group_deck_reorder_hint")
                 : `${t("group_deck_count", { count })} · ${t("group_deck_qr_hint")}`}
             </p>
+            {onPrintCartel && !reorderMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="absolute right-0 top-0 h-auto w-[6.75rem] flex-col items-center justify-center gap-0 whitespace-normal border-amber-500/50 bg-white px-2 py-1.5 text-center text-[11px] font-black leading-tight text-black hover:bg-white hover:text-black"
+                onClick={onPrintCartel}
+              >
+                <span className="block w-full">{t("btn_print_cartel_group_line1")}</span>
+                <span className="block w-full">{t("btn_print_cartel_group_line2")}</span>
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -422,7 +452,7 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
                 style={{ marginBottom: index < count - 1 ? CATALOGUE_DECK_SLIDE_GAP_PX : 0 }}
               >
                 {renderStackLayers(index)}
-                <div className="relative z-10 h-full">{renderCard(aw)}</div>
+                <div className="relative z-10 h-full">{renderCard(aw, { index, total: count })}</div>
               </div>
             ))}
           </div>

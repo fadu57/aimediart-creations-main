@@ -9,6 +9,7 @@ export type PlanLimitsSnapshot = {
   isEtincelle: boolean;
   includedMediationLangsMin: number | null;
   includedMediationLangsMax: number | null;
+  includedAudioLangs: number | null;
   maxArtworks: number | null;
   maxVisitors: number | null;
   artworksUsed: number;
@@ -70,6 +71,7 @@ export function buildPlanLimitsSnapshot(input: {
   pricing_label?: string | null;
   included_mediation_langs_min?: number | null;
   included_mediation_langs_max?: number | null;
+  included_audio_langs?: number | null;
   max_oeuvres?: number | null;
   max_visitors?: number | null;
   is_unlimited?: boolean | null;
@@ -91,6 +93,7 @@ export function buildPlanLimitsSnapshot(input: {
     isEtincelle,
     includedMediationLangsMin: input.included_mediation_langs_min ?? null,
     includedMediationLangsMax: input.included_mediation_langs_max ?? null,
+    includedAudioLangs: input.included_audio_langs ?? null,
     maxArtworks,
     maxVisitors,
     artworksUsed: input.artworksUsed,

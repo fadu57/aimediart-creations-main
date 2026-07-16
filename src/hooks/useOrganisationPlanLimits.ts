@@ -83,9 +83,12 @@ export function useOrganisationPlanLimits(agencyId: string | null | undefined): 
           trial_duration_days?: number | null;
           included_mediation_langs_min?: number | null;
           included_mediation_langs_max?: number | null;
+          included_audio_langs?: number | null;
         } | null = null;
 
         const pricingSelectTiers = [
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
+          "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max, included_audio_langs",
           "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max",
           "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, princing_max_visitors, pricing_is_unlimited, trial_duration_days, included_mediation_langs_min, included_mediation_langs_max",
           "pricing_label, pricing_plan, plan_code, pricing_max_oeuvres, pricing_max_visitors, pricing_is_unlimited, trial_duration_days",
@@ -137,6 +140,7 @@ export function useOrganisationPlanLimits(agencyId: string | null | undefined): 
             pricing_label: pricing?.pricing_label ?? null,
             included_mediation_langs_min: pricing?.included_mediation_langs_min ?? null,
             included_mediation_langs_max: pricing?.included_mediation_langs_max ?? null,
+            included_audio_langs: pricing?.included_audio_langs ?? null,
             max_oeuvres: pricing?.pricing_max_oeuvres ?? null,
             max_visitors: pricing?.pricing_max_visitors ?? pricing?.princing_max_visitors ?? null,
             is_unlimited: pricing?.pricing_is_unlimited ?? null,

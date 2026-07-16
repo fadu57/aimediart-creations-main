@@ -130,7 +130,12 @@
     "desc": "Alle Stimmen nach Persona und Sprache verfolgen.",
     "close": "Schließen",
     "fill_missing": "Fehlende Stimmen ergänzen",
+    "generate_voices": "Audiostimmen generieren",
     "all_voices_ready": "Alle Stimmen wurden generiert",
+    "progress_aria": "Gesamtfortschritt Audio {{percent}} %",
+    "progress_running": "{{ready}} / {{total}} Stimmen fertig · {{active}} laufend",
+    "progress_idle": "{{ready}} / {{total}} Stimmen fertig",
+    "progress_done": "{{ready}} / {{total}} Stimmen fertig",
     "background_hint": "Sie können schließen — die Generierung läuft im Hintergrund weiter."
   },
   "qr_warn_no_expo": "Keine Ausstellung zugewiesen — der QR-Code funktioniert, jedoch ohne Ausstellungskontext für den Besucher.",

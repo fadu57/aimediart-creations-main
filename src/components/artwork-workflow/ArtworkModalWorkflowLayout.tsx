@@ -5,7 +5,6 @@ import type { TFunction } from "i18next";
 import { WorkflowRegenerationNotice } from "@/components/artwork-workflow/WorkflowRegenerationNotice";
 import { WorkflowIaStatusBadges } from "@/components/artwork-workflow/WorkflowIaStatusBadges";
 import { WorkflowPersonaVoiceStatus } from "@/components/artwork-workflow/WorkflowPersonaVoiceStatus";
-import { MultiOptionalLangPicker } from "@/components/artwork-workflow/MultiOptionalLangPicker";
 import type { MediationVoiceFillState } from "@/services/audioService";
 import { ArtworkWorkflowMarkdown, isVerseMediationStyleKey } from "@/components/artwork-workflow/ArtworkWorkflowMarkdown";
 import { PhotoCaptureField } from "@/components/artwork-workflow/PhotoCaptureField";
@@ -87,6 +86,8 @@ export type ArtworkModalWorkflowLayoutProps = {
   isLoading: boolean;
   isSubmitting: boolean;
   isAiBusy: boolean;
+  /** Bloque la fermeture (génération texte / analyse / audio en cours). */
+  isCloseBlocked: boolean;
   canSave: boolean;
   canAnalyze: boolean;
   canGenerateMediations: boolean;
@@ -115,6 +116,9 @@ export type ArtworkModalWorkflowLayoutProps = {
   onSourceMaterialSave: (value: string) => void;
   mediationEditLang: MediationUiLang;
   onMediationLangSelect: (lang: MediationUiLang) => void;
+  /** Langues cochées pour « Générer les médiations IA » (textes uniquement). */
+  mediationGenerateLangs: MediationUiLang[];
+  onMediationGenerateLangToggle: (lang: MediationUiLang) => void;
   mediationLangHelp: string;
   planMaxMediationLangs: number;
   mediationPrimaryLang: MediationUiLang;
@@ -159,14 +163,24 @@ export type ArtworkModalWorkflowLayoutProps = {
   initialWorkflowTab?: WorkflowTabId;
 };
 
-function mediationLangButtonClassName(isSelected: boolean, langEnabled: boolean): string {
+function mediationLangButtonClassName(
+  isGenerateSelected: boolean,
+  isEditLang: boolean,
+  langEnabled: boolean,
+): string {
   if (!langEnabled) {
     return "border border-dashed border-muted-foreground/40 bg-muted/60 text-muted-foreground/50";
   }
-  if (isSelected) {
-    return "border-amber-700 bg-amber-700 text-white";
+  if (isGenerateSelected) {
+    return cn(
+      "border-[#E63946] bg-[#E63946] text-white hover:bg-[#d12f3c] hover:text-white",
+      isEditLang && "ring-2 ring-[#E63946]/40 ring-offset-1 ring-offset-amber-50",
+    );
   }
-  return "border-amber-500 bg-amber-50 text-amber-950";
+  return cn(
+    "border-border bg-white text-neutral-900 hover:bg-white hover:text-neutral-900",
+    isEditLang && "ring-2 ring-neutral-400/50 ring-offset-1",
+  );
 }
 
 function ProgressBar({ percent, detail }: { percent: number; detail: string }) {
@@ -254,6 +268,7 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
     isLoading,
     isSubmitting,
     isAiBusy,
+    isCloseBlocked,
     canSave,
     canAnalyze,
     canGenerateMediations,
@@ -282,16 +297,11 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
     onSourceMaterialSave,
     mediationEditLang,
     onMediationLangSelect,
+    mediationGenerateLangs,
+    onMediationGenerateLangToggle,
     mediationLangHelp,
     planMaxMediationLangs,
     mediationPrimaryLang,
-    workflowOptionalLangs,
-    onWorkflowOptionalLangsChange,
-    planAllowsOptionalLang,
-    showOptionalLangPicker,
-    adminGeneralOptionalLangPicker,
-    maxOptionalMediationLangs,
-    planEnabledLangSet,
     mediationLegacyLangs,
     styleTabs,
     activeTab,
@@ -436,7 +446,7 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
               variant="ghost"
               size="icon"
               className="h-9 w-9 shrink-0 text-white hover:bg-white/20"
-              disabled={isAiBusy}
+              disabled={isCloseBlocked}
               aria-label={t("btn_close_aria")}
               onClick={onClose}
             >
@@ -768,28 +778,6 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
               Médiations IA
             </p>
 
-            {showOptionalLangPicker ? (
-              <div className="space-y-1.5">
-                <Label className="text-xs">
-                  {adminGeneralOptionalLangPicker
-                    ? t("mediation_optional_lang_admin_label", { primary: mediationPrimaryLang.toUpperCase() })
-                    : t("mediation_optional_lang_label", { primary: mediationPrimaryLang.toUpperCase() })}
-                </Label>
-                <MultiOptionalLangPicker
-                  primaryLang={mediationPrimaryLang}
-                  availableLangs={[...MEDIATION_UI_LANGS]}
-                  selectedLangs={workflowOptionalLangs}
-                  maxOptional={maxOptionalMediationLangs}
-                  disabled={
-                    generatingMediation ||
-                    isLoading ||
-                    (!adminGeneralOptionalLangPicker && planMaxMediationLangs <= 1)
-                  }
-                  onChange={onWorkflowOptionalLangsChange}
-                />
-              </div>
-            ) : null}
-
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
               <Button
                 type="button"
@@ -827,28 +815,52 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
             ) : null}
 
             <div className="space-y-2">
-              <Label className="text-xs">{t("label_mediations")}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {MEDIATION_UI_LANGS.map((lng) => {
-                  const langEnabled =
-                    planEnabledLangSet.has(lng) || mediationLegacyLangs.includes(lng);
-                  return (
-                    <Button
-                      key={lng}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        "h-8 min-w-[2.5rem] px-2 text-[12px] font-semibold leading-none",
-                        mediationLangButtonClassName(mediationEditLang === lng, langEnabled),
-                      )}
-                      disabled={isAiBusy || isLoading || !langEnabled}
-                      onClick={() => onMediationLangSelect(lng)}
-                    >
-                      {lng.toUpperCase()}
-                    </Button>
-                  );
-                })}
+              <Label className="text-xs">{t("label_mediation_langs_select")}</Label>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {MEDIATION_UI_LANGS.map((lng) => {
+                    const langSelectable =
+                      planMaxMediationLangs <= 1
+                        ? lng === mediationPrimaryLang || mediationLegacyLangs.includes(lng)
+                        : true;
+                    const isGenerateSelected = mediationGenerateLangs.includes(lng);
+                    const isEditLang = mediationEditLang === lng;
+                    return (
+                      <Button
+                        key={lng}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        aria-pressed={isGenerateSelected}
+                        title={
+                          isGenerateSelected
+                            ? t("mediation_lang_toggle_selected", { lang: lng.toUpperCase() })
+                            : t("mediation_lang_toggle_unselected", { lang: lng.toUpperCase() })
+                        }
+                        className={cn(
+                          "h-8 min-w-[2.5rem] px-2 text-[12px] font-semibold leading-none",
+                          mediationLangButtonClassName(isGenerateSelected, isEditLang, langSelectable),
+                        )}
+                        disabled={isAiBusy || isLoading || !langSelectable}
+                        onClick={() => {
+                          onMediationGenerateLangToggle(lng);
+                          onMediationLangSelect(lng);
+                        }}
+                      >
+                        {lng.toUpperCase()}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <span
+                  className="shrink-0 text-xs font-semibold tabular-nums text-amber-950"
+                  aria-live="polite"
+                >
+                  {t("mediation_langs_selected_count", {
+                    count: mediationGenerateLangs.length,
+                    max: planMaxMediationLangs,
+                  })}
+                </span>
               </div>
               <p className="text-[11px] text-muted-foreground">{mediationLangHelp}</p>
 

@@ -130,7 +130,12 @@
     "desc": "Seguimiento de todas las voces por persona e idioma.",
     "close": "Cerrar",
     "fill_missing": "Completar voces faltantes",
+    "generate_voices": "Generar voces de audio",
     "all_voices_ready": "Todas las voces han sido generadas",
+    "progress_aria": "Progreso de audio global {{percent}} %",
+    "progress_running": "{{ready}} / {{total}} voces listas · {{active}} en curso",
+    "progress_idle": "{{ready}} / {{total}} voces listas",
+    "progress_done": "{{ready}} / {{total}} voces listas",
     "background_hint": "Puede cerrar: la generación continuará en segundo plano."
   },
   "qr_warn_no_expo": "Ninguna exposición asignada — el código QR funcionará pero sin contexto de exposición para el visitante.",

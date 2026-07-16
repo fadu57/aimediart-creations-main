@@ -288,6 +288,7 @@ const Artists = () => {
                 >
                   <div className="h-[100px] w-[100px] shrink-0 overflow-hidden rounded-2xl ring-2 ring-border bg-muted/30">
                     <img
+                      key={photoSrc}
                       src={photoSrc}
                       alt=""
                       className="h-full w-full object-cover"
