@@ -4,7 +4,11 @@ import {
   type Html5QrcodeCameraScanConfig,
   type Html5QrcodeFullConfig,
 } from "html5-qrcode";
-import { attachNativeQrScanWhenReady } from "@/lib/qrNativeVideoScan";
+import {
+  attachNativeQrScanWhenReady,
+  ensureHtml5QrVideoPlaying,
+  isAppleMobileDevice,
+} from "@/lib/qrNativeVideoScan";
 import type { QRCodeToDataURLOptions } from "qrcode";
 
 /** QR PNG stockés (catalogue, fiche œuvre) : correction élevée + zone calme pour scan webcam / mobile. */
@@ -30,7 +34,8 @@ export function qrCodePrintOptions(width: number): QRCodeToDataURLOptions {
 export function createHtml5QrcodeReader(elementId: string): Html5Qrcode {
   const config: Html5QrcodeFullConfig = {
     verbose: false,
-    useBarCodeDetectorIfSupported: true,
+    // BarcodeDetector absent / peu fiable sur iOS — ZXing via html5-qrcode.
+    useBarCodeDetectorIfSupported: !isAppleMobileDevice(),
   };
   return new Html5Qrcode(elementId, config);
 }
@@ -205,16 +210,24 @@ export async function stopQrScannerIfRunning(qr: Html5Qrcode): Promise<void> {
 }
 
 /**
- * Au plus 3 essais : ID caméra (string), puis facingMode user, puis environment (mobile).
- * Pas de contraintes HD au démarrage (évite OverconstrainedError + transitions bloquées).
+ * Au plus 3 essais. Sur iOS : pas de getCameras() avant start (brûle le geste utilisateur
+ * Safari → &lt;video&gt; créé mais flux noir). facingMode exact, sans idéal HD.
  */
 export async function buildQrScannerCameraAttempts(): Promise<CameraStartConfig[]> {
   const mobile = isLikelyMobileDevice();
+  const apple = isAppleMobileDevice();
   const attempts: CameraStartConfig[] = [];
 
+  if (apple) {
+    // Chaîne courte : getUserMedia au plus tôt après le tap (pas de getCameras).
+    attempts.push({ facingMode: "environment" });
+    attempts.push({ facingMode: "user" });
+    attempts.push({});
+    return attempts.slice(0, 3);
+  }
+
   if (mobile) {
-    // iOS Safari : facingMode simple, caméra arrière en priorité (sans résolution HD).
-    attempts.push({ facingMode: { ideal: "environment" } });
+    attempts.push({ facingMode: "environment" });
   }
 
   try {
@@ -275,6 +288,16 @@ async function runQrWebcamScannerStart(
     try {
       await ensureQrReaderReady(elementId, shouldContinue);
       await qr.start(config, scanConfig, onSuccess, onScanError);
+      try {
+        await ensureHtml5QrVideoPlaying(elementId);
+      } catch (playError) {
+        if (import.meta.env.DEV) {
+          console.warn("[scanner] vidéo créée mais sans image", scanErrorMessage(playError));
+        }
+        await waitForQrScannerIdle(qr);
+        lastError = playError;
+        continue;
+      }
       if (import.meta.env.DEV) {
         console.debug("[scanner] caméra démarrée", { config });
       }

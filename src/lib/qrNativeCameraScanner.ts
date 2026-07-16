@@ -33,7 +33,10 @@ function configureVideoForInlinePlayback(video: HTMLVideoElement): void {
   video.setAttribute("webkit-playsinline", "true");
   video.playsInline = true;
   video.muted = true;
+  video.defaultMuted = true;
   video.autoplay = true;
+  video.setAttribute("muted", "true");
+  video.setAttribute("autoplay", "true");
 }
 
 async function openCameraStream(): Promise<MediaStream> {
