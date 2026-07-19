@@ -121,33 +121,19 @@ function buildPasswordSetupActionLink(linkPayload: unknown): string {
   return url.toString();
 }
 
-function buildBrandLogoHeaderHtml(): string {
-  // Carré rouge + cœur blanc (SVG data-URI — évite l’emoji coloré qui ignore le CSS)
-  const heartSvg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none">' +
-    '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" ' +
-    'stroke="#ffffff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>' +
-    "</svg>";
-  const heartDataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(heartSvg)}`;
-  const font =
-    "Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
+const PASSWORD_SETUP_EMAIL_SUBJECT = "❤️ AIMEDIArt — créez votre mot de passe";
 
+function buildBrandLogoHeaderHtml(): string {
+  // Bloc logo officiel (PNG hébergé — meilleur support clients mail que SVG/data-URI)
+  const logoUrl = `${getPublicSiteOrigin()}/brand/aimediart-logo-block.png`;
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
   <tr>
     <td style="vertical-align:middle;padding:0;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td width="40" height="40" align="center" valign="middle" bgcolor="#ca2b2b"
-              style="width:40px;height:40px;background-color:#ca2b2b;border-radius:6px;text-align:center;vertical-align:middle;line-height:40px;">
-            <img src="${heartDataUri}" width="22" height="22" alt=""
-                 style="display:inline-block;width:22px;height:22px;border:0;outline:none;vertical-align:middle;" />
-          </td>
-          <td style="padding-left:8px;vertical-align:middle;">
-            <div style="font-family:${font};font-size:16px;font-weight:700;letter-spacing:-0.025em;color:#ca2b2b;line-height:1.15;">AIMEDIArt.com</div>
-            <div style="font-family:${font};font-size:10px;font-weight:700;font-style:italic;color:#ca2b2b;line-height:1.2;margin-top:2px;">Art-mediation with AI</div>
-          </td>
-        </tr>
-      </table>
+      <a href="${getPublicSiteOrigin()}/" style="text-decoration:none;border:0;">
+        <img src="${logoUrl}"
+             width="167" height="40" alt="AIMEDIArt.com — Art-mediation with AI"
+             style="display:block;width:167px;max-width:100%;height:auto;border:0;outline:none;" />
+      </a>
     </td>
   </tr>
 </table>`;
@@ -343,7 +329,7 @@ async function sendPasswordSetupEmail(
     apiKey: resendApiKey,
     fromEmail,
     to: params.email,
-    subject: "AIMEDIArt — créez votre mot de passe",
+    subject: PASSWORD_SETUP_EMAIL_SUBJECT,
     html,
   });
   if (!mail.ok) {
@@ -353,7 +339,7 @@ async function sendPasswordSetupEmail(
         apiKey: resendApiKey,
         fromEmail: "Aimediart <onboarding@resend.dev>",
         to: params.email,
-        subject: "AIMEDIArt — créez votre mot de passe",
+        subject: PASSWORD_SETUP_EMAIL_SUBJECT,
         html,
       });
       if (!retry.ok) {
@@ -606,7 +592,7 @@ serve(async (req: Request) => {
         apiKey: resendApiKey,
         fromEmail,
         to: email,
-        subject: "AIMEDIArt — créez votre mot de passe",
+        subject: PASSWORD_SETUP_EMAIL_SUBJECT,
         html: emailHtml,
       });
       if (!mail.ok && /domain is not verified/i.test(mail.error || "") && !/onboarding@resend\.dev/i.test(fromEmail)) {
@@ -614,7 +600,7 @@ serve(async (req: Request) => {
           apiKey: resendApiKey,
           fromEmail: "Aimediart <onboarding@resend.dev>",
           to: email,
-          subject: "AIMEDIArt — créez votre mot de passe",
+          subject: PASSWORD_SETUP_EMAIL_SUBJECT,
           html: emailHtml,
         });
       }

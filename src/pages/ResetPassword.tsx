@@ -168,7 +168,7 @@ const ResetPassword = () => {
 
   if (checking) {
     return (
-      <div className="flex flex-1 items-center justify-center py-16">
+      <div className="flex flex-1 items-center justify-center py-16 px-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
       </div>
     );
@@ -176,7 +176,7 @@ const ResetPassword = () => {
 
   if (!ready) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-12 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-12 text-center overflow-y-auto">
         <p className="text-sm text-muted-foreground max-w-md">{t("recovery.invalid_link")}</p>
         <Button variant="outline" asChild>
           <Link to="/login">{t("recovery.link_back_login")}</Link>
@@ -201,22 +201,22 @@ const ResetPassword = () => {
     isPasswordPolicyOk(password) && passwordsMatch && !submitting;
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-md border-border shadow-lg">
-        <CardHeader className="space-y-1">
-          <CardTitle className="font-serif text-2xl text-center">
+    <div className="flex w-full flex-1 flex-col items-center justify-start px-4 py-6 sm:justify-center sm:py-12 overflow-y-auto">
+      <Card className="w-full max-w-md border-border shadow-lg my-auto">
+        <CardHeader className="space-y-1 px-4 sm:px-6">
+          <CardTitle className="font-serif text-xl sm:text-2xl text-center">
             {isFirstSetup ? t("recovery.setup_card_title") : t("recovery.card_title")}
           </CardTitle>
           {showSetupWelcome ? (
-            <div className="flex flex-col items-center gap-1 pt-1 text-center text-sm text-foreground">
+            <div className="flex flex-col items-center gap-1 pt-1 text-center text-sm text-foreground min-w-0 w-full">
               {displayName ? (
-                <p>
+                <p className="break-words max-w-full">
                   {t("recovery.setup_welcome_hello")}{" "}
                   <strong className="font-bold text-[#ca2b2b]">{displayName}</strong>
                 </p>
               ) : null}
               {identity.email ? (
-                <p>
+                <p className="break-all max-w-full">
                   <strong className="font-bold text-[#ca2b2b]">{identity.email}</strong>
                 </p>
               ) : null}
@@ -227,12 +227,12 @@ const ResetPassword = () => {
               {t("recovery.card_description")}
             </CardDescription>
           ) : (
-            <p className="text-center text-xs text-muted-foreground pt-1">
+            <p className="text-center text-xs text-muted-foreground pt-1 px-1">
               {t("recovery.setup_after_hint")}
             </p>
           )}
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6 pb-6">
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
             {!isFirstSetup ? (
               <div className="space-y-[5px]">
@@ -263,7 +263,7 @@ const ResetPassword = () => {
               <Label htmlFor="reset-new">
                 {isFirstSetup ? t("recovery.setup_password_label") : t("recovery.new_password_label")}
               </Label>
-              <p className="text-xs text-muted-foreground">{t("recovery.setup_password_hint")}</p>
+              <p className="text-xs text-muted-foreground leading-snug">{t("recovery.setup_password_hint")}</p>
               <div className="relative">
                 <Input
                   id="reset-new"
@@ -347,7 +347,7 @@ const ResetPassword = () => {
             </div>
             <Button
               type="submit"
-              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground min-h-11"
               disabled={!canSubmit}
             >
               {submitting ? (
@@ -361,7 +361,7 @@ const ResetPassword = () => {
                 t("recovery.submit")
               )}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <Link to="/login" className="text-primary underline-offset-4 hover:underline">
                 {t("recovery.link_back_login")}
               </Link>
