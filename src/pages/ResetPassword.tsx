@@ -182,8 +182,11 @@ const ResetPassword = () => {
 
   const displayName = [identity?.firstName, identity?.lastName].filter(Boolean).join(" ").trim();
   const showSetupWelcome = isFirstSetup && identity && (displayName || identity.email);
-  const passwordsMatch = password.length > 0 && confirm.length > 0 && password === confirm;
-  const confirmMismatch = confirm.length > 0 && password !== confirm;
+  /** Dès qu’une saisie existe dans le 2e champ : comparer en direct avec le 1er. */
+  const confirmStarted = confirm.length > 0;
+  const passwordsMatch = confirmStarted && password === confirm;
+  const confirmMismatch = confirmStarted && password !== confirm;
+  const canSubmit = passwordsMatch && password.length >= MIN_LEN && !submitting;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
@@ -283,14 +286,20 @@ const ResetPassword = () => {
                   minLength={MIN_LEN}
                   aria-invalid={confirmMismatch ? "true" : "false"}
                   aria-describedby={confirmMismatch ? "reset-confirm-error" : undefined}
-                  className={`pr-16 ${confirmMismatch ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  className={`pr-16 ${
+                    confirmMismatch
+                      ? "border-[#ca2b2b] focus-visible:ring-[#ca2b2b]"
+                      : passwordsMatch
+                        ? "border-emerald-500 focus-visible:ring-emerald-500"
+                        : ""
+                  }`}
                 />
-                {confirm.length > 0 ? (
-                  <span className="absolute inset-y-0 right-10 flex items-center">
+                {confirmStarted ? (
+                  <span className="absolute inset-y-0 right-10 flex items-center pointer-events-none">
                     {passwordsMatch ? (
                       <Check className="h-4 w-4 text-emerald-500" aria-hidden />
                     ) : (
-                      <X className="h-4 w-4 text-destructive" aria-hidden />
+                      <X className="h-4 w-4 text-[#ca2b2b]" aria-hidden />
                     )}
                   </span>
                 ) : null}
@@ -304,15 +313,15 @@ const ResetPassword = () => {
                 </button>
               </div>
               {confirmMismatch ? (
-                <p id="reset-confirm-error" className="text-xs text-destructive" role="alert">
-                  {t("recovery.toast_confirm_mismatch")}
+                <p id="reset-confirm-error" className="text-xs font-medium text-[#ca2b2b]" role="alert">
+                  {t("recovery.confirm_mismatch_live")}
                 </p>
               ) : null}
             </div>
             <Button
               type="submit"
               className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              disabled={submitting || confirmMismatch || !passwordsMatch}
+              disabled={!canSubmit}
             >
               {submitting ? (
                 <>
