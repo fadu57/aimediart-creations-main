@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, X } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -182,6 +182,8 @@ const ResetPassword = () => {
 
   const displayName = [identity?.firstName, identity?.lastName].filter(Boolean).join(" ").trim();
   const showSetupWelcome = isFirstSetup && identity && (displayName || identity.email);
+  const passwordsMatch = password.length > 0 && confirm.length > 0 && password === confirm;
+  const confirmMismatch = confirm.length > 0 && password !== confirm;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
@@ -279,8 +281,19 @@ const ResetPassword = () => {
                   disabled={submitting}
                   required
                   minLength={MIN_LEN}
-                  className="pr-10"
+                  aria-invalid={confirmMismatch ? "true" : "false"}
+                  aria-describedby={confirmMismatch ? "reset-confirm-error" : undefined}
+                  className={`pr-16 ${confirmMismatch ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
+                {confirm.length > 0 ? (
+                  <span className="absolute inset-y-0 right-10 flex items-center">
+                    {passwordsMatch ? (
+                      <Check className="h-4 w-4 text-emerald-500" aria-hidden />
+                    ) : (
+                      <X className="h-4 w-4 text-destructive" aria-hidden />
+                    )}
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -290,8 +303,17 @@ const ResetPassword = () => {
                   {showCf ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {confirmMismatch ? (
+                <p id="reset-confirm-error" className="text-xs text-destructive" role="alert">
+                  {t("recovery.toast_confirm_mismatch")}
+                </p>
+              ) : null}
             </div>
-            <Button type="submit" className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground" disabled={submitting}>
+            <Button
+              type="submit"
+              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              disabled={submitting || confirmMismatch || !passwordsMatch}
+            >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
