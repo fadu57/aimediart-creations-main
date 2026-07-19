@@ -211,6 +211,8 @@
     "registration_email_invalid": "Invalid email address.",
     "registration_password_short": "Password must be at least 6 characters.",
     "registration_password_mismatch": "The two passwords do not match.",
+    "registration_password_hint": "After you continue, we will email you a link to create your password for future sign-in.",
+    "registration_email_sent": "An email was sent to {{email}} so you can create your password.",
     "registration_auth_error": "Invalid session. Please sign in again.",
     "registration_unknown_error": "Unable to save your information.",
     "registration_submit": "Access my diary",

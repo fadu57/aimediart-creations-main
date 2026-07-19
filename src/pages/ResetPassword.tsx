@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -15,6 +15,8 @@ const MIN_LEN = 8;
 const ResetPassword = () => {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isFirstSetup = searchParams.get("setup") === "1";
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
 
@@ -38,17 +40,39 @@ const ResetPassword = () => {
       }
     });
 
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    void (async () => {
+      const tokenHash = searchParams.get("token_hash")?.trim() || "";
+      const otpType = (searchParams.get("type")?.trim() || "recovery") as
+        | "recovery"
+        | "magiclink"
+        | "signup"
+        | "invite"
+        | "email";
+
+      if (tokenHash) {
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: otpType === "recovery" ? "recovery" : otpType,
+        });
+        if (cancelled) return;
+        if (!error) {
+          setReady(true);
+          setChecking(false);
+          return;
+        }
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
       if (cancelled) return;
       if (session) setReady(true);
       setChecking(false);
-    });
+    })();
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,10 +84,12 @@ const ResetPassword = () => {
       toast.error(t("recovery.toast_confirm_mismatch"));
       return;
     }
-    const prev = previousPassword.trim();
-    if (prev.length > 0 && prev === password) {
-      toast.error(t("recovery.toast_same_as_previous"));
-      return;
+    if (!isFirstSetup) {
+      const prev = previousPassword.trim();
+      if (prev.length > 0 && prev === password) {
+        toast.error(t("recovery.toast_same_as_previous"));
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -75,7 +101,7 @@ const ResetPassword = () => {
       return;
     }
 
-    toast.success(t("recovery.toast_updated"));
+    toast.success(isFirstSetup ? t("recovery.toast_created") : t("recovery.toast_updated"));
     await supabase.auth.signOut();
     navigate("/login", { replace: true });
   };
@@ -103,36 +129,44 @@ const ResetPassword = () => {
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="space-y-1">
-          <CardTitle className="font-serif text-2xl text-center">{t("recovery.card_title")}</CardTitle>
-          <CardDescription className="text-center">{t("recovery.card_description")}</CardDescription>
+          <CardTitle className="font-serif text-2xl text-center">
+            {isFirstSetup ? t("recovery.setup_card_title") : t("recovery.card_title")}
+          </CardTitle>
+          <CardDescription className="text-center">
+            {isFirstSetup ? t("recovery.setup_card_description") : t("recovery.card_description")}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-            <div className="space-y-[5px]">
-              <Label htmlFor="reset-previous">{t("recovery.previous_password_label")}</Label>
-              <div className="relative">
-                <Input
-                  id="reset-previous"
-                  type={showPrev ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={previousPassword}
-                  onChange={(e) => setPreviousPassword(e.target.value)}
-                  disabled={submitting}
-                  className="pr-10"
-                  placeholder={t("recovery.previous_placeholder")}
-                />
-                <button
-                  type="button"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onClick={() => setShowPrev((v) => !v)}
-                  aria-label={showPrev ? t("recovery.aria_hide_password") : t("recovery.aria_show_password")}
-                >
-                  {showPrev ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+            {!isFirstSetup ? (
+              <div className="space-y-[5px]">
+                <Label htmlFor="reset-previous">{t("recovery.previous_password_label")}</Label>
+                <div className="relative">
+                  <Input
+                    id="reset-previous"
+                    type={showPrev ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={previousPassword}
+                    onChange={(e) => setPreviousPassword(e.target.value)}
+                    disabled={submitting}
+                    className="pr-10"
+                    placeholder={t("recovery.previous_placeholder")}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => setShowPrev((v) => !v)}
+                    aria-label={showPrev ? t("recovery.aria_hide_password") : t("recovery.aria_show_password")}
+                  >
+                    {showPrev ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
             <div className="space-y-[5px]">
-              <Label htmlFor="reset-new">{t("recovery.new_password_label")}</Label>
+              <Label htmlFor="reset-new">
+                {isFirstSetup ? t("recovery.setup_password_label") : t("recovery.new_password_label")}
+              </Label>
               <div className="relative">
                 <Input
                   id="reset-new"
@@ -185,6 +219,8 @@ const ResetPassword = () => {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {t("recovery.submit_loading")}
                 </>
+              ) : isFirstSetup ? (
+                t("recovery.setup_submit")
               ) : (
                 t("recovery.submit")
               )}

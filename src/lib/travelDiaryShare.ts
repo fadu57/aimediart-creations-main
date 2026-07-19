@@ -116,8 +116,9 @@ export async function resolveTravelDiaryShareToken(token: string): Promise<Trave
 }
 
 /** Lien public : toujours la couverture (page 1), sans paramètre `page`. */
-export function buildTravelDiaryShareUrl(token: string): string {
-  const url = new URL(`${window.location.origin}/summary`);
+export function buildTravelDiaryShareUrl(token: string, siteOrigin?: string): string {
+  const origin = (siteOrigin?.trim() || window.location.origin).replace(/\/$/, "");
+  const url = new URL(`${origin}/summary`);
   url.searchParams.set("share", token.trim());
   return url.toString();
 }

@@ -211,6 +211,8 @@
     "registration_email_invalid": "Adresse e-mail invalide.",
     "registration_password_short": "Le mot de passe doit contenir au moins 6 caractères.",
     "registration_password_mismatch": "Les deux mots de passe ne correspondent pas.",
+    "registration_password_hint": "Après validation, un e-mail vous sera envoyé pour créer votre mot de passe (connexion ultérieure).",
+    "registration_email_sent": "Un e-mail a été envoyé à {{email}} pour créer votre mot de passe.",
     "registration_auth_error": "Session invalide. Reconnectez-vous.",
     "registration_unknown_error": "Impossible d'enregistrer vos informations.",
     "registration_submit": "Accéder à mon carnet",

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Eye, EyeOff, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { CountryFlagIcon } from "@/components/CountryFlagIcon";
@@ -16,6 +16,11 @@ import { postalPlaceholderForCountryLabel } from "@/lib/postalCode";
 import { startDiaryRegistrationOAuth } from "@/lib/visitorOAuth";
 import { supabase } from "@/lib/supabase";
 import { getOrCreateVisitorUuid } from "@/lib/visitorIdentity";
+import {
+  buildTravelDiaryShareUrl,
+  createTravelDiaryShareLink,
+} from "@/lib/travelDiaryShare";
+import { resolveQrSiteOrigin } from "@/lib/oeuvrePublicUrl";
 import {
   getStoredVisitorAgeInput,
   parseVisitorAge,
@@ -39,10 +44,6 @@ type Props = {
 
 const REQUIRED_MARK = <span className="text-[#E63946]">*</span>;
 const FIELD_LABEL_CLASS = "text-xs";
-const PASSWORD_TOGGLE_BASE =
-  "absolute top-[18px] flex h-5 w-8 items-center justify-center text-muted-foreground focus:outline-none focus:ring-0 left-[160px]";
-const PASSWORD_FIELD_INPUT_CLASS =
-  "absolute left-[5px] top-0 h-10 w-[154px] pr-9 text-neutral-900";
 
 function isEmailLike(value: string): boolean {
   return /\S+@\S+\.\S+/.test(value.trim());
@@ -69,9 +70,6 @@ export function VisitorDiaryRegistrationDialog({
   const [zipCode, setZipCode] = useState(initialZipCode);
   const [city, setCity] = useState(initialCity);
   const [country, setCountry] = useState(() => resolveProfileCountryLabel(null, initialCountryCode));
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const postalPlaceholder = useMemo(() => postalPlaceholderForCountryLabel(country), [country]);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -86,9 +84,6 @@ export function VisitorDiaryRegistrationDialog({
     setZipCode(initialZipCode);
     setCity(initialCity);
     setCountry(resolveProfileCountryLabel(null, initialCountryCode));
-    setPassword("");
-    setPasswordConfirm("");
-    setShowPassword(false);
     setError(null);
   }, [open, initialFirstName, initialLastName, initialEmail, initialZipCode, initialCity, initialCountryCode]);
 
@@ -150,57 +145,56 @@ export function VisitorDiaryRegistrationDialog({
           .eq("id", uid);
         if (profileErr) throw new Error(profileErr.message);
       } else {
-        if (password.trim().length < 6) {
-          setError(t("diary.registration_password_short"));
-          setSubmitting(false);
-          return;
-        }
-        if (password.trim() !== passwordConfirm.trim()) {
-          setError(t("diary.registration_password_mismatch"));
-          setSubmitting(false);
-          return;
-        }
-
         const visitorUuid = getOrCreateVisitorUuid();
+        // Liens e-mail : toujours le préfixe QR public (jamais localhost).
+        const publicOrigin = resolveQrSiteOrigin();
+        const redirectTo = `${publicOrigin}/reset-password?setup=1`;
+        let diaryUrl = `${publicOrigin}/summary`;
+        const expoTrimmed = expoId?.trim() || "";
+        if (expoTrimmed) {
+          diaryUrl = `${publicOrigin}/summary?expo_id=${encodeURIComponent(expoTrimmed)}`;
+        }
+        if (visitorUuid) {
+          const share = await createTravelDiaryShareLink(visitorUuid, expoTrimmed || null);
+          if (share?.token) {
+            diaryUrl = buildTravelDiaryShareUrl(share.token, publicOrigin);
+          }
+        }
         const { data, error: fnErr } = await supabase.functions.invoke("register-visitor-instant", {
           body: {
             email: mail,
-            password: password.trim(),
             prenom: fn,
             nom: ln,
-            user_expo_id: expoId?.trim() || null,
+            user_expo_id: expoTrimmed || null,
             visitor_uuid: visitorUuid || null,
+            zip_code: zip,
+            city: c,
+            country: countryLabel,
+            country_code: countryCode,
+            send_password_setup_email: true,
+            redirect_to: redirectTo,
+            diary_url: diaryUrl,
           },
         });
 
         if (fnErr) throw new Error(fnErr.message);
 
-        const signIn = await supabase.auth.signInWithPassword({ email: mail, password: password.trim() });
-        if (signIn.error) throw new Error(signIn.error.message);
+        const payload = data as {
+          ok?: boolean;
+          error?: string;
+          user_id?: string;
+          password_setup_email_sent?: boolean;
+        } | null;
 
-        const authId = signIn.data.user?.id;
-        if (authId) authUserId = authId;
-        if (authId && visitorUuid) {
-          await supabase.rpc("link_visitor_to_auth_user", {
-            p_visitor_client_id: visitorUuid,
-            p_auth_user_id: authId,
-          });
+        if (!payload?.ok) {
+          throw new Error(payload?.error || t("diary.registration_unknown_error"));
         }
 
-        if (authId) {
-          await supabase
-            .from("profiles")
-            .update({
-              zip_code: zip,
-              city: c,
-              country: countryLabel,
-              country_code: countryCode,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", authId);
-        }
+        authUserId = payload.user_id?.trim() || null;
 
-        void data;
+        if (payload.password_setup_email_sent) {
+          toast.success(t("diary.registration_email_sent", { email: mail }));
+        }
       }
 
       const visitorId = resolveFeedbackVisitorId(authUserId);
@@ -365,56 +359,7 @@ export function VisitorDiaryRegistrationDialog({
               </div>
             </div>
             {!isAuthenticated ? (
-              <div className="grid w-full grid-cols-2 gap-1.5">
-                <div className="min-w-0">
-                  <Label htmlFor="diary-password" className={FIELD_LABEL_CLASS}>
-                    {t("diary.field_password")} {REQUIRED_MARK}
-                  </Label>
-                  <div className="relative mt-0.5 h-10 w-[190px]">
-                    <Input
-                      id="diary-password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={PASSWORD_FIELD_INPUT_CLASS}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className={PASSWORD_TOGGLE_BASE}
-                      aria-label={showPassword ? t("diary.aria_hide_password") : t("diary.aria_show_password")}
-                      disabled={submitting}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="min-w-0">
-                  <Label htmlFor="diary-password-confirm" className={FIELD_LABEL_CLASS}>
-                    {t("diary.field_password_confirm")} {REQUIRED_MARK}
-                  </Label>
-                  <div className="relative mt-0.5 h-10 w-[190px]">
-                    <Input
-                      id="diary-password-confirm"
-                      type={showPassword ? "text" : "password"}
-                      value={passwordConfirm}
-                      onChange={(e) => setPasswordConfirm(e.target.value)}
-                      className={PASSWORD_FIELD_INPUT_CLASS}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className={PASSWORD_TOGGLE_BASE}
-                      aria-label={showPassword ? t("diary.aria_hide_password") : t("diary.aria_show_password")}
-                      disabled={submitting}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <p className="text-[11px] leading-snug text-neutral-500">{t("diary.registration_password_hint")}</p>
             ) : null}
             <div className="space-y-1">
               <div className="flex items-end gap-2">

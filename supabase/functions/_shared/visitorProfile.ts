@@ -11,6 +11,10 @@ export type VisitorProfileInput = {
   userPhone?: string | null;
   userPhotoUrl?: string | null;
   deviceFingerprint?: string | null;
+  zipCode?: string | null;
+  city?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
 };
 
 function parseBirthYear(userAge: string | null | undefined): number | null {
@@ -35,6 +39,10 @@ export async function persistVisitorProfile(
     userPhone = null,
     userPhotoUrl = null,
     deviceFingerprint = null,
+    zipCode = null,
+    city = null,
+    country = null,
+    countryCode = null,
   } = input;
 
   const birthYear = parseBirthYear(userAge);
@@ -84,6 +92,11 @@ export async function persistVisitorProfile(
       phone: userPhone,
       ...(userPhotoUrl ? { avatar_url: userPhotoUrl } : {}),
       ...(birthYear != null ? { birth_year: birthYear } : {}),
+      ...(zipCode ? { zip_code: zipCode } : {}),
+      ...(city ? { city } : {}),
+      ...(country ? { country } : {}),
+      ...(countryCode ? { country_code: countryCode } : {}),
+      updated_at: new Date().toISOString(),
     },
     { onConflict: "id" },
   );
