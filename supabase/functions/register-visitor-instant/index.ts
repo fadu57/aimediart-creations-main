@@ -90,11 +90,7 @@ function brandAimediart(text: string): string {
   );
 }
 
-async function buildPasswordSetupActionLink(
-  linkPayload: unknown,
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<string> {
+function buildPasswordSetupActionLink(linkPayload: unknown): string {
   const props =
     linkPayload && typeof linkPayload === "object" && "properties" in linkPayload
       ? ((linkPayload as { properties?: Record<string, unknown> }).properties ?? {})
@@ -117,43 +113,9 @@ async function buildPasswordSetupActionLink(
   }
   if (!hashedToken) return "";
 
-  const publicReset = `${getPublicSiteOrigin()}/reset-password?setup=1`;
-
-  // Échange immédiat → URL aimediart.com avec session (compatible front actuel, sans /auth/v1/verify).
-  try {
-    const res = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-      },
-      body: JSON.stringify({ type: "recovery", token_hash: hashedToken }),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as {
-        access_token?: string;
-        refresh_token?: string;
-        expires_in?: number;
-        expires_at?: number;
-        token_type?: string;
-      };
-      if (data.access_token && data.refresh_token) {
-        const hash = new URLSearchParams();
-        hash.set("access_token", data.access_token);
-        hash.set("refresh_token", data.refresh_token);
-        hash.set("expires_in", String(data.expires_in ?? 3600));
-        if (data.expires_at != null) hash.set("expires_at", String(data.expires_at));
-        hash.set("token_type", data.token_type || "bearer");
-        hash.set("type", "recovery");
-        return `${publicReset}#${hash.toString()}`;
-      }
-    }
-  } catch {
-    /* fallback */
-  }
-
-  const url = new URL(publicReset);
+  // Lien court public — la page /reset-password appelle verifyOtp (front déployé).
+  const url = new URL(`${getPublicSiteOrigin()}/reset-password`);
+  url.searchParams.set("setup", "1");
   url.searchParams.set("token_hash", hashedToken);
   url.searchParams.set("type", "recovery");
   return url.toString();
@@ -338,8 +300,6 @@ async function sendPasswordSetupEmail(
     prenom: string;
     redirectTo: string;
     diaryUrl: string;
-    supabaseUrl: string;
-    serviceRoleKey: string;
   },
 ): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
   const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
@@ -357,11 +317,7 @@ async function sendPasswordSetupEmail(
     return { ok: false, error: linkErr.message || "Impossible de générer le lien de création de mot de passe." };
   }
 
-  const actionLink = await buildPasswordSetupActionLink(
-    linkData,
-    params.supabaseUrl,
-    params.serviceRoleKey,
-  );
+  const actionLink = buildPasswordSetupActionLink(linkData);
   if (!actionLink) {
     return { ok: false, error: "Lien de création de mot de passe vide." };
   }
@@ -601,11 +557,7 @@ serve(async (req: Request) => {
         });
       }
 
-      const actionLink = await buildPasswordSetupActionLink(
-        linkBootstrap,
-        supabaseUrl,
-        serviceRoleKey,
-      );
+      const actionLink = buildPasswordSetupActionLink(linkBootstrap);
       if (!actionLink) {
         return jsonResponse(502, {
           ok: false,
@@ -755,8 +707,6 @@ serve(async (req: Request) => {
       prenom,
       redirectTo,
       diaryUrl,
-      supabaseUrl,
-      serviceRoleKey,
     });
     if (!mail.ok) {
       return jsonResponse(502, {

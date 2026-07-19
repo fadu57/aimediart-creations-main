@@ -12,6 +12,45 @@ import { Label } from "@/components/ui/label";
 
 const MIN_LEN = 8;
 
+type AccountIdentity = {
+  email: string;
+  firstName: string;
+  lastName: string;
+};
+
+function pickMetaString(meta: Record<string, unknown> | undefined, keys: string[]): string {
+  if (!meta) return "";
+  for (const key of keys) {
+    const value = meta[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+async function resolveAccountIdentity(): Promise<AccountIdentity | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const email = user.email?.trim() || "";
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  let firstName = pickMetaString(meta, ["first_name", "prenom", "user_prenom", "given_name"]);
+  let lastName = pickMetaString(meta, ["last_name", "nom", "family_name"]);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile) {
+    if (profile.first_name?.trim()) firstName = profile.first_name.trim();
+    if (profile.last_name?.trim()) lastName = profile.last_name.trim();
+  }
+
+  if (!email && !firstName && !lastName) return null;
+  return { email, firstName, lastName };
+}
+
 const ResetPassword = () => {
   const { t } = useTranslation("auth");
   const navigate = useNavigate();
@@ -19,6 +58,7 @@ const ResetPassword = () => {
   const isFirstSetup = searchParams.get("setup") === "1";
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [identity, setIdentity] = useState<AccountIdentity | null>(null);
 
   const [previousPassword, setPreviousPassword] = useState("");
   const [password, setPassword] = useState("");
@@ -27,6 +67,21 @@ const ResetPassword = () => {
   const [showPw, setShowPw] = useState(false);
   const [showCf, setShowCf] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!ready) {
+      setIdentity(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const resolved = await resolveAccountIdentity();
+      if (!cancelled) setIdentity(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +180,9 @@ const ResetPassword = () => {
     );
   }
 
+  const displayName = [identity?.firstName, identity?.lastName].filter(Boolean).join(" ").trim();
+  const showSetupWelcome = isFirstSetup && identity && (displayName || identity.email);
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md border-border shadow-lg">
@@ -132,9 +190,29 @@ const ResetPassword = () => {
           <CardTitle className="font-serif text-2xl text-center">
             {isFirstSetup ? t("recovery.setup_card_title") : t("recovery.card_title")}
           </CardTitle>
+          {showSetupWelcome ? (
+            <div className="flex flex-col items-center gap-1 pt-1 text-center text-sm text-foreground">
+              {displayName ? (
+                <p>
+                  {t("recovery.setup_welcome_hello")}{" "}
+                  <strong className="font-bold text-[#ca2b2b]">{displayName}</strong>
+                </p>
+              ) : null}
+              {identity.email ? (
+                <p>
+                  <strong className="font-bold text-[#ca2b2b]">{identity.email}</strong>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <CardDescription className="text-center">
             {isFirstSetup ? t("recovery.setup_card_description") : t("recovery.card_description")}
           </CardDescription>
+          {isFirstSetup ? (
+            <p className="text-center text-xs text-muted-foreground pt-1">
+              {t("recovery.setup_after_hint")}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
