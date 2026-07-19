@@ -140,14 +140,6 @@ const ResetPassword = () => {
       toast.error(t("recovery.toast_min_length", { min: PASSWORD_MIN_LENGTH }));
       return;
     }
-    if (policyIssue === "missing_letter") {
-      toast.error(t("recovery.error_password_missing_letter"));
-      return;
-    }
-    if (policyIssue === "missing_digit") {
-      toast.error(t("recovery.error_password_missing_digit"));
-      return;
-    }
     if (password !== confirm) {
       toast.error(t("recovery.toast_confirm_mismatch"));
       return;
@@ -204,11 +196,7 @@ const ResetPassword = () => {
   const passwordPolicyError =
     passwordPolicyIssue === "too_short"
       ? t("recovery.toast_min_length", { min: PASSWORD_MIN_LENGTH })
-      : passwordPolicyIssue === "missing_letter"
-        ? t("recovery.error_password_missing_letter")
-        : passwordPolicyIssue === "missing_digit"
-          ? t("recovery.error_password_missing_digit")
-          : null;
+      : null;
   const canSubmit =
     isPasswordPolicyOk(password) && passwordsMatch && !submitting;
 
@@ -234,14 +222,15 @@ const ResetPassword = () => {
               ) : null}
             </div>
           ) : null}
-          <CardDescription className="text-center">
-            {isFirstSetup ? t("recovery.setup_card_description") : t("recovery.card_description")}
-          </CardDescription>
-          {isFirstSetup ? (
+          {!isFirstSetup ? (
+            <CardDescription className="text-center">
+              {t("recovery.card_description")}
+            </CardDescription>
+          ) : (
             <p className="text-center text-xs text-muted-foreground pt-1">
               {t("recovery.setup_after_hint")}
             </p>
-          ) : null}
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">

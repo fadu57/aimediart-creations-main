@@ -1,15 +1,10 @@
-/** Politique MDP alignée sur Auth Supabase (min 8, lettre + chiffre ; signes autorisés). */
+/** Politique MDP : minimum 8 caractères ; lettres, chiffres et signes autorisés (aucune obligation combinée). */
 export const PASSWORD_MIN_LENGTH = 8;
 
-const HAS_LETTER = /[a-zA-ZÀ-ÿ]/;
-const HAS_DIGIT = /[0-9]/;
-
-export type PasswordPolicyIssue = "too_short" | "missing_letter" | "missing_digit" | null;
+export type PasswordPolicyIssue = "too_short" | null;
 
 export function getPasswordPolicyIssue(password: string): PasswordPolicyIssue {
   if (password.length < PASSWORD_MIN_LENGTH) return "too_short";
-  if (!HAS_LETTER.test(password)) return "missing_letter";
-  if (!HAS_DIGIT.test(password)) return "missing_digit";
   return null;
 }
 
@@ -37,11 +32,7 @@ export function mapSupabasePasswordError(
   if (lower.includes("pwned") || lower.includes("known to be weak") || lower.includes("easy to guess")) {
     return translate("recovery.error_password_weak");
   }
-  if (lower.includes("weak")) {
-    return translate("recovery.error_password_charset");
-  }
-  // Ne pas renvoyer le texte anglais brut
-  if (/^password\b/i.test(raw)) {
+  if (lower.includes("weak") || /^password\b/i.test(raw)) {
     return translate("recovery.error_password_charset");
   }
   return translate("recovery.toast_update_failed");
