@@ -419,8 +419,8 @@ serve(async (req: Request) => {
   if (!isEmailLike(email)) {
     return jsonResponse(400, { ok: false, code: "invalid_email", error: "Adresse e-mail invalide." });
   }
-  if (!deferPasswordSetup && password.length < 6) {
-    return jsonResponse(400, { ok: false, code: "weak_password", error: "Mot de passe trop court (minimum 6 caractères)." });
+  if (!deferPasswordSetup && password.length < 8) {
+    return jsonResponse(400, { ok: false, code: "weak_password", error: "Mot de passe trop court (minimum 8 caractères)." });
   }
   if (!prenom || !nom) {
     return jsonResponse(400, { ok: false, code: "invalid_profile", error: "Prénom et nom sont requis." });

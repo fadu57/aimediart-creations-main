@@ -5,12 +5,16 @@ import { toast } from "sonner";
 import { Check, Eye, EyeOff, Loader2, X } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import {
+  getPasswordPolicyIssue,
+  isPasswordPolicyOk,
+  mapSupabasePasswordError,
+  PASSWORD_MIN_LENGTH,
+} from "@/lib/passwordPolicy";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const MIN_LEN = 8;
 
 type AccountIdentity = {
   email: string;
@@ -131,8 +135,17 @@ const ResetPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < MIN_LEN) {
-      toast.error(t("recovery.toast_min_length", { min: MIN_LEN }));
+    const policyIssue = getPasswordPolicyIssue(password);
+    if (policyIssue === "too_short") {
+      toast.error(t("recovery.toast_min_length", { min: PASSWORD_MIN_LENGTH }));
+      return;
+    }
+    if (policyIssue === "missing_letter") {
+      toast.error(t("recovery.error_password_missing_letter"));
+      return;
+    }
+    if (policyIssue === "missing_digit") {
+      toast.error(t("recovery.error_password_missing_digit"));
       return;
     }
     if (password !== confirm) {
@@ -152,7 +165,7 @@ const ResetPassword = () => {
     setSubmitting(false);
 
     if (error) {
-      toast.error(error.message || t("recovery.toast_update_failed"));
+      toast.error(mapSupabasePasswordError(error.message, t));
       return;
     }
 
@@ -186,7 +199,18 @@ const ResetPassword = () => {
   const confirmStarted = confirm.length > 0;
   const passwordsMatch = confirmStarted && password === confirm;
   const confirmMismatch = confirmStarted && password !== confirm;
-  const canSubmit = passwordsMatch && password.length >= MIN_LEN && !submitting;
+  const passwordStarted = password.length > 0;
+  const passwordPolicyIssue = passwordStarted ? getPasswordPolicyIssue(password) : null;
+  const passwordPolicyError =
+    passwordPolicyIssue === "too_short"
+      ? t("recovery.toast_min_length", { min: PASSWORD_MIN_LENGTH })
+      : passwordPolicyIssue === "missing_letter"
+        ? t("recovery.error_password_missing_letter")
+        : passwordPolicyIssue === "missing_digit"
+          ? t("recovery.error_password_missing_digit")
+          : null;
+  const canSubmit =
+    isPasswordPolicyOk(password) && passwordsMatch && !submitting;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
@@ -250,6 +274,7 @@ const ResetPassword = () => {
               <Label htmlFor="reset-new">
                 {isFirstSetup ? t("recovery.setup_password_label") : t("recovery.new_password_label")}
               </Label>
+              <p className="text-xs text-muted-foreground">{t("recovery.setup_password_hint")}</p>
               <div className="relative">
                 <Input
                   id="reset-new"
@@ -259,8 +284,12 @@ const ResetPassword = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={submitting}
                   required
-                  minLength={MIN_LEN}
-                  className="pr-10"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  aria-invalid={passwordPolicyError ? "true" : "false"}
+                  aria-describedby={passwordPolicyError ? "reset-password-error" : "reset-password-hint"}
+                  className={`pr-10 ${
+                    passwordPolicyError ? "border-[#ca2b2b] focus-visible:ring-[#ca2b2b]" : ""
+                  }`}
                 />
                 <button
                   type="button"
@@ -271,6 +300,15 @@ const ResetPassword = () => {
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {passwordPolicyError ? (
+                <p id="reset-password-error" className="text-xs font-medium text-[#ca2b2b]" role="alert">
+                  {passwordPolicyError}
+                </p>
+              ) : (
+                <span id="reset-password-hint" className="sr-only">
+                  {t("recovery.setup_password_hint")}
+                </span>
+              )}
             </div>
             <div className="space-y-[5px]">
               <Label htmlFor="reset-confirm">{t("recovery.confirm_password_label")}</Label>
@@ -283,7 +321,7 @@ const ResetPassword = () => {
                   onChange={(e) => setConfirm(e.target.value)}
                   disabled={submitting}
                   required
-                  minLength={MIN_LEN}
+                  minLength={PASSWORD_MIN_LENGTH}
                   aria-invalid={confirmMismatch ? "true" : "false"}
                   aria-describedby={confirmMismatch ? "reset-confirm-error" : undefined}
                   className={`pr-16 ${
