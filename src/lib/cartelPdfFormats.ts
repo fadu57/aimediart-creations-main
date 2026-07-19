@@ -9,6 +9,7 @@ export type CartelFormatId =
   | "a7-landscape"
   | "square-105"
   | "square-85"
+  | "square-80"
   | "square-65";
 
 export type CartelFormatGroup = "rectangular" | "square";
@@ -83,6 +84,15 @@ export const CARTEL_FORMATS: CartelFormatDef[] = [
     cardsPerPage: 1,
     labelKey: "pdf_format_square_85",
     dimensionsLabel: "85 × 85 mm",
+  },
+  {
+    id: "square-80",
+    group: "square",
+    pageWidthMm: 80,
+    pageHeightMm: 80,
+    cardsPerPage: 1,
+    labelKey: "pdf_format_square_80",
+    dimensionsLabel: "80 × 80 mm",
   },
   {
     id: "square-65",

@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { buildArtworkGroupQrUrl, buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl";
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
-import { generateCartelPdf } from "@/lib/cartelPdfRenderer";
+import { generateCartelPdf, generateCartelPdfBatch, type GenerateCartelPdfInput } from "@/lib/cartelPdfRenderer";
 import { cartelExplorationLines } from "@/lib/cartelExplorationText";
 import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
 import { CartelFormatDialog } from "@/components/CartelFormatDialog";
@@ -204,6 +204,9 @@ const Catalogue = () => {
   const [expoArtworkGroups, setExpoArtworkGroups] = useState<ArtworkGroupWithMembers[]>([]);
   const [cartelArtwork, setCartelArtwork] = useState<ArtworkRow | null>(null);
   const [cartelGroup, setCartelGroup] = useState<ArtworkGroupWithMembers | null>(null);
+  const [cartelBatchMode, setCartelBatchMode] = useState(false);
+  const [selectedArtworkIds, setSelectedArtworkIds] = useState<Set<string>>(() => new Set());
+  const [batchCartelGenerating, setBatchCartelGenerating] = useState(false);
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
   const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
   const { scope, loading: authLoading } = useDataScope();
@@ -1180,14 +1183,138 @@ const Catalogue = () => {
 
   const openCartelFormatDialog = (aw: ArtworkRow) => {
     setCartelGroup(null);
+    setCartelBatchMode(false);
     setCartelArtwork(aw);
     setCartelFormatDialogOpen(true);
   };
 
   const openGroupCartelFormatDialog = (group: ArtworkGroupWithMembers) => {
     setCartelArtwork(null);
+    setCartelBatchMode(false);
     setCartelGroup(group);
     setCartelFormatDialogOpen(true);
+  };
+
+  const toggleArtworkCartelSelection = useCallback((artworkId: string) => {
+    setSelectedArtworkIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(artworkId)) next.delete(artworkId);
+      else next.add(artworkId);
+      return next;
+    });
+  }, []);
+
+  const clearCartelSelection = useCallback(() => {
+    setSelectedArtworkIds(new Set());
+  }, []);
+
+  const selectAllFilteredArtworks = useCallback(() => {
+    setSelectedArtworkIds(new Set(filtered.map((aw) => aw.artwork_id)));
+  }, [filtered]);
+
+  const openBatchCartelFormatDialog = () => {
+    if (selectedArtworkIds.size === 0) return;
+    setCartelArtwork(null);
+    setCartelGroup(null);
+    setCartelBatchMode(true);
+    setCartelFormatDialogOpen(true);
+  };
+
+  const handleGenerateBatchPDF = async (formatId: CartelFormatId) => {
+    if (selectedArtworkIds.size === 0) return;
+
+    const orderedIds: string[] = [];
+    const seen = new Set<string>();
+    for (const entry of catalogueGridEntries) {
+      if (entry.kind === "single") {
+        const id = entry.artwork.artwork_id;
+        if (selectedArtworkIds.has(id) && !seen.has(id)) {
+          orderedIds.push(id);
+          seen.add(id);
+        }
+      } else {
+        for (const id of entry.groupInfo.orderedIds) {
+          if (selectedArtworkIds.has(id) && !seen.has(id)) {
+            orderedIds.push(id);
+            seen.add(id);
+          }
+        }
+      }
+    }
+    for (const id of selectedArtworkIds) {
+      if (!seen.has(id)) {
+        orderedIds.push(id);
+        seen.add(id);
+      }
+    }
+
+    const rows = orderedIds
+      .map((id) => filteredArtworkById.get(id) ?? artworkByIdScoped.get(id))
+      .filter((row): row is ArtworkRow => Boolean(row));
+
+    if (rows.length === 0) {
+      toast.error(t("pdf_batch_error"));
+      return;
+    }
+
+    setBatchCartelGenerating(true);
+    try {
+      const originOverride = await fetchQrPublicSiteOriginFromSettings();
+      const explorationLines = cartelExplorationLines(œuvresNavigationType, t);
+      const items: GenerateCartelPdfInput[] = [];
+
+      for (const aw of rows) {
+        const artworkId = aw.artwork_id?.trim();
+        if (!artworkId) continue;
+
+        const artist = artworkArtistFromRow(aw);
+        const artistLabel =
+          [artist?.artist_firstname ?? artist?.artist_prenom, artist?.artist_lastname ?? artist?.artist_name]
+            .filter(Boolean)
+            .join(" ")
+            .trim() || t("artist_unknown");
+
+        const expoForQr = ((aw.expo_id ?? aw.artwork_expo_id) ?? "").trim() || null;
+        const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
+        if (!targetUrl) continue;
+
+        items.push({
+          formatId,
+          titleText: (aw.artwork_title ?? t("artwork_untitled")).trim(),
+          artistText: artistLabel,
+          explorationLines,
+          qrTargetUrl: targetUrl,
+        });
+      }
+
+      if (items.length === 0) {
+        toast.error(t("pdf_error_no_qr_url"));
+        return;
+      }
+
+      const blobUrl = await generateCartelPdfBatch(items);
+
+      navigate(catalogueFiltersPath(), { replace: true });
+
+      const pdfLink = document.createElement("a");
+      pdfLink.href = blobUrl;
+      pdfLink.target = "_blank";
+      pdfLink.rel = "noopener noreferrer";
+      document.body.appendChild(pdfLink);
+      pdfLink.click();
+      document.body.removeChild(pdfLink);
+      window.focus();
+
+      toast.success(t("pdf_batch_success", { count: items.length }));
+      if (getCartelFormat(formatId).landscapeDuplex) {
+        toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
+      }
+      clearCartelSelection();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("pdf_batch_error"));
+    } finally {
+      setBatchCartelGenerating(false);
+    }
   };
 
   return (
@@ -1441,6 +1568,44 @@ const Catalogue = () => {
               : `${planLimits.artworksRemaining ?? 0} œuvre${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} restante${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} à créer`}
           </p>
         ) : null}
+        {selectedArtworkIds.size > 0 ? (
+          <div className="flex w-full flex-wrap items-center gap-2 border-t border-border/40 pt-2">
+            <span className="text-sm font-medium tabular-nums text-white">
+              {t("cartel_selected_count", { count: selectedArtworkIds.size })}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="backoffice-toolbar-outline-btn"
+              onClick={selectAllFilteredArtworks}
+              disabled={filtered.length === 0}
+            >
+              {t("cartel_select_all")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="backoffice-toolbar-outline-btn"
+              onClick={clearCartelSelection}
+            >
+              {t("cartel_clear_selection")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={openBatchCartelFormatDialog}
+              disabled={batchCartelGenerating}
+            >
+              {batchCartelGenerating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : null}
+              {t("btn_print_cartels_batch")}
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {showScopeHint && (
@@ -1536,10 +1701,26 @@ const Catalogue = () => {
               <Card
                 key={row.artwork_id}
                 className={cn(
-                  "flex flex-col overflow-hidden border-border bg-card/80 shadow-none backdrop-blur-xl hover:shadow-none",
+                  "relative flex flex-col overflow-hidden border-border bg-card/80 shadow-none backdrop-blur-xl hover:shadow-none",
                   CATALOGUE_CARD_HEIGHT_CLASS,
+                  selectedArtworkIds.has(row.artwork_id) && "ring-2 ring-[#E63946]/70",
                 )}
               >
+                <div
+                  className="absolute left-2 top-2 z-30"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <label className="inline-flex items-center rounded-md bg-background/90 p-1 shadow-sm">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[#E63946]"
+                      checked={selectedArtworkIds.has(row.artwork_id)}
+                      onChange={() => toggleArtworkCartelSelection(row.artwork_id)}
+                      aria-label={t("cartel_select_aria")}
+                    />
+                  </label>
+                </div>
                 <CardContent
                   className="relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-4 overflow-hidden p-4 sm:flex-row"
                   role="button"
@@ -1829,11 +2010,14 @@ const Catalogue = () => {
           if (!open) {
             setCartelArtwork(null);
             setCartelGroup(null);
+            setCartelBatchMode(false);
           }
         }}
         artworkTitle={cartelGroup?.group_label ?? cartelArtwork?.artwork_title}
+        batchCount={cartelBatchMode ? selectedArtworkIds.size : undefined}
         onConfirm={(formatId) => {
-          if (cartelGroup) void handleGenerateGroupPDF(cartelGroup, formatId);
+          if (cartelBatchMode) void handleGenerateBatchPDF(formatId);
+          else if (cartelGroup) void handleGenerateGroupPDF(cartelGroup, formatId);
           else if (cartelArtwork) void handleGeneratePDF(cartelArtwork, formatId);
         }}
       />

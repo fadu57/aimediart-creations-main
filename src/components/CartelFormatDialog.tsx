@@ -20,6 +20,8 @@ type CartelFormatDialogProps = {
   onOpenChange: (open: boolean) => void;
   onConfirm: (formatId: CartelFormatId) => void;
   artworkTitle?: string | null;
+  /** Nombre d'œuvres en mode génération groupée. */
+  batchCount?: number;
 };
 
 const DEFAULT_FORMAT: CartelFormatId = "a6-portrait";
@@ -53,7 +55,13 @@ function FormatOption({
   );
 }
 
-export function CartelFormatDialog({ open, onOpenChange, onConfirm, artworkTitle }: CartelFormatDialogProps) {
+export function CartelFormatDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  artworkTitle,
+  batchCount,
+}: CartelFormatDialogProps) {
   const { t } = useTranslation("catalogue");
   const [selectedId, setSelectedId] = useState<CartelFormatId>(DEFAULT_FORMAT);
 
@@ -69,16 +77,19 @@ export function CartelFormatDialog({ open, onOpenChange, onConfirm, artworkTitle
     onOpenChange(false);
   };
 
+  const description =
+    batchCount != null && batchCount > 1
+      ? t("pdf_format_dialog_desc_batch", { count: batchCount })
+      : artworkTitle?.trim()
+        ? t("pdf_format_dialog_desc_named", { title: artworkTitle.trim() })
+        : t("pdf_format_dialog_desc");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("pdf_format_dialog_title")}</DialogTitle>
-          <DialogDescription>
-            {artworkTitle?.trim()
-              ? t("pdf_format_dialog_desc_named", { title: artworkTitle.trim() })
-              : t("pdf_format_dialog_desc")}
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <RadioGroup value={selectedId} onValueChange={(v) => setSelectedId(v as CartelFormatId)} className="gap-4">
