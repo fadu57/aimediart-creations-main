@@ -14,6 +14,7 @@ import {
   getPendingAudioJobsByCell,
   scheduleAutoRetryAudioJob,
   subscribeAudioQueue,
+  type AudioGender,
   type LangVoiceAggregate,
   type VoiceGenderStatus,
 } from "@/services/audioService";
@@ -36,6 +37,13 @@ type MediationAllVoicesStatusProps = {
   onOptimisticCellDone?: (cellKey: string) => void;
   onRetryCell?: (lang: string, styleKey: string, promptStyleId: string) => void;
   onCancelCell?: (lang: string, promptStyleId: string) => void | Promise<void>;
+  /** Régénérer une voix déjà prête (F ou M) — réservé staff global. */
+  onRegenerateVoice?: (
+    lang: string,
+    styleKey: string,
+    promptStyleId: string,
+    gender: AudioGender,
+  ) => void;
   className?: string;
 };
 
@@ -125,131 +133,6 @@ function progressLabel(
   });
 }
 
-type PersonaSortMetrics = {
-  tier: number;
-  ready: number;
-  total: number;
-  readyRatio: number;
-};
-
-function getCellAggregate(
-  persona: MediationPersonaEntry,
-  lang: string,
-  descriptionsByLang: Record<string, Record<string, string>>,
-  statusMap: Record<string, LangVoiceAggregate>,
-  pendingByCell: Record<string, number>,
-  optimisticSet: Set<string>,
-): {
-  hasText: boolean;
-  hasTarget: boolean;
-  progress: LangVoiceAggregate["progress"];
-  isWorking: boolean;
-  langSortTier: number;
-} {
-  const langKey = normLang(lang);
-  const promptStyleId = persona.promptStyleId?.trim() ?? "";
-  const hasText = cellHasText(descriptionsByLang, persona.key, lang);
-  const hasTarget = hasText && !!promptStyleId;
-  const cellKey = hasTarget ? audioVoiceCellKey(lang, promptStyleId) : "";
-  const st = (cellKey ? statusMap[cellKey] : undefined) ?? {
-    F: "none" as const,
-    M: "none" as const,
-    progress: { ready: 0, total: 0, generating: 0, error: 0 },
-    errors: [],
-  };
-  const { progress } = st;
-  const queued = cellKey ? (pendingByCell[cellKey] ?? 0) : 0;
-  const isOptimistic = cellKey ? optimisticSet.has(cellKey) : false;
-  const activeCount = progress.generating + queued;
-  const isWorking =
-    hasTarget &&
-    (isOptimistic || activeCount > 0 || st.F === "generating" || st.M === "generating");
-
-  let langSortTier = 4;
-  if (!hasText) langSortTier = 5;
-  else if (!hasTarget) langSortTier = 4;
-  else if (progress.total > 0 && progress.ready === progress.total) langSortTier = 0;
-  else if (progress.ready > 0) langSortTier = 1;
-  else if (isWorking) langSortTier = 2;
-  else langSortTier = 3;
-
-  return { hasText, hasTarget, progress, isWorking, langSortTier };
-}
-
-function personaSortMetrics(
-  persona: MediationPersonaEntry,
-  languages: readonly string[],
-  descriptionsByLang: Record<string, Record<string, string>>,
-  statusMap: Record<string, LangVoiceAggregate>,
-  pendingByCell: Record<string, number>,
-  optimisticSet: Set<string>,
-): PersonaSortMetrics {
-  let ready = 0;
-  let total = 0;
-  let inProgress = false;
-
-  for (const lang of languages) {
-    const cell = getCellAggregate(
-      persona,
-      lang,
-      descriptionsByLang,
-      statusMap,
-      pendingByCell,
-      optimisticSet,
-    );
-    if (!cell.hasTarget) continue;
-    ready += cell.progress.ready;
-    total += cell.progress.total;
-    if (cell.isWorking) inProgress = true;
-  }
-
-  if (total === 0) {
-    return { tier: 4, ready: 0, total: 0, readyRatio: 0 };
-  }
-  if (ready === total) {
-    return { tier: 0, ready, total, readyRatio: 1 };
-  }
-  if (ready > 0) {
-    return { tier: 1, ready, total, readyRatio: ready / total };
-  }
-  if (inProgress) {
-    return { tier: 2, ready, total, readyRatio: 0 };
-  }
-  return { tier: 3, ready, total, readyRatio: 0 };
-}
-
-function comparePersonaVoiceOrder(
-  a: MediationPersonaEntry,
-  b: MediationPersonaEntry,
-  languages: readonly string[],
-  descriptionsByLang: Record<string, Record<string, string>>,
-  statusMap: Record<string, LangVoiceAggregate>,
-  pendingByCell: Record<string, number>,
-  optimisticSet: Set<string>,
-): number {
-  const metricsA = personaSortMetrics(
-    a,
-    languages,
-    descriptionsByLang,
-    statusMap,
-    pendingByCell,
-    optimisticSet,
-  );
-  const metricsB = personaSortMetrics(
-    b,
-    languages,
-    descriptionsByLang,
-    statusMap,
-    pendingByCell,
-    optimisticSet,
-  );
-
-  if (metricsA.tier !== metricsB.tier) return metricsA.tier - metricsB.tier;
-  if (metricsA.readyRatio !== metricsB.readyRatio) return metricsB.readyRatio - metricsA.readyRatio;
-  if (metricsA.ready !== metricsB.ready) return metricsB.ready - metricsA.ready;
-  return a.label.localeCompare(b.label, "fr");
-}
-
 /** Suivi voix F/M pour tous les personas × langues de médiation d'une œuvre. */
 export function MediationAllVoicesStatus({
   artworkId,
@@ -261,6 +144,7 @@ export function MediationAllVoicesStatus({
   onOptimisticCellDone,
   onRetryCell,
   onCancelCell,
+  onRegenerateVoice,
   className,
 }: MediationAllVoicesStatusProps) {
   const { t } = useTranslation("artwork_modal");
@@ -276,55 +160,6 @@ export function MediationAllVoicesStatus({
   );
 
   const optimisticSet = useMemo(() => new Set(optimisticCells), [optimisticCells]);
-
-  const sortedPersonas = useMemo(
-    () =>
-      [...personas].sort((a, b) =>
-        comparePersonaVoiceOrder(
-          a,
-          b,
-          languages,
-          descriptionsByLang,
-          statusMap,
-          pendingByCell,
-          optimisticSet,
-        ),
-      ),
-    [personas, languages, descriptionsByLang, statusMap, pendingByCell, optimisticSet],
-  );
-
-  const sortedLanguagesByPersona = useMemo(() => {
-    const map = new Map<string, MediationUiLang[]>();
-    for (const persona of sortedPersonas) {
-      const sorted = [...languages].sort((langA, langB) => {
-        const cellA = getCellAggregate(
-          persona,
-          langA,
-          descriptionsByLang,
-          statusMap,
-          pendingByCell,
-          optimisticSet,
-        );
-        const cellB = getCellAggregate(
-          persona,
-          langB,
-          descriptionsByLang,
-          statusMap,
-          pendingByCell,
-          optimisticSet,
-        );
-        if (cellA.langSortTier !== cellB.langSortTier) {
-          return cellA.langSortTier - cellB.langSortTier;
-        }
-        if (cellA.progress.ready !== cellB.progress.ready) {
-          return cellB.progress.ready - cellA.progress.ready;
-        }
-        return langA.localeCompare(langB, "fr");
-      });
-      map.set(persona.key, sorted);
-    }
-    return map;
-  }, [sortedPersonas, languages, descriptionsByLang, statusMap, pendingByCell, optimisticSet]);
 
   useEffect(() => {
     return subscribeAudioQueue(() => {
@@ -401,11 +236,11 @@ export function MediationAllVoicesStatus({
       ) : null}
 
       <div className="grid grid-cols-2 gap-3">
-      {sortedPersonas.map((persona) => (
+      {personas.map((persona) => (
         <section key={persona.key} className="flex min-w-0 flex-col gap-1.5">
           <h4 className="text-sm font-semibold text-foreground">{persona.label}</h4>
           <div className="flex flex-col gap-1.5 pl-1">
-            {(sortedLanguagesByPersona.get(persona.key) ?? languages).map((lang) => {
+            {languages.map((lang) => {
               const langKey = normLang(lang);
               const promptStyleId = persona.promptStyleId?.trim() ?? "";
               const hasText = cellHasText(descriptionsByLang, persona.key, lang);
@@ -461,20 +296,46 @@ export function MediationAllVoicesStatus({
                       </span>
                     ) : (
                       <>
-                        <span
-                          className={cn("inline-flex items-center gap-1", statusClass(st.F))}
-                          title={t("audio_voice_status.voice_f")}
-                        >
-                          <span className="text-xs text-muted-foreground">{t("audio_voice_status.voice_f")}</span>
-                          <span className="font-semibold">{statusSymbol(st.F)}</span>
-                        </span>
-                        <span
-                          className={cn("inline-flex items-center gap-1", statusClass(st.M))}
-                          title={t("audio_voice_status.voice_m")}
-                        >
-                          <span className="text-xs text-muted-foreground">{t("audio_voice_status.voice_m")}</span>
-                          <span className="font-semibold">{statusSymbol(st.M)}</span>
-                        </span>
+                        {(["F", "M"] as const).map((gender) => {
+                          const genderStatus = st[gender];
+                          const canRegenerate =
+                            hasTarget &&
+                            !isWorking &&
+                            genderStatus === "ready" &&
+                            !!onRegenerateVoice;
+                          return (
+                            <span
+                              key={gender}
+                              className={cn("inline-flex items-center gap-1", statusClass(genderStatus))}
+                              title={t(gender === "F" ? "audio_voice_status.voice_f" : "audio_voice_status.voice_m")}
+                            >
+                              <span className="text-xs text-muted-foreground">
+                                {t(gender === "F" ? "audio_voice_status.voice_f" : "audio_voice_status.voice_m")}
+                              </span>
+                              <span className="font-semibold">{statusSymbol(genderStatus)}</span>
+                              {canRegenerate ? (
+                                <button
+                                  type="button"
+                                  className="inline-flex shrink-0 rounded p-0.5 text-amber-800 hover:bg-amber-100"
+                                  title={t("audio_voice_status.regenerate_voice")}
+                                  aria-label={t("audio_voice_status.regenerate_voice_aria", {
+                                    voice: t(
+                                      gender === "F"
+                                        ? "audio_voice_status.voice_f"
+                                        : "audio_voice_status.voice_m",
+                                    ),
+                                    lang: langKey.toUpperCase(),
+                                  })}
+                                  onClick={() =>
+                                    onRegenerateVoice(langKey, persona.key, promptStyleId, gender)
+                                  }
+                                >
+                                  <RotateCw className="h-3 w-3" aria-hidden />
+                                </button>
+                              ) : null}
+                            </span>
+                          );
+                        })}
                       </>
                     )}
                     {isWorking ? (

@@ -32,6 +32,10 @@ import {
   type MediationUiLang,
 } from "@/lib/artworkDescriptionI18n";
 import {
+  normalizeTitleToByLang,
+  titleTextForLang,
+} from "@/lib/artworkTitleI18n";
+import {
   expandSlidesForInfiniteCarousel,
   mediationCarouselLogicalIndex,
   type MediationCarouselSlide,
@@ -84,6 +88,8 @@ type QuickFeedbackHint = "both" | "emotion" | "heart";
 type ArtworkRow = {
   artwork_id: string;
   artwork_title?: string | null;
+  artwork_title_i18n?: unknown;
+  artwork_title_i18n_enabled?: boolean | null;
   artwork_description_i18n?: string | Record<string, string | null> | null;
   artwork_photo_url?: string | null;
   artwork_image_url?: string | null;
@@ -846,7 +852,16 @@ const VisitorViewCore = () => {
     };
   }, []);
 
-  const artworkTitle = artwork?.artwork_title?.trim() || t("artwork_no_title");
+  const artworkTitle = (() => {
+    if (artwork?.artwork_title_i18n_enabled) {
+      const byLang = normalizeTitleToByLang(artwork.artwork_title_i18n, artwork.artwork_title);
+      return (
+        titleTextForLang(byLang, language, { legacyTitle: artwork.artwork_title }) ||
+        t("artwork_no_title")
+      );
+    }
+    return artwork?.artwork_title?.trim() || t("artwork_no_title");
+  })();
   const artistDisplayName =
     `${artist?.artist_firstname ?? artist?.artist_prenom ?? artwork?.artwork_artist_firstname ?? artwork?.artwork_artist_prenom ?? ""} ${
       artist?.artist_lastname ?? artist?.artist_name ?? artwork?.artwork_artist_lastname ?? artwork?.artwork_artist_name ?? ""

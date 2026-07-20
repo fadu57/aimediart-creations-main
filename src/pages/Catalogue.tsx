@@ -30,8 +30,8 @@ import { buildArtworkGroupQrUrl, buildOeuvreQrUrl } from "@/lib/oeuvrePublicUrl"
 import { fetchQrPublicSiteOriginFromSettings } from "@/lib/qrPublicSiteOrigin";
 import { generateCartelPdf, generateCartelPdfBatch, type GenerateCartelPdfInput } from "@/lib/cartelPdfRenderer";
 import { cartelExplorationLines } from "@/lib/cartelExplorationText";
-import { getCartelFormat, type CartelFormatId } from "@/lib/cartelPdfFormats";
-import { CartelFormatDialog } from "@/components/CartelFormatDialog";
+import { resolveCartelFormat, type CartelFormatSelection } from "@/lib/cartelPdfFormats";
+import { CartelFormatDialog, type CartelExtraTitleLangOption } from "@/components/CartelFormatDialog";
 import { cn } from "@/lib/utils";
 import { CatalogueArtworkGroupDeck } from "@/components/catalogue/CatalogueArtworkGroupDeck";
 import {
@@ -45,6 +45,9 @@ import { getUsdToEurRate } from "@/lib/fxRates";
 import {
   countMaxMediationStylesAcrossLangs,
   getMediationFilledUiLangs,
+  MEDIATION_UI_LANGS,
+  type MediationUiLang,
+  resolveMediationUiLang,
 } from "@/lib/artworkDescriptionI18n";
 import {
   buildArtworkVoiceCatalogMap,
@@ -52,9 +55,16 @@ import {
   type ArtworkVoiceCatalogSummary,
 } from "@/lib/artworkVoiceCatalog";
 import { useTranslation } from "react-i18next";
+import {
+  normalizeTitleToByLang,
+  titleTextForLang,
+} from "@/lib/artworkTitleI18n";
+
 type ArtworkRow = {
   artwork_id: string;
   artwork_title: string | null;
+  artwork_title_i18n?: unknown;
+  artwork_title_i18n_enabled?: boolean | null;
   artwork_description_i18n?: Record<string, string | null> | string | null;
   artwork_source_material?: string | null;
   artwork_image_url?: string | null;
@@ -145,12 +155,67 @@ function artworkArtistLabel(aw: Pick<ArtworkRow, "artists">): string {
   return `${artist?.artist_firstname ?? artist?.artist_prenom ?? ""} ${artist?.artist_lastname ?? artist?.artist_name ?? ""}`.trim();
 }
 
-function artworkMatchesSearchQuery(aw: Pick<ArtworkRow, "artwork_title" | "artists">, q: string): boolean {
+function artworkDisplayTitle(
+  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n" | "artwork_title_i18n_enabled">,
+  languageTag: string,
+  untitledFallback: string,
+): string {
+  if (aw.artwork_title_i18n_enabled) {
+    const byLang = normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title);
+    return (
+      titleTextForLang(byLang, languageTag, { legacyTitle: aw.artwork_title }) || untitledFallback
+    );
+  }
+  return (aw.artwork_title ?? "").trim() || untitledFallback;
+}
+
+/** Langues de titre i18n disponibles en plus de la langue UI (pour le PDF cartel). */
+function artworkExtraTitleLangOptions(
+  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n" | "artwork_title_i18n_enabled">,
+  uiLanguageTag: string,
+): CartelExtraTitleLangOption[] {
+  if (!aw.artwork_title_i18n_enabled) return [];
+  const byLang = normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title);
+  const mainLang = resolveMediationUiLang(uiLanguageTag);
+  const mainTitle = (byLang[mainLang] ?? "").trim() || (aw.artwork_title ?? "").trim();
+  const options: CartelExtraTitleLangOption[] = [];
+  for (const lang of MEDIATION_UI_LANGS) {
+    if (lang === mainLang) continue;
+    const preview = (byLang[lang] ?? "").trim();
+    if (!preview || preview === mainTitle) continue;
+    options.push({ lang, label: lang.toUpperCase(), preview });
+  }
+  return options;
+}
+
+function artworkExtraTitlesForLangs(
+  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n" | "artwork_title_i18n_enabled">,
+  langs: readonly MediationUiLang[],
+  uiLanguageTag: string,
+): string[] {
+  if (!aw.artwork_title_i18n_enabled || langs.length === 0) return [];
+  const byLang = normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title);
+  const mainTitle = artworkDisplayTitle(aw, uiLanguageTag, "");
+  const out: string[] = [];
+  for (const lang of langs) {
+    const text = (byLang[lang] ?? "").trim();
+    if (text && text !== mainTitle) out.push(text);
+  }
+  return out;
+}
+
+function artworkMatchesSearchQuery(
+  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n" | "artists">,
+  q: string,
+): boolean {
   const normalized = q.trim().toLowerCase();
   if (!normalized) return true;
   const title = (aw.artwork_title ?? "").toLowerCase();
+  const i18nBlob = Object.values(normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title))
+    .join(" ")
+    .toLowerCase();
   const artistLabel = artworkArtistLabel(aw).toLowerCase();
-  return title.includes(normalized) || artistLabel.includes(normalized);
+  return title.includes(normalized) || i18nBlob.includes(normalized) || artistLabel.includes(normalized);
 }
 
 function resolveExpoIdForArtwork(
@@ -170,7 +235,7 @@ const catalogIaBadgeClass =
   "inline-flex w-full min-w-0 items-center rounded-full border px-3 py-0.5 text-left text-[11px] font-medium";
 
 const Catalogue = () => {
-  const { t } = useTranslation("catalogue");
+  const { t, i18n } = useTranslation("catalogue");
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q")?.trim() ?? "");
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
@@ -197,7 +262,6 @@ const Catalogue = () => {
   const [artworkModalOpen, setArtworkModalOpen] = useState(false);
   const [editingArtworkId, setEditingArtworkId] = useState<string | null>(null);
   const [voicesEntryFromCatalogue, setVoicesEntryFromCatalogue] = useState(false);
-  const [œuvresNavigationType, setOeuvresNavigationType] = useState("single_scan_sequence");
   const [isAssigningExpo, setIsAssigningExpo] = useState(false);
   const [updatingArtworkStatusId, setUpdatingArtworkStatusId] = useState<string | null>(null);
   const [cartelFormatDialogOpen, setCartelFormatDialogOpen] = useState(false);
@@ -315,35 +379,6 @@ const Catalogue = () => {
     searchParams,
     userExpoId,
   ]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadOeuvresNavigationType = async () => {
-      const { data, error: settingError } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "œuvres_navigation_type")
-        .maybeSingle();
-      if (cancelled || settingError) return;
-
-      const raw = typeof data?.value === "string" ? data.value.trim() : "";
-      if (!raw) {
-        setOeuvresNavigationType("single_scan_sequence");
-        return;
-      }
-      try {
-        const parsed = JSON.parse(raw) as { mode?: string };
-        const mode = typeof parsed?.mode === "string" ? parsed.mode.trim() : "";
-        setOeuvresNavigationType(mode || raw);
-      } catch {
-        setOeuvresNavigationType(raw);
-      }
-    };
-    void loadOeuvresNavigationType();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const loadExpoOptions = useCallback(async () => {
     const scopeAgencyId = scope.mode === "agency" || scope.mode === "expo" ? scope.agencyId : undefined;
@@ -516,7 +551,7 @@ const Catalogue = () => {
     let query = supabase
       .from("artworks")
       .select(
-        "artwork_id, artwork_title, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
+        "artwork_id, artwork_title, artwork_title_i18n, artwork_title_i18n_enabled, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
       )
       .is("deleted_at", null)
       .order("artwork_title", { ascending: true, nullsFirst: false });
@@ -532,7 +567,7 @@ const Catalogue = () => {
       const fallbackQuery = supabase
         .from("artworks")
         .select(
-          "artwork_id, artwork_title, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status",
+          "artwork_id, artwork_title, artwork_title_i18n, artwork_title_i18n_enabled, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status",
         )
         .is("deleted_at", null)
         .order("artwork_title", { ascending: true, nullsFirst: false });
@@ -1085,7 +1120,11 @@ const Catalogue = () => {
 
   const showScopeHint = !authLoading && scope.mode === "none";
 
-  const handleGeneratePDF = async (aw: ArtworkRow, formatId: CartelFormatId) => {
+  const handleGeneratePDF = async (
+    aw: ArtworkRow,
+    selection: CartelFormatSelection,
+    extraLangs: MediationUiLang[] = [],
+  ) => {
     const artworkId = aw.artwork_id?.trim();
     if (!artworkId) {
       toast.error(t("pdf_error_no_id"));
@@ -1108,11 +1147,14 @@ const Catalogue = () => {
         return;
       }
 
+      const hasAudio = (voiceSummaryByArtwork[artworkId]?.readyCount ?? 0) > 0;
       const blobUrl = await generateCartelPdf({
-        formatId,
-        titleText: (aw.artwork_title ?? t("artwork_untitled")).trim(),
+        formatId: selection.formatId,
+        customSizeMm: selection.customSizeMm,
+        titleText: artworkDisplayTitle(aw, i18n.language, t("artwork_untitled")),
+        extraTitles: artworkExtraTitlesForLangs(aw, extraLangs, i18n.language),
         artistText: artistLabel,
-        explorationLines: cartelExplorationLines(œuvresNavigationType, t),
+        explorationLines: cartelExplorationLines(hasAudio, t),
         qrTargetUrl: targetUrl,
       });
 
@@ -1127,7 +1169,7 @@ const Catalogue = () => {
       document.body.removeChild(pdfLink);
       window.focus();
 
-      if (getCartelFormat(formatId).landscapeDuplex) {
+      if (resolveCartelFormat(selection).landscapeDuplex) {
         toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
       }
     } catch (e) {
@@ -1135,7 +1177,10 @@ const Catalogue = () => {
     }
   };
 
-  const handleGenerateGroupPDF = async (group: ArtworkGroupWithMembers, formatId: CartelFormatId) => {
+  const handleGenerateGroupPDF = async (
+    group: ArtworkGroupWithMembers,
+    selection: CartelFormatSelection,
+  ) => {
     const groupId = group.id?.trim();
     if (!groupId) {
       toast.error(t("pdf_error_no_id"));
@@ -1153,12 +1198,16 @@ const Catalogue = () => {
       const label = (group.group_label ?? "").trim() || t("group_deck_badge");
       const number = (group.group_display_number ?? "").trim();
       const artistText = number ? `${label} · ${t("group_deck_number", { number })}` : label;
+      const groupHasAudio = group.members.some(
+        (m) => (voiceSummaryByArtwork[m.artwork_id]?.readyCount ?? 0) > 0,
+      );
 
       const blobUrl = await generateCartelPdf({
-        formatId,
+        formatId: selection.formatId,
+        customSizeMm: selection.customSizeMm,
         titleText: "",
         artistText,
-        explorationLines: cartelExplorationLines(œuvresNavigationType, t),
+        explorationLines: cartelExplorationLines(groupHasAudio, t),
         qrTargetUrl: targetUrl,
       });
 
@@ -1173,7 +1222,7 @@ const Catalogue = () => {
       document.body.removeChild(pdfLink);
       window.focus();
 
-      if (getCartelFormat(formatId).landscapeDuplex) {
+      if (resolveCartelFormat(selection).landscapeDuplex) {
         toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
       }
     } catch (e) {
@@ -1220,7 +1269,10 @@ const Catalogue = () => {
     setCartelFormatDialogOpen(true);
   };
 
-  const handleGenerateBatchPDF = async (formatId: CartelFormatId) => {
+  const handleGenerateBatchPDF = async (
+    selection: CartelFormatSelection,
+    extraLangs: MediationUiLang[] = [],
+  ) => {
     if (selectedArtworkIds.size === 0) return;
 
     const orderedIds: string[] = [];
@@ -1260,7 +1312,6 @@ const Catalogue = () => {
     setBatchCartelGenerating(true);
     try {
       const originOverride = await fetchQrPublicSiteOriginFromSettings();
-      const explorationLines = cartelExplorationLines(œuvresNavigationType, t);
       const items: GenerateCartelPdfInput[] = [];
 
       for (const aw of rows) {
@@ -1278,11 +1329,14 @@ const Catalogue = () => {
         const targetUrl = buildOeuvreQrUrl(artworkId, originOverride, expoForQr);
         if (!targetUrl) continue;
 
+        const hasAudio = (voiceSummaryByArtwork[artworkId]?.readyCount ?? 0) > 0;
         items.push({
-          formatId,
-          titleText: (aw.artwork_title ?? t("artwork_untitled")).trim(),
+          formatId: selection.formatId,
+          customSizeMm: selection.customSizeMm,
+          titleText: artworkDisplayTitle(aw, i18n.language, t("artwork_untitled")),
+          extraTitles: artworkExtraTitlesForLangs(aw, extraLangs, i18n.language),
           artistText: artistLabel,
-          explorationLines,
+          explorationLines: cartelExplorationLines(hasAudio, t),
           qrTargetUrl: targetUrl,
         });
       }
@@ -1306,7 +1360,7 @@ const Catalogue = () => {
       window.focus();
 
       toast.success(t("pdf_batch_success", { count: items.length }));
-      if (getCartelFormat(formatId).landscapeDuplex) {
+      if (resolveCartelFormat(selection).landscapeDuplex) {
         toast.info(t("pdf_duplex_screen_hint"), { duration: 12000 });
       }
       clearCartelSelection();
@@ -1316,6 +1370,35 @@ const Catalogue = () => {
       setBatchCartelGenerating(false);
     }
   };
+
+  const cartelExtraTitleLangOptions = useMemo((): CartelExtraTitleLangOption[] => {
+    if (cartelGroup) return [];
+    if (cartelBatchMode) {
+      const byLang = new Map<MediationUiLang, string>();
+      for (const id of selectedArtworkIds) {
+        const aw = filteredArtworkById.get(id) ?? artworkByIdScoped.get(id);
+        if (!aw) continue;
+        for (const opt of artworkExtraTitleLangOptions(aw, i18n.language)) {
+          if (!byLang.has(opt.lang)) byLang.set(opt.lang, opt.preview);
+        }
+      }
+      return MEDIATION_UI_LANGS.filter((lang) => byLang.has(lang)).map((lang) => ({
+        lang,
+        label: lang.toUpperCase(),
+        preview: byLang.get(lang) ?? "",
+      }));
+    }
+    if (cartelArtwork) return artworkExtraTitleLangOptions(cartelArtwork, i18n.language);
+    return [];
+  }, [
+    cartelGroup,
+    cartelBatchMode,
+    cartelArtwork,
+    selectedArtworkIds,
+    filteredArtworkById,
+    artworkByIdScoped,
+    i18n.language,
+  ]);
 
   return (
     <div className="container min-w-0 max-w-full pt-[38px] pb-8 space-y-8">
@@ -1568,42 +1651,45 @@ const Catalogue = () => {
               : `${planLimits.artworksRemaining ?? 0} œuvre${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} restante${(planLimits.artworksRemaining ?? 0) > 1 ? "s" : ""} à créer`}
           </p>
         ) : null}
-        {selectedArtworkIds.size > 0 ? (
+        {!loading && filtered.length > 0 ? (
           <div className="flex w-full flex-wrap items-center gap-2 border-t border-border/40 pt-2">
-            <span className="text-sm font-medium tabular-nums text-white">
-              {t("cartel_selected_count", { count: selectedArtworkIds.size })}
-            </span>
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="backoffice-toolbar-outline-btn"
               onClick={selectAllFilteredArtworks}
-              disabled={filtered.length === 0}
             >
               {t("cartel_select_all")}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="backoffice-toolbar-outline-btn"
-              onClick={clearCartelSelection}
-            >
-              {t("cartel_clear_selection")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={openBatchCartelFormatDialog}
-              disabled={batchCartelGenerating}
-            >
-              {batchCartelGenerating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              ) : null}
-              {t("btn_print_cartels_batch")}
-            </Button>
+            {selectedArtworkIds.size > 0 ? (
+              <>
+                <span className="text-sm font-medium tabular-nums text-white">
+                  {t("cartel_selected_count", { count: selectedArtworkIds.size })}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="backoffice-toolbar-outline-btn"
+                  onClick={clearCartelSelection}
+                >
+                  {t("cartel_clear_selection")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+                  onClick={openBatchCartelFormatDialog}
+                  disabled={batchCartelGenerating}
+                >
+                  {batchCartelGenerating ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : null}
+                  {t("btn_print_cartels_batch")}
+                </Button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -1737,7 +1823,7 @@ const Catalogue = () => {
                     <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
                       <img
                         src={rowImage}
-                        alt={row.artwork_title ?? "œuvre"}
+                        alt={artworkDisplayTitle(row, i18n.language, t("artwork_untitled"))}
                         className="h-[150px] w-[150px] rounded-xl object-cover shrink-0"
                       />
                     </div>
@@ -1804,7 +1890,7 @@ const Catalogue = () => {
                   <div className="relative flex min-w-0 flex-1 flex-col gap-3 sm:min-h-[156px] sm:gap-0">
                     <div className="flex min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20">
                       <h3 className="min-w-0 w-full truncate font-serif text-lg font-bold">
-                        {row.artwork_title ?? t("artwork_untitled")}
+                        {artworkDisplayTitle(row, i18n.language, t("artwork_untitled"))}
                       </h3>
                       <p className="min-w-0 w-full truncate text-sm italic text-primary">{rowArtistLabel}</p>
                       <div
@@ -2013,12 +2099,18 @@ const Catalogue = () => {
             setCartelBatchMode(false);
           }
         }}
-        artworkTitle={cartelGroup?.group_label ?? cartelArtwork?.artwork_title}
+        artworkTitle={
+          cartelGroup?.group_label ??
+          (cartelArtwork
+            ? artworkDisplayTitle(cartelArtwork, i18n.language, t("artwork_untitled"))
+            : null)
+        }
         batchCount={cartelBatchMode ? selectedArtworkIds.size : undefined}
-        onConfirm={(formatId) => {
-          if (cartelBatchMode) void handleGenerateBatchPDF(formatId);
-          else if (cartelGroup) void handleGenerateGroupPDF(cartelGroup, formatId);
-          else if (cartelArtwork) void handleGeneratePDF(cartelArtwork, formatId);
+        extraTitleLangOptions={cartelExtraTitleLangOptions}
+        onConfirm={(selection, extraLangs) => {
+          if (cartelBatchMode) void handleGenerateBatchPDF(selection, extraLangs);
+          else if (cartelGroup) void handleGenerateGroupPDF(cartelGroup, selection);
+          else if (cartelArtwork) void handleGeneratePDF(cartelArtwork, selection, extraLangs);
         }}
       />
 
@@ -2027,6 +2119,7 @@ const Catalogue = () => {
         onOpenChange={(next) => {
           setArtworkModalOpen(next);
           if (!next) {
+            setEditingArtworkId(null);
             setVoicesEntryFromCatalogue(false);
             void loadCatalogue().then(() => {
               // Rattrapage si des audio_files passent à « ready » juste après la fermeture.
@@ -2039,7 +2132,8 @@ const Catalogue = () => {
         artworkId={editingArtworkId}
         openMediationAudioOnLoad={voicesEntryFromCatalogue}
         closeOnMediationAudioClose={voicesEntryFromCatalogue}
-        onSuccess={() => {
+        onSuccess={(savedId) => {
+          if (savedId?.trim()) setEditingArtworkId(savedId.trim());
           void loadCatalogue().then(() => {
             window.setTimeout(() => void refreshVoiceSummaries(), 1500);
           });

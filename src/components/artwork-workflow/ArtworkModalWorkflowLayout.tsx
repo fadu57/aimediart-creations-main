@@ -52,6 +52,14 @@ export type ArtworkModalWorkflowLayoutProps = {
   isEditingExisting: boolean;
   title: string;
   onTitleChange: (value: string) => void;
+  titleI18nEnabled: boolean;
+  onTitleI18nEnabledChange: (enabled: boolean) => void;
+  titleByLang: Record<MediationUiLang, string>;
+  onTitleLangChange: (lang: MediationUiLang, value: string) => void;
+  onTranslateTitles: () => void;
+  translatingTitles: boolean;
+  /** Langues affichées pour les titres i18n (médiations + FR si UI ≠ FR). */
+  titleI18nLangs: MediationUiLang[];
   agencyLabel: string;
   canPickAgency: boolean;
   agencyOptions: { id: string; name: string }[];
@@ -160,6 +168,12 @@ export type ArtworkModalWorkflowLayoutProps = {
   onAudioRetryCell: (lang: string, styleKey: string, promptStyleId: string) => void;
   onAudioCancelCell: (lang: string, promptStyleId: string) => void | Promise<void>;
   onFillMissingMediationVoices: () => void | Promise<void>;
+  onRegenerateAudioVoice?: (
+    lang: string,
+    styleKey: string,
+    promptStyleId: string,
+    gender: "F" | "M",
+  ) => void;
   initialWorkflowTab?: WorkflowTabId;
 };
 
@@ -234,6 +248,13 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
     isEditingExisting,
     title,
     onTitleChange,
+    titleI18nEnabled,
+    onTitleI18nEnabledChange,
+    titleByLang,
+    onTitleLangChange,
+    onTranslateTitles,
+    translatingTitles,
+    titleI18nLangs,
     agencyLabel,
     canPickAgency,
     agencyOptions,
@@ -333,6 +354,7 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
     onAudioRetryCell,
     onAudioCancelCell,
     onFillMissingMediationVoices,
+    onRegenerateAudioVoice,
     initialWorkflowTab,
   } = props;
 
@@ -619,8 +641,59 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
               onChange={(e) => onTitleChange(e.target.value)}
               disabled={isVisitorLocked || isLoading}
               className="h-10 text-sm"
-              placeholder="Nom de l'œuvre"
+              placeholder={t("title_placeholder")}
             />
+            <label className="flex items-center gap-2 pt-1 text-xs text-foreground">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#E63946]"
+                checked={titleI18nEnabled}
+                disabled={isVisitorLocked || isLoading}
+                onChange={(e) => onTitleI18nEnabledChange(e.target.checked)}
+              />
+              <span>{t("title_i18n_enable")}</span>
+            </label>
+            {titleI18nEnabled ? (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2.5">
+                <p className="text-[11px] text-muted-foreground">{t("title_i18n_help")}</p>
+                <div className="flex flex-col gap-2">
+                  {titleI18nLangs.map((lng) => (
+                    <div key={lng} className="flex items-center gap-2">
+                      <span className="w-8 shrink-0 text-[11px] font-semibold uppercase text-muted-foreground">
+                        {lng}
+                      </span>
+                      <Input
+                        value={titleByLang[lng] ?? ""}
+                        onChange={(e) => onTitleLangChange(lng, e.target.value)}
+                        disabled={isVisitorLocked || isLoading || translatingTitles}
+                        className="h-8 text-sm"
+                        placeholder={t("title_i18n_lang_placeholder", { lang: lng.toUpperCase() })}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs"
+                  disabled={
+                    isVisitorLocked ||
+                    isLoading ||
+                    translatingTitles ||
+                    isAiBusy ||
+                    !title.trim() ||
+                    titleI18nLangs.length === 0
+                  }
+                  onClick={() => void onTranslateTitles()}
+                >
+                  {translatingTitles ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : null}
+                  {translatingTitles ? t("title_i18n_translating") : t("title_i18n_translate_btn")}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
@@ -987,6 +1060,7 @@ export function ArtworkModalWorkflowLayout(props: ArtworkModalWorkflowLayoutProp
               onRetryCell={onAudioRetryCell}
               onCancelCell={onAudioCancelCell}
               onFillMissing={onFillMissingMediationVoices}
+              onRegenerateVoice={onRegenerateAudioVoice}
               variant="inline"
             />
           </div>

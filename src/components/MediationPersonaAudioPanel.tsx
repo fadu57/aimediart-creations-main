@@ -35,6 +35,12 @@ export type MediationPersonaAudioPanelProps = {
   onRetryCell: (lang: string, styleKey: string, promptStyleId: string) => void;
   onCancelCell: (lang: string, promptStyleId: string) => void | Promise<void>;
   onFillMissing: () => void | Promise<void>;
+  onRegenerateVoice?: (
+    lang: string,
+    styleKey: string,
+    promptStyleId: string,
+    gender: "F" | "M",
+  ) => void;
   /** Variante intégrée dans l'onglet Audio du workflow. */
   variant?: "dialog" | "inline";
   onClose?: () => void;
@@ -52,6 +58,7 @@ export function MediationPersonaAudioPanel({
   onRetryCell,
   onCancelCell,
   onFillMissing,
+  onRegenerateVoice,
   variant = "dialog",
   onClose,
 }: MediationPersonaAudioPanelProps) {
@@ -196,6 +203,7 @@ export function MediationPersonaAudioPanel({
           onOptimisticCellDone={onOptimisticCellDone}
           onRetryCell={onRetryCell}
           onCancelCell={onCancelCell}
+          onRegenerateVoice={onRegenerateVoice}
         />
       </div>
 

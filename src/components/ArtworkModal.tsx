@@ -26,6 +26,7 @@ import {
   cancelAudioGenerationForCell,
   triggerMediationAudioBatchForChanges,
   triggerMediationAudioForPersonaLang,
+  triggerMediationAudioForVoice,
   triggerMissingMediationVoices,
   audioVoiceCellKey,
   mediationLangNeedsAudioGeneration,
@@ -102,6 +103,14 @@ import {
   sourceMaterialDraftFingerprint,
   sourceMaterialTextForLang,
 } from "@/lib/artworkSourceMaterialI18n";
+import {
+  createEmptyTitleByLang,
+  normalizeTitleToByLang,
+  resolveTitleTranslationSource,
+  serializeTitleByLang,
+  titleByLangDraftFingerprint,
+} from "@/lib/artworkTitleI18n";
+import { translateArtworkTitleToLangs } from "@/lib/translateArtworkTitle";
 import { FR_MEDIATION_STYLE_LABELS } from "@/lib/mediationVisitorStyles";
 import { CANONICAL_MEDIATION_STYLE_SET } from "@/lib/mediationStyleCodes";
 import {
@@ -148,7 +157,8 @@ async function generateAndSaveQrCode(artworkId: string, expoId?: string | null):
 type ArtworkModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  /** Appelé après un enregistrement réussi ; reçoit l’id de l’œuvre (création ou édition). */
+  onSuccess?: (artworkId?: string) => void;
   artworkId?: string | null;
   /** Ouvre le modal voix dès que l'œuvre est chargée (ex. depuis le catalogue). */
   openMediationAudioOnLoad?: boolean;
@@ -205,6 +215,8 @@ function styleTabsToMediationPayload(tabs: StyleTabEntry[]): MediationStyleReque
 
 type DraftSnapshot = {
   title: string;
+  titleI18nEnabled: boolean;
+  titleFingerprint: string;
   artistId: string;
   artworkExpoId: string;
   artworkAgencyId: string;
@@ -215,6 +227,8 @@ type DraftSnapshot = {
 
 function buildDraftSnapshot(input: {
   title: string;
+  titleI18nEnabled: boolean;
+  titleByLang: Record<MediationUiLang, string>;
   artistId: string;
   artworkExpoId: string;
   artworkAgencyId: string;
@@ -224,6 +238,8 @@ function buildDraftSnapshot(input: {
 }): DraftSnapshot {
   return {
     title: input.title,
+    titleI18nEnabled: input.titleI18nEnabled,
+    titleFingerprint: titleByLangDraftFingerprint(input.titleByLang),
     artistId: input.artistId.trim(),
     artworkExpoId: input.artworkExpoId.trim(),
     artworkAgencyId: input.artworkAgencyId.trim(),
@@ -584,8 +600,13 @@ export function ArtworkModal({
   const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const editingArtworkIdRef = useRef<string | null>(null);
   const [editingArtworkId, setEditingArtworkId] = useState<string | null>(null);
+  editingArtworkIdRef.current = editingArtworkId;
   const [title, setTitle] = useState("");
+  const [titleByLang, setTitleByLang] = useState<Record<MediationUiLang, string>>(createEmptyTitleByLang);
+  const [titleI18nEnabled, setTitleI18nEnabled] = useState(false);
+  const [translatingTitles, setTranslatingTitles] = useState(false);
   const [artistId, setArtistId] = useState("");
   const [artworkExpoId, setArtworkExpoId] = useState("");
   const [artworkAgencyId, setArtworkAgencyId] = useState("");
@@ -782,6 +803,7 @@ export function ArtworkModal({
   const [initialDraftSignature, setInitialDraftSignature] = useState("");
   const [artistDialogOpen, setArtistDialogOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const modalWasOpenRef = useRef(false);
   const [notesFlash, setNotesFlash] = useState(false);
   /** Édition : true tant que loadArtwork n’a pas fixé la baseline du brouillon */
   const [artworkDraftLoading, setArtworkDraftLoading] = useState(false);
@@ -993,8 +1015,11 @@ export function ArtworkModal({
       setRegeneratingQr(false);
       setEditingArtworkId(null);
       setArtworkDraftLoading(false);
+      modalWasOpenRef.current = false;
       return;
     }
+    const justOpened = !modalWasOpenRef.current;
+    modalWasOpenRef.current = true;
     let cancelled = false;
 
     const loadArtists = async () => {
@@ -1119,7 +1144,7 @@ export function ArtworkModal({
         const { data, error } = await supabase
           .from("artworks")
           .select(
-            "artwork_id, artwork_title, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_source_material_i18n, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url, artwork_status",
+            "artwork_id, artwork_title, artwork_title_i18n, artwork_title_i18n_enabled, artwork_artist_id, artwork_expo_id, artwork_agency_id, artwork_source_material, artwork_source_material_i18n, artwork_description_i18n, artwork_image_url, artwork_qrcode_image, artwork_qr_code_url, artwork_status",
           )
           .eq("artwork_id", id)
           .is("deleted_at", null)
@@ -1134,7 +1159,17 @@ export function ArtworkModal({
           (data as { artwork_description_i18n?: unknown }).artwork_description_i18n,
         );
         setEditingArtworkId(data.artwork_id as string);
-        setTitle((data.artwork_title as string | null) ?? "");
+        const loadedTitle = (data.artwork_title as string | null) ?? "";
+        const loadedTitleByLang = normalizeTitleToByLang(
+          (data as { artwork_title_i18n?: unknown }).artwork_title_i18n,
+          loadedTitle,
+        );
+        const loadedTitleI18nEnabled = Boolean(
+          (data as { artwork_title_i18n_enabled?: boolean | null }).artwork_title_i18n_enabled,
+        );
+        setTitle(loadedTitle);
+        setTitleByLang(loadedTitleByLang);
+        setTitleI18nEnabled(loadedTitleI18nEnabled);
         setArtistId((data.artwork_artist_id as string | null) ?? "");
         setArtworkExpoId((data.artwork_expo_id as string | null) ?? "");
         setArtworkAgencyId((data.artwork_agency_id as string | null) ?? "");
@@ -1155,7 +1190,9 @@ export function ArtworkModal({
         setWorkflowArtworkStatus(((data as { artwork_status?: string | null }).artwork_status ?? "").trim());
         setMediationEditLang(resolveMediationUiLang(i18n.language));
         const initialSnapshot = buildDraftSnapshot({
-          title: (data.artwork_title as string | null) ?? "",
+          title: loadedTitle,
+          titleI18nEnabled: loadedTitleI18nEnabled,
+          titleByLang: loadedTitleByLang,
           artistId: (data.artwork_artist_id as string | null) ?? "",
           artworkExpoId: (data.artwork_expo_id as string | null) ?? "",
           artworkAgencyId: (data.artwork_agency_id as string | null) ?? "",
@@ -1180,12 +1217,18 @@ export function ArtworkModal({
     void loadArtists();
     void loadPromptStyles();
     if (artworkId) {
-      setArtworkDraftLoading(true);
-      void loadArtwork(artworkId);
-    } else {
+      const alreadyOnThisArtwork =
+        !justOpened && (editingArtworkIdRef.current?.trim() ?? "") === artworkId.trim();
+      if (!alreadyOnThisArtwork) {
+        setArtworkDraftLoading(true);
+        void loadArtwork(artworkId);
+      }
+    } else if (justOpened) {
       setArtworkDraftLoading(false);
       setEditingArtworkId(null);
       setTitle("");
+      setTitleByLang(createEmptyTitleByLang());
+      setTitleI18nEnabled(false);
       setArtistId("");
       setArtistSearch("");
       setShowArtistSuggestions(false);
@@ -1204,6 +1247,8 @@ export function ArtworkModal({
       setDuplicateArtwork(null);
       const initialSnapshot = buildDraftSnapshot({
         title: "",
+        titleI18nEnabled: false,
+        titleByLang: createEmptyTitleByLang(),
         artistId: "",
         artworkExpoId: isGlobalStaff ? "" : (expo_id ?? ""),
         artworkAgencyId: isGlobalStaff ? "" : (agency_id ?? ""),
@@ -1294,8 +1339,18 @@ export function ArtworkModal({
         sourceMaterialTextForLang(sourceMaterialByLang, "fr") ||
         null;
       const workflowStatus = hasMediations ? "active" : "draft";
+      const syncedTitleByLang = { ...titleByLang };
+      if (title.trim()) {
+        syncedTitleByLang[mediationPrimaryLang] = title.trim();
+        if (!(syncedTitleByLang.fr ?? "").trim()) syncedTitleByLang.fr = title.trim();
+      }
+      const serializedTitleI18n = serializeTitleByLang(
+        titleI18nEnabled ? syncedTitleByLang : normalizeTitleToByLang(null, title.trim()),
+      );
       const payload = {
         artwork_title: title.trim(),
+        artwork_title_i18n: serializedTitleI18n,
+        artwork_title_i18n_enabled: titleI18nEnabled,
         artwork_artist_id: artistId,
         artwork_expo_id: artworkExpoId.trim() || null,
         artwork_agency_id: artworkAgencyId.trim() || null,
@@ -1328,10 +1383,13 @@ export function ArtworkModal({
           triggerMediationAudioOnChanges(persistedArtworkId, descriptionsByLang);
         }
         updateMediationBaseline(descriptionsByLang);
+        setTitleByLang(syncedTitleByLang);
         setInitialDraftSignature(
           serializeDraftSnapshot(
             buildDraftSnapshot({
               title,
+              titleI18nEnabled,
+              titleByLang: syncedTitleByLang,
               artistId,
               artworkExpoId,
               artworkAgencyId,
@@ -1368,10 +1426,13 @@ export function ArtworkModal({
             triggerMediationAudioOnChanges(newArtworkId, descriptionsByLang);
           }
           updateMediationBaseline(descriptionsByLang);
+          setTitleByLang(syncedTitleByLang);
           setInitialDraftSignature(
             serializeDraftSnapshot(
               buildDraftSnapshot({
                 title,
+                titleI18nEnabled,
+                titleByLang: syncedTitleByLang,
                 artistId,
                 artworkExpoId,
                 artworkAgencyId,
@@ -1384,12 +1445,16 @@ export function ArtworkModal({
         }
         toast.success(t("toast_artwork_created"));
       }
+      const savedId = persistedArtworkId || newArtworkId || undefined;
       if (experimentalWorkflow) {
         setWorkflowHasSavedOnce(true);
-        onSuccess?.();
+        onSuccess?.(savedId);
+      } else if (newArtworkId) {
+        // Création : rester sur l’œuvre ; fermer uniquement via le bouton fermer.
+        onSuccess?.(newArtworkId);
       } else {
         onOpenChange(false);
-        onSuccess?.();
+        onSuccess?.(savedId);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("toast_error_save");
@@ -1673,6 +1738,30 @@ export function ArtworkModal({
     [persistedArtworkId],
   );
 
+  const handlePersonaAudioRegenerateVoice = useCallback(
+    (lang: string, styleKey: string, promptStyleId: string, gender: "F" | "M") => {
+      if (!isGlobalStaff || !persistedArtworkId || !promptStyleId) return;
+      const lng = lang.trim().toLowerCase().slice(0, 2) as MediationUiLang;
+      triggerMediationAudioForVoice({
+        artworkId: persistedArtworkId,
+        lang: lng,
+        styleKey,
+        prompt_style_id: promptStyleId,
+        gender,
+      });
+      const cellKey = audioVoiceCellKey(lng, promptStyleId);
+      setAudioOptimisticCells((prev) => (prev.includes(cellKey) ? prev : [...prev, cellKey]));
+      setAudioStatusRefreshKey((k) => k + 1);
+      toast.info(
+        t("audio_voice_status.regenerate_started", {
+          voice: t(gender === "F" ? "audio_voice_status.voice_f" : "audio_voice_status.voice_m"),
+          lang: lng.toUpperCase(),
+        }),
+      );
+    },
+    [isGlobalStaff, persistedArtworkId, t],
+  );
+
   const handlePersonaAudioCancelCell = useCallback(
     async (lang: string, promptStyleId: string) => {
       if (!persistedArtworkId || !promptStyleId.trim()) return;
@@ -1805,6 +1894,8 @@ export function ArtworkModal({
   const currentDraftSignature = useMemo(() => {
     const snapshot = buildDraftSnapshot({
       title,
+      titleI18nEnabled,
+      titleByLang,
       artistId,
       artworkExpoId,
       artworkAgencyId,
@@ -1813,7 +1904,17 @@ export function ArtworkModal({
       descriptionsByLang,
     });
     return serializeDraftSnapshot(snapshot);
-  }, [title, artistId, artworkExpoId, artworkAgencyId, imageUrl, sourceMaterialByLang, descriptionsByLang]);
+  }, [
+    title,
+    titleI18nEnabled,
+    titleByLang,
+    artistId,
+    artworkExpoId,
+    artworkAgencyId,
+    imageUrl,
+    sourceMaterialByLang,
+    descriptionsByLang,
+  ]);
   const hasUnsavedChanges =
     !artworkDraftLoading && currentDraftSignature !== initialDraftSignature;
 
@@ -1827,6 +1928,87 @@ export function ArtworkModal({
     workflowHasSavedOnce &&
     hasMediations &&
     !workflowAudioBlocked;
+
+  const handleTitleChange = useCallback(
+    (value: string) => {
+      setTitle(value);
+      setTitleByLang((prev) => ({
+        ...prev,
+        [mediationPrimaryLang]: value,
+        ...(mediationPrimaryLang !== "fr" && !(prev.fr ?? "").trim() ? { fr: value } : {}),
+      }));
+    },
+    [mediationPrimaryLang],
+  );
+
+  const handleTitleLangChange = useCallback((lang: MediationUiLang, value: string) => {
+    setTitleByLang((prev) => ({ ...prev, [lang]: value }));
+    if (lang === mediationPrimaryLang) setTitle(value);
+  }, [mediationPrimaryLang]);
+
+  const handleTitleI18nEnabledChange = useCallback(
+    (enabled: boolean) => {
+      setTitleI18nEnabled(enabled);
+      if (enabled) {
+        setTitleByLang((prev) => {
+          const next = { ...prev };
+          if (title.trim()) {
+            next[mediationPrimaryLang] = title.trim();
+            if (!(next.fr ?? "").trim()) next.fr = title.trim();
+          }
+          return next;
+        });
+      }
+    },
+    [mediationPrimaryLang, title],
+  );
+
+  /** Langues pour les titres i18n : langues de médiation + FR si UI / primaire ≠ FR. */
+  const titleI18nLangs = useMemo((): MediationUiLang[] => {
+    const set = new Set<MediationUiLang>(mediationGenerateLangs);
+    set.add(mediationPrimaryLang);
+    const uiLang = resolveMediationUiLang(i18n.language);
+    if (uiLang !== "fr" || mediationPrimaryLang !== "fr") {
+      set.add("fr");
+    }
+    return MEDIATION_UI_LANGS.filter((lng) => set.has(lng));
+  }, [mediationGenerateLangs, mediationPrimaryLang, i18n.language]);
+
+  const handleTranslateArtworkTitles = useCallback(async () => {
+    const source = resolveTitleTranslationSource(titleByLang, mediationPrimaryLang, title);
+    if (!source?.text) {
+      toast.error(t("title_i18n_translate_source_required"));
+      return;
+    }
+    // Cibles = langues titre i18n (médiations + FR si besoin), hors langue source.
+    const targets = titleI18nLangs.filter((lng) => lng !== source.lang);
+    if (targets.length === 0) {
+      toast.info(t("title_i18n_translate_no_targets"));
+      return;
+    }
+    setTranslatingTitles(true);
+    try {
+      const { translations, okCount, failCount } = await translateArtworkTitleToLangs({
+        sourceText: source.text,
+        sourceLang: source.lang,
+        targetLangs: targets,
+      });
+      setTitleByLang((prev) => {
+        const next = { ...prev, [source.lang]: source.text };
+        for (const [lng, text] of Object.entries(translations)) {
+          if (text?.trim()) next[lng as MediationUiLang] = text.trim();
+        }
+        return next;
+      });
+      if (okCount > 0 && failCount === 0) toast.success(t("title_i18n_translate_done", { count: okCount }));
+      else if (okCount > 0) toast.warning(t("title_i18n_translate_partial", { ok: okCount, fail: failCount }));
+      else toast.error(t("title_i18n_translate_none"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("title_i18n_translate_error"));
+    } finally {
+      setTranslatingTitles(false);
+    }
+  }, [titleByLang, mediationPrimaryLang, title, titleI18nLangs, t]);
 
   const requestCloseModal = () => {
     if (isCloseBlocked) {
@@ -2511,7 +2693,14 @@ export function ArtworkModal({
               t={t}
               isEditingExisting={isEditingExisting}
               title={title}
-              onTitleChange={setTitle}
+              onTitleChange={handleTitleChange}
+              titleI18nEnabled={titleI18nEnabled}
+              onTitleI18nEnabledChange={handleTitleI18nEnabledChange}
+              titleByLang={titleByLang}
+              onTitleLangChange={handleTitleLangChange}
+              onTranslateTitles={() => void handleTranslateArtworkTitles()}
+              translatingTitles={translatingTitles}
+              titleI18nLangs={titleI18nLangs}
               agencyLabel={agencyLabel}
               canPickAgency={canPickAgency}
               agencyOptions={agencyOptions}
@@ -2639,6 +2828,7 @@ export function ArtworkModal({
               onAudioRetryCell={handlePersonaAudioRetryCell}
               onAudioCancelCell={handlePersonaAudioCancelCell}
               onFillMissingMediationVoices={handleFillMissingMediationVoices}
+              onRegenerateAudioVoice={isGlobalStaff ? handlePersonaAudioRegenerateVoice : undefined}
               initialWorkflowTab={openMediationAudioOnLoad ? "audio" : undefined}
             />
           </div>
@@ -2747,7 +2937,7 @@ export function ArtworkModal({
             uploadingImage={uploadingImage}
             onUploadImage={(file) => void uploadArtworkImage(file)}
             title={title}
-            onTitleChange={setTitle}
+            onTitleChange={handleTitleChange}
             artistSearch={artistSearch}
             onArtistSearchChange={setArtistSearch}
             showArtistSuggestions={showArtistSuggestions}
@@ -3458,6 +3648,7 @@ export function ArtworkModal({
         onRetryCell={handlePersonaAudioRetryCell}
         onCancelCell={handlePersonaAudioCancelCell}
         onFillMissing={handleFillMissingMediationVoices}
+        onRegenerateVoice={isGlobalStaff ? handlePersonaAudioRegenerateVoice : undefined}
       />
     ) : null}
     <AddArtistDialog

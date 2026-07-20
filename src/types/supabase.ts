@@ -247,6 +247,8 @@ export interface Database {
           artwork_expo_id: string | null;
           artwork_agency_id: string | null;
           artwork_title: string | null;
+          artwork_title_i18n?: Json;
+          artwork_title_i18n_enabled?: boolean;
           artwork_description_i18n: Json;
           artwork_source_material: string | null;
           artwork_source_material_i18n?: Json;
@@ -270,6 +272,8 @@ export interface Database {
           artwork_expo_id?: string | null;
           artwork_agency_id?: string | null;
           artwork_title?: string | null;
+          artwork_title_i18n?: Json;
+          artwork_title_i18n_enabled?: boolean;
           artwork_description_i18n?: Json;
           artwork_source_material?: string | null;
           artwork_source_material_i18n?: Json;
@@ -292,6 +296,8 @@ export interface Database {
           artwork_expo_id?: string | null;
           artwork_agency_id?: string | null;
           artwork_title?: string | null;
+          artwork_title_i18n?: Json;
+          artwork_title_i18n_enabled?: boolean;
           artwork_description_i18n?: Json;
           artwork_source_material?: string | null;
           artwork_source_material_i18n?: Json;

@@ -1,8 +1,13 @@
-/** Référence de mise en page : cartel A6 portrait (105 × 148 mm). */
-export const CARTEL_REF_WIDTH_MM = 105;
-export const CARTEL_REF_HEIGHT_MM = 148;
+import { getCartelMinCustomSizeMm } from "@/lib/cartelPdfLayout";
 
-export type CartelFormatId =
+export {
+  getCartelMinCustomSizeMm,
+  CARTEL_REF_WIDTH_MM,
+  CARTEL_REF_HEIGHT_MM,
+  cartelScaleForSlot,
+} from "@/lib/cartelPdfLayout";
+
+export type CartelPresetFormatId =
   | "a6-portrait"
   | "a6-landscape"
   | "a7-portrait"
@@ -12,7 +17,23 @@ export type CartelFormatId =
   | "square-80"
   | "square-65";
 
-export type CartelFormatGroup = "rectangular" | "square";
+/** Préréglages + format libre (dimensions saisies). */
+export type CartelFormatId = CartelPresetFormatId | "custom";
+
+export type CartelFormatGroup = "rectangular" | "square" | "custom";
+
+export type CartelSizeUnit = "mm" | "cm";
+
+export type CartelCustomSizeMm = {
+  widthMm: number;
+  heightMm: number;
+};
+
+/** Choix utilisateur dans le dialogue de format. */
+export type CartelFormatSelection = {
+  formatId: CartelFormatId;
+  customSizeMm?: CartelCustomSizeMm;
+};
 
 export type CartelFormatDef = {
   id: CartelFormatId;
@@ -27,6 +48,70 @@ export type CartelFormatDef = {
   /** Suffixe dimensions affiché tel quel (ex. « 105 × 148 mm »). */
   dimensionsLabel: string;
 };
+
+/** Limites raisonnables pour un cartel imprimable (mm). */
+export const CARTEL_CUSTOM_MAX_MM = 420;
+
+export function sizeValueToMm(value: number, unit: CartelSizeUnit): number {
+  return unit === "cm" ? value * 10 : value;
+}
+
+export function sizeValueFromMm(mm: number, unit: CartelSizeUnit): number {
+  return unit === "cm" ? mm / 10 : mm;
+}
+
+export function formatCustomDimensionsLabel(widthMm: number, heightMm: number, unit: CartelSizeUnit): string {
+  const w = sizeValueFromMm(widthMm, unit);
+  const h = sizeValueFromMm(heightMm, unit);
+  const fmt = (n: number) => {
+    const rounded = Math.round(n * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+  };
+  return `${fmt(w)} × ${fmt(h)} ${unit}`;
+}
+
+export function isValidCartelCustomSizeMm(
+  size: CartelCustomSizeMm | undefined,
+  extraTitleCount = 0,
+): size is CartelCustomSizeMm {
+  if (!size) return false;
+  const { widthMm, heightMm } = size;
+  const min = getCartelMinCustomSizeMm(extraTitleCount);
+  return (
+    Number.isFinite(widthMm) &&
+    Number.isFinite(heightMm) &&
+    widthMm >= min.widthMm &&
+    heightMm >= min.heightMm &&
+    widthMm <= CARTEL_CUSTOM_MAX_MM &&
+    heightMm <= CARTEL_CUSTOM_MAX_MM
+  );
+}
+
+/** Ramène les dimensions sous les minima vers les dimensions minimales autorisées. */
+export function clampCartelCustomSizeToMinimum(
+  size: CartelCustomSizeMm,
+  extraTitleCount = 0,
+): CartelCustomSizeMm {
+  const min = getCartelMinCustomSizeMm(extraTitleCount);
+  return {
+    widthMm: Math.min(CARTEL_CUSTOM_MAX_MM, Math.max(min.widthMm, size.widthMm)),
+    heightMm: Math.min(CARTEL_CUSTOM_MAX_MM, Math.max(min.heightMm, size.heightMm)),
+  };
+}
+
+export function buildCustomCartelFormat(size: CartelCustomSizeMm): CartelFormatDef {
+  const widthMm = Math.round(size.widthMm * 100) / 100;
+  const heightMm = Math.round(size.heightMm * 100) / 100;
+  return {
+    id: "custom",
+    group: "custom",
+    pageWidthMm: widthMm,
+    pageHeightMm: heightMm,
+    cardsPerPage: 1,
+    labelKey: "pdf_format_custom",
+    dimensionsLabel: formatCustomDimensionsLabel(widthMm, heightMm, "mm"),
+  };
+}
 
 export const CARTEL_FORMATS: CartelFormatDef[] = [
   {
@@ -105,10 +190,21 @@ export const CARTEL_FORMATS: CartelFormatDef[] = [
   },
 ];
 
-export function getCartelFormat(id: CartelFormatId): CartelFormatDef {
+export function getCartelFormat(id: CartelPresetFormatId): CartelFormatDef {
   const format = CARTEL_FORMATS.find((f) => f.id === id);
   if (!format) throw new Error(`Format cartel inconnu : ${id}`);
   return format;
+}
+
+/** Résout un préréglage ou un format libre (dimensions en mm). */
+export function resolveCartelFormat(selection: CartelFormatSelection): CartelFormatDef {
+  if (selection.formatId === "custom") {
+    if (!isValidCartelCustomSizeMm(selection.customSizeMm)) {
+      throw new Error("Dimensions personnalisées invalides");
+    }
+    return buildCustomCartelFormat(selection.customSizeMm);
+  }
+  return getCartelFormat(selection.formatId);
 }
 
 export type CartelSlot = {
@@ -125,9 +221,4 @@ export function getCartelSlots(format: CartelFormatDef): CartelSlot[] {
     return [{ x: 0, y: 0, w: slotW, h: format.pageHeightMm }];
   }
   return [{ x: 0, y: 0, w: format.pageWidthMm, h: format.pageHeightMm }];
-}
-
-/** Échelle uniforme pour adapter le cartel A6 de référence à l'emplacement. */
-export function cartelScaleForSlot(slotW: number, slotH: number): number {
-  return Math.min(slotW / CARTEL_REF_WIDTH_MM, slotH / CARTEL_REF_HEIGHT_MM);
 }
