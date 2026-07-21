@@ -44,10 +44,10 @@ export function resolveEffectiveRoleId(
   return null;
 }
 
-/** Rôles backoffice autorisés à créer des utilisateurs (hors visiteur). */
+/** Rôles autorisés à créer des utilisateurs : admins SaaS (1–3) et admin organisation (4). */
 export function canCreateUsers(roleId: number | null | undefined): boolean {
   const id = parseNumericRoleId(roleId);
-  return id != null && id >= 1 && id <= 6;
+  return id != null && ((id >= 1 && id <= 3) || id === 4);
 }
 
 /** Admin organisation (4) : peut modifier les membres de rôles 4, 5 et 6. Admins globaux (1–3) : tous. */

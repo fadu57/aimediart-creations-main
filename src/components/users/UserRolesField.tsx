@@ -34,6 +34,10 @@ type UserRolesFieldProps = {
   canEditAgency: boolean;
   resolvedAgencyLabel: string;
   disabled?: boolean;
+  /** Affiche un * sur le titre des rôles (création). */
+  rolesRequired?: boolean;
+  /** Libellé d'affectation SaaS (ex. AIMEDIArt) quand pas d'organisation. */
+  saasAssignmentLabel?: string | null;
 };
 
 export function UserRolesField({
@@ -51,6 +55,8 @@ export function UserRolesField({
   canEditAgency,
   resolvedAgencyLabel,
   disabled = false,
+  rolesRequired = false,
+  saasAssignmentLabel = null,
 }: UserRolesFieldProps) {
   const { t } = useTranslation("utilisateurs");
   const primaryRoleId = derivePrimaryRoleId(roleIds);
@@ -81,7 +87,10 @@ export function UserRolesField({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>{t("form.roles_title")}</Label>
+        <Label>
+          {t("form.roles_title")}
+          {rolesRequired ? <span className="text-[#E63946]"> *</span> : null}
+        </Label>
         {globalOptions.length > 0 ? (
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
             <p className="text-xs font-medium text-muted-foreground">{t("form.role_global")}</p>
@@ -116,6 +125,7 @@ export function UserRolesField({
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
             <p className="text-xs font-medium text-muted-foreground">
               {t("form.roles_org")}
+              {rolesRequired ? <span className="text-[#E63946]"> *</span> : null}
               {orgRolesHint}
             </p>
             <div className="flex flex-col gap-2">
@@ -174,7 +184,17 @@ export function UserRolesField({
               ))}
             </SelectContent>
           </Select>
+          {!canEditAgency && resolvedAgencyLabel ? (
+            <p className="text-xs text-muted-foreground">
+              {t("form.organisation_prefix", { name: resolvedAgencyLabel })}
+            </p>
+          ) : null}
         </div>
+      ) : saasAssignmentLabel ? (
+        <p className="text-sm text-muted-foreground">
+          {t("form.assignment_label")}{" "}
+          <span className="font-semibold text-foreground">{saasAssignmentLabel}</span>
+        </p>
       ) : null}
 
       {showExpos ? (

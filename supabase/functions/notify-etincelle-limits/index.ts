@@ -119,7 +119,7 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
-  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") ?? "hello@aimediart.com";
+  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL") ?? "no-reply@aimediart.com";
 
   if (!supabaseUrl || !serviceKey) {
     return new Response(JSON.stringify({ error: "Config Supabase manquante" }), {

@@ -195,7 +195,7 @@ Deno.serve(async (req: Request) => {
     const email_errors: string[] = [];
     const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
   const notifyTo = Deno.env.get("QUOTE_NOTIFY_EMAIL")?.trim() || DEFAULT_QUOTE_NOTIFY_EMAIL;
-  const fromAddress = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() || "hello@aimediart.com";
+  const fromAddress = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() || "no-reply@aimediart.com";
 
   if (resendApiKey && row?.id) {
     if (!isResendApiKeyConfigured(resendApiKey)) {

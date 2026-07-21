@@ -317,7 +317,8 @@ async function sendPasswordSetupEmail(
   const fromEmail =
     Deno.env.get("RESEND_FROM")?.trim() ||
     Deno.env.get("RESEND_FROM_EMAIL")?.trim() ||
-    "Aimediart <onboarding@resend.dev>";
+    Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ||
+    "Aimediart <no-reply@aimediart.com>";
 
   const html = buildPasswordSetupEmailHtml({
     prenom: params.prenom,
@@ -333,20 +334,6 @@ async function sendPasswordSetupEmail(
     html,
   });
   if (!mail.ok) {
-    // Domaine perso non vérifié : retry via l’expéditeur de test Resend.
-    if (/domain is not verified/i.test(mail.error || "") && !/onboarding@resend\.dev/i.test(fromEmail)) {
-      const retry = await sendResendEmail({
-        apiKey: resendApiKey,
-        fromEmail: "Aimediart <onboarding@resend.dev>",
-        to: params.email,
-        subject: PASSWORD_SETUP_EMAIL_SUBJECT,
-        html,
-      });
-      if (!retry.ok) {
-        return { ok: false, error: retry.error || mail.error || "Échec d'envoi Resend." };
-      }
-      return { ok: true, id: retry.id };
-    }
     return { ok: false, error: mail.error || "Échec d'envoi Resend." };
   }
   return { ok: true, id: mail.id };
@@ -575,7 +562,8 @@ serve(async (req: Request) => {
       const fromEmail =
         Deno.env.get("RESEND_FROM")?.trim() ||
         Deno.env.get("RESEND_FROM_EMAIL")?.trim() ||
-        "Aimediart <onboarding@resend.dev>";
+        Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ||
+        "Aimediart <no-reply@aimediart.com>";
 
       const diaryUrl = toPublicAbsoluteUrl(
         await resolveDiaryUrl(admin, {
@@ -595,15 +583,6 @@ serve(async (req: Request) => {
         subject: PASSWORD_SETUP_EMAIL_SUBJECT,
         html: emailHtml,
       });
-      if (!mail.ok && /domain is not verified/i.test(mail.error || "") && !/onboarding@resend\.dev/i.test(fromEmail)) {
-        mail = await sendResendEmail({
-          apiKey: resendApiKey,
-          fromEmail: "Aimediart <onboarding@resend.dev>",
-          to: email,
-          subject: PASSWORD_SETUP_EMAIL_SUBJECT,
-          html: emailHtml,
-        });
-      }
       if (!mail.ok) {
         return jsonResponse(502, {
           ok: false,

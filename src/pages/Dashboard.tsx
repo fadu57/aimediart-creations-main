@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -228,6 +228,7 @@ const Dashboard = () => {
   } = useEffectiveAuth();
   const { can } = useNavigationMatrix();
   const { state: standbyState, isStandbyNavRestricted } = useOrganisationStandby();
+  const [searchParams, setSearchParams] = useSearchParams();
   const effectiveAgencyId = agency_id ?? standbyState.agency_id ?? null;
   const [viewedUserId, setViewedUserId] = useState<string | null>(null);
   const [createUserOpen, setCreateUserOpen] = useState(false);
@@ -245,6 +246,16 @@ const Dashboard = () => {
   };
 
   const userId = user?.id ?? null;
+
+  useEffect(() => {
+    if (searchParams.get("complete_profile") !== "1") return;
+    if (!userId) return;
+    openUserFiche(userId);
+    const next = new URLSearchParams(searchParams);
+    next.delete("complete_profile");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, userId, setSearchParams]);
+
   const email = user?.email ?? null;
   const effectiveRoleId = useMemo(() => resolveEffectiveRoleId(role_id, role_name), [role_id, role_name]);
   const profileUserId = viewedUserId ?? userId;

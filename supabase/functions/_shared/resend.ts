@@ -2,7 +2,7 @@
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
-export const DEFAULT_RESEND_FROM = "Aimediart <hello@aimediart.com>";
+export const DEFAULT_RESEND_FROM = "Aimediart <no-reply@aimediart.com>";
 
 export function isResendApiKeyConfigured(apiKey: string): boolean {
   const key = apiKey.trim();
@@ -11,7 +11,7 @@ export function isResendApiKeyConfigured(apiKey: string): boolean {
   return true;
 }
 
-/** « hello@aimediart.com » → « Aimediart <hello@aimediart.com> » */
+/** « no-reply@aimediart.com » → « Aimediart <no-reply@aimediart.com> » */
 export function formatResendFrom(fromEmail: string): string {
   const trimmed = fromEmail.trim();
   if (!trimmed) return DEFAULT_RESEND_FROM;
@@ -76,7 +76,7 @@ export async function sendResendEmail(params: {
   }
 
   const payload: Record<string, unknown> = {
-    from: formatResendFrom(params.fromEmail ?? "hello@aimediart.com"),
+    from: formatResendFrom(params.fromEmail ?? DEFAULT_RESEND_FROM),
     to: [to],
     subject: params.subject,
     html: params.html,

@@ -4,7 +4,7 @@
  * Variables d'env :
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto)
  *   RESEND_API_KEY, ADMIN_EMAIL, APP_URL
- *   NOTIFY_FROM_EMAIL (optionnel, défaut hello@aimediart.com)
+ *   NOTIFY_FROM_EMAIL (optionnel, défaut no-reply@aimediart.com)
  *
  * Déploiement : supabase functions deploy check-ai-limits --no-verify-jwt
  */
@@ -235,7 +235,7 @@ serve(async (req: Request) => {
   const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
   const adminEmail = Deno.env.get("ADMIN_EMAIL")?.trim() ?? "";
   const appUrl = (Deno.env.get("APP_URL") ?? "").trim().replace(/\/$/, "");
-  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ?? "hello@aimediart.com";
+  const fromEmail = Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() ?? "no-reply@aimediart.com";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, { ok: false, error: "Variables Supabase manquantes." });

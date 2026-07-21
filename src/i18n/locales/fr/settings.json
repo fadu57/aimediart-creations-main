@@ -309,7 +309,7 @@
   "notif_channels_heading": "Canaux",
   "notif_email_from": "Email expéditeur",
   "notif_webhook_url": "URL webhook",
-  "notif_placeholder_email_from": "noreply@exemple.com",
+  "notif_placeholder_email_from": "no-reply@aimediart.com",
   "notif_placeholder_webhook": "https://...",
   "notif_frequency_heading": "Fréquence",
   "notif_batch_seconds": "Regroupement (secondes)",

@@ -84,8 +84,8 @@ function extractRoleNameClair(
 }
 
 function getAllowedRoleIds(currentRoleId: number | null): number[] {
-  if (currentRoleId === 1) return [];
-  if (currentRoleId === 2) return [];
+  if (currentRoleId === 1) return [1, 2, 3, 4, 5, 6];
+  if (currentRoleId === 2 || currentRoleId === 3) return [4, 5, 6];
   if (currentRoleId === 4) return [4, 5, 6];
   return [];
 }
@@ -93,6 +93,7 @@ function getAllowedRoleIds(currentRoleId: number | null): number[] {
 function getVisibleRoleIds(currentRoleId: number | null): number[] | null {
   if (currentRoleId === 1) return null;
   if (currentRoleId === 2) return null;
+  if (currentRoleId === 3) return null;
   if (currentRoleId === 4) return [4, 5, 6];
   return [];
 }

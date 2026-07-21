@@ -840,6 +840,8 @@ const Users = ({
   const handledEditUserIdRef = useRef<string | null>(null);
   const { agency_id: connectedAgencyId, role_id: currentRoleId, user: authUser, refresh: refreshAuthUser } = useAuthUser();
   const canRepairAuthAccess = Number(currentRoleId) >= 1 && Number(currentRoleId) <= 3;
+  /** MDP provisoire : visible seulement pour les admins SaaS (1–3). */
+  const canUseTempPassword = Number(currentRoleId) >= 1 && Number(currentRoleId) <= 3;
   const [rows, setRows] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1069,11 +1071,19 @@ const Users = ({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const base = supabase.from("roles_user").select("*").order("role_id", { ascending: true });
-      const { data, error: qErr } =
-        typeof currentRoleId === "number" && Number.isFinite(currentRoleId)
-          ? await base.gte("role_id", currentRoleId).lte("role_id", 6)
-          : await base.in("role_id", [4, 5, 6]);
+      let query = supabase.from("roles_user").select("*").order("role_id", { ascending: true });
+      if (currentRoleId === 1) {
+        query = query.in("role_id", [1, 2, 3, 4, 5, 6]);
+      } else if (currentRoleId === 2 || currentRoleId === 3) {
+        query = query.in("role_id", [4, 5, 6]);
+      } else if (currentRoleId === 4) {
+        query = query.in("role_id", [4, 5, 6]);
+      } else if (typeof currentRoleId === "number" && Number.isFinite(currentRoleId)) {
+        query = query.gte("role_id", currentRoleId).lte("role_id", 6);
+      } else {
+        query = query.in("role_id", [4, 5, 6]);
+      }
+      const { data, error: qErr } = await query;
       if (cancelled) return;
       if (qErr) {
         setRoleOptions(FALLBACK_ROLE_OPTIONS);
@@ -1322,9 +1332,10 @@ const Users = ({
 
   const canEditAgency = useMemo(() => {
     if (saving || !roleIdsNeedOrganisation(editingRoleIds)) return false;
-    if (currentRoleId === 4) return mode === "create" && !connectedAgencyId;
+    // Rôle 4 : toujours rattaché à son agence (non modifiable).
+    if (currentRoleId === 4) return false;
     return currentRoleId === 1 || currentRoleId === 2 || currentRoleId === 3;
-  }, [editingRoleIds, saving, currentRoleId, mode, connectedAgencyId]);
+  }, [editingRoleIds, saving, currentRoleId]);
 
   const canEditExpo = useMemo(() => {
     if (saving || !roleIdsNeedExpos(editingRoleIds)) return false;
@@ -1671,7 +1682,9 @@ const Users = ({
       const needsOrganisation = roleIdsNeedOrganisation(roleIds);
       const needsExpos = roleIdsNeedExpos(roleIds);
       const effectiveAgencyId = needsOrganisation
-        ? editing.agency_id?.trim() || connectedAgencyId || null
+        ? (currentRoleId === 4
+            ? connectedAgencyId || null
+            : editing.agency_id?.trim() || connectedAgencyId || null)
         : null;
       const effectiveExpoIds = needsExpos
         ? await resolveExpoStorageIds(
@@ -1739,9 +1752,9 @@ const Users = ({
           setSaving(false);
           return;
         }
-        const tempPassword = temporaryPassword.trim();
-        if (tempPassword.length < 6) {
-          toast.error(t("messages.password_min"));
+        const phoneTrimmed = editing.phone?.trim() || "";
+        if (!phoneTrimmed) {
+          toast.error(t("messages.phone_required"));
           setSaving(false);
           return;
         }
@@ -1751,46 +1764,62 @@ const Users = ({
           return;
         }
 
-        // Création Auth via edge function
+        const useTempPassword = canUseTempPassword && temporaryPassword.trim().length > 0;
+        if (useTempPassword && temporaryPassword.trim().length < 6) {
+          toast.error(t("messages.password_min"));
+          setSaving(false);
+          return;
+        }
+
+        // Création Auth (+ invitation e-mail si pas de MDP provisoire)
         const { data: createAuthData, error: createAuthErr } = await supabase.functions.invoke(
           "admin-create-user",
-          { body: { email: effectiveEmail, password: tempPassword, prenom, nom, role_id: globalRoleId ?? nextRoleId } },
+          {
+            body: {
+              email: effectiveEmail,
+              prenom,
+              nom,
+              phone: phoneTrimmed,
+              role_id: globalRoleId ?? nextRoleId,
+              agency_id: effectiveAgencyId,
+              expo_ids: effectiveExpoIds,
+              invite: !useTempPassword,
+              ...(useTempPassword ? { password: temporaryPassword.trim() } : {}),
+            },
+          },
         );
         if (createAuthErr) throw createAuthErr;
 
+        const createPayload = createAuthData as {
+          ok?: boolean;
+          error?: string;
+          user_id?: string | null;
+          invite_sent?: boolean;
+          data?: { user_id?: string | null };
+        } | null;
+        if (createPayload?.ok === false && createPayload.error) {
+          throw new Error(createPayload.error);
+        }
+
         const createdUserId =
-          (createAuthData as { user_id?: string | null } | null)?.user_id?.trim() ||
-          (createAuthData as { data?: { user_id?: string | null } } | null)?.data?.user_id?.trim() ||
+          createPayload?.user_id?.trim() ||
+          createPayload?.data?.user_id?.trim() ||
           "";
         if (!createdUserId) {
           throw new Error(t("messages.auth_create_no_id"));
         }
 
-        // Écriture profil
+        // Compléter le profil (avatar / adresse éventuels saisis à la création)
         const { error: profileErr } = await supabase
           .from("profiles")
           .upsert({ id: createdUserId, ...profilePayload }, { onConflict: "id" });
         if (profileErr) throw profileErr;
 
-        // Rattachement agence + rôle
-        if (effectiveAgencyId && agencyRoleId) {
-          const { error: agencyErr } = await supabase
-            .from("agency_users")
-            .upsert(
-              { user_id: createdUserId, agency_id: effectiveAgencyId, role_id: agencyRoleId },
-              { onConflict: "user_id,agency_id" },
-            );
-          if (agencyErr) throw agencyErr;
+        if (createPayload?.invite_sent) {
+          toast.success(t("messages.user_invited", { email: effectiveEmail }));
+        } else {
+          toast.success(t("messages.user_created", { email: effectiveEmail }));
         }
-
-        if (effectiveExpoIds.length > 0) {
-          const { error: expoErr } = await supabase
-            .from("expo_user_role")
-            .insert(effectiveExpoIds.map((expo_id) => ({ user_id: createdUserId, expo_id })));
-          if (expoErr) throw expoErr;
-        }
-
-        toast.success(t("messages.user_created", { email: effectiveEmail }));
       } else {
         if (!phoneValid) {
           toast.error(t("messages.phone_invalid"));
@@ -2003,10 +2032,21 @@ const Users = ({
         >
           <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <h2 className="min-w-0 font-serif text-lg text-white sm:text-2xl">
                 {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
+              {agencyLogoUrl ? (
+                <div className="mx-auto h-11 w-[140px] shrink-0 overflow-hidden rounded-md border border-white/50 bg-white sm:mx-0 sm:h-12 sm:w-[160px]">
+                  <img
+                    src={agencyLogoUrl}
+                    alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")}
+                    className="h-full w-full object-contain p-1"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              ) : null}
               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                 <Button
                   type="button"
@@ -2043,24 +2083,19 @@ const Users = ({
             </div>
           </div>
 
-          <div className="px-4 sm:px-5 pt-3 pb-4">
-            <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
-              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
-                {agencyLogoUrl ? (
-                  <img src={agencyLogoUrl} alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
-              </div>
-              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
-                {expoLogoUrl ? (
-                  <img src={expoLogoUrl} alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
+          {expoLogoUrl ? (
+            <div className="px-4 sm:px-5 pt-3 pb-0">
+              <div className="mb-3 ml-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:h-[100px]">
+                <img
+                  src={expoLogoUrl}
+                  alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")}
+                  className="h-full w-full object-contain p-1"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
             </div>
-          </div>
+          ) : null}
 
           {!editing ? null : (
             <form
@@ -2091,6 +2126,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-prenom" className="w-[70px] shrink-0 text-xs">
                       {t("form.firstname")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <Input
                       id="user-prenom"
@@ -2104,6 +2140,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-nom" className="w-[70px] shrink-0 text-xs">
                       {t("form.lastname")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <Input
                       id="user-nom"
@@ -2166,6 +2203,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-phone" className="w-[70px] shrink-0 text-xs">
                       {t("form.phone")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <SmartPhoneInput
                       id="user-phone"
@@ -2188,7 +2226,10 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-email">{t("form.email")}</Label>
+                  <Label htmlFor="user-email">
+                    {t("form.email")}
+                    {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
+                  </Label>
                   <Input
                     id="user-email"
                     type="email"
@@ -2207,7 +2248,7 @@ const Users = ({
                     </p>
                   ) : null}
                 </div>
-                {(mode === "create" || mode === "edit") && (
+                {(mode === "create" || mode === "edit") && canUseTempPassword && (
                   <div className="space-y-1.5">
                     <Label htmlFor="user-temporary-password">
                       {mode === "create" ? t("form.temp_password") : t("form.new_temp_password")}
@@ -2221,6 +2262,9 @@ const Users = ({
                       disabled={saving}
                       placeholder={t("form.temp_password_placeholder")}
                     />
+                    {mode === "create" ? (
+                      <p className="text-xs text-muted-foreground">{t("form.temp_password_hint")}</p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -2256,6 +2300,12 @@ const Users = ({
                 canEditAgency={canEditAgency}
                 resolvedAgencyLabel={resolvedAgencyLabel}
                 disabled={saving}
+                rolesRequired={mode === "create"}
+                saasAssignmentLabel={
+                  mode === "create" && currentRoleId === 1 && !roleIdsNeedOrganisation(editingRoleIds)
+                    ? "AIMEDIArt"
+                    : null
+                }
               />
 
               {checkingControl && <p className="text-xs text-muted-foreground">{t("form.checking_username")}</p>}
@@ -2419,10 +2469,21 @@ const Users = ({
         >
           <DialogTitle className="sr-only">{mode === "create" ? t("form.title_create") : t("form.title_edit")}</DialogTitle>
           <div className="sticky top-0 z-30 px-4 sm:px-5 py-3 bg-[#E63946] border-b border-[#c92f3b] shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <h2 className="min-w-0 font-serif text-lg text-white sm:text-2xl">
                 {mode === "create" ? t("form.title_create") : t("form.title_edit")}
               </h2>
+              {agencyLogoUrl ? (
+                <div className="mx-auto h-11 w-[140px] shrink-0 overflow-hidden rounded-md border border-white/50 bg-white sm:mx-0 sm:h-12 sm:w-[160px]">
+                  <img
+                    src={agencyLogoUrl}
+                    alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")}
+                    className="h-full w-full object-contain p-1"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              ) : null}
               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                 <Button
                   type="button"
@@ -2459,24 +2520,19 @@ const Users = ({
             </div>
           </div>
 
-          <div className="px-4 sm:px-5 pt-3 pb-4">
-            <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
-              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
-                {agencyLogoUrl ? (
-                  <img src={agencyLogoUrl} alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
-              </div>
-              <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
-                {expoLogoUrl ? (
-                  <img src={expoLogoUrl} alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                ) : (
-                  <div className="h-full w-full" />
-                )}
+          {expoLogoUrl ? (
+            <div className="px-4 sm:px-5 pt-3 pb-0">
+              <div className="mb-3 ml-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:h-[100px]">
+                <img
+                  src={expoLogoUrl}
+                  alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")}
+                  className="h-full w-full object-contain p-1"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
             </div>
-          </div>
+          ) : null}
 
           {!editing ? null : (
             <form
@@ -2501,6 +2557,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-prenom-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.firstname")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <Input
                       id="user-prenom-main"
@@ -2514,6 +2571,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-nom-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.lastname")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <Input
                       id="user-nom-main"
@@ -2576,6 +2634,7 @@ const Users = ({
                   <div className="flex min-w-0 items-center gap-2">
                     <Label htmlFor="user-phone-main" className="w-[70px] shrink-0 text-xs">
                       {t("form.phone")}
+                      {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
                     </Label>
                     <SmartPhoneInput
                       id="user-phone-main"
@@ -2598,7 +2657,10 @@ const Users = ({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="user-email-main">{t("form.email")}</Label>
+                  <Label htmlFor="user-email-main">
+                    {t("form.email")}
+                    {mode === "create" ? <span className="text-[#E63946]"> *</span> : null}
+                  </Label>
                   <Input
                     id="user-email-main"
                     type="email"
@@ -2617,7 +2679,7 @@ const Users = ({
                     </p>
                   ) : null}
                 </div>
-                {(mode === "create" || mode === "edit") && (
+                {(mode === "create" || mode === "edit") && canUseTempPassword && (
                   <div className="space-y-1.5">
                     <Label htmlFor="user-temporary-password-main">
                       {mode === "create" ? t("form.temp_password") : t("form.new_temp_password")}
@@ -2631,6 +2693,9 @@ const Users = ({
                       disabled={saving}
                       placeholder={t("form.temp_password_placeholder")}
                     />
+                    {mode === "create" ? (
+                      <p className="text-xs text-muted-foreground">{t("form.temp_password_hint")}</p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -2666,6 +2731,12 @@ const Users = ({
                 canEditAgency={canEditAgency}
                 resolvedAgencyLabel={resolvedAgencyLabel}
                 disabled={saving}
+                rolesRequired={mode === "create"}
+                saasAssignmentLabel={
+                  mode === "create" && currentRoleId === 1 && !roleIdsNeedOrganisation(editingRoleIds)
+                    ? "AIMEDIArt"
+                    : null
+                }
               />
 
               {checkingControl && <p className="text-xs text-muted-foreground">{t("form.checking_username")}</p>}

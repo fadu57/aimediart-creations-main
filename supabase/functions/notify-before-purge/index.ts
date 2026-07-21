@@ -15,8 +15,8 @@
  *   SUPABASE_URL                — automatique dans les Edge Functions
  *   SUPABASE_SERVICE_ROLE_KEY   — automatique dans les Edge Functions
  *   RESEND_API_KEY              — clé API Resend (https://resend.com/api-keys)
- *   NOTIFY_FROM_EMAIL           — expéditeur ex: "hello@aimediart.com"
- *                                 (optionnel, défaut : "hello@aimediart.com")
+ *   NOTIFY_FROM_EMAIL           — expéditeur ex: "no-reply@aimediart.com"
+ *                                 (optionnel, défaut : "no-reply@aimediart.com")
  *
  * Déploiement :
  *   supabase functions deploy notify-before-purge --no-verify-jwt
@@ -259,7 +259,7 @@ serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() ?? "";
   const fromEmail =
-    Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() || "hello@aimediart.com";
+    Deno.env.get("NOTIFY_FROM_EMAIL")?.trim() || "no-reply@aimediart.com";
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, {

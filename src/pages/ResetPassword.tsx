@@ -162,6 +162,12 @@ const ResetPassword = () => {
     }
 
     toast.success(isFirstSetup ? t("recovery.toast_created") : t("recovery.toast_updated"));
+    if (isFirstSetup) {
+      const nextRaw = searchParams.get("next")?.trim() || "/dashboard?complete_profile=1";
+      const nextPath = nextRaw.startsWith("/") ? nextRaw : `/${nextRaw}`;
+      navigate(nextPath, { replace: true });
+      return;
+    }
     await supabase.auth.signOut();
     navigate("/login", { replace: true });
   };
