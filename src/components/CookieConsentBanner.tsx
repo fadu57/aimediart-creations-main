@@ -10,8 +10,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { applyCookieBannerChoice, getCookieBannerChoice, type CookieBannerChoice } from "@/lib/cookieConsent";
 import { getLegalCgvHref, getLegalRgpdHref, isExternalLegalUrl } from "@/lib/legalUrls";
+import { cn } from "@/lib/utils";
 
 function subscribeToConsent(cb: () => void) {
   if (typeof window === "undefined") return () => {};
@@ -33,13 +40,14 @@ function getServerSnapshot(): CookieBannerChoice | null {
 }
 
 /**
- * Bannière cookies / traceurs : accepter, refuser, liens CGV et RGPD (pas de case à cocher sur la page visiteur).
+ * Bannière cookies / traceurs : accepter, refuser, liens CGV et RGPD.
+ * Dialog Radix en barre basse (focus trap) — look inchangé.
  */
 const CookieConsentBanner = () => {
   const { t } = useTranslation("landing");
   const [searchParams] = useSearchParams();
 
-  /** En dev uniquement : garder la bannière visible malgré un choix déjà en stockage (pour retouche UI), jusqu’à un clic utilisateur qui la masque. URL : `?preview_cookie_banner=1` */
+  /** En dev uniquement : `?preview_cookie_banner=1` */
   const previewInDev = useMemo(
     () => import.meta.env.DEV && searchParams.get("preview_cookie_banner") === "1",
     [searchParams],
@@ -52,7 +60,6 @@ const CookieConsentBanner = () => {
   );
 
   const [refuseConfirmOpen, setRefuseConfirmOpen] = useState(false);
-  /** Après clic Accepter/Refuser (bannière ou popup), masquer même en prévisualisation dev (`preview_cookie_banner=1`). */
   const [bannerHiddenAfterChoice, setBannerHiddenAfterChoice] = useState(false);
 
   const handleChoose = useCallback((choice: CookieBannerChoice, opts?: { closeRefusePopup?: boolean }) => {
@@ -64,7 +71,7 @@ const CookieConsentBanner = () => {
     }
   }, []);
 
-  if (bannerHiddenAfterChoice || (!previewInDev && choice !== null)) return null;
+  const bannerOpen = !bannerHiddenAfterChoice && (previewInDev || choice === null);
 
   const cgv = getLegalCgvHref();
   const rgpd = getLegalRgpdHref();
@@ -126,42 +133,55 @@ const CookieConsentBanner = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div
-        role="dialog"
-        aria-label={t("cookie_banner.aria_label")}
-        className="fixed inset-x-0 bottom-0 z-[100] border-t border-border/80 bg-[#1a1a1a]/98 px-4 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md"
-      >
-        <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex-1 space-y-1.5 text-sm text-foreground">
-            <p className="leading-snug">{t("cookie_banner.message")}</p>
-            <p className="text-xs leading-snug text-muted-foreground">
-              {CgvLink}
-              <span className="px-1.5 text-muted-foreground">·</span>
-              {RgpdLink}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{t("cookie_banner.privacy_note")}</p>
+      <Dialog open={bannerOpen} onOpenChange={() => { /* choix obligatoire */ }}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[100] bg-transparent pointer-events-none"
+          className={cn(
+            "fixed inset-x-0 bottom-0 top-auto z-[100] flex max-h-none w-full max-w-none translate-x-0 translate-y-0",
+            "gap-0 rounded-none border-0 border-t border-border/80 bg-[#1a1a1a]/98 p-0 shadow-[0_-8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md",
+            "data-[state=open]:slide-in-from-bottom-2 data-[state=closed]:slide-out-to-bottom-2",
+            "left-0 right-0",
+          )}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-1.5 text-sm text-foreground">
+              <DialogTitle className="sr-only">{t("cookie_banner.aria_label")}</DialogTitle>
+              <DialogDescription className="leading-snug text-foreground">
+                {t("cookie_banner.message")}
+              </DialogDescription>
+              <p className="text-xs leading-snug text-muted-foreground">
+                {CgvLink}
+                <span className="px-1.5 text-muted-foreground">·</span>
+                {RgpdLink}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{t("cookie_banner.privacy_note")}</p>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full border-border sm:w-auto"
+                onClick={() => setRefuseConfirmOpen(true)}
+              >
+                {t("cookie_banner.refuse")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
+                onClick={() => handleChoose("accepted")}
+              >
+                {t("cookie_banner.accept")}
+              </Button>
+            </div>
           </div>
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full border-border sm:w-auto"
-              onClick={() => setRefuseConfirmOpen(true)}
-            >
-              {t("cookie_banner.refuse")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
-              onClick={() => handleChoose("accepted")}
-            >
-              {t("cookie_banner.accept")}
-            </Button>
-          </div>
-        </div>
-    </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

@@ -210,8 +210,8 @@ const Login = () => {
   };
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center px-4 pb-8 pt-0">
-      <Card className="mt-5 w-full max-w-[320px] border-border shadow-lg">
+    <div className="flex w-full flex-1 flex-col items-center px-4 pb-8 pt-2">
+      <Card className="mt-2 w-full max-w-[320px] border-border shadow-lg">
         <CardHeader className="space-y-1 px-3 pt-4 pb-2">
           <CardTitle className="font-serif text-2xl text-center">{t("login.title")}</CardTitle>
         </CardHeader>
@@ -261,7 +261,7 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none drop-shadow-none focus:outline-none focus:ring-0 active:opacity-100"
+                  className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none drop-shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-100"
                   aria-label={showPassword ? t("login.aria_hide_password") : t("login.aria_show_password")}
                   disabled={submitting}
                 >
@@ -271,7 +271,7 @@ const Login = () => {
               <div className="flex justify-end pt-0.5">
                 <button
                   type="button"
-                  className="text-xs font-medium text-red-500 no-underline shadow-none drop-shadow-none hover:text-red-500 focus:outline-none focus:ring-0 active:opacity-100 disabled:opacity-50"
+                  className="text-xs font-medium text-red-500 no-underline shadow-none drop-shadow-none hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-100 disabled:opacity-50"
                   onClick={() => void handleForgotPassword()}
                   disabled={submitting || sendingReset}
                 >

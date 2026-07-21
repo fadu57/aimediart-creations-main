@@ -34,6 +34,7 @@ import Users from "@/pages/Users";
 // ---------------------------------------------------------------------------
 import { softDeleteUserProfile } from "@/lib/userSoftDelete";
 import { formatUserLastSignIn } from "@/lib/userLastSignIn";
+import { A11Y_CLICKABLE_FOCUS_CLASS, a11yActivateProps } from "@/lib/a11yClickable";
 type AdminUserRow = {
   id: string;
   role_id: number | null;
@@ -246,8 +247,8 @@ export default function Utilisateurs() {
           setSortKey(column);
           setSortDir("asc");
         }}
-        aria-label="Trier ascendant"
-        title="Trier ascendant"
+        aria-label={t("list.sortAsc")}
+        title={t("list.sortAsc")}
       >
         ↑
       </button>
@@ -260,8 +261,8 @@ export default function Utilisateurs() {
           setSortKey(column);
           setSortDir("desc");
         }}
-        aria-label="Trier descendant"
-        title="Trier descendant"
+        aria-label={t("list.sortDesc")}
+        title={t("list.sortDesc")}
       >
         ↓
       </button>
@@ -424,11 +425,11 @@ export default function Utilisateurs() {
 
     const roleId = deleteTarget.role_id;
     if (currentRoleId === 2 && roleId === 1) {
-      toast.error("Suppression non autorisée pour ce rôle.");
+      toast.error(t("messages.delete_forbidden_role"));
       return;
     }
     if (currentRoleId === 4 && roleId != null && ![4, 5, 6].includes(roleId)) {
-      toast.error("Suppression non autorisée pour ce rôle.");
+      toast.error(t("messages.delete_forbidden_role"));
       return;
     }
 
@@ -438,11 +439,11 @@ export default function Utilisateurs() {
       const result = await softDeleteUserProfile(uid);
       if (!result.ok) throw new Error(result.message);
 
-      toast.success("Utilisateur envoyé en corbeille.");
+      toast.success(t("messages.deleted_to_trash"));
       setDeleteTarget(null);
       await loadUsers();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Suppression impossible.");
+      toast.error(e instanceof Error ? e.message : t("messages.delete_failed"));
     } finally {
       setDeleting(false);
     }
@@ -595,7 +596,11 @@ export default function Utilisateurs() {
                   const handleOpen = () => openUserCard(row);
 
                   return (
-                    <tr key={row.id} className={`border-b ${rowClass}`} onClick={handleOpen}>
+                    <tr
+                      key={row.id}
+                      className={`border-b ${rowClass} ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                      {...a11yActivateProps(handleOpen)}
+                    >
                       <td className="px-1.5 py-1 truncate" title={row.first_name || "—"}>
                         {row.first_name || "—"}
                       </td>

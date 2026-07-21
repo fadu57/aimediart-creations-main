@@ -62,6 +62,13 @@
         "i2": "La suspensión puede ser temporal (mientras se realizan comprobaciones) o definitiva.",
         "i3": "La supresión de una cuenta de usuario no afecta a los datos y contenidos creados o gestionados bajo la responsabilidad del cliente, sin perjuicio de los derechos de las personas concernidas y de las obligaciones de conservación."
       }
+    },
+    "accessibility": {
+      "title": "7. Accesibilidad digital",
+      "p1": "Accesibilidad digital: enfoque activo de mejora continua (conformidad parcial / base WCAG 2.2 AA auditada internamente).",
+      "p2": "Se ha llevado a cabo un proceso interno de auditoría y remediación en los recorridos críticos de la plataforma (visita QR, autenticación, listas del backoffice), en particular sobre el uso del teclado, los diálogos, el contraste, las alternativas textuales de las imágenes y el respeto de prefers-reduced-motion.",
+      "p3": "Esta revisión ha permitido obtener una conformidad parcial con el referente WCAG 2.2: se ha auditado internamente una base de criterios de los niveles A y AA. No se trata de una certificación emitida por un organismo tercero.",
+      "p4": "Para la definición de los niveles de conformidad WCAG (A, AA, AAA) y los requisitos asociados, consulte <wcagLink>Understanding Conformance — WCAG 2.2 (W3C)</wcagLink>."
     }
   }
 }

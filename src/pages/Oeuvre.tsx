@@ -543,9 +543,9 @@ const Oeuvre = () => {
           <div className="mb-4 px-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1 text-right">
-                <h2 className="font-serif text-xl font-semibold text-gray-800">
+                <h1 className="font-serif text-xl font-semibold text-gray-800">
                   {artwork?.artwork_title || t("oeuvre.untitled")}
-                </h2>
+                </h1>
                 <p className="text-sm italic text-gray-500">
                   {artistName || t("oeuvre.unknown_artist")}
                 </p>

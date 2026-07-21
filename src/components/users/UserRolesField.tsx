@@ -11,6 +11,7 @@ import {
   toggleUserRole,
 } from "@/lib/userRoleAssignment";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type RoleOption = { role_id: number; label: string };
 
@@ -51,6 +52,7 @@ export function UserRolesField({
   resolvedAgencyLabel,
   disabled = false,
 }: UserRolesFieldProps) {
+  const { t } = useTranslation("utilisateurs");
   const primaryRoleId = derivePrimaryRoleId(roleIds);
   const globalRoleId = deriveGlobalRoleId(roleIds);
   const showOrganisation = roleIdsNeedOrganisation(roleIds);
@@ -69,13 +71,20 @@ export function UserRolesField({
     }
   };
 
+  const orgRolesHint =
+    primaryRoleId != null && primaryRoleId <= 3
+      ? t("form.roles_org_with_global")
+      : primaryRoleId === 4
+        ? t("form.roles_org_with_admin")
+        : "";
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Rôles</Label>
+        <Label>{t("form.roles_title")}</Label>
         {globalOptions.length > 0 ? (
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-            <p className="text-xs font-medium text-muted-foreground">Rôle global (un seul)</p>
+            <p className="text-xs font-medium text-muted-foreground">{t("form.role_global")}</p>
             <div className="flex flex-col gap-2">
               {globalOptions.map((role) => {
                 const checked = globalRoleId === role.role_id;
@@ -106,12 +115,8 @@ export function UserRolesField({
         {agencyOptions.length > 0 ? (
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
             <p className="text-xs font-medium text-muted-foreground">
-              Rôles organisation
-              {primaryRoleId != null && primaryRoleId <= 3
-                ? " (cumulables avec un rôle global)"
-                : primaryRoleId === 4
-                  ? " (cumulables : commissaire, équipier)"
-                  : null}
+              {t("form.roles_org")}
+              {orgRolesHint}
             </p>
             <div className="flex flex-col gap-2">
               {agencyOptions.map((role) => {
@@ -144,7 +149,7 @@ export function UserRolesField({
 
       {showOrganisation ? (
         <div className="space-y-1.5">
-          <Label htmlFor={`${idPrefix}-agency`}>Organisation</Label>
+          <Label htmlFor={`${idPrefix}-agency`}>{t("form.organisation")}</Label>
           <Select
             value={agencyId ?? ""}
             onValueChange={(v) => {
@@ -154,12 +159,12 @@ export function UserRolesField({
             disabled={disabled || !canEditAgency}
           >
             <SelectTrigger id={`${idPrefix}-agency`}>
-              <SelectValue placeholder="Choisir une organisation" />
+              <SelectValue placeholder={t("form.choose_organisation")} />
             </SelectTrigger>
             <SelectContent>
               {agencies.length === 0 && (
                 <SelectItem value="__none_agency__" disabled>
-                  Aucune organisation disponible
+                  {t("form.no_organisation")}
                 </SelectItem>
               )}
               {agencies.map((agency) => (
@@ -174,11 +179,11 @@ export function UserRolesField({
 
       {showExpos ? (
         <div className="space-y-2">
-          <Label>Exposition(s)</Label>
+          <Label>{t("form.expos_label")}</Label>
           {!agencyId?.trim() ? (
-            <p className="text-xs text-muted-foreground">Sélectionnez d&apos;abord une organisation.</p>
+            <p className="text-xs text-muted-foreground">{t("form.select_org_first")}</p>
           ) : expoOptions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Aucune exposition pour cette organisation.</p>
+            <p className="text-xs text-muted-foreground">{t("form.no_expo_for_org")}</p>
           ) : (
             <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-border/60 p-3">
               {expoOptions.map((expo) => {
@@ -199,7 +204,7 @@ export function UserRolesField({
             </div>
           )}
           <p className="text-[11px] text-muted-foreground">
-            Organisation : {resolvedAgencyLabel}
+            {t("form.organisation_prefix", { name: resolvedAgencyLabel })}
           </p>
         </div>
       ) : null}

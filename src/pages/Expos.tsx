@@ -143,7 +143,7 @@ function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | nul
       {showImg ? (
         <ImageWithSkeleton
           src={displaySrc}
-          alt=""
+          alt={title}
           wrapperClassName="h-full w-full"
           className="h-full w-full object-contain border border-black p-1.5 shadow-[0_4px_12px_0_rgba(0,0,0,0.15)]"
           loading="lazy"
@@ -175,7 +175,7 @@ function SponsorCarousel({ logos }: { logos: string[] }) {
       <img
         key={src}
         src={src}
-        alt=""
+        alt="Sponsor"
         className="max-h-12 max-w-[104px] object-contain"
         loading="lazy"
         decoding="async"
@@ -1088,7 +1088,7 @@ const Expos = () => {
                         setSponsorExpo({ id: ex.id, name: expoTitle(ex) });
                       }}
                     >
-                      {t("card.sponsors", "Sponsors / Mécènes")}
+                      {t("card.sponsors")}
                     </Button>
                     <Button
                       type="button"
@@ -1253,64 +1253,67 @@ const Expos = () => {
         }}
         canPickAgency={typeof role_id === "number" && role_id < 4}
       />
-      {panelFormatExpo && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setPanelFormatExpo(null)}
-          role="presentation"
+      <Dialog
+        open={Boolean(panelFormatExpo)}
+        onOpenChange={(open) => {
+          if (!open) setPanelFormatExpo(null);
+        }}
+      >
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[120] bg-black/60"
+          className="z-[120] w-full max-w-[340px] gap-0 rounded-lg border-0 bg-white p-4 text-center shadow-xl"
+          aria-describedby={undefined}
+          aria-label={t("panel.formatAria")}
         >
-          <div
-            className="w-full max-w-[340px] rounded-lg bg-white p-4 text-center shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Choix du format du panneau expo"
-          >
-            <p className="text-sm font-semibold text-gray-900">
-              {t("panel.chooseFormat")}
-            </p>
-            <Button
-              type="button"
-              variant="default"
-              className="mt-4 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={() => {
-                openVisitorExpoPresentation(panelFormatExpo.id);
-                setPanelFormatExpo(null);
-              }}
-            >
-              {t("panel.previewPresentation")}
-            </Button>
-            <div className="mt-4 grid grid-cols-2 gap-2">
+          <DialogTitle className="text-sm font-semibold text-gray-900">
+            {t("panel.chooseFormat")}
+          </DialogTitle>
+          {panelFormatExpo ? (
+            <>
               <Button
                 type="button"
+                variant="default"
+                className="mt-4 w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
                 onClick={() => {
-                  void handleGenerateExpoPanel(panelFormatExpo, "a4");
+                  openVisitorExpoPresentation(panelFormatExpo.id);
                   setPanelFormatExpo(null);
                 }}
               >
-                A4
+                {t("panel.previewPresentation")}
               </Button>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void handleGenerateExpoPanel(panelFormatExpo, "a4");
+                    setPanelFormatExpo(null);
+                  }}
+                >
+                  A4
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void handleGenerateExpoPanel(panelFormatExpo, "a3");
+                    setPanelFormatExpo(null);
+                  }}
+                >
+                  A3
+                </Button>
+              </div>
               <Button
                 type="button"
-                onClick={() => {
-                  void handleGenerateExpoPanel(panelFormatExpo, "a3");
-                  setPanelFormatExpo(null);
-                }}
+                variant="outline"
+                className="mt-2 w-full"
+                onClick={() => setPanelFormatExpo(null)}
               >
-                A3
+                {t("panel.cancel")}
               </Button>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-2 w-full"
-              onClick={() => setPanelFormatExpo(null)}
-            >
-              {t("panel.cancel")}
-            </Button>
-          </div>
-        </div>
-      )}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog
         open={Boolean(qrConfirmExpoKey)}

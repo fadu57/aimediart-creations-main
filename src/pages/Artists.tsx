@@ -290,7 +290,7 @@ const Artists = () => {
                     <img
                       key={photoSrc}
                       src={photoSrc}
-                      alt=""
+                      alt={label}
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />

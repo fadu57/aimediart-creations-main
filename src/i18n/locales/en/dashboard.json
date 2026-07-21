@@ -229,9 +229,15 @@
     "expo_limit_blocked": "Your free \"Etincelle\" subscription does not allow creating another exhibition (1 exhibition included)."
   },
   "commercial_kind": {
+    "standard": "Standard",
     "partner_showcase": "Showcase partner",
     "sponsoring": "AIMediArt sponsoring",
     "internal_test": "Test organisation"
+  },
+  "commercial_plan": {
+    "ATELIER": "Atelier",
+    "HORIZON": "Horizon",
+    "RAYONNEMENT": "Rayonnement"
   },
   "plan_actions": {
     "upgrade_prefix": "Upgrade to the plan",

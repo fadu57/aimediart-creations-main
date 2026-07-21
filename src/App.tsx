@@ -27,6 +27,7 @@ import { useEffectiveAuth } from "./hooks/useEffectiveAuth";
 import { VisitorErrorLogCapture } from "./components/visitor/VisitorErrorLogCapture";
 import { OrganizerErrorLogCapture } from "./components/organizer/OrganizerErrorLogCapture";
 import CookieConsentBanner from "./components/CookieConsentBanner";
+import { SkipToContentLink } from "./components/SkipToContentLink";
 import { getAudienceChoice } from "./lib/audienceChoice";
 import { isVisitorRole } from "./lib/authUser";
 import { Loader2 } from "lucide-react";
@@ -126,6 +127,7 @@ function AppShell() {
     normalizedPathname.startsWith("/visitor/") ||
     normalizedPathname === "/visitor" ||
     normalizedPathname.startsWith("/dev/visitor") ||
+    normalizedPathname === "/dev/a11y-demo" ||
     normalizedPathname === "/scan" ||
     normalizedPathname.startsWith("/scan/") ||
     normalizedPathname === "/scan-work1" ||
@@ -136,7 +138,13 @@ function AppShell() {
   return (
     <div className="flex min-h-screen flex-col bg-[#121212]">
       {!hideGlobalHeader && <Header />}
-      <main className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] ${hideGlobalHeader ? "" : "pt-[10px]"}`}>
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] outline-none ${
+          hideGlobalHeader ? "" : "scroll-mt-[4.75rem] pt-[4.75rem]"
+        }`}
+      >
         <Outlet />
       </main>
     </div>
@@ -237,6 +245,9 @@ const AppRoutes = () => (
       <Route path="login" element={<Pages.Login />} />
       <Route path="signup" element={<Pages.RegisterSaaS />} />
       <Route path="reset-password" element={<Pages.ResetPassword />} />
+      {import.meta.env.DEV ? (
+        <Route path="dev/a11y-demo" element={<Pages.A11yDemoPage />} />
+      ) : null}
       <Route path="legal/cgv" element={<Pages.LegalStaticPage variant="cgv" />} />
       <Route path="legal/rgpd" element={<Pages.LegalStaticPage variant="rgpd" />} />
       {/* Redirects rétrocompatibilité anciens QR codes */}
@@ -351,6 +362,7 @@ const App = () => {
             <NavigationModeProvider>
             <NavigationMatrixProvider>
               <OrganisationStandbyProvider>
+              <SkipToContentLink />
               <NormalizeMultipleSlashPathname />
               <I18nRouteLoader />
               <VisitorErrorLogCapture />

@@ -3,11 +3,12 @@ import i18n from "@/i18n/instance";
 export type PresetCommercialKind = "standard" | "partner_showcase" | "sponsoring" | "internal_test";
 export type CommercialKind = PresetCommercialKind | string;
 
-export const COMMERCIAL_KIND_OPTIONS: { value: PresetCommercialKind; label: string }[] = [
-  { value: "standard", label: "Standard" },
-  { value: "partner_showcase", label: "Partenaire vitrine" },
-  { value: "sponsoring", label: "Sponsoring AIMediArt" },
-  { value: "internal_test", label: "Organisation test" },
+/** Valeurs stockées — libellés via i18n `dashboard.commercial_kind.*`. */
+export const COMMERCIAL_KIND_OPTIONS: { value: PresetCommercialKind }[] = [
+  { value: "standard" },
+  { value: "partner_showcase" },
+  { value: "sponsoring" },
+  { value: "internal_test" },
 ];
 
 export const COMMERCIAL_KIND_ADD_OPTION = "__add_commercial_kind__";
@@ -15,6 +16,10 @@ export const COMMERCIAL_KIND_ADD_OPTION = "__add_commercial_kind__";
 const PRESET_COMMERCIAL_KIND_SET = new Set<string>(
   COMMERCIAL_KIND_OPTIONS.map((option) => option.value),
 );
+
+export function commercialKindOptionLabel(kind: PresetCommercialKind): string {
+  return i18n.t(`commercial_kind.${kind}`, { ns: "dashboard", defaultValue: kind });
+}
 
 export function isPresetCommercialKind(kind: string | null | undefined): boolean {
   const value = (kind ?? "").trim();
@@ -29,10 +34,11 @@ export function normalizeCommercialKindForSave(raw: string | null | undefined): 
 
 export type CommercialPlanCode = "ATELIER" | "HORIZON" | "RAYONNEMENT";
 
-export const COMMERCIAL_PLAN_OPTIONS: { value: CommercialPlanCode; label: string }[] = [
-  { value: "ATELIER", label: "Atelier" },
-  { value: "HORIZON", label: "Horizon" },
-  { value: "RAYONNEMENT", label: "Rayonnement" },
+/** Codes stockés — libellés via i18n `dashboard.commercial_plan.*`. */
+export const COMMERCIAL_PLAN_OPTIONS: { value: CommercialPlanCode }[] = [
+  { value: "ATELIER" },
+  { value: "HORIZON" },
+  { value: "RAYONNEMENT" },
 ];
 
 export type AgencyCommercialPreset = {
@@ -54,7 +60,9 @@ export type SubscriptionCommercialTerms = {
 };
 
 export function commercialPlanLabel(planCode: CommercialPlanCode | null | undefined): string | null {
-  return COMMERCIAL_PLAN_OPTIONS.find((option) => option.value === planCode)?.label ?? null;
+  if (!planCode) return null;
+  if (!COMMERCIAL_PLAN_OPTIONS.some((option) => option.value === planCode)) return null;
+  return i18n.t(`commercial_plan.${planCode}`, { ns: "dashboard", defaultValue: planCode });
 }
 
 export function commercialPlanAppliesToPreset(
@@ -89,16 +97,10 @@ export function computeNetPriceEur(
 export function commercialKindLabel(kind: CommercialKind | null | undefined): string | null {
   const value = (kind ?? "").trim();
   if (!value || value === "standard") return null;
-  switch (value) {
-    case "partner_showcase":
-      return i18n.t("commercial_kind.partner_showcase", { ns: "dashboard" });
-    case "sponsoring":
-      return i18n.t("commercial_kind.sponsoring", { ns: "dashboard" });
-    case "internal_test":
-      return i18n.t("commercial_kind.internal_test", { ns: "dashboard" });
-    default:
-      return value;
+  if (PRESET_COMMERCIAL_KIND_SET.has(value)) {
+    return commercialKindOptionLabel(value as PresetCommercialKind);
   }
+  return value;
 }
 
 export function hasCommercialDiscount(terms: SubscriptionCommercialTerms | null | undefined): boolean {

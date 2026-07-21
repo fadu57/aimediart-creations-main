@@ -54,7 +54,27 @@
     "temp_password_placeholder": "Enter a temporary password",
     "checking_username": "Checking username…",
     "username_taken": "This username is already taken. The Save button is disabled.",
-    "change_photo": "Change photo"
+    "change_photo": "Change photo",
+    "roles_title": "Roles",
+    "role_global": "Global role (one only)",
+    "roles_org": "Organisation roles",
+    "roles_org_with_global": " (stackable with a global role)",
+    "roles_org_with_admin": " (stackable: curator, team member)",
+    "organisation": "Organisation",
+    "choose_organisation": "Choose an organisation",
+    "no_organisation": "No organisation available",
+    "expos_label": "Exhibition(s)",
+    "select_org_first": "Select an organisation first.",
+    "no_expo_for_org": "No exhibition for this organisation.",
+    "organisation_prefix": "Organisation: {{name}}",
+    "address_complement": "Address line 2",
+    "address_complement_ph": "Building, floor, box…",
+    "address": "Address",
+    "country": "Country",
+    "zip": "Postal code",
+    "city": "City",
+    "alt_organisation": "Organisation",
+    "alt_exposition": "Exhibition"
   },
   "list": {
     "title": "Users",
@@ -62,6 +82,8 @@
     "search_label": "user",
     "clear_search": "Clear search",
     "clear": "Clear",
+    "sortAsc": "Sort ascending",
+    "sortDesc": "Sort descending",
     "new_user": "+ New user",
     "table": "Table",
     "loading": "Loading users…",
@@ -97,6 +119,9 @@
     "repair_failed": "Auth repair failed.",
     "repair_success": "Auth access repaired. Login: {{email}}",
     "no_agency_resolved": "No organisation resolved",
-    "save_failed": "Saving failed."
+    "save_failed": "Saving failed.",
+    "delete_forbidden_role": "Deletion not allowed for this role.",
+    "deleted_to_trash": "User moved to trash.",
+    "delete_failed": "Deletion failed."
   }
 }

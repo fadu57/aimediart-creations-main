@@ -62,6 +62,13 @@
         "i2": "La suspension peut être temporaire (le temps de mener des vérifications) ou définitive.",
         "i3": "La suppression d’un compte utilisateur n’affecte pas les données et contenus qui ont été créés ou gérés sous la responsabilité du client, sous réserve des droits des personnes concernées et des obligations de conservation."
       }
+    },
+    "accessibility": {
+      "title": "7. Accessibilité numérique",
+      "p1": "Accessibilité numérique : démarche active d'amélioration continue (conformité partielle / socle WCAG 2.2 — AA audité en interne).",
+      "p2": "Une démarche interne d'audit et de remédiation a été réalisée sur les parcours critiques de la plateforme (visite QR, authentification, listes backoffice), en particulier pour le parcours clavier, les dialogues, le contraste, les alternatives textuelles aux images et le respect de prefers-reduced-motion.",
+      "p3": "Cette revue a permis d'obtenir une conformité partielle au référentiel WCAG 2.2 : un socle de critères des niveaux A et AA a été audité en interne. Il ne s'agit pas d'une certification délivrée par un organisme tiers.",
+      "p4": "Pour la définition des niveaux de conformité WCAG (A, AA, AAA) et des exigences associées, voir <wcagLink>Understanding Conformance — WCAG 2.2 (W3C)</wcagLink>."
     }
   }
 }

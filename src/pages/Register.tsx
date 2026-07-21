@@ -558,7 +558,7 @@ const Register = () => {
     "h-9 w-full rounded-md border border-border bg-background text-sm font-normal text-foreground hover:bg-accent hover:text-accent-foreground";
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-0">
+    <div className="flex w-full flex-1 flex-col items-center px-4 pb-6 pt-2">
       <AlertDialog open={emailDuplicateOpen} onOpenChange={setEmailDuplicateOpen}>
         <AlertDialogContent className="max-w-[min(320px,calc(100vw-2rem))]">
           <AlertDialogHeader>
@@ -643,7 +643,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus:ring-0"
+                    className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     aria-label={
                       showPassword ? t("register_visitor.aria_hide_password") : t("register_visitor.aria_show_password")
                     }
@@ -673,7 +673,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus:ring-0"
+                    className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground shadow-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     aria-label={
                       showPassword ? t("register_visitor.aria_hide_confirm") : t("register_visitor.aria_show_confirm")
                     }

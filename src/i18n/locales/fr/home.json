@@ -10,7 +10,7 @@
     "public_vitrine": "VITRINE PUBLIQUE",
     "language_label": "Langue de l'interface",
     "anchor_accueil": "Accueil",
-    "anchor_exposition_vivante": "Exposition vivante",
+    "anchor_exposition_vivante": "Expo vivante",
     "anchor_production": "Production",
     "anchor_parcours": "Parcours",
     "anchor_tarifs": "Tarifs",
@@ -425,7 +425,9 @@
     "terms": "Conditions d’utilisation",
     "ai_policy": "Politique IA",
     "login": "Connexion",
-    "copyright": "© 2026 AIMEDIArt – Tous droits réservés."
+    "copyright": "© 2026 AIMEDIArt – Tous droits réservés.",
+    "accessibility": "Accessibilité numérique : Démarche active d'amélioration continue (conformité partielle / socle WCAG 2.2 - AA audité en interne).",
+    "accessibility_terms_link": "Voir la section dans les Conditions d’utilisation"
   },
   "connexion": {
     "promo_link": "Exposition connectée : Ne laissez plus le réseau limiter votre créativité",
@@ -487,11 +489,12 @@
           "speed": "<bold>Rapidité de déploiement</bold> : Votre exposition est prête à accueillir le public en moins d'une heure.",
           "discretion": "<bold>Discrétion absolue</bold> : Nos bornes Wi-Fi sont conçues pour se fondre dans le décor de votre galerie, laissant la vedette à vos œuvres."
         },
-        "outro": "Avec AIMEDIArt, vous investissez dans une solution durable qui garantit à votre public une immersion totale, sans aucune coupure, où que vous soyez."
+        "outro": "Avec AIMEDIArt, vous investissez dans une solution durable qui garantit à votre public une immersion totale, sans aucune coupure, où que vous soyez.",
+        "expertise_on_site": "Chaque lieu d'exposition étant différent, une expertise par un de nos techniciens sera réalisée sur place pour adapter une solution matérielle sur mesure."
       }
     },
     "quote": {
-      "cta_prefix": "Vous voulez obtenir un devis personnalisé ?",
+      "cta_prefix": "Donnez-nous rapidement vos besoins ici",
       "cta_link": "Cliquer ICI"
     },
     "form": {

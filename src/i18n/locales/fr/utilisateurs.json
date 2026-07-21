@@ -54,7 +54,27 @@
     "temp_password_placeholder": "Saisir un mot de passe provisoire",
     "checking_username": "Vérification du pseudo…",
     "username_taken": "Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.",
-    "change_photo": "Changer la photo"
+    "change_photo": "Changer la photo",
+    "roles_title": "Rôles",
+    "role_global": "Rôle global (un seul)",
+    "roles_org": "Rôles organisation",
+    "roles_org_with_global": " (cumulables avec un rôle global)",
+    "roles_org_with_admin": " (cumulables : commissaire, équipier)",
+    "organisation": "Organisation",
+    "choose_organisation": "Choisir une organisation",
+    "no_organisation": "Aucune organisation disponible",
+    "expos_label": "Exposition(s)",
+    "select_org_first": "Sélectionnez d'abord une organisation.",
+    "no_expo_for_org": "Aucune exposition pour cette organisation.",
+    "organisation_prefix": "Organisation : {{name}}",
+    "address_complement": "Complément d'adresse",
+    "address_complement_ph": "Bâtiment, étage, boîte…",
+    "address": "Adresse",
+    "country": "Pays",
+    "zip": "Code postal",
+    "city": "Ville",
+    "alt_organisation": "Organisation",
+    "alt_exposition": "Exposition"
   },
   "list": {
     "title": "Utilisateurs",
@@ -62,6 +82,8 @@
     "search_label": "utilisateur",
     "clear_search": "Effacer la recherche",
     "clear": "Effacer",
+    "sortAsc": "Trier ascendant",
+    "sortDesc": "Trier descendant",
     "new_user": "+ Nouvel utilisateur",
     "table": "Tableau",
     "loading": "Chargement des utilisateurs…",
@@ -97,6 +119,9 @@
     "repair_failed": "Réparation Auth impossible.",
     "repair_success": "Accès Auth réparé. Connexion: {{email}}",
     "no_agency_resolved": "Aucune agence résolue",
-    "save_failed": "Enregistrement impossible."
+    "save_failed": "Enregistrement impossible.",
+    "delete_forbidden_role": "Suppression non autorisée pour ce rôle.",
+    "deleted_to_trash": "Utilisateur envoyé en corbeille.",
+    "delete_failed": "Suppression impossible."
   }
 }

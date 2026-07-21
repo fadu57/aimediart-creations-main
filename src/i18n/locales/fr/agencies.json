@@ -80,5 +80,83 @@
     "close_confirm_desc": "Des modifications non enregistrées existent. Fermer la fiche ?",
     "no": "Non",
     "yes": "Oui"
-  }
+  },
+  "fields": {
+    "id": "Identifiant (UUID)",
+    "name_agency": "Nom",
+    "acronyme_expo": "Sigle / Acronyme",
+    "created_at": "Créé le",
+    "updated_at": "Modifié le",
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "address": "Adresse",
+    "website": "Site web",
+    "description": "Description",
+    "logo_agency": "Logo",
+    "adresse_agency": "Adresse",
+    "compl_adresse_agency": "Adresse complémentaire",
+    "zip_agency": "Code postal",
+    "city_agency": "Ville",
+    "cedex_agency": "Cedex",
+    "phone_agency": "Téléphone",
+    "mail_agency": "E-mail",
+    "web_agency": "Site web",
+    "agency_pays": "Pays",
+    "commercial_kind": "Profil commercial",
+    "commercial_plan_code": "Abonnement concerné",
+    "discount_percent": "Remise (%)",
+    "discount_amount_eur": "Remise (€ TTC mensuelle)",
+    "commercial_notes": "Notes commerciales / sponsoring",
+    "structure_category": "Famille de structure",
+    "structure_type": "Forme juridique",
+    "siret": "Numéro SIRET",
+    "legal_rep_firstname": "Prénom du responsable légal",
+    "legal_rep_lastname": "Nom du responsable légal",
+    "legal_rep_role": "Qualité du responsable légal"
+  },
+  "identity": {
+    "categories": {
+      "private_lucratif": "Structures privées à but lucratif (Entreprises)",
+      "private_non_lucratif": "Structures privées à but non lucratif",
+      "public_parapublic": "Organismes publics et parapublics"
+    },
+    "types": {
+      "societe_commerciale": "Sociétés commerciales",
+      "entreprise_individuelle": "Entreprises individuelles",
+      "societe_civile": "Sociétés civiles",
+      "profession_liberale": "Professions libérales",
+      "association": "Associations",
+      "fondation": "Fondations",
+      "fonds_dotation": "Fonds de dotation",
+      "administration_etat": "Administrations d'État",
+      "collectivite_territoriale": "Collectivités territoriales",
+      "etablissement_public": "Établissements publics"
+    },
+    "roles": {
+      "gerant": "Gérant(e)",
+      "president": "Président(e)",
+      "president_dg": "Président(e)-Directeur(trice) général(e)",
+      "president_ca": "Président(e) du conseil d'administration",
+      "directeur_general": "Directeur(trice) Général(e)",
+      "maire": "Maire",
+      "president_conseil_departemental": "Président(e) du Conseil départemental",
+      "president_conseil_regional": "Président(e) du Conseil régional",
+      "dgs": "Directeur(trice) Général(e) des Services (DGS)",
+      "directeur": "Directeur(trice)"
+    },
+    "validation": {
+      "type_required": "Sélectionnez la forme juridique détaillée.",
+      "category_required": "Sélectionnez d'abord la famille de structure.",
+      "type_mismatch": "La forme juridique ne correspond pas à la famille sélectionnée.",
+      "siret_length": "Le SIRET doit contenir exactement 14 chiffres (format XXX XXX XXX XXXXX).",
+      "role_invalid": "La qualité du responsable légal n'est pas valide pour cette structure."
+    },
+    "convention": {
+      "list_and": "et",
+      "complete": "Votre fiche organisation contient les informations requises.",
+      "missing": "merci de compléter les champs manquants dans votre fiche organisation suivants : {{fields}}."
+    }
+  },
+  "logo_alt_fallback": "Logo organisation",
+  "logo_alt_named": "{{name}} — logo"
 }

@@ -420,7 +420,9 @@
     "terms": "Condiciones de uso",
     "ai_policy": "Política IA",
     "login": "Acceso",
-    "copyright": "© 2026 AIMEDIArt – Todos los derechos reservados."
+    "copyright": "© 2026 AIMEDIArt – Todos los derechos reservados.",
+    "accessibility": "Accesibilidad digital: Enfoque activo de mejora continua (conformidad parcial / base WCAG 2.2 AA auditada internamente).",
+    "accessibility_terms_link": "Ver la sección en las Condiciones de uso"
   },
   "connexion": {
     "promo_link": "Exposición conectada: no deje que la red limite su creatividad",
@@ -482,11 +484,12 @@
           "speed": "<bold>Rapidez de despliegue</bold>: listo en menos de una hora.",
           "discretion": "<bold>Discreción absoluta</bold>: puntos de acceso discretos."
         },
-        "outro": "Con AIMEDIArt, inversión durable para una inmersión total sin cortes."
+        "outro": "Con AIMEDIArt, inversión durable para una inmersión total sin cortes.",
+        "expertise_on_site": "Como cada lugar de exposición es diferente, uno de nuestros técnicos realizará una valoración in situ para adaptar una solución de material a medida."
       }
     },
     "quote": {
-      "cta_prefix": "¿Desea un presupuesto personalizado?",
+      "cta_prefix": "Indíquenos rápidamente aquí sus necesidades",
       "cta_link": "Haga clic AQUÍ"
     },
     "form": {

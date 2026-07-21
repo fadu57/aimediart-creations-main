@@ -62,6 +62,13 @@
         "i2": "Die Sperrung kann vorübergehend sein (während Prüfungen) oder dauerhaft.",
         "i3": "Die Löschung eines Nutzerkontos berührt nicht die unter Verantwortung des Kunden erstellten oder verwalteten Daten und Inhalte, vorbehaltlich der Rechte der Betroffenen und Aufbewahrungspflichten."
       }
+    },
+    "accessibility": {
+      "title": "7. Digitale Barrierefreiheit",
+      "p1": "Digitale Barrierefreiheit: aktiver kontinuierlicher Verbesserungsprozess (teilweise Konformität / WCAG-2.2-AA-Grundlage intern geprüft).",
+      "p2": "Ein interner Audit- und Nachbesserungsprozess wurde für die kritischen Wege der Plattform durchgeführt (QR-Besuch, Authentifizierung, Backoffice-Listen), insbesondere zu Tastaturbedienung, Dialogen, Kontrast, Textalternativen für Bilder und Beachtung von prefers-reduced-motion.",
+      "p3": "Diese Überprüfung führte zu einer teilweisen Konformität mit WCAG 2.2: Eine Grundlage von Kriterien der Stufen A und AA wurde intern geprüft. Es handelt sich nicht um eine Zertifizierung durch eine externe Stelle.",
+      "p4": "Zur Definition der WCAG-Konformitätsstufen (A, AA, AAA) und der zugehörigen Anforderungen siehe <wcagLink>Understanding Conformance — WCAG 2.2 (W3C)</wcagLink>."
     }
   }
 }

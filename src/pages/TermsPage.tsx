@@ -1,8 +1,15 @@
-import { useTranslation } from "react-i18next";
+import { useEffect } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 
 import { PublicVitrineShell } from "@/components/PublicVitrineShell";
 import { highlightAimediartCom } from "@/lib/highlightAimediartCom";
 import { LEGAL_ARTICLE_CLASS, LEGAL_SECTION_TITLE_CLASS } from "@/pages/legalPageStyles";
+
+const WCAG_CONFORMANCE_URL = "https://www.w3.org/WAI/WCAG22/Understanding/conformance";
+const ACCESSIBILITY_SECTION_ID = "accessibilite-numerique";
+
+
 
 function BulletList({
   prefix,
@@ -28,7 +35,22 @@ function BulletList({
  */
 const TermsPage = () => {
   const { t } = useTranslation("terms");
+  const { hash } = useLocation();
   const bt = (key: string) => highlightAimediartCom(t(key));
+
+  useEffect(() => {
+    const id = hash.replace(/^#/, "").trim();
+    if (id !== ACCESSIBILITY_SECTION_ID) return;
+    const scroll = () => {
+      document.getElementById(ACCESSIBILITY_SECTION_ID)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    };
+    requestAnimationFrame(scroll);
+    const timer = window.setTimeout(scroll, 80);
+    return () => window.clearTimeout(timer);
+  }, [hash]);
 
   return (
     <PublicVitrineShell vitrinePathPrefix="/organisation" atmosphericBackdrop>
@@ -72,6 +94,29 @@ const TermsPage = () => {
             <section className="mb-10">
               <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.suspension.title")}</h2>
               <BulletList prefix="sections.suspension.list" keys={["i1", "i2", "i3"]} />
+            </section>
+
+            <section id={ACCESSIBILITY_SECTION_ID} className="mb-10 scroll-mt-28">
+              <h2 className={LEGAL_SECTION_TITLE_CLASS}>{bt("sections.accessibility.title")}</h2>
+              <p className="mt-3">{bt("sections.accessibility.p1")}</p>
+              <p className="mt-3">{bt("sections.accessibility.p2")}</p>
+              <p className="mt-3">{bt("sections.accessibility.p3")}</p>
+              <p className="mt-3">
+                <Trans
+                  i18nKey="sections.accessibility.p4"
+                  ns="terms"
+                  components={{
+                    wcagLink: (
+                      <a
+                        href={WCAG_CONFORMANCE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-[#1f1f1f] underline underline-offset-2 hover:text-[#E63946] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    ),
+                  }}
+                />
+              </p>
             </section>
           </article>
         </div>

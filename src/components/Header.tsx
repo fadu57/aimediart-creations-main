@@ -272,7 +272,7 @@ export default function Header() {
             : cn(
                 "mx-auto flex w-full py-1",
                 showVitrineNavInHeaderDesktop
-                  ? "max-w-[1060px] flex-col px-5 py-1 sm:px-6 min-h-[5rem]"
+                  ? "max-w-[1060px] flex-col px-5 py-1 sm:px-6"
                   : "max-w-[1200px] items-center justify-between gap-2 px-2 sm:px-4 min-h-[4.25rem]",
               )
         }
@@ -281,17 +281,70 @@ export default function Header() {
           className={cn(
             "flex w-full gap-2",
             showVitrineNavInHeaderDesktop
-              ? "items-center justify-between px-2 sm:px-3"
+              ? "items-start justify-between px-2 sm:px-3"
               : "items-center justify-between",
           )}
         >
         <div
           className={cn(
-            "header-left flex min-w-0 items-center gap-[15px]",
+            "header-left flex min-w-0 gap-[15px]",
+            showVitrineNavInHeaderDesktop ? "items-start" : "items-center",
             !showVitrineNavInHeaderDesktop && "flex-1",
           )}
         >
-          <Logo compact={isAuthFormPage} role_name={role_name} role_id={role_id} />
+          <div className="flex min-w-0 flex-col items-start gap-0.5">
+            <Logo compact={isAuthFormPage} role_name={role_name} role_id={role_id} />
+            {showVitrineNavInHeaderDesktop ? (
+              <div className="flex flex-nowrap items-center gap-1.5">
+                {session && !isAuthFormPage ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center rounded-md border border-neutral-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-foreground shadow-sm transition-colors hover:border-neutral-400 hover:bg-neutral-50"
+                    onClick={() => {
+                      void handleLogout();
+                    }}
+                  >
+                    {t("logout")}
+                  </button>
+                ) : (
+                  <NavLink
+                    to="/login"
+                    className={({ isActive }) =>
+                      `inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-semibold shadow-sm transition-colors ${
+                        isActive
+                          ? "border border-[#E63946] bg-[#E63946] text-white"
+                          : "border border-neutral-300 bg-white text-foreground hover:border-neutral-400 hover:bg-neutral-50"
+                      }`
+                    }
+                  >
+                    {t("login")}
+                  </NavLink>
+                )}
+                {session ? (
+                  <Link
+                    to={homePath}
+                    className="whitespace-nowrap text-[11px] text-gray-700 transition-colors hover:text-foreground"
+                  >
+                    {t("greeting")}{" "}
+                    {authLoading ? (
+                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
+                    ) : (
+                      <span id="display_user_prenom" className="font-semibold">
+                        {displayUserPrenom}
+                        {showGreetingAgency && agencyDisplayName
+                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                          : null}
+                      </span>
+                    )}
+                  </Link>
+                ) : (
+                  <span className="whitespace-nowrap text-[11px] text-gray-700">
+                    {t("greeting")}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </div>
           {!languageInNavRow ? (
             <div className="user-controls flex flex-col items-start gap-1">
               {languageSelector}
@@ -324,142 +377,133 @@ export default function Header() {
           <div
             className={cn(
               "hidden min-w-0 flex-col xl:flex",
-              showVitrineNavInHeaderDesktop ? "shrink-0 items-end gap-0" : "ml-4 shrink-0 items-end gap-0.5",
+              showVitrineNavInHeaderDesktop
+                ? "shrink-0 items-end justify-start gap-0"
+                : "ml-4 shrink-0 items-end gap-0.5",
             )}
           >
-            <nav className="flex flex-nowrap items-center justify-end gap-1">
-              {languageInNavRow ? languageSelector : null}
-              <NavLink
-                to="/organisation"
-                className={({ isActive }) =>
-                  `${navPillClass} ${
-                    isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                  }`
-                }
-              >
-                {t("nav_accueil")}
-              </NavLink>
-              {!standbyNavOnly &&
-                hasFullHeader &&
-                HEADER_NAV_ITEMS.map((item) => {
-                  if (item.key === "menu_home") return null;
-                  if (hideOrganisationNav && item.key === "menu_agence") return null;
-                  if (!can(item.key)) return null;
-                  return (
-                    <NavLink
-                      key={`desktop-nav-${item.key}`}
-                      to={item.to}
-                      className={({ isActive }) =>
-                        `${navPillClass} ${
-                          isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                        }`
-                      }
+            {showVitrineNavInHeaderDesktop ? (
+              <div className="flex flex-nowrap items-center justify-end gap-1">
+                {languageInNavRow ? languageSelector : null}
+                <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
+                  <VitrineAnchorNav
+                    vitrinePathPrefix={vitrineAnchorPrefix}
+                    variant="header"
+                    align="end"
+                  />
+                  {session ? (
+                    <Link
+                      to={homePath}
+                      className={`${HEADER_NAV_PILL_COMPACT_CLASS} bg-[#E63946] text-white hover:bg-[#E63946]/90`}
                     >
-                      {t(navKey(item.label))}
-                    </NavLink>
-                  );
-                })}
-              {canSeeHomeMenu && (
-                <div className="inline-flex items-center gap-1.5">
+                      {t("nav_to_studio")}
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <>
+                <nav className="flex flex-nowrap items-center justify-end gap-1" aria-label={t("nav_main")}>
+                  {languageInNavRow ? languageSelector : null}
                   <NavLink
-                    to={homePath}
+                    to="/organisation"
                     className={({ isActive }) =>
                       `${navPillClass} ${
                         isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
                       }`
                     }
                   >
-                    {t("nav_home")}
+                    {t("nav_accueil")}
                   </NavLink>
-                  {standbyNavOnly ? (
-                    <span className="rounded-full border border-amber-400/90 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
-                      {t("standby_mode_badge")}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-              {!standbyNavOnly && hasFullHeader && canSeeSettings && (
-                <SettingsMenuDropdown triggerClassName={navPillClass} />
-              )}
-              {session && !isAuthFormPage ? (
-                <button
-                  type="button"
-                  className={`${navPillClass} text-foreground hover:bg-muted ${HEADER_LOGOUT_SHADOW}`}
-                  onClick={() => {
-                    void handleLogout();
-                  }}
-                >
-                  {t("logout")}
-                </button>
-              ) : (
-                <NavLink
-                  to="/login"
-                  className={({ isActive }) =>
-                    `${navPillClass} ${
-                      isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
-                    }`
-                  }
-                >
-                  {t("login")}
-                </NavLink>
-              )}
-            </nav>
-            {showVitrineNavInHeaderDesktop ? (
-              <div className="flex items-center justify-end gap-3">
-                <div className="rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
-                  <VitrineAnchorNav
-                    vitrinePathPrefix={vitrineAnchorPrefix}
-                    variant="header"
-                    align="end"
-                  />
-                </div>
-                {session ? (
-                  <Link
-                    to={homePath}
-                    className="whitespace-nowrap text-[11px] text-gray-700 transition-colors hover:text-foreground"
-                  >
-                    {t("greeting")}{" "}
-                    {authLoading ? (
-                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
-                    ) : (
-                      <span id="display_user_prenom" className="font-semibold">
-                        {displayUserPrenom}
-                        {showGreetingAgency && agencyDisplayName
-                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
-                          : null}
-                      </span>
-                    )}
-                  </Link>
-                ) : (
-                  <span className="whitespace-nowrap text-[11px] text-gray-700">
-                    {t("greeting")}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
-                {t("greeting")}
-                {session ? (
-                  <>
-                    {" "}
-                    {authLoading ? (
-                      <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
-                    ) : (
-                      <Link
+                  {!standbyNavOnly &&
+                    hasFullHeader &&
+                    HEADER_NAV_ITEMS.map((item) => {
+                      if (item.key === "menu_home") return null;
+                      if (hideOrganisationNav && item.key === "menu_agence") return null;
+                      if (!can(item.key)) return null;
+                      return (
+                        <NavLink
+                          key={`desktop-nav-${item.key}`}
+                          to={item.to}
+                          className={({ isActive }) =>
+                            `${navPillClass} ${
+                              isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                            }`
+                          }
+                        >
+                          {t(navKey(item.label))}
+                        </NavLink>
+                      );
+                    })}
+                  {canSeeHomeMenu && (
+                    <div className="inline-flex items-center gap-1.5">
+                      <NavLink
                         to={homePath}
-                        className="font-semibold transition-colors hover:text-foreground"
+                        className={({ isActive }) =>
+                          `${navPillClass} ${
+                            isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                          }`
+                        }
                       >
-                        {displayUserPrenom}
-                        {showGreetingAgency && agencyDisplayName
-                          ? t("greeting_agency_suffix", { agency: agencyDisplayName })
-                          : null}
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  ""
-                )}
-              </span>
+                        {t("nav_home")}
+                      </NavLink>
+                      {standbyNavOnly ? (
+                        <span className="rounded-full border border-amber-400/90 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                          {t("standby_mode_badge")}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
+                  {!standbyNavOnly && hasFullHeader && canSeeSettings && (
+                    <SettingsMenuDropdown triggerClassName={navPillClass} />
+                  )}
+                  {session && !isAuthFormPage ? (
+                    <button
+                      type="button"
+                      className={`${navPillClass} text-foreground hover:bg-muted ${HEADER_LOGOUT_SHADOW}`}
+                      onClick={() => {
+                        void handleLogout();
+                      }}
+                    >
+                      {t("logout")}
+                    </button>
+                  ) : (
+                    <NavLink
+                      to="/login"
+                      className={({ isActive }) =>
+                        `${navPillClass} ${
+                          isActive ? "bg-[#E63946] text-white" : "text-foreground hover:bg-muted"
+                        }`
+                      }
+                    >
+                      {t("login")}
+                    </NavLink>
+                  )}
+                </nav>
+                <span className="whitespace-nowrap text-[11px] text-gray-700 text-right">
+                  {t("greeting")}
+                  {session ? (
+                    <>
+                      {" "}
+                      {authLoading ? (
+                        <Loader2 className="inline-block h-3 w-3 animate-spin align-middle text-gray-500" aria-hidden />
+                      ) : (
+                        <Link
+                          to={homePath}
+                          className="font-semibold transition-colors hover:text-foreground"
+                        >
+                          {displayUserPrenom}
+                          {showGreetingAgency && agencyDisplayName
+                            ? t("greeting_agency_suffix", { agency: agencyDisplayName })
+                            : null}
+                        </Link>
+                      )}
+                    </>
+                  ) : (
+                    ""
+                  )}
+                </span>
+              </>
             )}
           </div>
         )}

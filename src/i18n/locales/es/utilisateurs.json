@@ -54,7 +54,27 @@
     "temp_password_placeholder": "Introduzca una contraseña provisional",
     "checking_username": "Verificando el alias…",
     "username_taken": "Este alias ya está en uso. El botón Guardar está desactivado.",
-    "change_photo": "Cambiar la foto"
+    "change_photo": "Cambiar la foto",
+    "roles_title": "Roles",
+    "role_global": "Rol global (uno solo)",
+    "roles_org": "Roles de organización",
+    "roles_org_with_global": " (acumulables con un rol global)",
+    "roles_org_with_admin": " (acumulables: comisario, equipo)",
+    "organisation": "Organización",
+    "choose_organisation": "Elegir una organización",
+    "no_organisation": "Ninguna organización disponible",
+    "expos_label": "Exposición(es)",
+    "select_org_first": "Seleccione primero una organización.",
+    "no_expo_for_org": "Ninguna exposición para esta organización.",
+    "organisation_prefix": "Organización: {{name}}",
+    "address_complement": "Complemento de dirección",
+    "address_complement_ph": "Edificio, piso, apartado…",
+    "address": "Dirección",
+    "country": "País",
+    "zip": "Código postal",
+    "city": "Ciudad",
+    "alt_organisation": "Organización",
+    "alt_exposition": "Exposición"
   },
   "list": {
     "title": "Usuarios",
@@ -68,7 +88,9 @@
     "empty": "Ningún usuario visible.",
     "alias": "alias \"{{name}}\"",
     "last_sign_in": "Última conexión",
-    "org_all_expos": "Responsable de todas las exposiciones de la organización"
+    "org_all_expos": "Responsable de todas las exposiciones de la organización",
+    "sortAsc": "Orden ascendente",
+    "sortDesc": "Orden descendente"
   },
   "messages": {
     "email_confirm_sent": "Se ha enviado un correo de confirmación a la nueva dirección. Valide el enlace para finalizar el cambio.",
@@ -97,6 +119,9 @@
     "repair_failed": "No se pudo reparar Auth.",
     "repair_success": "Acceso Auth reparado. Conexión: {{email}}",
     "no_agency_resolved": "Ninguna organización resuelta",
-    "save_failed": "Error al guardar."
+    "save_failed": "Error al guardar.",
+    "delete_forbidden_role": "Eliminación no autorizada para este rol.",
+    "deleted_to_trash": "Usuario enviado a la papelera.",
+    "delete_failed": "Eliminación imposible."
   }
 }

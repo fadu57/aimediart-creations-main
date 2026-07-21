@@ -425,7 +425,9 @@
     "terms": "Terms of Use",
     "ai_policy": "AI Policy",
     "login": "Login",
-    "copyright": "© 2026 AIMEDIArt – All rights reserved."
+    "copyright": "© 2026 AIMEDIArt – All rights reserved.",
+    "accessibility": "Digital accessibility: Active continuous improvement approach (partial conformance / WCAG 2.2 AA baseline audited internally).",
+    "accessibility_terms_link": "See the section in the Terms of Use"
   },
   "connexion": {
     "promo_link": "Connected exhibition: Don't let the network limit your creativity",
@@ -487,11 +489,12 @@
           "speed": "<bold>Fast deployment</bold>: Your exhibition is ready for the public in under an hour.",
           "discretion": "<bold>Total discretion</bold>: Our Wi-Fi access points blend into your gallery décor, keeping the focus on your artworks."
         },
-        "outro": "With AIMEDIArt, you invest in a durable solution that guarantees your audience total immersion, without interruption, wherever you are."
+        "outro": "With AIMEDIArt, you invest in a durable solution that guarantees your audience total immersion, without interruption, wherever you are.",
+        "expertise_on_site": "As every exhibition venue is different, one of our technicians will carry out an on-site assessment to adapt a tailored hardware solution."
       }
     },
     "quote": {
-      "cta_prefix": "Want a personalised quote?",
+      "cta_prefix": "Share your needs with us quickly here",
       "cta_link": "Click HERE"
     },
     "form": {

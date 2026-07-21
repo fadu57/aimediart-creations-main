@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useForm, useFormState, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -58,7 +57,7 @@ import { BirthDatePickerFr } from "@/components/BirthDatePickerFr";
 import { CountryFlagIcon } from "@/components/CountryFlagIcon";
 import { SmartPhoneInput } from "@/components/SmartPhoneInput";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -111,75 +110,79 @@ function ArtistAgeDisplay({ ageYears, missingText, yearsText }: {
 
 const socialSchema = z.record(z.string());
 
-const artistFormSchemaBase = z.object({
-  artist_firstname: z.string().min(1, "Le prénom est obligatoire.").trim(),
-  artist_lastname: z.string().min(1, "Le nom est obligatoire.").trim(),
-  artist_typ: z.array(z.string()).min(1, "Sélectionnez au moins un type d’art."),
-  country: z.string().optional(),
-  addressLine1: z.string().optional(),
-  addressLine2: z.string().optional(),
-  postalCode: z.string().optional(),
-  city: z.string().optional(),
-  artist_nickname: z.string().optional(),
-  artist_photo_url: z.string().optional(),
-  email: z.union([z.literal(""), z.string().email("Format d’e-mail invalide.")]).optional(),
-  phone: z.string().optional(),
-  birth_date: z.date().optional().nullable(),
-  death_date: z.date().optional().nullable(),
-  artist_vivant: z.boolean().default(true),
-  social: socialSchema.optional(),
-});
+type ArtistTranslateFn = (key: string) => string;
 
-const artistFormSchema = artistFormSchemaBase.superRefine((data, ctx) => {
-  const today = startOfLocalDay(new Date());
-  const birth = coerceFormDate(data.birth_date);
-  const death = coerceFormDate(data.death_date);
+function buildArtistFormSchema(t: ArtistTranslateFn) {
+  const base = z.object({
+    artist_firstname: z.string().min(1, t("validation.firstname_required")).trim(),
+    artist_lastname: z.string().min(1, t("validation.lastname_required")).trim(),
+    artist_typ: z.array(z.string()).min(1, t("validation.art_type_required")),
+    country: z.string().optional(),
+    addressLine1: z.string().optional(),
+    addressLine2: z.string().optional(),
+    postalCode: z.string().optional(),
+    city: z.string().optional(),
+    artist_nickname: z.string().optional(),
+    artist_photo_url: z.string().optional(),
+    email: z.union([z.literal(""), z.string().email(t("validation.email_invalid"))]).optional(),
+    phone: z.string().optional(),
+    birth_date: z.date().optional().nullable(),
+    death_date: z.date().optional().nullable(),
+    artist_vivant: z.boolean().default(true),
+    social: socialSchema.optional(),
+  });
 
-  if (birth && birth > today) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["birth_date"],
-      message: "La date de naissance ne peut pas être postérieure à aujourd’hui.",
-    });
-  }
+  return base.superRefine((data, ctx) => {
+    const today = startOfLocalDay(new Date());
+    const birth = coerceFormDate(data.birth_date);
+    const death = coerceFormDate(data.death_date);
 
-  if (data.artist_vivant === false) {
-    if (death && death > today) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["death_date"],
-        message: "La date de décès ne peut pas être postérieure à aujourd’hui.",
-      });
-    }
-    if (birth && death && death < birth) {
+    if (birth && birth > today) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["birth_date"],
-        message: "La date de naissance doit être antérieure à la date de décès.",
-      });
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["death_date"],
-        message: "La date de décès doit être postérieure à la date de naissance.",
+        message: t("validation.birth_after_today"),
       });
     }
-    return;
-  }
 
-  const normalizedPostal = normalizePostalCode(data.postalCode ?? "");
-  if (!normalizedPostal) return;
+    if (data.artist_vivant === false) {
+      if (death && death > today) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["death_date"],
+          message: t("validation.death_after_today"),
+        });
+      }
+      if (birth && death && death < birth) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["birth_date"],
+          message: t("validation.birth_before_death"),
+        });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["death_date"],
+          message: t("validation.death_after_birth"),
+        });
+      }
+      return;
+    }
 
-  const res = validatePostalCodeForCountryLabel(normalizedPostal, data.country ?? "");
-  if (res.ok === false) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["postalCode"],
-      message: res.message,
-    });
-  }
-});
+    const normalizedPostal = normalizePostalCode(data.postalCode ?? "");
+    if (!normalizedPostal) return;
 
-export type ArtistFormInput = z.infer<typeof artistFormSchema>;
+    const res = validatePostalCodeForCountryLabel(normalizedPostal, data.country ?? "");
+    if (res.ok === false) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["postalCode"],
+        message: res.message,
+      });
+    }
+  });
+}
+
+export type ArtistFormInput = z.infer<ReturnType<typeof buildArtistFormSchema>>;
 
 type ArtistsTableUpdate = Database["public"]["Tables"]["artists"]["Update"];
 type ArtistsTableInsert = Database["public"]["Tables"]["artists"]["Insert"];
@@ -297,7 +300,8 @@ export function AddArtistDialog({
   artistId: artistIdProp,
   initialEditMode = false,
 }: AddArtistDialogProps) {
-  const { t } = useTranslation("artists");
+  const { t, i18n } = useTranslation("artists");
+  const artistFormSchema = useMemo(() => buildArtistFormSchema(t), [t, i18n.language]);
   const { user, agency_id } = useAuthUser();
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const bypassCloseConfirmRef = useRef(false);
@@ -2013,91 +2017,93 @@ export function AddArtistDialog({
           </form>
         </Form>
 
-        {isDuplicateModalOpen &&
-          duplicateRow &&
-          typeof document !== "undefined" &&
-          createPortal(
-            <div
-              className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4"
-              onClick={() => setIsDuplicateModalOpen(false)}
-              role="presentation"
-            >
-              <div
-                className="relative w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-label={t("duplicate_modal_aria")}
-              >
-                <button
-                  type="button"
-                  onClick={() => setIsDuplicateModalOpen(false)}
-                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                  aria-label={t("btn_cancel")}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-
-                <h3 className="pr-8 text-base font-semibold text-foreground">{t("duplicate_modal_title")}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{t("duplicate_modal_desc")}</p>
-
-                <div className="mt-4 flex gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
-                  <img
-                    src={duplicatePhotoSrc}
-                    alt=""
-                    className="h-20 w-20 shrink-0 rounded-lg border border-border object-cover"
-                  />
-                  <div className="min-w-0 text-left text-sm">
-                    <p className="font-semibold text-foreground">{duplicateDisplayName}</p>
-                    {duplicateTypLabels.length > 0 && (
-                      <p className="mt-1 text-muted-foreground">
-                        {t("duplicate_existing_types")} : {duplicateTypLabels.join(" · ")}
-                      </p>
-                    )}
-                    {(duplicateRow.artist_email ?? "").trim() && (
-                      <p className="mt-1 truncate text-muted-foreground">{duplicateRow.artist_email}</p>
-                    )}
-                    {duplicateBioFr && (
-                      <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{duplicateBioFr}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    onClick={() => setIsDuplicateModalOpen(false)}
-                  >
-                    {t("btn_cancel")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    onClick={handleCreateDespiteDuplicate}
-                    disabled={isSubmitting}
-                  >
-                    {t("btn_create_new_anyway")}
-                  </Button>
-                  <Button
-                    type="button"
-                    className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
-                    onClick={handleUseExistingArtistFiche}
-                  >
-                    {t("btn_use_existing_fiche")}
-                  </Button>
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )}
       </DialogContent>
     </Dialog>
 
+      <Dialog
+        open={Boolean(isDuplicateModalOpen && duplicateRow)}
+        onOpenChange={(next) => {
+          if (!next) setIsDuplicateModalOpen(false);
+        }}
+      >
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[200] bg-black/55"
+          className="z-[201] w-full max-w-md gap-0 rounded-lg border border-border bg-background p-4 shadow-xl"
+        >
+          <button
+            type="button"
+            onClick={() => setIsDuplicateModalOpen(false)}
+            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t("btn_cancel")}
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+
+          <DialogTitle className="pr-8 text-base font-semibold text-foreground">
+            {t("duplicate_modal_title")}
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-muted-foreground">
+            {t("duplicate_modal_desc")}
+          </DialogDescription>
+
+          {duplicateRow ? (
+            <>
+              <div className="mt-4 flex gap-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <img
+                  src={duplicatePhotoSrc}
+                  alt={duplicateDisplayName}
+                  className="h-20 w-20 shrink-0 rounded-lg border border-border object-cover"
+                />
+                <div className="min-w-0 text-left text-sm">
+                  <p className="font-semibold text-foreground">{duplicateDisplayName}</p>
+                  {duplicateTypLabels.length > 0 && (
+                    <p className="mt-1 text-muted-foreground">
+                      {t("duplicate_existing_types")} : {duplicateTypLabels.join(" · ")}
+                    </p>
+                  )}
+                  {(duplicateRow.artist_email ?? "").trim() && (
+                    <p className="mt-1 truncate text-muted-foreground">{duplicateRow.artist_email}</p>
+                  )}
+                  {duplicateBioFr && (
+                    <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{duplicateBioFr}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => setIsDuplicateModalOpen(false)}
+                >
+                  {t("btn_cancel")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={handleCreateDespiteDuplicate}
+                  disabled={isSubmitting}
+                >
+                  {t("btn_create_new_anyway")}
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground sm:w-auto"
+                  onClick={handleUseExistingArtistFiche}
+                >
+                  {t("btn_use_existing_fiche")}
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
-        <AlertDialogContent className="z-[250]">
+        <AlertDialogContent className="z-[250]" overlayClassName="z-[250]">
           <AlertDialogHeader>
             <AlertDialogTitle>{t("discard.title")}</AlertDialogTitle>
             <AlertDialogDescription>

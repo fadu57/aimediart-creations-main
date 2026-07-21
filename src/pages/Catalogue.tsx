@@ -23,6 +23,7 @@ import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { useOrganisationStandby } from "@/providers/OrganisationStandbyProvider";
 import { useDataScope } from "@/hooks/useDataScope";
 import { hasFullDataAccess } from "@/lib/authUser";
+import { A11Y_CLICKABLE_FOCUS_CLASS } from "@/lib/a11yClickable";
 import { Plus, Search, Loader2, X, Undo2, ExternalLink, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -237,6 +238,8 @@ const catalogIaBadgeClass =
 const Catalogue = () => {
   const { t, i18n } = useTranslation("catalogue");
   const [searchParams, setSearchParams] = useSearchParams();
+  const artworkPopupId = searchParams.get("artwork")?.trim() || "";
+  const artworkPopupOpenedRef = useRef(false);
   const [search, setSearch] = useState(() => searchParams.get("q")?.trim() ?? "");
   const [artworks, setArtworks] = useState<ArtworkRow[]>([]);
   const [voiceSummaryByArtwork, setVoiceSummaryByArtwork] = useState<
@@ -752,6 +755,8 @@ const Catalogue = () => {
     const q = search.trim();
     if (q) next.set("q", q);
     if (selectedExpoFilter !== "all") next.set("expo", selectedExpoFilter);
+    const artwork = searchParams.get("artwork")?.trim();
+    if (artwork) next.set("artwork", artwork);
     const nextStr = next.toString();
     if (nextStr !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
@@ -784,6 +789,17 @@ const Catalogue = () => {
     setVoicesEntryFromCatalogue(false);
     setArtworkModalOpen(true);
   };
+
+  /** Ouverture fiche backoffice depuis Catalogue2 (`?artwork=`). */
+  useEffect(() => {
+    if (!artworkPopupId) {
+      artworkPopupOpenedRef.current = false;
+      return;
+    }
+    if (artworkPopupOpenedRef.current || authLoading || loading) return;
+    artworkPopupOpenedRef.current = true;
+    openEditArtwork(artworkPopupId);
+  }, [artworkPopupId, authLoading, loading]);
 
   const openArtworkVoicesModal = (id: string) => {
     setEditingArtworkId(id);
@@ -1401,7 +1417,7 @@ const Catalogue = () => {
   ]);
 
   return (
-    <div className="container min-w-0 max-w-full pt-[38px] pb-8 space-y-8">
+    <div className="container min-w-0 max-w-full pt-2 pb-8 space-y-8">
       <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 backdrop-blur-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
@@ -1808,7 +1824,7 @@ const Catalogue = () => {
                   </label>
                 </div>
                 <CardContent
-                  className="relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-4 overflow-hidden p-4 sm:flex-row"
+                  className={`relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-4 overflow-hidden p-4 sm:flex-row ${A11Y_CLICKABLE_FOCUS_CLASS}`}
                   role="button"
                   tabIndex={0}
                   onClick={() => openEditArtwork(row.artwork_id)}

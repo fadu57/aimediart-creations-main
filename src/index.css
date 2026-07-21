@@ -22,7 +22,8 @@
     --secondary-foreground: 20 20% 15%;
 
     --muted: 30 10% 92%;
-    --muted-foreground: 20 10% 45%;
+    /* ~4.5:1+ sur fond clair (AA) — reste « muted » sans casser la hiérarchie */
+    --muted-foreground: 20 12% 38%;
 
     --accent: 0 65% 48%;
     --accent-foreground: 0 0% 100%;
@@ -67,7 +68,8 @@
     --secondary-foreground: 30 15% 92%;
 
     --muted: 20 10% 18%;
-    --muted-foreground: 30 10% 55%;
+    /* Plus clair sur fond sombre pour viser AA */
+    --muted-foreground: 30 8% 68%;
 
     --accent: 0 65% 48%;
     --accent-foreground: 0 0% 100%;
@@ -394,7 +396,7 @@
     background-clip: text;
   }
 
-  /** Cœur du logo header — rotation continue */
+  /** Cœur du logo header — rotation continue (coupée si reduced-motion) */
   .animate-logo-heart {
     animation: logo-heart-rotate 4s linear infinite;
   }
@@ -1220,6 +1222,8 @@
   }
 }
 
+/* Note : bloc reduced-motion global (ph-*, logo, bounce…) plus bas, après le swiper pricing. */
+
 .ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner {
   transform: scale(1.1);
   z-index: 3;
@@ -1240,7 +1244,7 @@
   border: 1px solid rgba(157, 37, 37, 0.35);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   color: #9d2525;
-  opacity: 0.5;
+  opacity: 0.85;
   transition: opacity 0.2s ease, background 0.2s ease;
 }
 
@@ -1266,7 +1270,7 @@
   .ph-pricing-swiper .swiper-button-next {
     width: 28px;
     height: 28px;
-    opacity: 0.32;
+    opacity: 0.75;
   }
   .ph-pricing-swiper .swiper-button-prev::after,
   .ph-pricing-swiper .swiper-button-next::after {
@@ -1275,8 +1279,44 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ph-pricing-slide-inner {
-    transition: none;
+  /* Logo + vitrine marketing (S10) */
+  .animate-logo-heart,
+  .ph-animate-float,
+  .ph-animate-float-delayed,
+  .ph-animate-shimmer,
+  .ph-forest-canopy,
+  .ph-heart-rain-cell span,
+  .ph-wave-pulse,
+  .ph-top-flash {
+    animation: none !important;
+  }
+
+  .ph-pricing-slide-inner,
+  .ph-fold-card {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  /* Animations Tailwind décoratives (pas les loaders spin) */
+  .animate-bounce,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  .animate-in,
+  .animate-out,
+  .fade-in,
+  .fade-out,
+  .zoom-in-75,
+  .zoom-out-75,
+  .zoom-in-95,
+  .slide-in-from-top-3,
+  .slide-in-from-top-full,
+  .slide-in-from-bottom-full,
+  .slide-out-to-right-full {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

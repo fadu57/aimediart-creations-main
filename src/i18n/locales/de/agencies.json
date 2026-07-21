@@ -80,5 +80,83 @@
     "close_confirm_desc": "Es gibt nicht gespeicherte Änderungen. Datensatz schließen?",
     "no": "Nein",
     "yes": "Ja"
-  }
+  },
+  "fields": {
+    "id": "Kennung (UUID)",
+    "name_agency": "Name",
+    "acronyme_expo": "Kürzel / Akronym",
+    "created_at": "Erstellt am",
+    "updated_at": "Aktualisiert am",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "address": "Adresse",
+    "website": "Website",
+    "description": "Beschreibung",
+    "logo_agency": "Logo",
+    "adresse_agency": "Adresse",
+    "compl_adresse_agency": "Adresszusatz",
+    "zip_agency": "Postleitzahl",
+    "city_agency": "Stadt",
+    "cedex_agency": "Cedex",
+    "phone_agency": "Telefon",
+    "mail_agency": "E-Mail",
+    "web_agency": "Website",
+    "agency_pays": "Land",
+    "commercial_kind": "Kommerzielles Profil",
+    "commercial_plan_code": "Betroffenes Abonnement",
+    "discount_percent": "Rabatt (%)",
+    "discount_amount_eur": "Rabatt (€ inkl. MwSt. / Monat)",
+    "commercial_notes": "Kommerzielle / Sponsoring-Notizen",
+    "structure_category": "Organisationsfamilie",
+    "structure_type": "Rechtsform",
+    "siret": "SIRET-Nummer",
+    "legal_rep_firstname": "Vorname des gesetzlichen Vertreters",
+    "legal_rep_lastname": "Nachname des gesetzlichen Vertreters",
+    "legal_rep_role": "Funktion des gesetzlichen Vertreters"
+  },
+  "identity": {
+    "categories": {
+      "private_lucratif": "Private gewinnorientierte Strukturen (Unternehmen)",
+      "private_non_lucratif": "Private gemeinnützige Strukturen",
+      "public_parapublic": "Öffentliche und halböffentliche Einrichtungen"
+    },
+    "types": {
+      "societe_commerciale": "Handelsgesellschaften",
+      "entreprise_individuelle": "Einzelunternehmen",
+      "societe_civile": "Zivilgesellschaften",
+      "profession_liberale": "Freie Berufe",
+      "association": "Vereinigungen",
+      "fondation": "Stiftungen",
+      "fonds_dotation": "Stiftungsfonds",
+      "administration_etat": "Staatsverwaltungen",
+      "collectivite_territoriale": "Gebietskörperschaften",
+      "etablissement_public": "Öffentliche Einrichtungen"
+    },
+    "roles": {
+      "gerant": "Geschäftsführer/in",
+      "president": "Präsident/in",
+      "president_dg": "Präsident/in und Generaldirektor/in",
+      "president_ca": "Vorsitzende/r des Verwaltungsrats",
+      "directeur_general": "Generaldirektor/in",
+      "maire": "Bürgermeister/in",
+      "president_conseil_departemental": "Vorsitzende/r des Départementrats",
+      "president_conseil_regional": "Vorsitzende/r des Regionalrats",
+      "dgs": "Generaldirektor/in der Dienste (DGS)",
+      "directeur": "Direktor/in"
+    },
+    "validation": {
+      "type_required": "Wählen Sie die detaillierte Rechtsform.",
+      "category_required": "Wählen Sie zuerst die Organisationsfamilie.",
+      "type_mismatch": "Die Rechtsform entspricht nicht der gewählten Familie.",
+      "siret_length": "Die SIRET-Nummer muss genau 14 Ziffern haben (Format XXX XXX XXX XXXXX).",
+      "role_invalid": "Die Funktion des gesetzlichen Vertreters ist für diese Struktur ungültig."
+    },
+    "convention": {
+      "list_and": "und",
+      "complete": "Ihre Organisationsakte enthält die erforderlichen Angaben.",
+      "missing": "bitte ergänzen Sie die folgenden fehlenden Felder in Ihrer Organisationsakte: {{fields}}."
+    }
+  },
+  "logo_alt_fallback": "Organisationslogo",
+  "logo_alt_named": "{{name}} — Logo"
 }

@@ -49,7 +49,10 @@
     "artworkTotal_one": "{{count}} opera in totale",
     "artworkTotal_other": "{{count}} opere in totale",
     "costPrefix": "Costo totale:",
-    "costUnavailable": "Costo totale: dati non disponibili"
+    "costUnavailable": "Costo totale: dati non disponibili",
+    "sponsors": "Sponsor / Mecenati",
+    "artworkGroups": "Raggruppamenti di opere",
+    "travelDiary": "Diario del visitatore"
   },
   "panel": {
     "chooseFormat": "Scegli il formato del pannello da stampare",
@@ -63,7 +66,8 @@
     "taglineLine3Prefix": "",
     "taglineLine3Bold": "diario di viaggio emotivo.",
     "guideLine1": "Scegliete la vostra guida: siete più Poeta, Bambino, Narratore, Hip-hopper, …?",
-    "guideLine2": "8 tipi di guida vi accompagneranno."
+    "guideLine2": "8 tipi di guida vi accompagneranno.",
+    "formatAria": "Scelta del formato del pannello mostra"
   },
   "form": {
     "navTypeLabel": "Per il visitatore, tipo di navigazione",
@@ -255,5 +259,55 @@
     "col_artwork": "Opera",
     "col_emotion": "Emozione",
     "col_comment": "Commento"
+  },
+  "fields": {
+    "id": "Identificativo (UUID)",
+    "expo_name": "Nome della mostra",
+    "logo_expo": "Logo della mostra",
+    "expo_logo": "Logo della mostra",
+    "created_at": "Creato il",
+    "updated_at": "Aggiornato il",
+    "description": "Descrizione",
+    "notes": "Note",
+    "location": "Luogo",
+    "dates": "Date",
+    "slug": "Slug",
+    "status": "Stato",
+    "curator": "Curatore/trice",
+    "curator_name": "Curatore/trice",
+    "expo_descript_i18n": "Descrizione mostra",
+    "lieu_expo": "Luogo della mostra",
+    "adress_expo": "Indirizzo",
+    "zip_expo": "CAP",
+    "city_expo": "Città",
+    "date_expo_du": "Dal",
+    "date_expo_au": "Al",
+    "ref_expo": "Rif. mostra",
+    "tel_ref_expo": "Tel. referente"
+  },
+  "horaires": {
+    "day": "Giorno",
+    "open": "Apertura",
+    "close": "Chiusura",
+    "closed": "Chiuso",
+    "closed_aria": "{{day}} chiuso",
+    "lundi": "Lunedì",
+    "mardi": "Martedì",
+    "mercredi": "Mercoledì",
+    "jeudi": "Giovedì",
+    "vendredi": "Venerdì",
+    "samedi": "Sabato",
+    "dimanche": "Domenica"
+  },
+  "diary_picker": {
+    "title": "Diari dei visitatori",
+    "description": "Scegliete un diario da consultare.",
+    "search_placeholder": "Cerca…",
+    "loading": "Caricamento…",
+    "empty": "Nessun diario trovato.",
+    "error": "Impossibile caricare.",
+    "anonymous": "Anonimo",
+    "registered": "Registrato",
+    "close": "Chiudi"
   }
 }

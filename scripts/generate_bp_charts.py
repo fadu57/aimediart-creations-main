@@ -494,13 +494,13 @@ def chart_tresorerie() -> Path:
 
 def chart_clients_plans() -> Path:
     """Répartition clients par plan — fin A1, A2, A3."""
-    plans = ["Atelier", "Horizon", "Rayonnement", "Zénith"]
-    a1 = [5, 10, 0, 0]
-    a2 = [10, 35, 2, 1]
-    a3 = [20, 70, 5, 3]
+    plans = ["Atelier", "Horizon", "Envergure", "Rayonnement", "Zénith"]
+    a1 = [5, 10, 0, 0, 0]
+    a2 = [10, 35, 1, 1, 1]
+    a3 = [20, 70, 3, 2, 3]
     years = ["Fin A1", "Fin A2", "Fin A3"]
     data = np.array([a1, a2, a3])
-    colors = [RED_LIGHT, RED, RED_DARK, ACCENT]
+    colors = [RED_LIGHT, RED, "#F77F00", RED_DARK, ACCENT]
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
     bottom = np.zeros(3)
@@ -629,11 +629,11 @@ def chart_tam_sam_som() -> Path:
 
 def chart_pricing() -> Path:
     """Grille tarifaire visuelle."""
-    plans = ["Étincelle", "Atelier", "Horizon", "Rayonnement", "Zénith"]
-    prices = [0, 59, 149, 549, 15000]
-    colors = [GRAY_LIGHT, RED_LIGHT, RED, RED_DARK, ACCENT]
+    plans = ["Étincelle", "Atelier", "Horizon", "Envergure", "Rayonnement", "Zénith"]
+    prices = [0, 89, 149, 499, 990, 15000]
+    colors = [GRAY_LIGHT, RED_LIGHT, RED, "#F77F00", RED_DARK, ACCENT]
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(10, 5))
     bars = ax.bar(plans, [p if p < 1000 else p / 30 for p in prices], color=colors, edgecolor="white")
     ax.set_ylabel("Prix TTC (€ / mois — Zénith : €/mois lissé sur 30 mois)")
     ax.set_title("Grille tarifaire AIMEDIArt")
@@ -758,14 +758,14 @@ def chart_methodologie_calcul() -> Path:
         (
             "2",
             "Attrition (churn)",
-            "Dès le mois 9 · taux initial 5 %/mois\nsur clients payants (Atelier, Horizon,\nRayonnement) · −10 %/mois sur le taux",
+            "Dès le mois 9 · taux initial 5 %/mois\nsur clients payants (Atelier → Rayonnement)\n· −10 %/mois sur le taux",
             "#F4A3A8",
             RED,
         ),
         (
             "3",
             "Facturation annuelle",
-            "Part annuelle croissante (40 % → 60 %)\nCoefficient 11/12 sur l'annuel\n(1 mois offert · ex. Rayonnement 6 039 €)",
+            "Part annuelle croissante (40 % → 60 %)\nCoefficient 11/12 sur l'annuel\n(1 mois offert · ex. Rayonnement 10 890 €)",
             ACCENT,
             "#2A4A6B",
         ),

@@ -56,6 +56,7 @@ import {
   roleIdsNeedOrganisation,
 } from "@/lib/userRoleAssignment";
 import { formatUserLastSignIn } from "@/lib/userLastSignIn";
+import { A11Y_CLICKABLE_FOCUS_CLASS } from "@/lib/a11yClickable";
 
 /** Boutons barre d'outils /utilisateurs : même largeur et hauteur. */
 const USERS_TOOLBAR_BTN_GOLD =
@@ -2046,14 +2047,14 @@ const Users = ({
             <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
               <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {agencyLogoUrl ? (
-                  <img src={agencyLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                  <img src={agencyLogoUrl} alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}
               </div>
               <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {expoLogoUrl ? (
-                  <img src={expoLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                  <img src={expoLogoUrl} alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}
@@ -2345,7 +2346,7 @@ const Users = ({
         {filteredUsers.map((u) => (
           <Card key={u.id} className="glass-card hover:shadow-lg transition-all duration-300">
             <CardContent
-              className="p-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 sm:flex sm:flex-row sm:items-start sm:gap-4 cursor-pointer hover:bg-muted/10"
+              className={`p-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 sm:flex sm:flex-row sm:items-start sm:gap-4 cursor-pointer hover:bg-muted/10 ${A11Y_CLICKABLE_FOCUS_CLASS}`}
               role="button"
               tabIndex={0}
               onClick={() => openEdit(u)}
@@ -2362,7 +2363,7 @@ const Users = ({
                   {u.agency_id && agencyLogoById.get(u.agency_id) ? (
                     <img
                       src={agencyLogoById.get(u.agency_id) || ""}
-                      alt=""
+                      alt={agencyNameById.get(u.agency_id) || t("form.alt_organisation")}
                       className="h-full w-full object-contain p-1"
                       loading="lazy"
                       decoding="async"
@@ -2379,7 +2380,7 @@ const Users = ({
                   ) : u.expo_id && expoLogosByKey.get(u.expo_id) ? (
                     <img
                       src={expoLogosByKey.get(u.expo_id) || ""}
-                      alt=""
+                      alt={expoNameByValue.get(u.expo_id) || t("form.alt_exposition")}
                       className="h-full w-full object-contain p-1"
                       loading="lazy"
                       decoding="async"
@@ -2462,14 +2463,14 @@ const Users = ({
             <div className="mb-3 flex flex-col items-stretch gap-3 min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
               <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {agencyLogoUrl ? (
-                  <img src={agencyLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                  <img src={agencyLogoUrl} alt={agencyNameById.get(resolvedAgencyId || "") || t("form.alt_organisation")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}
               </div>
               <div className="mx-auto h-[80px] w-full max-w-[200px] shrink-0 overflow-hidden rounded-md border border-border bg-muted/20 min-[420px]:mx-0 min-[420px]:h-[100px]">
                 {expoLogoUrl ? (
-                  <img src={expoLogoUrl} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                  <img src={expoLogoUrl} alt={expoNameByValue.get(safeTrim(editing?.expo_id) || "") || t("form.alt_exposition")} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                 ) : (
                   <div className="h-full w-full" />
                 )}

@@ -48,7 +48,7 @@ export function fieldLabel(key: string): string {
   const map: Record<string, string> = {
     id: "Identifiant (UUID)",
     name_agency: "Nom",
-    acronyme_expo: "Acronyme",
+    acronyme_expo: "Sigle / Acronyme",
     created_at: "Créé le",
     updated_at: "Modifié le",
     email: "E-mail",

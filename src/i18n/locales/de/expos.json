@@ -49,7 +49,10 @@
     "artworkTotal_one": "{{count}} Kunstwerk insgesamt",
     "artworkTotal_other": "{{count}} Kunstwerke insgesamt",
     "costPrefix": "Gesamtkosten:",
-    "costUnavailable": "Gesamtkosten: Daten nicht verfügbar"
+    "costUnavailable": "Gesamtkosten: Daten nicht verfügbar",
+    "sponsors": "Sponsoren / Mäzene",
+    "artworkGroups": "Kunstwerk-Gruppen",
+    "travelDiary": "Besucher-Tagebuch"
   },
   "panel": {
     "chooseFormat": "Wählen Sie das zu druckende Tabellenformat",
@@ -63,7 +66,8 @@
     "taglineLine3Prefix": "",
     "taglineLine3Bold": "emotionalen Reisetagebuch.",
     "guideLine1": "Wählen Sie Ihren Guide: sind Sie eher Poet, Kind, Erzähler, Hip-Hopper, …?",
-    "guideLine2": "8 Guide-Typen begleiten Sie."
+    "guideLine2": "8 Guide-Typen begleiten Sie.",
+    "formatAria": "Format der Ausstellungs-Tafel wählen"
   },
   "form": {
     "navTypeLabel": "Für den Besucher, Navigationstyp",
@@ -255,5 +259,55 @@
     "col_artwork": "Werk",
     "col_emotion": "Emotion",
     "col_comment": "Kommentar"
+  },
+  "fields": {
+    "id": "Kennung (UUID)",
+    "expo_name": "Name der Ausstellung",
+    "logo_expo": "Logo der Ausstellung",
+    "expo_logo": "Logo der Ausstellung",
+    "created_at": "Erstellt am",
+    "updated_at": "Aktualisiert am",
+    "description": "Beschreibung",
+    "notes": "Notizen",
+    "location": "Ort",
+    "dates": "Daten",
+    "slug": "Slug",
+    "status": "Status",
+    "curator": "Kurator/in",
+    "curator_name": "Kurator/in",
+    "expo_descript_i18n": "Ausstellungsbeschreibung",
+    "lieu_expo": "Ausstellungsort",
+    "adress_expo": "Adresse",
+    "zip_expo": "Postleitzahl",
+    "city_expo": "Stadt",
+    "date_expo_du": "Von",
+    "date_expo_au": "Bis",
+    "ref_expo": "Ausstellungs-Ref.",
+    "tel_ref_expo": "Kontakttelefon"
+  },
+  "horaires": {
+    "day": "Tag",
+    "open": "Öffnung",
+    "close": "Schließung",
+    "closed": "Geschlossen",
+    "closed_aria": "{{day}} geschlossen",
+    "lundi": "Montag",
+    "mardi": "Dienstag",
+    "mercredi": "Mittwoch",
+    "jeudi": "Donnerstag",
+    "vendredi": "Freitag",
+    "samedi": "Samstag",
+    "dimanche": "Sonntag"
+  },
+  "diary_picker": {
+    "title": "Besucher-Tagebücher",
+    "description": "Wählen Sie ein Tagebuch, um es anzuzeigen.",
+    "search_placeholder": "Suchen…",
+    "loading": "Laden…",
+    "empty": "Kein Tagebuch gefunden.",
+    "error": "Laden unmöglich.",
+    "anonymous": "Anonym",
+    "registered": "Registriert",
+    "close": "Schließen"
   }
 }

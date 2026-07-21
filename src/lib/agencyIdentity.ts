@@ -1,3 +1,5 @@
+import i18n from "@/i18n/instance";
+
 /** Colonnes identité juridique — bloc dédié dans AgencyFormDialog. */
 export const AGENCY_IDENTITY_KEYS = [
   "structure_category",
@@ -12,36 +14,37 @@ export type AgencyStructureCategory = (typeof AGENCY_STRUCTURE_CATEGORIES)[numbe
 export type AgencyStructureType = (typeof AGENCY_STRUCTURE_TYPES)[number]["value"];
 export type AgencyLegalRepRole = (typeof AGENCY_LEGAL_REP_ROLES)[number]["value"];
 
+/** Valeurs stockées en DB — libellés via i18n `agencies.identity.*`. */
 export const AGENCY_STRUCTURE_CATEGORIES = [
-  { value: "private_lucratif", label: "Structures privées à but lucratif (Entreprises)" },
-  { value: "private_non_lucratif", label: "Structures privées à but non lucratif" },
-  { value: "public_parapublic", label: "Organismes publics et parapublics" },
+  { value: "private_lucratif" },
+  { value: "private_non_lucratif" },
+  { value: "public_parapublic" },
 ] as const;
 
 export const AGENCY_STRUCTURE_TYPES = [
-  { value: "societe_commerciale", label: "Sociétés commerciales", category: "private_lucratif" },
-  { value: "entreprise_individuelle", label: "Entreprises individuelles", category: "private_lucratif" },
-  { value: "societe_civile", label: "Sociétés civiles", category: "private_lucratif" },
-  { value: "profession_liberale", label: "Professions libérales", category: "private_lucratif" },
-  { value: "association", label: "Associations", category: "private_non_lucratif" },
-  { value: "fondation", label: "Fondations", category: "private_non_lucratif" },
-  { value: "fonds_dotation", label: "Fonds de dotation", category: "private_non_lucratif" },
-  { value: "administration_etat", label: "Administrations d'État", category: "public_parapublic" },
-  { value: "collectivite_territoriale", label: "Collectivités territoriales", category: "public_parapublic" },
-  { value: "etablissement_public", label: "Établissements publics", category: "public_parapublic" },
+  { value: "societe_commerciale", category: "private_lucratif" },
+  { value: "entreprise_individuelle", category: "private_lucratif" },
+  { value: "societe_civile", category: "private_lucratif" },
+  { value: "profession_liberale", category: "private_lucratif" },
+  { value: "association", category: "private_non_lucratif" },
+  { value: "fondation", category: "private_non_lucratif" },
+  { value: "fonds_dotation", category: "private_non_lucratif" },
+  { value: "administration_etat", category: "public_parapublic" },
+  { value: "collectivite_territoriale", category: "public_parapublic" },
+  { value: "etablissement_public", category: "public_parapublic" },
 ] as const;
 
 export const AGENCY_LEGAL_REP_ROLES = [
-  { value: "gerant", label: "Gérant(e)" },
-  { value: "president", label: "Président(e)" },
-  { value: "president_dg", label: "Président(e)-Directeur(trice) général(e)" },
-  { value: "president_ca", label: "Président(e) du conseil d'administration" },
-  { value: "directeur_general", label: "Directeur(trice) Général(e)" },
-  { value: "maire", label: "Maire" },
-  { value: "president_conseil_departemental", label: "Président(e) du Conseil départemental" },
-  { value: "president_conseil_regional", label: "Président(e) du Conseil régional" },
-  { value: "dgs", label: "Directeur(trice) Général(e) des Services (DGS)" },
-  { value: "directeur", label: "Directeur(trice)" },
+  { value: "gerant" },
+  { value: "president" },
+  { value: "president_dg" },
+  { value: "president_ca" },
+  { value: "directeur_general" },
+  { value: "maire" },
+  { value: "president_conseil_departemental" },
+  { value: "president_conseil_regional" },
+  { value: "dgs" },
+  { value: "directeur" },
 ] as const;
 
 const LUCRATIF_ROLES: AgencyLegalRepRole[] = [
@@ -60,6 +63,10 @@ const TERRITORIAL_ROLES: AgencyLegalRepRole[] = [
 ];
 
 const STANDARD_ROLES: AgencyLegalRepRole[] = ["president", "directeur"];
+
+function agenciesT(key: string, defaultValue: string): string {
+  return i18n.t(key, { ns: "agencies", defaultValue });
+}
 
 export function isAgencyIdentityFormKey(key: string): boolean {
   return (AGENCY_IDENTITY_KEYS as readonly string[]).includes(key);
@@ -107,15 +114,18 @@ export function legalRepRolesForStructureType(type: string): AgencyLegalRepRole[
 }
 
 export function structureTypeLabel(value: string): string {
-  return AGENCY_STRUCTURE_TYPES.find((t) => t.value === value)?.label ?? value;
+  if (!AGENCY_STRUCTURE_TYPES.some((t) => t.value === value)) return value;
+  return agenciesT(`identity.types.${value}`, value);
 }
 
 export function structureCategoryLabel(value: string): string {
-  return AGENCY_STRUCTURE_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+  if (!AGENCY_STRUCTURE_CATEGORIES.some((c) => c.value === value)) return value;
+  return agenciesT(`identity.categories.${value}`, value);
 }
 
 export function legalRepRoleLabel(value: string): string {
-  return AGENCY_LEGAL_REP_ROLES.find((r) => r.value === value)?.label ?? value;
+  if (!AGENCY_LEGAL_REP_ROLES.some((r) => r.value === value)) return value;
+  return agenciesT(`identity.roles.${value}`, value);
 }
 
 /** Extrait les 14 chiffres max (stockage DB sans espaces). */
@@ -137,55 +147,80 @@ export function validateAgencyIdentityValues(values: Record<string, string>): st
   const role = (values.legal_rep_role ?? "").trim();
 
   if (category && !type) {
-    return "Sélectionnez la forme juridique détaillée.";
+    return agenciesT(
+      "identity.validation.type_required",
+      "Sélectionnez la forme juridique détaillée.",
+    );
   }
   if (type && !category) {
-    return "Sélectionnez d'abord la famille de structure.";
+    return agenciesT(
+      "identity.validation.category_required",
+      "Sélectionnez d'abord la famille de structure.",
+    );
   }
   if (type && category && !structureTypesForCategory(category).includes(type as AgencyStructureType)) {
-    return "La forme juridique ne correspond pas à la famille sélectionnée.";
+    return agenciesT(
+      "identity.validation.type_mismatch",
+      "La forme juridique ne correspond pas à la famille sélectionnée.",
+    );
   }
   if (siretDigits.length > 0 && siretDigits.length !== 14) {
-    return "Le SIRET doit contenir exactement 14 chiffres (format XXX XXX XXX XXXXX).";
+    return agenciesT(
+      "identity.validation.siret_length",
+      "Le SIRET doit contenir exactement 14 chiffres (format XXX XXX XXX XXXXX).",
+    );
   }
   if (role && type && !legalRepRolesForStructureType(type).includes(role as AgencyLegalRepRole)) {
-    return "La qualité du responsable légal n'est pas valide pour cette structure.";
+    return agenciesT(
+      "identity.validation.role_invalid",
+      "La qualité du responsable légal n'est pas valide pour cette structure.",
+    );
   }
   return null;
 }
 
 /** Champs organisation requis pour la convention de sponsoring. */
 export const CONVENTION_REQUIRED_AGENCY_FIELDS = [
-  { key: "adresse_agency", label: "Adresse" },
-  { key: "zip_agency", label: "Code postal" },
-  { key: "city_agency", label: "Ville" },
-  { key: "siret", label: "SIRET" },
-  { key: "legal_rep_firstname", label: "Prénom du représentant légal" },
-  { key: "legal_rep_lastname", label: "Nom du représentant légal" },
-  { key: "legal_rep_role", label: "Qualité du représentant légal" },
+  { key: "adresse_agency", labelKey: "fields.adresse_agency" },
+  { key: "zip_agency", labelKey: "fields.zip_agency" },
+  { key: "city_agency", labelKey: "fields.city_agency" },
+  { key: "siret", labelKey: "fields.siret" },
+  { key: "legal_rep_firstname", labelKey: "fields.legal_rep_firstname" },
+  { key: "legal_rep_lastname", labelKey: "fields.legal_rep_lastname" },
+  { key: "legal_rep_role", labelKey: "fields.legal_rep_role" },
 ] as const;
 
 export function listMissingConventionAgencyFields(
   agency: Record<string, string | null | undefined> | null | undefined,
 ): string[] {
-  if (!agency) return CONVENTION_REQUIRED_AGENCY_FIELDS.map((field) => field.label);
+  const labelFor = (labelKey: string) => agenciesT(labelKey, labelKey);
+  if (!agency) return CONVENTION_REQUIRED_AGENCY_FIELDS.map((field) => labelFor(field.labelKey));
   return CONVENTION_REQUIRED_AGENCY_FIELDS.filter(({ key }) => !(agency[key] ?? "").trim()).map(
-    ({ label }) => label,
+    ({ labelKey }) => labelFor(labelKey),
   );
 }
 
-function formatFrenchList(items: string[]): string {
+function formatLocalizedList(items: string[]): string {
   if (items.length === 0) return "";
   if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} et ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")} et ${items[items.length - 1]}`;
+  const andWord = agenciesT("identity.convention.list_and", "et");
+  if (items.length === 2) return `${items[0]} ${andWord} ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} ${andWord} ${items[items.length - 1]}`;
 }
 
 export function formatMissingConventionFieldsSentence(missingLabels: string[]): string {
   if (missingLabels.length === 0) {
-    return "Votre fiche organisation contient les informations requises.";
+    return agenciesT(
+      "identity.convention.complete",
+      "Votre fiche organisation contient les informations requises.",
+    );
   }
-  return `merci de compléter les champs manquants dans votre fiche organisation suivants : ${formatFrenchList(missingLabels)}.`;
+  return i18n.t("identity.convention.missing", {
+    ns: "agencies",
+    fields: formatLocalizedList(missingLabels),
+    defaultValue:
+      "merci de compléter les champs manquants dans votre fiche organisation suivants : {{fields}}.",
+  });
 }
 
 export function appendAgencyIdentityPayload(

@@ -10,7 +10,7 @@
 |---|---|
 | **Dénomination** | AIMEDIArt (AIMEDIArt.com) |
 | **Document** | Plan d'affaires[^business-plan] — synthèse stratégique et financière |
-| **Date** | juin 2026 |
+| **Date** | juillet 2026 |
 | **Signe distinctif** | `aimediart-logo-block` — pictogramme cœur (#E63946) · logotype AIMEDIArt.com · baseline *Art-mediation with AI* |
 | **Rédaction** | DUPONT Fabien |
 
@@ -18,10 +18,8 @@
 
 # Plan d'affaires AIMEDIArt
 
-**Document de synthèse — juin 2026**  
+**Document de synthèse — juillet 2026**  
 *Art-mediation with AI — logiciel en ligne[^saas-b2b] pour professionnels[^b2b] de la médiation culturelle*
-
-> **Légende :** 🟨 = modifications liées au tarif **Rayonnement 549 € TTC/mois** (6 039 € TTC/an), en remplacement de « sur devis » / hypothèse 399 €.
 
 ---
 
@@ -29,7 +27,7 @@
 
 AIMEDIArt est une plateforme en ligne[^saas-b2b] qui permet aux institutions culturelles de produire, diffuser et mesurer une médiation numérique multilingue (textes IA, audioguides, codes QR[^qr], statistiques d’émotion et cartographie des visiteurs) à partir d’une simple photographie d’œuvre.
 
-**Modèle économique :** abonnements récurrents (Atelier, Horizon, 🟨 Rayonnement), essai gratuit (Étincelle), 🟨 grands événements sur devis (Zénith), complété par options, dépassements et plan veille.
+**Modèle économique :** abonnements récurrents (Atelier, Horizon, L'Envergure, Rayonnement), essai gratuit (Étincelle), grands événements sur devis (Zénith), complété par options, dépassements et plan veille.
 
 **Marché adressable (France) :** 25 000 à 30 000 expositions/an, portées par ~1 220 Musées de France, ~2 200 galeries et ~51 centres d’art contemporain (réseau DCA[^dca]).
 
@@ -39,10 +37,10 @@ AIMEDIArt est une plateforme en ligne[^saas-b2b] qui permet aux institutions cul
 |------------|--------|--------|--------|
 | Clients totaux (tous abonnements) | 25 | 68 | 128 |
 | Clients payants (hors Étincelle) | 15 | 47 | 95 |
-| Revenu récurrent mensuel[^mrr] TTC | ~1 740 € | ~6 445 € | 🟨 ~13 980 € |
-| Chiffre d'affaires HT annuel | ~7 600 € | ~50 100 € | 🟨 ~127 100 € |
-| Excédent brut d'exploitation[^ebitda] (1 développeur dès A2) | ~0 € | ~−17 500 € | 🟨 ~48 900 € |
-| Trésorerie cumulée | ~6 500 € | ~−11 000 € | 🟨 ~37 600 € |
+| Revenu récurrent mensuel[^mrr] TTC | ~1 890 € | ~7 400 € | ~15 250 € |
+| Chiffre d'affaires HT annuel | ~8 200 € | ~55 000 € | ~136 300 € |
+| Excédent brut d'exploitation[^ebitda] (1 développeur dès A2) | ~700 € | ~−12 600 € | ~58 000 € |
+| Trésorerie cumulée | ~2 800 € | ~−9 900 € | ~48 200 € |
 
 **Points clés :** produit **opérationnel**[^live], propriété intellectuelle déposée (e-Soleau), trois scénarios modélisés sur 36 mois (voir tableur Excel). Le scénario **ambitieux** (+30 % clients, 5 développeurs) nécessite un financement ; le scénario **prudent** reste autofinançable sans sous-traitance.
 
@@ -96,7 +94,7 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 | **M** — Musées territoriaux / centres d’art | ~60 | 25 % | 30 % |
 | **L** — Expositions à fort succès[^blockbusters] / musées nationaux | ~180 | 5 % | 60 % |
 
-**Implication produit :** l'abonnement **Atelier** (100 œuvres) cible le format S–M ; **Horizon** (500 œuvres) le format M–L ; **Rayonnement / Zénith** les grands comptes et événements exceptionnels.
+**Implication produit :** l'abonnement **Atelier** (100 œuvres) cible le format S–M ; **Horizon** (250 œuvres) le format M ; **L'Envergure** (500 œuvres) et **Rayonnement** (1 000 œuvres) les formats M–L ; **Zénith** les événements exceptionnels.
 
 ### 3.3 Saisonnalité
 
@@ -126,18 +124,19 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 |---------|-----------------|------------------|
 | Galeries et petites structures | Étincelle → Atelier | Coût maîtrisé, rapidité |
 | Musées territoriaux, centres d’art | Horizon | Volume d'œuvres, multilingue, statistiques |
-| Institutions nationales, réseaux | Rayonnement | 🟨 Illimité, 549 €/mois |
+| Institutions régionales / réseaux | L'Envergure | Quotas étendus, 3 langues + audio |
+| Institutions nationales, grands comptes | Rayonnement | 990 €/mois, 1 000 œuvres, 5 000 visiteurs |
 | Grands événements (biennale, festival) | Zénith | Projet ponctuel clé en main |
 
 ### Propositions de valeur
 
 1. **Produire dix fois plus vite** — médiation complète en heures plutôt qu'en semaines  
-2. **Personnaliser** — 8 registres, 5 langues, voix audio  
+2. **Personnaliser** — 8 registres, jusqu'à 5 langues, voix audio  
 3. **Mesurer** — émotion par œuvre + carte géographique du public  
 
 ### Canaux
 
-- Vente directe (démonstration, site, essai Étincelle 30 jours)
+- Vente directe (démonstration, site, essai Étincelle 15 jours)
 - Réseaux professionnels (DCA[^dca], ICOM[^icom], NEMO[^nemo], ACCR[^accr])
 - Partenariats agences / commissaires
 - Recommandation curatorale
@@ -146,12 +145,12 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 | Flux | Détail |
 |------|--------|
-| Abonnements | 🟨 Atelier 59 €/mois TTC, Horizon 149 €/mois TTC, Rayonnement 549 €/mois TTC |
-| Facturation annuelle | 🟨 11 mois pour 12 (≈ −8,3 % par rapport au mensuel) — Rayonnement : 6 039 € TTC/an |
-| Dépassements | Packs œuvres / visiteurs au-delà des quotas |
-| Options | Langues supplémentaires (+5 € Atelier, +15 € Horizon) |
-| Plan veille | 19 € (Atelier) / 49 € (Horizon) |
-| Sur devis | 🟨 Zénith (ponctuel 15–17 k€) |
+| Abonnements | Atelier 89 €/mois TTC, Horizon 149 €/mois TTC, L'Envergure 499 €/mois TTC, Rayonnement 990 €/mois TTC |
+| Facturation annuelle | 11 mois pour 12 (≈ −8,3 % par rapport au mensuel) — Rayonnement : 10 890 € TTC/an |
+| Dépassements | Pack +50 œuvres → 45 € |
+| Options | Langue médiation supplémentaire +15 € ; langue audio supplémentaire +15 € |
+| Plan veille | 29 € (Atelier) / 49 € (Horizon) |
+| Sur devis | Zénith (ponctuel 15–17 k€) |
 
 ### Ressources clés
 
@@ -174,16 +173,19 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 | Abonnement | Prix TTC/mois | Œuvres | Visiteurs/mois | Langues médiation | Audio |
 |---------|---------------|--------|----------------|-------------------|-------|
-| **Étincelle** | 0 € (essai 30 j) | 10 | 100 | 1 | Non |
-| **Atelier** | 59 € | 100 | 1 500 | 1–2 | Oui |
-| **Horizon** | 149 € | 500 | 2 500 | 5 | Oui |
-| **Rayonnement** | 🟨 549 € (6 039 €/an) | Illimité | Illimité | Sur mesure | Oui |
+| **Étincelle** | 0 € (essai 15 j) | 10 | 50 | 1 | 0 |
+| **Atelier** | 89 € | 100 | 1 000 | 1 | 1 |
+| **Horizon** | 149 € | 250 | 1 500 | 2 | 2 |
+| **L'Envergure** | 499 € | 500 | 2 500 | 3 | 3 |
+| **Rayonnement** | 990 € (10 890 €/an) | 1 000 | 5 000 | 3 | 3 |
 | **Zénith** | Sur devis | Événement | Événement | Sur mesure | Oui |
 
-**Dépassements (extraits) :**
+**Options et dépassements :**
 
-- Atelier : +25 œuvres → 15 € ; +500 visiteurs → 5 €  
-- Horizon : +50 œuvres → 20 € ; +500 visiteurs → 5 €  
+- Pack +50 œuvres → **45 €**
+- Langue de médiation supplémentaire → **15 €**
+- Langue audio supplémentaire → **15 €**
+- Plan veille : Atelier **29 €** / Horizon **49 €**
 
 ![Grille tarifaire AIMEDIArt](assets/bp/bp-grille-tarifaire.png)
 
@@ -191,13 +193,13 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 ## 6. Hypothèses du prévisionnel
 
-*Source : « hypothèses BP.docx »*
+*Source : « hypothèses BP.docx » · grille tarifaire produit juillet 2026*
 
 ### 6.1 Paramètres généraux
 
 | Paramètre | Valeur |
 |-----------|--------|
-| Capital initial | 4 900 € |
+| Capital initial | 2 100 € |
 | Frais fixes infrastructure au départ | 500 €/mois |
 | Hausse frais fixes | +15 % / trimestre |
 | Frais variables | 1 % du chiffre d'affaires HT |
@@ -221,7 +223,8 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 | Étincelle | 10 | 20 | 30 |
 | Atelier | 5 | 10 | 20 |
 | Horizon | 10 | 35 | 70 |
-| Rayonnement | 0 | 2 | 5 |
+| L'Envergure | 0 | 1 | 3 |
+| Rayonnement | 0 | 1 | 2 |
 | Zénith (contrats actifs) | 0 | 1 | 3 |
 | **Total** | **25** | **68** | **128** |
 
@@ -239,11 +242,12 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 *Cible : **50 %** des organisations ayant souscrit à l'essai Étincelle passent à un abonnement payant (Atelier, Horizon ou au-delà) à l'issue ou pendant la période d'essai.*
 
-### 🟨 6.5 Tarif Rayonnement (validé)
+### 6.5 Tarif Rayonnement
+
 | Paramètre | Valeur | Note |
 |-----------|--------|------|
-| **Rayonnement — abonnement mensuel** | 🟨 **549 € TTC** | Grands comptes, quotas illimités |
-| **Rayonnement — abonnement annuel** | 🟨 **6 039 € TTC** | 🟨 11 mois pour 12 (549 € × 11) |
+| **Rayonnement — abonnement mensuel** | **990 € TTC** | Grands comptes, 1 000 œuvres / 5 000 visiteurs |
+| **Rayonnement — abonnement annuel** | **10 890 € TTC** | 11 mois pour 12 (990 € × 11) |
 
 ### 6.6 Sous-traitance développeurs
 
@@ -253,13 +257,13 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 | **Référence** | 1 développeur | Mois 13 (début A2) | 4 500 € HT/mois[^tjm] |
 | **Ambitieux** | 2 → 5 développeurs | M1 : 2 · M7 : 3 · M13 : 4 · M19+ : 5 | 4 500 € HT/mois/développeur |
 
-*Hypothèse TJM[^tjm] 450 € × 10 jours/mois. Le fondateur reste porteur produit ; la sous-traitance couvre l'accélération technique (paiement en ligne, Union européenne, Rayonnement).*
+*Hypothèse TJM[^tjm] 450 € × 10 jours/mois. Le fondateur reste porteur produit ; la sous-traitance couvre l'accélération technique (paiement en ligne, Union européenne, plans premium).*
 
 ---
 
 ## 7. Prévisionnel financier — 3 scénarios
 
-*Détail mensuel : `docs/business-plan-previsionnel-36m-new.xlsx`*
+*Détail mensuel : `docs/business-plan-previsionnel-36m-new.xlsx` · généré par `scripts/generate_bp_excel.py`*
 
 ![Chiffre d'affaires — 3 scénarios](assets/bp/bp-ca-scenarios.png)
 
@@ -271,39 +275,39 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 | Poste | Prudent A3 | Référence A3 | Ambitieux A3 |
 |-------|------------|--------------|--------------|
-| **Chiffre d'affaires HT total** | 🟨 87 632 | 🟨 127 111 | 🟨 157 145 |
-| Sous-traitance développement (cumul 3 ans) | 0 | ~81 000 | ~648 000 |
-| **Excédent brut cumulé (3 ans)**[^ebitda] | 🟨 63 844 | 🟨 32 685 | 🟨 −457 943 |
-| **Trésorerie fin A3** | 🟨 91 761 | 🟨 37 584 | 🟨 −457 943 |
+| **Chiffre d'affaires HT total** | 94 552 | 136 315 | 168 633 |
+| Sous-traitance développement (cumul 3 ans) | 0 | ~108 000 | ~648 000 |
+| **Excédent brut cumulé (3 ans)**[^ebitda] | 99 606 | 46 053 | −448 849 |
+| **Trésorerie fin A3** | 101 707 | 48 154 | −446 749 |
 | Développeurs actifs fin A3 | 0 | 1 | 5 |
 
 ### 7.2 Scénario de référence — compte de résultat
 
 | Poste | Année 1 | Année 2 | Année 3 |
 |-------|---------|---------|---------|
-| **Abonnements récurrents** | 7 530 | 🟨 37 125 | 🟨 95 335 |
-| **Options et dépassements** | 65 | 715 | 2 442 |
+| **Abonnements récurrents** | 8 163 | 41 793 | 105 539 |
+| **Options et dépassements** | 66 | 715 | 2 442 |
 | **Zénith (projets ponctuels)** | 0 | 12 500 | 28 333 |
-| **Chiffre d'affaires HT total** | **7 596** | 🟨 **51 340** | 🟨 **127 111** |
-| Frais variables (1 %) | −76 | −501 | −1 224 |
+| **Chiffre d'affaires HT total** | **8 228** | **55 009** | **136 315** |
+| Frais variables (1 %) | −82 | −550 | −1 363 |
 | Frais fixes infrastructure | −7 490 | −13 100 | −22 912 |
-| Sous-traitance développement | 0 | −54 000 | −27 000 |
-| **Excédent brut d'exploitation** | **≈ 30** | 🟨 **≈ −16 273** | 🟨 **≈ 48 928** |
+| Sous-traitance développement | 0 | −54 000 | −54 000 |
+| **Excédent brut d'exploitation** | **≈ 656** | **≈ −12 642** | **≈ 58 039** |
 
 ### 7.3 Indicateurs récurrents (référence, fin d’année)
 
 | Indicateur[^kpi] | A1 | A2 | A3 |
 |------------------|----|----|-----|
-| Revenu récurrent mensuel[^mrr] TTC (abo + options) | 1 740 € | 6 445 € | 🟨 13 980 € |
-| Revenu récurrent annuel[^arr] TTC (× 12) | 20 880 € | 77 340 € | 🟨 167 760 € |
+| Revenu récurrent mensuel[^mrr] TTC (abo + options) | 1 886 € | 7 395 € | 15 245 € |
+| Revenu récurrent annuel[^arr] TTC (× 12) | 22 632 € | 88 740 € | 182 940 € |
 | Clients payants (abonnement) | 15 | 47 | 95 |
-| Revenu moyen par client[^arpu] TTC/mois | ~116 € | ~137 € | 🟨 ~147 € |
-| Trésorerie cumulée | ~6 500 € | ~−11 000 € | 🟨 ~37 600 € |
+| Revenu moyen par client[^arpu] TTC/mois | ~126 € | ~157 € | ~160 € |
+| Trésorerie cumulée | ~2 800 € | ~−9 900 € | ~48 200 € |
 
 ### 7.4 Lecture stratégique
 
-- **Prudent** : croissance lente, pas de développeur externalisé → trésorerie confortable (~88 k€) mais montée en charge[^scale] limitée.
-- **Référence** : équilibre produit / trésorerie — 1 développeur en A2, léger creux en A2, remontée en A3 🟨 (~38 k€ de trésorerie).
+- **Prudent** : croissance lente, pas de développeur externalisé → trésorerie confortable (~102 k€) mais montée en charge[^scale] limitée.
+- **Référence** : équilibre produit / trésorerie — 1 développeur dès A2, creux en A2 (~−10 k€), remontée en A3 (~48 k€ de trésorerie).
 - **Ambitieux** : 5 développeurs, +30 % clients → **consommation de trésorerie**[^burn] importante → levée de fonds ~500 k€ recommandée pour tenir 24 mois.
 
 ---
@@ -314,8 +318,10 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 | Abonnement | Revenu moyen/client TTC/mois | Attrition mensuelle estimée | Valeur vie client TTC |
 |---------|------------------------------|----------------------------|------------------------|
-| Atelier | 59 € | ~3 %/mois | ~1 900 € |
+| Atelier | 89 € | ~3 %/mois | ~3 000 € |
 | Horizon | 149 € | ~1,5 %/mois | ~9 900 € |
+| L'Envergure | 499 € | ~1 %/mois | ~50 000 € |
+| Rayonnement | 990 € | ~1 %/mois | ~99 000 € |
 
 *Valeur vie client ≈ revenu moyen par client ÷ attrition mensuelle, avec taux décroissant selon hypothèses.*
 
@@ -323,11 +329,12 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 | Abonnement | Clients | Revenu récurrent mensuel TTC estimé |
 |---------|---------|-------------------------------------|
-| Atelier (20) | 20 | 1 180 € |
-| Horizon (70) | 70 | 10 430 € |
-| Rayonnement (5) | 5 | 🟨 2 745 € |
-| Options (12 % × 95) | — | ~342 € |
-| **Total** | | 🟨 **~13 980 €** |
+| Atelier (20) | 20 | ~1 690 € |
+| Horizon (70) | 70 | ~9 910 € |
+| L'Envergure (3) | 3 | ~1 420 € |
+| Rayonnement (2) | 2 | ~1 880 € |
+| Options (12 % × 95) | — | ~340 € |
+| **Total** | | **~15 240 €** |
 
 ---
 
@@ -335,22 +342,22 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 ### Phase 1 — A1 : Validation (0 → 25 clients)
 
-- Essai **Étincelle** gratuit (30 j, 10 œuvres) comme **entonnoir d'acquisition**[^funnel]
+- Essai **Étincelle** gratuit (15 j, 10 œuvres) comme **entonnoir d'acquisition**[^funnel]
 - Ciblage **centres d’art DCA** et **musées territoriaux** (format M, 60 œuvres/expo)
 - Démonstrations curatorales, 5 Atelier + 10 Horizon fin A1
 - Objectif : **50 % de conversion** Étincelle → payant[^conversion-etincelle] et rétention après l'attrition à partir de M9
 
 ### Phase 2 — A2 : Accélération (25 → 68 clients)
 
-- Montée en charge **Horizon** (35 clients) — cœur de marge
-- Premiers **Rayonnement** (2) et **Zénith** (1 × 15 k€)
+- Montée en charge **Horizon** (35 clients) — cœur de volume
+- Premiers **L'Envergure** (1), **Rayonnement** (1) et **Zénith** (1 × 15 k€)
 - **1 développeur** sous-traité pour paiement en ligne et facturation
 - Activation réseaux (DCA, festivals photo Arles / Perpignan)
 
 ### Phase 3 — A3 : Déploiement régional (68 → 128 clients)
 
 - **70 Horizon** — ancrage musées de province
-- **5 Rayonnement** + **3 Zénith** — grands comptes
+- **3 L'Envergure** + **2 Rayonnement** + **3 Zénith** — grands comptes
 - Dépassements à 12 % — **montée en gamme**[^upsell] naturelle via quotas
 - Extension géographique hors Île-de-France
 
@@ -365,7 +372,7 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 | A1 | Statistiques émotion + carte géographique | ✅ |
 | A2 | Paiement en ligne (Stripe) | 🔜 Prévu |
 | A2 | Facturation automatique des dépassements | ✅ Schéma `pricing_overage_rules` |
-| A3 | 🟨 Rayonnement (549 €) / Zénith — contrats sur devis | 🔜 Processus manuel |
+| A3 | L'Envergure / Rayonnement (990 €) / Zénith — contrats sur devis | 🔜 Processus manuel |
 | A3 | Expansion Union européenne (5 langues déjà supportées) | 🔜 Commercial |
 
 ---
@@ -376,11 +383,9 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 |--------|--------|-------------------|
 | Attrition élevée après M9 | Retard de croissance | Accueil renforcé[^onboarding], plan veille hors saison |
 | Coût IA non maîtrisé | Érosion de marge | Quotas par abonnement, suivi `ai_usage_logs`, passage automatique à l'abonnement supérieur[^upgrade] |
-| Saisonnalité des expositions | Revenu récurrent instable | Plan veille (19–49 €/mois), contrats annuels |
+| Saisonnalité des expositions | Revenu récurrent instable | Plan veille (29–49 €/mois), contrats annuels |
 | Sous-traitance (référence) | Creux de trésorerie en A2 | Décalage du recrutement ou levée préventive |
-| Scénario ambitieux | Consommation > 465 k€ | Financement avant M7 |
-
-> ~~**Supprimé (§11)** — Risque « Rayonnement non tarifé » : prévisionnel incertain, hypothèse 399 € à valider~~
+| Scénario ambitieux | Consommation > 445 k€ | Financement avant M7 |
 
 ---
 
@@ -389,8 +394,8 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 ### Livrables disponibles
 
 - [x] Plan d'affaires complet (ce document)
-- [x] Index des annexes A et B (`business-plan-index-annexes.docx`)
-- [x] Visuels du dossier — 14 graphiques (`docs/assets/bp/`, script `scripts/generate_bp_charts.py`)
+- [x] Index des annexes A, B et C (`business-plan-index-annexes.docx`)
+- [x] Visuels du dossier — graphiques (`docs/assets/bp/`, script `scripts/generate_bp_charts.py`)
 - [x] Export Excel 36 mois — 3 scénarios (`business-plan-previsionnel-36m-new.xlsx`)
 - [x] Présentation investisseur 10 slides (`pitch-investisseur-aimediart.md`)
 - [ ] Dossier BPI / French Tech
@@ -399,8 +404,6 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 1. **Coût IA moyen par client** (données `SettingsCouts`)  
 2. **Date exacte** de démarrage de la sous-traitance (M13 retenu en référence)
-
-> ~~**Supprimé (§12)** — À valider : « Prix Rayonnement mensuel de référence »~~ → validé : **549 € / 6 039 €**
 
 ---
 
@@ -412,7 +415,7 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 1. **Montée progressive linéaire**[^rampup] des effectifs payants sur chaque année, ajustement[^snap] en fin d’année aux cibles du tableau d'hypothèses  
 2. **Attrition** appliquée à partir du mois 9, taux diminuant de 10 % par mois  
-3. **Facturation annuelle** : coefficient 11/12 sur la part non mensuelle  
+3. **Facturation annuelle** : coefficient 11/12 sur la part non mensuelle (ex. Rayonnement 10 890 € TTC/an)  
 4. **Zénith** : 1 contrat à 15 000 € TTC en A2 ; 2 contrats à 17 000 € TTC en A3  
 5. **TVA** : chiffre d'affaires présenté HT ; charges HT  
 6. **Scénarios** : effectifs clients × 0,70 / × 1,00 / × 1,30  
@@ -433,9 +436,38 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 ---
 
-## Notes de bas de page — Glossaire
+## Annexe C — Glossaire
 
-*Les termes français sont privilégiés dans le texte ; les équivalents anglo-saxons courants en finance et en tech sont rappelés entre parenthèses.*
+Définitions des termes utilisés dans ce document (équivalents anglo-saxons entre parenthèses le cas échéant).
+
+| Terme | Définition |
+|-------|------------|
+| **Plan d'affaires** (*business plan*) | Document de synthèse stratégique, commerciale et financière. |
+| **Synthèse exécutive** (*executive summary*) | Résumé en tête de document pour les décideurs. |
+| **Logiciel en ligne** (*SaaS*) | Application hébergée, accessible par abonnement sans installation. |
+| **B2B** | Vente à des institutions ou entreprises, non au grand public. |
+| **MRR** | Revenu récurrent mensuel (abonnements + options). |
+| **ARR** | Revenu récurrent annuel (MRR × 12). |
+| **ARPU** | Revenu moyen par client payant et par mois. |
+| **LTV** | Valeur vie client — revenu total estimé sur la durée de relation. |
+| **Attrition** (*churn*) | Proportion de clients qui résilient chaque mois. |
+| **EBITDA** | Excédent brut d'exploitation (avant intérêts, impôts, amortissements). |
+| **COGS** | Coûts directs de service (appels IA, usage à la demande). |
+| **TAM / SAM / SOM** | Marché total / adressable / part capturable. |
+| **GTM** | Stratégie de mise sur le marché. |
+| **Entonnoir** (*funnel*) | Parcours de conversion prospects → clients payants. |
+| **TJM** | Taux journalier moyen de prestation (ici 450 € HT). |
+| **Burn** | Consommation nette de trésorerie lorsque les charges dépassent les encaissements. |
+| **Ramp-up / snap** | Montée progressive linéaire des effectifs, puis recalage fin d'année. |
+| **TTS** | Synthèse vocale (*Text-to-Speech*). |
+| **Upsell / upgrade** | Montée en gamme vers un abonnement ou des options supérieurs. |
+| **Onboarding** | Accueil et prise en main des nouveaux clients. |
+
+---
+
+## Notes de bas de page
+
+*Les appels de note dans le texte renvoient aux définitions ci-dessous (notes de bas de page dans les exports Word/PDF).*
 
 [^baseline]: **Baseline** (angl.) — signature ou slogan de marque ; ici : *Art-mediation with AI* (« médiation artistique avec IA »).
 [^business-plan]: **Plan d'affaires** (*business plan*) — document de synthèse stratégique, commerciale et financière.
@@ -487,4 +519,4 @@ Une chaîne unifiée : photo → 8 registres de discours × jusqu’à 5 langues
 
 ---
 
-*Document généré à partir des hypothèses du plan d'affaires et de l'étude marché fournies — juin 2026.*
+*Document généré à partir des hypothèses du plan d'affaires et de l'étude marché fournies — juillet 2026.*

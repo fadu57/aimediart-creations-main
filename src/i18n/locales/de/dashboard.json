@@ -229,9 +229,15 @@
     "expo_limit_blocked": "Ihr kostenloses Abo \"Etincelle\" erlaubt nicht das Erstellen einer weiteren Ausstellung (1 Ausstellung inklusive)."
   },
   "commercial_kind": {
+    "standard": "Standard",
     "partner_showcase": "Schaufenster-Partner",
     "sponsoring": "AIMediArt-Sponsoring",
     "internal_test": "Testorganisation"
+  },
+  "commercial_plan": {
+    "ATELIER": "Atelier",
+    "HORIZON": "Horizon",
+    "RAYONNEMENT": "Rayonnement"
   },
   "plan_actions": {
     "upgrade_prefix": "Zum Abo wechseln",

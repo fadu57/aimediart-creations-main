@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -2157,20 +2156,26 @@ const Statistics = () => {
     }
   };
 
-  const exportProgressOverlay =
-    printExportBusy && exportProgress
-      ? createPortal(
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label={exportProgressLabel || t("preview.printPreparing")}
-          >
-            <div className="w-full max-w-md rounded-xl border border-neutral-200 bg-white p-6 shadow-2xl">
-              <p className="mb-1 text-center font-serif text-lg font-bold text-neutral-900">
-                {t("preview.pdfTabLoading")}
-              </p>
-              <p className="mb-4 text-center text-sm text-neutral-600">{exportProgressLabel}</p>
+  return (
+    <div className="container min-w-0 max-w-full py-8 space-y-8">
+      <Dialog open={Boolean(printExportBusy && exportProgress)}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[200] bg-black/55"
+          className="z-[200] w-full max-w-md gap-0 rounded-xl border border-neutral-200 bg-white p-6 shadow-2xl"
+          aria-describedby={undefined}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <DialogTitle className="mb-1 text-center font-serif text-lg font-bold text-neutral-900">
+            {t("preview.pdfTabLoading")}
+          </DialogTitle>
+          <p className="mb-4 text-center text-sm text-neutral-600">
+            {exportProgressLabel || t("preview.printPreparing")}
+          </p>
+          {exportProgress ? (
+            <>
               <Progress
                 value={exportProgress.percent}
                 aria-label={exportProgressLabel}
@@ -2179,15 +2184,10 @@ const Statistics = () => {
               <p className="mt-2 text-center text-xs font-medium tabular-nums text-neutral-500">
                 {Math.round(exportProgress.percent)} %
               </p>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
-
-  return (
-    <div className="container min-w-0 max-w-full py-8 space-y-8">
-      {exportProgressOverlay}
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <div className="sticky top-16 z-30 flex min-w-0 flex-col justify-between gap-4 bg-[#121212]/95 py-2 backdrop-blur-sm md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 max-w-full shrink-0 md:max-w-md">
           <div className="flex min-w-0 items-start gap-3">

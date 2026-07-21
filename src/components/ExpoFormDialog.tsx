@@ -41,7 +41,7 @@ import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadExpoLogo } from "@/lib/storagePaths";
 import {
-  fieldLabel,
+  fieldLabel as expoFieldLabelFallback,
   filterExpoFormKeys,
   isExpoLogoField,
   isReadonlyExpoKey,
@@ -145,6 +145,7 @@ function parseExpoDescriptI18n(raw: string): Record<string, string> {
 
 export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, onSuccess, onSponsorsChange, canPickAgency = false }: ExpoFormDialogProps) {
   const { i18n, t } = useTranslation("expos");
+  const fl = (key: string) => t(`fields.${key}`, { defaultValue: expoFieldLabelFallback(key) });
   const { role_id } = useAuthUser();
   const canTriggerTranslation = typeof role_id === "number" && role_id < 6 && mode === "edit" && !!expoId;
   const [translating, setTranslating] = useState(false);
@@ -796,7 +797,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   <div key="name-dates" className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <Label htmlFor="expo-field-expo_name" className="text-xs font-medium">
-                        {fieldLabel("expo_name")}
+                        {fl("expo_name")}
                       </Label>
                       <Input
                         id="expo-field-expo_name"
@@ -815,7 +816,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       return (
                         <div key={dk} className="w-full min-w-0 space-y-1.5 sm:w-[130px] sm:shrink-0">
                           <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
-                            {fieldLabel(dk)}
+                            {fl(dk)}
                           </Label>
                           <Input
                             id={`expo-field-${dk}`}
@@ -846,7 +847,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                       return (
                         <div key={dk} className="w-full min-w-0 space-y-1.5 sm:w-[130px]">
                           <Label htmlFor={`expo-field-${dk}`} className="text-xs font-medium">
-                            {fieldLabel(dk)}
+                            {fl(dk)}
                           </Label>
                           <Input
                             id={`expo-field-${dk}`}
@@ -877,7 +878,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   <div key="zip-city" className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="w-full min-w-0 space-y-1.5 sm:w-[150px] sm:shrink-0">
                       <Label htmlFor="expo-field-zip_expo" className="text-xs font-medium">
-                        {fieldLabel("zip_expo")}
+                        {fl("zip_expo")}
                       </Label>
                       <Input
                         id="expo-field-zip_expo"
@@ -890,7 +891,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                     </div>
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <Label htmlFor="expo-field-city_expo" className="text-xs font-medium">
-                        {fieldLabel("city_expo")}
+                        {fl("city_expo")}
                       </Label>
                       <Input
                         id="expo-field-city_expo"
@@ -918,7 +919,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   <div key="ref-tel" className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <Label htmlFor="expo-field-ref_expo" className="text-xs font-medium">
-                        {fieldLabel("ref_expo")}
+                        {fl("ref_expo")}
                       </Label>
                       <Input
                         id="expo-field-ref_expo"
@@ -931,7 +932,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                     </div>
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <Label htmlFor="expo-field-tel_ref_expo" className="text-xs font-medium">
-                        {fieldLabel("tel_ref_expo")}
+                        {fl("tel_ref_expo")}
                       </Label>
                       <Input
                         id="expo-field-tel_ref_expo"
@@ -961,7 +962,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                   <div key={key} className="space-y-1.5">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <Label htmlFor="expo-field-expo_descript_i18n" className="text-xs font-medium">
-                        {fieldLabel(key)}
+                        {fl(key)}
                         <span className="ml-1.5 text-[10px] font-normal uppercase text-muted-foreground">
                           ({descriptLang})
                         </span>
@@ -1050,14 +1051,14 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
                 return (
                   <div key={key} className="space-y-2">
                     <Label htmlFor={`expo-field-${key}`} className="text-xs font-medium">
-                      {fieldLabel(key)}
+                      {fl(key)}
                     </Label>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
                       <div className="mx-auto w-full max-w-[150px] shrink-0 space-y-2 lg:mx-0">
                         {(previewUrl || showStoredLogo) && (
                           <img
                             src={logoSrc}
-                            alt=""
+                            alt={fl(key)}
                             className="h-20 w-full rounded-md border border-border object-contain bg-muted/30"
                           />
                         )}
@@ -1161,7 +1162,7 @@ export function ExpoFormDialog({ open, onOpenChange, mode, expoId, fieldKeys, on
               return (
                 <div key={key} className={cn("min-w-0 space-y-1.5", isDatePicker && "w-full sm:w-[150px]")}>
                   <Label htmlFor={`expo-field-${key}`} className="text-xs font-medium">
-                    {fieldLabel(key)}
+                    {fl(key)}
                     {key === "id" && mode === "create" && (
                       <span className="text-muted-foreground font-normal">{t("form.id_uuid_hint")}</span>
                     )}

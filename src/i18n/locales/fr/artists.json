@@ -140,6 +140,16 @@
     "save_failed": "Enregistrement impossible.",
     "image_processing_failed": "Traitement de l’image impossible."
   },
+  "validation": {
+    "firstname_required": "Le prénom est obligatoire.",
+    "lastname_required": "Le nom est obligatoire.",
+    "art_type_required": "Sélectionnez au moins un type d’art.",
+    "email_invalid": "Format d’e-mail invalide.",
+    "birth_after_today": "La date de naissance ne peut pas être postérieure à aujourd’hui.",
+    "death_after_today": "La date de décès ne peut pas être postérieure à aujourd’hui.",
+    "birth_before_death": "La date de naissance doit être antérieure à la date de décès.",
+    "death_after_birth": "La date de décès doit être postérieure à la date de naissance."
+  },
   "bio_placeholder_lang": "Bio en {{lang}}… (spécifique à votre organisation)",
   "loading_bio_tabs": "Chargement des biographies…",
   "discard": {

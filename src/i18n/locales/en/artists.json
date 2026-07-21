@@ -140,6 +140,16 @@
     "save_failed": "Saving failed.",
     "image_processing_failed": "Unable to process the image."
   },
+  "validation": {
+    "firstname_required": "First name is required.",
+    "lastname_required": "Last name is required.",
+    "art_type_required": "Select at least one art type.",
+    "email_invalid": "Invalid e-mail format.",
+    "birth_after_today": "Birth date cannot be after today.",
+    "death_after_today": "Death date cannot be after today.",
+    "birth_before_death": "Birth date must be before death date.",
+    "death_after_birth": "Death date must be after birth date."
+  },
   "bio_placeholder_lang": "Bio in {{lang}}… (specific to your organisation)",
   "loading_bio_tabs": "Loading biographies…",
   "discard": {

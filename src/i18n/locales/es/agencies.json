@@ -80,5 +80,83 @@
     "close_confirm_desc": "Hay cambios sin guardar. ¿Cerrar la ficha?",
     "no": "No",
     "yes": "Sí"
-  }
+  },
+  "fields": {
+    "id": "Identificador (UUID)",
+    "name_agency": "Nombre",
+    "acronyme_expo": "Sigla / Acrónimo",
+    "created_at": "Creado el",
+    "updated_at": "Actualizado el",
+    "email": "Correo electrónico",
+    "phone": "Teléfono",
+    "address": "Dirección",
+    "website": "Sitio web",
+    "description": "Descripción",
+    "logo_agency": "Logotipo",
+    "adresse_agency": "Dirección",
+    "compl_adresse_agency": "Complemento de dirección",
+    "zip_agency": "Código postal",
+    "city_agency": "Ciudad",
+    "cedex_agency": "Cedex",
+    "phone_agency": "Teléfono",
+    "mail_agency": "Correo electrónico",
+    "web_agency": "Sitio web",
+    "agency_pays": "País",
+    "commercial_kind": "Perfil comercial",
+    "commercial_plan_code": "Suscripción concernida",
+    "discount_percent": "Descuento (%)",
+    "discount_amount_eur": "Descuento (€ IVA incl. / mes)",
+    "commercial_notes": "Notas comerciales / patrocinio",
+    "structure_category": "Familia de estructura",
+    "structure_type": "Forma jurídica",
+    "siret": "Número SIRET",
+    "legal_rep_firstname": "Nombre del representante legal",
+    "legal_rep_lastname": "Apellido del representante legal",
+    "legal_rep_role": "Cargo del representante legal"
+  },
+  "identity": {
+    "categories": {
+      "private_lucratif": "Estructuras privadas con ánimo de lucro (Empresas)",
+      "private_non_lucratif": "Estructuras privadas sin ánimo de lucro",
+      "public_parapublic": "Organismos públicos y semipúblicos"
+    },
+    "types": {
+      "societe_commerciale": "Sociedades mercantiles",
+      "entreprise_individuelle": "Empresas individuales",
+      "societe_civile": "Sociedades civiles",
+      "profession_liberale": "Profesiones liberales",
+      "association": "Asociaciones",
+      "fondation": "Fundaciones",
+      "fonds_dotation": "Fondos de dotación",
+      "administration_etat": "Administraciones del Estado",
+      "collectivite_territoriale": "Entidades territoriales",
+      "etablissement_public": "Establecimientos públicos"
+    },
+    "roles": {
+      "gerant": "Gerente",
+      "president": "Presidente",
+      "president_dg": "Presidente-Director/a general",
+      "president_ca": "Presidente del consejo de administración",
+      "directeur_general": "Director/a general",
+      "maire": "Alcalde/sa",
+      "president_conseil_departemental": "Presidente del consejo departamental",
+      "president_conseil_regional": "Presidente del consejo regional",
+      "dgs": "Director/a general de servicios (DGS)",
+      "directeur": "Director/a"
+    },
+    "validation": {
+      "type_required": "Seleccione la forma jurídica detallada.",
+      "category_required": "Seleccione primero la familia de estructura.",
+      "type_mismatch": "La forma jurídica no corresponde a la familia seleccionada.",
+      "siret_length": "El SIRET debe contener exactamente 14 dígitos (formato XXX XXX XXX XXXXX).",
+      "role_invalid": "El cargo del representante legal no es válido para esta estructura."
+    },
+    "convention": {
+      "list_and": "y",
+      "complete": "Su ficha de organización contiene la información requerida.",
+      "missing": "complete los siguientes campos faltantes en su ficha de organización: {{fields}}."
+    }
+  },
+  "logo_alt_fallback": "Logotipo de la organización",
+  "logo_alt_named": "{{name}} — logotipo"
 }

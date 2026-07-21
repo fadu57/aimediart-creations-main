@@ -53,7 +53,7 @@ function AgencyLogoThumb({ logoUrl, title }: { logoUrl: string | null | undefine
       {src && !failed ? (
         <img
           src={src}
-          alt=""
+          alt={title}
           className="h-full w-full object-contain p-1.5"
           loading="lazy"
           decoding="async"

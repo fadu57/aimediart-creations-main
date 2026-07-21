@@ -20,6 +20,7 @@ function deriveWebpSrc(src: string): string | undefined {
 
 /**
  * Image avec <picture> WebP + fallback, decoding async et lazy/priority cohérents.
+ * AA : passer un `alt` descriptif pour toute image informative ; `alt=""` seulement si décorative (`aria-hidden`).
  */
 export function OptimizedImage({
   src,

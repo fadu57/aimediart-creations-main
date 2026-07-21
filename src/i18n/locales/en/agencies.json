@@ -80,5 +80,83 @@
     "close_confirm_desc": "There are unsaved changes. Close the record?",
     "no": "No",
     "yes": "Yes"
-  }
+  },
+  "fields": {
+    "id": "Identifier (UUID)",
+    "name_agency": "Name",
+    "acronyme_expo": "Abbreviation / Acronym",
+    "created_at": "Created on",
+    "updated_at": "Updated on",
+    "email": "E-mail",
+    "phone": "Phone",
+    "address": "Address",
+    "website": "Website",
+    "description": "Description",
+    "logo_agency": "Logo",
+    "adresse_agency": "Address",
+    "compl_adresse_agency": "Additional address",
+    "zip_agency": "Postal code",
+    "city_agency": "City",
+    "cedex_agency": "Cedex",
+    "phone_agency": "Phone",
+    "mail_agency": "E-mail",
+    "web_agency": "Website",
+    "agency_pays": "Country",
+    "commercial_kind": "Commercial profile",
+    "commercial_plan_code": "Related subscription",
+    "discount_percent": "Discount (%)",
+    "discount_amount_eur": "Discount (€ incl. tax / month)",
+    "commercial_notes": "Commercial / sponsoring notes",
+    "structure_category": "Organisation family",
+    "structure_type": "Legal form",
+    "siret": "SIRET number",
+    "legal_rep_firstname": "Legal representative first name",
+    "legal_rep_lastname": "Legal representative last name",
+    "legal_rep_role": "Legal representative role"
+  },
+  "identity": {
+    "categories": {
+      "private_lucratif": "For-profit private organisations (Companies)",
+      "private_non_lucratif": "Non-profit private organisations",
+      "public_parapublic": "Public and semi-public bodies"
+    },
+    "types": {
+      "societe_commerciale": "Commercial companies",
+      "entreprise_individuelle": "Sole traders",
+      "societe_civile": "Civil companies",
+      "profession_liberale": "Liberal professions",
+      "association": "Associations",
+      "fondation": "Foundations",
+      "fonds_dotation": "Endowment funds",
+      "administration_etat": "State administrations",
+      "collectivite_territoriale": "Local authorities",
+      "etablissement_public": "Public establishments"
+    },
+    "roles": {
+      "gerant": "Manager",
+      "president": "Chair / President",
+      "president_dg": "Chair and Chief Executive Officer",
+      "president_ca": "Chair of the board",
+      "directeur_general": "Chief Executive Officer",
+      "maire": "Mayor",
+      "president_conseil_departemental": "Chair of the departmental council",
+      "president_conseil_regional": "Chair of the regional council",
+      "dgs": "Director General of Services (DGS)",
+      "directeur": "Director"
+    },
+    "validation": {
+      "type_required": "Select the detailed legal form.",
+      "category_required": "Select the organisation family first.",
+      "type_mismatch": "The legal form does not match the selected family.",
+      "siret_length": "SIRET must contain exactly 14 digits (format XXX XXX XXX XXXXX).",
+      "role_invalid": "The legal representative role is not valid for this organisation type."
+    },
+    "convention": {
+      "list_and": "and",
+      "complete": "Your organisation record contains the required information.",
+      "missing": "please complete the following missing fields in your organisation record: {{fields}}."
+    }
+  },
+  "logo_alt_fallback": "Organisation logo",
+  "logo_alt_named": "{{name}} — logo"
 }

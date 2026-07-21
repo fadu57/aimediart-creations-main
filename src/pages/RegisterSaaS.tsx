@@ -449,7 +449,7 @@ const RegisterSaaS = () => {
   const hasCaptured = webcamMode === "captured" || (webcamMode === "idle" && avatarPreview);
 
   return (
-    <div className="flex w-full flex-1 flex-col items-center px-4 pb-16 pt-8">
+    <div className="flex w-full flex-1 flex-col items-center px-4 pb-16 pt-2">
       {/* Page header */}
       <div className="mb-8 text-center">
         <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
@@ -544,7 +544,7 @@ const RegisterSaaS = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus:ring-0"
+                      className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label={showPassword ? t("login.aria_hide_password") : t("login.aria_show_password")}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -619,7 +619,7 @@ const RegisterSaaS = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus:ring-0"
+                      className="absolute inset-y-0 right-1 flex items-center px-2 text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label={showPassword ? t("register_saas.username_toggle_hide") : t("register_saas.username_toggle_show")}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

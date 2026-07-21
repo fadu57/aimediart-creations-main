@@ -147,5 +147,15 @@
     "desc": "Es gibt nicht gespeicherte Änderungen. Datensatz schließen?",
     "continue": "Bearbeitung fortsetzen",
     "close": "Schließen ohne zu speichern"
+  },
+  "validation": {
+    "firstname_required": "Der Vorname ist erforderlich.",
+    "lastname_required": "Der Nachname ist erforderlich.",
+    "art_type_required": "Wählen Sie mindestens eine Kunstform.",
+    "email_invalid": "Ungültiges E-Mail-Format.",
+    "birth_after_today": "Das Geburtsdatum darf nicht nach heute liegen.",
+    "death_after_today": "Das Todesdatum darf nicht nach heute liegen.",
+    "birth_before_death": "Das Geburtsdatum muss vor dem Todesdatum liegen.",
+    "death_after_birth": "Das Todesdatum muss nach dem Geburtsdatum liegen."
   }
 }

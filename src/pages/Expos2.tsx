@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
+import { A11Y_CLICKABLE_FOCUS_CLASS, a11yActivateProps } from "@/lib/a11yClickable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -265,8 +266,11 @@ export default function Expos2() {
                   return (
                     <div
                       key={row.id}
-                      className="min-w-0 cursor-pointer space-y-2 rounded-lg border border-border/60 p-3 hover:bg-muted/30"
-                      onClick={() => navigate(`/expos?expo=${encodeURIComponent(row.id)}`)}
+                      className={`min-w-0 cursor-pointer space-y-2 rounded-lg border border-border/60 p-3 hover:bg-muted/30 ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                      {...a11yActivateProps(
+                        () => navigate(`/expos?expo=${encodeURIComponent(row.id)}`),
+                        { role: "button" },
+                      )}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <p className="min-w-0 flex-1 font-medium leading-snug" title={row.expo_name || row.id}>
@@ -325,8 +329,8 @@ export default function Expos2() {
                   return (
                     <tr
                       key={row.id}
-                      className="border-b hover:bg-muted/30 cursor-pointer"
-                      onClick={() => navigate(`/expos?expo=${encodeURIComponent(row.id)}`)}
+                      className={`border-b hover:bg-muted/30 cursor-pointer ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                      {...a11yActivateProps(() => navigate(`/expos?expo=${encodeURIComponent(row.id)}`))}
                     >
                       <td className="px-2 py-1 truncate" title={row.expo_name || row.id}>{row.expo_name || row.id}</td>
                       <td className="px-2 py-1 truncate" title={agency}>{agency}</td>

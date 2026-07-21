@@ -443,6 +443,7 @@ export function SponsorDialog({
                           size="icon"
                           className="h-8 w-8"
                           title={t("list.editTitle")}
+                          aria-label={t("list.editTitle")}
                           onClick={() => openEdit(s)}
                         >
                           <Pencil className="h-3.5 w-3.5" aria-hidden />
@@ -454,6 +455,7 @@ export function SponsorDialog({
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           disabled={deleting === s.id}
                           title={t("form.delete")}
+                          aria-label={t("form.delete")}
                           onClick={() => setPendingDelete({ id: s.id, nom: s.nom_sponsor })}
                         >
                           {deleting === s.id ? (

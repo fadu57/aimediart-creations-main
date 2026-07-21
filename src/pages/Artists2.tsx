@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
+import { A11Y_CLICKABLE_FOCUS_CLASS, a11yActivateProps } from "@/lib/a11yClickable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -292,8 +293,8 @@ export default function Artists2() {
                 {sortedRows.map((r) => (
                   <tr
                     key={r.artist_id}
-                    className="border-b hover:bg-muted/30 cursor-pointer"
-                    onClick={() => navigate(`/artist/edit/${encodeURIComponent(r.artist_id)}`)}
+                    className={`border-b hover:bg-muted/30 cursor-pointer ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                    {...a11yActivateProps(() => navigate(`/artist/edit/${encodeURIComponent(r.artist_id)}`))}
                   >
                     <td className="px-2 py-1 truncate" title={text(r.artist_firstname) || "—"}>
                       {text(r.artist_firstname) || "—"}

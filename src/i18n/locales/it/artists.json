@@ -147,5 +147,15 @@
     "desc": "Esistono modifiche non salvate. Chiudere la scheda?",
     "continue": "Continua la modifica",
     "close": "Chiudi senza salvare"
+  },
+  "validation": {
+    "firstname_required": "Il nome è obbligatorio.",
+    "lastname_required": "Il cognome è obbligatorio.",
+    "art_type_required": "Selezionate almeno un tipo di arte.",
+    "email_invalid": "Formato e-mail non valido.",
+    "birth_after_today": "La data di nascita non può essere successiva a oggi.",
+    "death_after_today": "La data di decesso non può essere successiva a oggi.",
+    "birth_before_death": "La data di nascita deve essere precedente alla data di decesso.",
+    "death_after_birth": "La data di decesso deve essere successiva alla data di nascita."
   }
 }

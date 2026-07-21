@@ -54,7 +54,27 @@
     "temp_password_placeholder": "Vorläufiges Passwort eingeben",
     "checking_username": "Benutzername wird geprüft…",
     "username_taken": "Dieser Benutzername ist bereits vergeben. Die Schaltfläche Speichern ist deaktiviert.",
-    "change_photo": "Foto ändern"
+    "change_photo": "Foto ändern",
+    "roles_title": "Rollen",
+    "role_global": "Globale Rolle (nur eine)",
+    "roles_org": "Organisationsrollen",
+    "roles_org_with_global": " (kombinierbar mit einer globalen Rolle)",
+    "roles_org_with_admin": " (kombinierbar: Kurator, Teammitglied)",
+    "organisation": "Organisation",
+    "choose_organisation": "Organisation wählen",
+    "no_organisation": "Keine Organisation verfügbar",
+    "expos_label": "Ausstellung(en)",
+    "select_org_first": "Wählen Sie zuerst eine Organisation.",
+    "no_expo_for_org": "Keine Ausstellung für diese Organisation.",
+    "organisation_prefix": "Organisation: {{name}}",
+    "address_complement": "Adresszusatz",
+    "address_complement_ph": "Gebäude, Etage, Postfach…",
+    "address": "Adresse",
+    "country": "Land",
+    "zip": "Postleitzahl",
+    "city": "Stadt",
+    "alt_organisation": "Organisation",
+    "alt_exposition": "Ausstellung"
   },
   "list": {
     "title": "Benutzer",
@@ -68,7 +88,9 @@
     "empty": "Kein sichtbarer Benutzer.",
     "alias": "Alias \"{{name}}\"",
     "last_sign_in": "Letzte Anmeldung",
-    "org_all_expos": "Verantwortlich für alle Ausstellungen der Organisation"
+    "org_all_expos": "Verantwortlich für alle Ausstellungen der Organisation",
+    "sortAsc": "Aufsteigend sortieren",
+    "sortDesc": "Absteigend sortieren"
   },
   "messages": {
     "email_confirm_sent": "Eine Bestätigungs-E-Mail wurde an die neue Adresse gesendet. Bestätigen Sie den Link, um die Änderung abzuschließen.",
@@ -97,6 +119,9 @@
     "repair_failed": "Auth-Reparatur fehlgeschlagen.",
     "repair_success": "Auth-Zugang repariert. Anmeldung: {{email}}",
     "no_agency_resolved": "Keine Organisation aufgelöst",
-    "save_failed": "Speichern fehlgeschlagen."
+    "save_failed": "Speichern fehlgeschlagen.",
+    "delete_forbidden_role": "Löschen für diese Rolle nicht erlaubt.",
+    "deleted_to_trash": "Benutzer in den Papierkorb verschoben.",
+    "delete_failed": "Löschen fehlgeschlagen."
   }
 }

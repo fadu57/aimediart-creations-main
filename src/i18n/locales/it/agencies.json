@@ -80,5 +80,83 @@
     "close_confirm_desc": "Esistono modifiche non salvate. Chiudere la scheda?",
     "no": "No",
     "yes": "Sì"
-  }
+  },
+  "fields": {
+    "id": "Identificativo (UUID)",
+    "name_agency": "Nome",
+    "acronyme_expo": "Sigla / Acronimo",
+    "created_at": "Creato il",
+    "updated_at": "Aggiornato il",
+    "email": "E-mail",
+    "phone": "Telefono",
+    "address": "Indirizzo",
+    "website": "Sito web",
+    "description": "Descrizione",
+    "logo_agency": "Logo",
+    "adresse_agency": "Indirizzo",
+    "compl_adresse_agency": "Complemento di indirizzo",
+    "zip_agency": "CAP",
+    "city_agency": "Città",
+    "cedex_agency": "Cedex",
+    "phone_agency": "Telefono",
+    "mail_agency": "E-mail",
+    "web_agency": "Sito web",
+    "agency_pays": "Paese",
+    "commercial_kind": "Profilo commerciale",
+    "commercial_plan_code": "Abbonamento interessato",
+    "discount_percent": "Sconto (%)",
+    "discount_amount_eur": "Sconto (€ IVA incl. / mese)",
+    "commercial_notes": "Note commerciali / sponsorizzazione",
+    "structure_category": "Famiglia di struttura",
+    "structure_type": "Forma giuridica",
+    "siret": "Numero SIRET",
+    "legal_rep_firstname": "Nome del rappresentante legale",
+    "legal_rep_lastname": "Cognome del rappresentante legale",
+    "legal_rep_role": "Qualifica del rappresentante legale"
+  },
+  "identity": {
+    "categories": {
+      "private_lucratif": "Strutture private a scopo di lucro (Imprese)",
+      "private_non_lucratif": "Strutture private senza scopo di lucro",
+      "public_parapublic": "Enti pubblici e parapubblici"
+    },
+    "types": {
+      "societe_commerciale": "Società commerciali",
+      "entreprise_individuelle": "Imprese individuali",
+      "societe_civile": "Società civili",
+      "profession_liberale": "Professioni liberali",
+      "association": "Associazioni",
+      "fondation": "Fondazioni",
+      "fonds_dotation": "Fondi di dotazione",
+      "administration_etat": "Amministrazioni dello Stato",
+      "collectivite_territoriale": "Enti territoriali",
+      "etablissement_public": "Enti pubblici"
+    },
+    "roles": {
+      "gerant": "Amministratore/trice",
+      "president": "Presidente",
+      "president_dg": "Presidente e direttore/trice generale",
+      "president_ca": "Presidente del consiglio di amministrazione",
+      "directeur_general": "Direttore/trice generale",
+      "maire": "Sindaco/a",
+      "president_conseil_departemental": "Presidente del consiglio dipartimentale",
+      "president_conseil_regional": "Presidente del consiglio regionale",
+      "dgs": "Direttore/trice generale dei servizi (DGS)",
+      "directeur": "Direttore/trice"
+    },
+    "validation": {
+      "type_required": "Selezionate la forma giuridica dettagliata.",
+      "category_required": "Selezionate prima la famiglia di struttura.",
+      "type_mismatch": "La forma giuridica non corrisponde alla famiglia selezionata.",
+      "siret_length": "Il SIRET deve contenere esattamente 14 cifre (formato XXX XXX XXX XXXXX).",
+      "role_invalid": "La qualifica del rappresentante legale non è valida per questa struttura."
+    },
+    "convention": {
+      "list_and": "e",
+      "complete": "La scheda organizzazione contiene le informazioni richieste.",
+      "missing": "completate i seguenti campi mancanti nella scheda organizzazione: {{fields}}."
+    }
+  },
+  "logo_alt_fallback": "Logo organizzazione",
+  "logo_alt_named": "{{name}} — logo"
 }

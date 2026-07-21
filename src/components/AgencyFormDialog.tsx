@@ -31,7 +31,7 @@ import { uploadAgencyLogo } from "@/lib/storagePaths";
 import {
   COMMERCIAL_AGENCY_KEYS,
   defaultCommercialAgencyValues,
-  fieldLabel,
+  fieldLabel as agencyFieldLabelFallback,
   isAgencyAddressInlineKey,
   isAgencyContactInlineKey,
   isAgencyCountryField,
@@ -52,7 +52,10 @@ import {
   defaultAgencyIdentityValues,
   formatSiretDisplay,
   isAgencyIdentityFormKey,
+  legalRepRoleLabel,
   legalRepRolesForStructureType,
+  structureCategoryLabel,
+  structureTypeLabel,
   structureTypesForCategory,
   validateAgencyIdentityValues,
 } from "@/lib/agencyIdentity";
@@ -60,6 +63,8 @@ import {
   COMMERCIAL_KIND_ADD_OPTION,
   COMMERCIAL_KIND_OPTIONS,
   COMMERCIAL_PLAN_OPTIONS,
+  commercialKindOptionLabel,
+  commercialPlanLabel,
   computeDiscountEurFromPercent,
   computeDiscountPercentFromEur,
   formatCommercialDiscountInput,
@@ -234,6 +239,7 @@ export function AgencyFormDialog({
   onSuccess,
 }: AgencyFormDialogProps) {
   const { t } = useTranslation("agencies");
+  const fl = (key: string) => t(`fields.${key}`, { defaultValue: agencyFieldLabelFallback(key) });
   const { role_id } = useAuthUser();
   const showCommercialTermsBlock =
     canEditCommercialTerms &&
@@ -607,13 +613,13 @@ export function AgencyFormDialog({
                     {showLogo ? (
                       <div className="space-y-2">
                         <Label htmlFor={`agency-field-${logoKey}`} className="text-xs font-medium">
-                          {fieldLabel(logoKey)}
+                          {fl(logoKey)}
                         </Label>
                         <div className="flex items-start gap-3">
                           {previewUrl || showStoredLogo ? (
                             <img
                               src={previewUrl || logoValue.trim()}
-                              alt=""
+                              alt={fl(logoKey)}
                               className="h-20 w-[200px] shrink-0 rounded-md border border-border object-contain bg-muted/30"
                             />
                           ) : (
@@ -683,7 +689,7 @@ export function AgencyFormDialog({
                         {showName ? (
                           <div className="w-[390px] shrink-0 space-y-1.5">
                             <Label htmlFor={`agency-field-${nameKey}`} className="text-xs font-medium">
-                              {fieldLabel(nameKey)}
+                              {fl(nameKey)}
                             </Label>
                             <Input
                               id={`agency-field-${nameKey}`}
@@ -704,7 +710,7 @@ export function AgencyFormDialog({
                         {showAcronyme ? (
                           <div className="w-[150px] shrink-0 space-y-1.5">
                             <Label htmlFor={`agency-field-${acronymeKey}`} className="text-xs font-medium">
-                              {fieldLabel(acronymeKey)}
+                              {fl(acronymeKey)}
                             </Label>
                             <Input
                               id={`agency-field-${acronymeKey}`}
@@ -772,7 +778,7 @@ export function AgencyFormDialog({
                     {showCedex ? (
                       <div className="w-[150px] shrink-0 space-y-1.5">
                         <Label htmlFor={`agency-field-${cedexKey}`} className="text-xs font-medium">
-                          {fieldLabel(cedexKey)}
+                          {fl(cedexKey)}
                         </Label>
                         <Input
                           id={`agency-field-${cedexKey}`}
@@ -787,7 +793,7 @@ export function AgencyFormDialog({
                     {showPays ? (
                       <div className="w-[50px] shrink-0 space-y-1.5">
                         <Label htmlFor={`agency-field-${paysKey}`} className="text-xs font-medium">
-                          {fieldLabel(paysKey)}
+                          {fl(paysKey)}
                         </Label>
                         <Select
                           value={countryValue || undefined}
@@ -815,7 +821,7 @@ export function AgencyFormDialog({
                     {showZip ? (
                       <div className="w-[80px] shrink-0 space-y-1.5">
                         <Label htmlFor={`agency-field-${zipKey}`} className="text-xs font-medium">
-                          {fieldLabel(zipKey)}
+                          {fl(zipKey)}
                         </Label>
                         <Input
                           id={`agency-field-${zipKey}`}
@@ -830,7 +836,7 @@ export function AgencyFormDialog({
                     {showCity ? (
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Label htmlFor={`agency-field-${cityKey}`} className="text-xs font-medium">
-                          {fieldLabel(cityKey)}
+                          {fl(cityKey)}
                         </Label>
                         <Input
                           id={`agency-field-${cityKey}`}
@@ -872,7 +878,7 @@ export function AgencyFormDialog({
                     {showMail ? (
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Label htmlFor={`agency-field-${mailKey}`} className="text-xs font-medium">
-                          {fieldLabel(mailKey)}
+                          {fl(mailKey)}
                         </Label>
                         <Input
                           id={`agency-field-${mailKey}`}
@@ -889,7 +895,7 @@ export function AgencyFormDialog({
                     {showPhone ? (
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Label htmlFor={`agency-field-${phoneKey}`} className="text-xs font-medium">
-                          {fieldLabel(phoneKey)}
+                          {fl(phoneKey)}
                         </Label>
                         <Input
                           id={`agency-field-${phoneKey}`}
@@ -906,7 +912,7 @@ export function AgencyFormDialog({
                     {showWeb ? (
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Label htmlFor={`agency-field-${webKey}`} className="text-xs font-medium">
-                          {fieldLabel(webKey)}
+                          {fl(webKey)}
                         </Label>
                         <Input
                           id={`agency-field-${webKey}`}
@@ -929,7 +935,7 @@ export function AgencyFormDialog({
                 return (
                   <div key={key} className="w-[50px] shrink-0 space-y-1.5">
                     <Label htmlFor={`agency-field-${key}`} className="text-xs font-medium">
-                      {fieldLabel(key)}
+                      {fl(key)}
                     </Label>
                     <Select
                       value={countryValue || undefined}
@@ -959,7 +965,7 @@ export function AgencyFormDialog({
               return (
                 <div key={key} className="space-y-1.5">
                   <Label htmlFor={`agency-field-${key}`} className="text-xs font-medium">
-                    {fieldLabel(key)}
+                    {fl(key)}
                   </Label>
                   {multiline ? (
                     <Textarea
@@ -991,7 +997,7 @@ export function AgencyFormDialog({
                 <div className="flex flex-row flex-nowrap items-start gap-3">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-structure-category" className="text-xs font-medium">
-                      {fieldLabel("structure_category")}
+                      {fl("structure_category")}
                     </Label>
                     <Select
                       value={structureCategory || undefined}
@@ -1011,7 +1017,7 @@ export function AgencyFormDialog({
                       <SelectContent>
                         {AGENCY_STRUCTURE_CATEGORIES.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                            {structureCategoryLabel(option.value)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1020,7 +1026,7 @@ export function AgencyFormDialog({
 
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-structure-type" className="text-xs font-medium">
-                      {fieldLabel("structure_type")}
+                      {fl("structure_type")}
                     </Label>
                     <Select
                       value={structureType || undefined}
@@ -1043,7 +1049,7 @@ export function AgencyFormDialog({
                       <SelectContent>
                         {identityStructureOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                            {structureTypeLabel(option.value)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1052,7 +1058,7 @@ export function AgencyFormDialog({
 
                   <div className="w-[180px] shrink-0 space-y-1.5">
                     <Label htmlFor="agency-siret" className="text-xs font-medium">
-                      {fieldLabel("siret")}
+                      {fl("siret")}
                     </Label>
                     <Input
                       id="agency-siret"
@@ -1077,7 +1083,7 @@ export function AgencyFormDialog({
                 <div className="flex flex-row flex-nowrap items-start gap-3">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-legal-rep-firstname" className="text-xs font-medium">
-                      {fieldLabel("legal_rep_firstname")}
+                      {fl("legal_rep_firstname")}
                     </Label>
                     <Input
                       id="agency-legal-rep-firstname"
@@ -1092,7 +1098,7 @@ export function AgencyFormDialog({
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-legal-rep-lastname" className="text-xs font-medium">
-                      {fieldLabel("legal_rep_lastname")}
+                      {fl("legal_rep_lastname")}
                     </Label>
                     <Input
                       id="agency-legal-rep-lastname"
@@ -1107,7 +1113,7 @@ export function AgencyFormDialog({
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label htmlFor="agency-legal-rep-role" className="text-xs font-medium">
-                      {fieldLabel("legal_rep_role")}
+                      {fl("legal_rep_role")}
                     </Label>
                     <Select
                       value={(values.legal_rep_role?.trim() || undefined) as string | undefined}
@@ -1122,7 +1128,7 @@ export function AgencyFormDialog({
                       <SelectContent>
                         {identityRoleOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                            {legalRepRoleLabel(option.value)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1138,7 +1144,7 @@ export function AgencyFormDialog({
                   <div className="flex flex-row flex-nowrap items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <Label htmlFor="agency-commercial-kind" className="text-xs font-medium">
-                        {fieldLabel("commercial_kind")}
+                        {fl("commercial_kind")}
                       </Label>
                       {commercialKindInputMode === "custom" ? (
                         <div className="space-y-1.5">
@@ -1188,7 +1194,7 @@ export function AgencyFormDialog({
                           <SelectContent>
                             {COMMERCIAL_KIND_OPTIONS.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
-                                {option.label}
+                                {commercialKindOptionLabel(option.value)}
                               </SelectItem>
                             ))}
                             {savedCustomCommercialKinds.map((kind) => (
@@ -1206,7 +1212,7 @@ export function AgencyFormDialog({
 
                     <div className="min-w-0 flex-1 space-y-1.5">
                       <Label htmlFor="agency-commercial-plan" className="text-xs font-medium">
-                        {fieldLabel("commercial_plan_code")}
+                        {fl("commercial_plan_code")}
                       </Label>
                       <Select
                         value={
@@ -1225,7 +1231,7 @@ export function AgencyFormDialog({
                         <SelectContent>
                           {COMMERCIAL_PLAN_OPTIONS.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
-                              {option.label}
+                              {commercialPlanLabel(option.value)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1236,7 +1242,7 @@ export function AgencyFormDialog({
                   <div className="flex flex-wrap items-end gap-3">
                     <div className="w-[70px] shrink-0 space-y-1.5">
                       <Label htmlFor="agency-discount-percent" className="text-xs font-medium">
-                        {fieldLabel("discount_percent")}
+                        {fl("discount_percent")}
                       </Label>
                       <Input
                         id="agency-discount-percent"
@@ -1259,7 +1265,7 @@ export function AgencyFormDialog({
                           htmlFor="agency-discount-eur"
                           className="block w-[120px] shrink-0 whitespace-nowrap text-xs font-medium"
                         >
-                          {fieldLabel("discount_amount_eur")}
+                          {fl("discount_amount_eur")}
                         </Label>
                         <Input
                           id="agency-discount-eur"
@@ -1294,7 +1300,7 @@ export function AgencyFormDialog({
                       </div>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <Label htmlFor="agency-commercial-notes" className="text-xs font-medium">
-                          {fieldLabel("commercial_notes")}
+                          {fl("commercial_notes")}
                         </Label>
                         <Textarea
                           id="agency-commercial-notes"

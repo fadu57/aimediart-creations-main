@@ -10,7 +10,6 @@ import connexionSolutionDiagramBg from "@/assets/connexion-solution-diagram-bg.p
 import connexionChallengeNoNetworkPhoto from "@/assets/connexion-challenge-no-network.png";
 import connexionSimplicityPlugPlayPhoto from "@/assets/connexion-simplicity-plug-play.png";
 
-const PACK_KEYS = ["solo", "standard", "grand"] as const;
 const SOLUTION_BULLETS = ["freedom", "reuse", "performance"] as const;
 const SIMPLICITY_BULLETS = ["plug_play", "speed", "discretion"] as const;
 
@@ -270,52 +269,6 @@ export function OrganisationConnexionContent() {
         </ConnexionSectionCard>
 
         <ConnexionSectionCard
-          titleLine1={t("connexion.sections.packs.title_line1")}
-          titleLine2={t("connexion.sections.packs.title_line2")}
-          contentWidth="full"
-          compact
-        >
-          <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-foreground/80">{t("connexion.sections.packs.intro")}</p>
-            <ul className="space-y-3">
-              {PACK_KEYS.map((key) => (
-                <li
-                  key={key}
-                  className={cn(
-                    "flex flex-col gap-3 rounded-2xl border border-neutral-300/70 bg-white px-4 py-3 text-sm leading-relaxed shadow-[0_8px_18px_rgba(0,0,0,0.04)] sm:flex-row sm:items-center sm:justify-between sm:gap-4",
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <span className="font-semibold text-foreground">
-                      {t(`connexion.sections.packs.items.${key}.title`)}
-                    </span>
-                    {" — "}
-                    <span className="text-foreground/80">{t(`connexion.sections.packs.items.${key}.desc`)}</span>
-                  </div>
-                  <Button
-                    type="button"
-                    className="h-auto min-h-11 w-full shrink-0 flex-col items-center justify-center gap-0 rounded-xl px-3 py-2 text-xs leading-snug hover:brightness-95 sm:w-[9.5rem]"
-                    style={{ backgroundColor: BRAND_RED_DARK, color: "white" }}
-                    onClick={() => setQuoteOpen(true)}
-                    aria-label={t("connexion.sections.packs.estimate_button_aria", {
-                      pack: t(`connexion.sections.packs.items.${key}.title`),
-                    })}
-                  >
-                    <span className="block font-normal">{t("connexion.sections.packs.estimate_label")}</span>
-                    <span className="mt-0.5 block font-semibold">
-                      {t(`connexion.sections.packs.items.${key}.estimate`)}
-                    </span>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs italic leading-relaxed text-[#E63946]">
-              {t("connexion.sections.packs.estimate_footnote")}
-            </p>
-          </div>
-        </ConnexionSectionCard>
-
-        <ConnexionSectionCard
           title={t("connexion.sections.simplicity.title")}
           backgroundImage={connexionSimplicityPlugPlayPhoto}
           backgroundImageAlt={t("connexion.sections.simplicity.image_alt")}
@@ -334,6 +287,9 @@ export function OrganisationConnexionContent() {
                 </li>
               ))}
             </ul>
+            <p className="text-sm leading-relaxed text-foreground/80">
+              {t("connexion.sections.simplicity.expertise_on_site")}
+            </p>
             <p className="text-sm leading-relaxed text-foreground/80">
               {highlightAimediartBold(t("connexion.sections.simplicity.outro"))}
             </p>

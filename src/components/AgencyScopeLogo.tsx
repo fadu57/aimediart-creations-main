@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /** Logo agence (`logo_agency`) tel qu’affiché dans le Header et auparavant sur le catalogue. */
 export function AgencyScopeLogo({
@@ -9,6 +10,7 @@ export function AgencyScopeLogo({
   logoUrl: string | null | undefined;
   agencyName?: string | null;
 }) {
+  const { t } = useTranslation("agencies");
   const [failed, setFailed] = useState(false);
   const src = logoUrl?.trim() || "";
   const label = agencyName?.trim() || "";
@@ -23,7 +25,7 @@ export function AgencyScopeLogo({
       {src && !failed ? (
         <img
           src={src}
-          alt={label ? `${label} — logo` : ""}
+          alt={label ? t("logo_alt_named", { name: label }) : t("logo_alt_fallback")}
           className="max-h-[52px] max-w-full object-contain"
           loading="lazy"
           decoding="async"

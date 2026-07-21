@@ -10,7 +10,7 @@
     "public_vitrine": "ÖFFENTLICHE VITRINE",
     "language_label": "Oberflächensprache",
     "anchor_accueil": "Startseite",
-    "anchor_exposition_vivante": "Lebendige Ausstellung",
+    "anchor_exposition_vivante": "Live-Expo",
     "anchor_production": "Produktion",
     "anchor_parcours": "Rundgang",
     "anchor_tarifs": "Preise",
@@ -420,7 +420,9 @@
     "terms": "Nutzungsbedingungen",
     "ai_policy": "KI-Richtlinie",
     "login": "Anmeldung",
-    "copyright": "© 2026 AIMEDIArt – Alle Rechte vorbehalten."
+    "copyright": "© 2026 AIMEDIArt – Alle Rechte vorbehalten.",
+    "accessibility": "Digitale Barrierefreiheit: Aktiver kontinuierlicher Verbesserungsprozess (teilweise Konformität / WCAG-2.2-AA-Grundlage intern geprüft).",
+    "accessibility_terms_link": "Abschnitt in den Nutzungsbedingungen ansehen"
   },
   "connexion": {
     "promo_link": "Vernetzte Ausstellung: Lassen Sie sich von der Netzwerkqualität nicht bremsen",
@@ -482,11 +484,12 @@
           "speed": "<bold>Schnelle Bereitstellung</bold>: Bereit in weniger als einer Stunde.",
           "discretion": "<bold>Absolute Diskretion</bold>: Dezente Access Points, die sich in die Galerie einfügen."
         },
-        "outro": "Mit AIMEDIArt investieren Sie in eine dauerhafte Lösung für totale Immersion ohne Unterbrechung."
+        "outro": "Mit AIMEDIArt investieren Sie in eine dauerhafte Lösung für totale Immersion ohne Unterbrechung.",
+        "expertise_on_site": "Da jeder Ausstellungsort anders ist, führt einer unserer Techniker vor Ort eine Expertise durch, um eine maßgeschneiderte Hardware-Lösung anzupassen."
       }
     },
     "quote": {
-      "cta_prefix": "Persönliches Angebot gewünscht?",
+      "cta_prefix": "Teilen Sie uns hier schnell Ihren Bedarf mit",
       "cta_link": "HIER klicken"
     },
     "form": {

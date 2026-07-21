@@ -53,7 +53,7 @@ type AppSettingRow = {
 };
 
 const checkboxNoShadow =
-  "shadow-none ring-0 ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0 data-[state=checked]:shadow-none";
+  "shadow-none ring-0 ring-offset-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=checked]:shadow-none";
 
 /** PostgREST / Supabase renvoie souvent `{ message }` sans être une instance de `Error`. */
 function getErrorMessage(e: unknown, fallback: string): string {

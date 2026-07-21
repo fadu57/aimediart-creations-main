@@ -8,6 +8,12 @@ import { GoogleLogoIcon } from "@/components/OAuthProviderIcons";
 import { TravelDiaryPreviewFlipbook } from "@/components/visitor/TravelDiaryPreviewFlipbook";
 import { resolveProfileCountryLabel } from "@/components/users/UserProfileAddressFields";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -86,8 +92,6 @@ export function VisitorDiaryRegistrationDialog({
     setCountry(resolveProfileCountryLabel(null, initialCountryCode));
     setError(null);
   }, [open, initialFirstName, initialLastName, initialEmail, initialZipCode, initialCity, initialCountryCode]);
-
-  if (!open) return null;
 
   const emailInvalid = email.trim().length > 0 && !isEmailLike(email);
   const ageInvalid = visitorAge.trim().length > 0 && parseVisitorAge(visitorAge) == null;
@@ -216,19 +220,21 @@ export function VisitorDiaryRegistrationDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[130] overflow-hidden bg-black/65 px-3 py-4 sm:px-4 sm:py-6"
-      onClick={onClose}
-      role="presentation"
-    >
-      <div className="flex min-h-full items-start justify-center sm:items-center">
-        <div
-          className="my-auto flex max-h-[calc(100vh-2rem)] w-full max-w-[390px] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl sm:max-h-[calc(100vh-3rem)]"
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("diary.registration_title")}
-        >
+    <Dialog open={open} onOpenChange={(next) => { if (!next && !submitting) onClose(); }}>
+      <DialogContent
+        hideCloseButton
+        overlayClassName="z-[130] bg-black/65"
+        className="z-[131] flex max-h-[calc(100vh-2rem)] w-full max-w-[390px] flex-col gap-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-0 shadow-xl sm:max-h-[calc(100vh-3rem)]"
+        onPointerDownOutside={(e) => {
+          if (submitting) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (submitting) e.preventDefault();
+        }}
+      >
+        <DialogTitle className="sr-only">{t("diary.registration_title")}</DialogTitle>
+        <DialogDescription className="sr-only">{t("diary.registration_desc_line1")}</DialogDescription>
+
           <header className="relative z-20 flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2 sm:px-4">
             <p className="min-w-0 flex-1 text-sm font-bold leading-[19px] text-neutral-600">
               {t("diary.registration_desc_line1")}
@@ -240,7 +246,7 @@ export function VisitorDiaryRegistrationDialog({
                 onClose();
               }}
               disabled={submitting}
-              className="relative z-20 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10 disabled:opacity-50"
+              className="relative z-20 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E63946] focus-visible:ring-offset-2"
               aria-label={t("btn_close")}
             >
               <X className="h-5 w-5" aria-hidden />
@@ -330,9 +336,10 @@ export function VisitorDiaryRegistrationDialog({
                   autoComplete="off"
                   placeholder={t("diary.field_age_placeholder")}
                   aria-invalid={ageInvalid}
+                  aria-describedby={ageInvalid ? "diary-age-error" : undefined}
                 />
                 {ageInvalid ? (
-                  <p className="mt-1 text-xs text-[#E63946]" role="alert">
+                  <p id="diary-age-error" className="mt-1 text-xs text-[#E63946]" role="alert">
                     {t("diary.field_age_invalid")}
                   </p>
                 ) : null}
@@ -350,9 +357,10 @@ export function VisitorDiaryRegistrationDialog({
                   autoComplete="email"
                   disabled={isAuthenticated && Boolean(initialEmail)}
                   aria-invalid={emailInvalid}
+                  aria-describedby={emailInvalid ? "diary-email-error" : undefined}
                 />
                 {emailInvalid ? (
-                  <p className="mt-1 text-xs text-[#E63946]" role="alert">
+                  <p id="diary-email-error" className="mt-1 text-xs text-[#E63946]" role="alert">
                     {t("diary.registration_email_invalid")}
                   </p>
                 ) : null}
@@ -435,8 +443,7 @@ export function VisitorDiaryRegistrationDialog({
             </Button>
           </div>
           </div>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

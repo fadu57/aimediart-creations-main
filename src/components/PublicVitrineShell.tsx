@@ -12,6 +12,7 @@ import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { AIMEDIART_CONTACT_MAILTO } from "@/lib/aimediartContact";
 import { cn } from "@/lib/utils";
+import { Sheet, SheetClose, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export const BRAND_RED = "hsl(0 65% 48%)";
 export const BRAND_RED_DARK = "hsl(0 62% 38%)";
@@ -120,69 +121,73 @@ function FloatingNav({
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-300/80 bg-white/70 px-2.5 py-2 text-xs font-medium shadow-[0_6px_18px_rgba(0,0,0,0.08)] backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-ring sm:gap-2 sm:px-3.5 sm:text-sm lg:hidden"
             onClick={() => setIsMobileOpen(true)}
             aria-label={t("nav.open_menu")}
+            aria-expanded={isMobileOpen}
+            aria-controls="vitrine-mobile-menu"
           >
             <Menu className="h-4 w-4 shrink-0" aria-hidden />
             <span className="hidden min-[340px]:inline">Menu</span>
           </button>
         </div>
       </header>
-      {isMobileOpen && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/45" aria-hidden onClick={() => setIsMobileOpen(false)} />
-          <aside
-            className={cn(
-              "fixed left-0 z-50 h-auto w-[82vw] max-w-[332px] rounded-br-xl border-r border-neutral-300 bg-[rgba(252,251,250,0.60)] p-4 shadow-2xl backdrop-blur-sm",
-              stackedBelowBackoffice ? "top-[4.25rem]" : "top-0",
-            )}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu vitrine"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <LogoMark compact />
+      <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+        <SheetContent
+          id="vitrine-mobile-menu"
+          side="left"
+          hideCloseButton
+          overlayClassName="z-50 bg-black/45"
+          className={cn(
+            "z-50 h-auto w-[82vw] max-w-[332px] gap-0 rounded-br-xl border-r border-neutral-300 bg-[rgba(252,251,250,0.60)] p-4 shadow-2xl backdrop-blur-sm",
+            "inset-y-auto data-[state=closed]:duration-200 data-[state=open]:duration-300",
+            stackedBelowBackoffice ? "top-[4.25rem]" : "top-0",
+          )}
+          aria-describedby={undefined}
+        >
+          <SheetTitle className="sr-only">{t("nav.public_vitrine")}</SheetTitle>
+          <div className="flex items-start justify-between gap-3">
+            <LogoMark compact />
+            <SheetClose asChild>
               <button
                 type="button"
                 className="rounded-md p-2 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
                 aria-label={t("nav.close_menu")}
-                onClick={() => setIsMobileOpen(false)}
               >
                 <X className="h-5 w-5" aria-hidden />
               </button>
-            </div>
-            <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-2.5">
-              <div className="px-2 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">{t("nav.public_vitrine")}</div>
-              {NavItems}
-              <div className="flex flex-col gap-2 pt-2">
-                {!hideLogin ? (
-                  <Link
-                    to="/login"
-                    className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
-                    onClick={() => setIsMobileOpen(false)}
-                  >
-                    {t("nav.login")}
-                    <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
-                  </Link>
-                ) : null}
-                <div className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
-                  <LanguageFlag lang={activeLanguage.value} />
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value as UiLanguage)}
-                    className="h-6 w-full cursor-pointer bg-transparent text-sm font-semibold outline-none"
-                    aria-label={t("nav.language_label")}
-                  >
-                    {UI_LANGUAGE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            </SheetClose>
+          </div>
+          <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-2.5">
+            <div className="px-2 pb-2 text-[11px] font-medium tracking-wide text-muted-foreground">{t("nav.public_vitrine")}</div>
+            {NavItems}
+            <div className="flex flex-col gap-2 pt-2">
+              {!hideLogin ? (
+                <Link
+                  to="/login"
+                  className="inline-flex items-center justify-center rounded-lg border border-neutral-300/80 bg-white px-3 py-2 text-sm font-medium text-foreground/85 shadow-sm transition-colors hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  {t("nav.login")}
+                  <ChevronRight className="ml-1 h-4 w-4" aria-hidden />
+                </Link>
+              ) : null}
+              <div className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2">
+                <LanguageFlag lang={activeLanguage.value} />
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as UiLanguage)}
+                  className="h-6 w-full cursor-pointer bg-transparent text-sm font-semibold outline-none"
+                  aria-label={t("nav.language_label")}
+                >
+                  {UI_LANGUAGE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          </aside>
-        </>
-      )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
@@ -314,9 +319,19 @@ function PublicVitrineFooter() {
             </nav>
           </div>
         </div>
-        <p className="mt-2.5 text-center text-[11px] text-neutral-500 sm:text-left">
-          {t("footer.copyright")}
-        </p>
+        <div className="mt-2.5 flex flex-col gap-1 text-center text-[11px] leading-snug text-neutral-500 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:text-left">
+          <p>
+            <span>{t("footer.accessibility")}</span>
+            <br />
+            <Link
+              to="/terms#accessibilite-numerique"
+              className="rounded font-medium text-foreground/80 underline underline-offset-2 transition-colors hover:text-[#E63946] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t("footer.accessibility_terms_link")}
+            </Link>
+          </p>
+          <p className="shrink-0">{t("footer.copyright")}</p>
+        </div>
       </div>
     </footer>
   );
@@ -372,8 +387,8 @@ export function PublicVitrineShell({
           />
         ) : null}
         <main
-          id="contenu-principal"
-          role="main"
+          id="main-content"
+          tabIndex={-1}
           className={cn("outline-none", mainTopPaddingClass)}
         >
           {children}

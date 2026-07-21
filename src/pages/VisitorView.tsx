@@ -10,6 +10,12 @@ import {
 import { EmotionCommunityInsight } from "@/components/visitor/EmotionCommunityInsight";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { BarChart3, BookOpen, Building2, ChevronDown, ChevronLeft, ChevronRight, GalleryVerticalEnd, Heart, House, Loader2, LogIn, LogOut, Menu, Search, Settings, UserPlus, Users, X } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -1815,7 +1821,7 @@ const VisitorViewCore = () => {
                     total: sameArtistNavMeta.total,
                   })}
                 </span>
-                <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#F0F0F0]/40">
+                <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#F0F0F0]/75">
                   {t("same_artist_nav_hub")}
                 </span>
               </div>
@@ -1867,11 +1873,11 @@ const VisitorViewCore = () => {
                   })}
                 </span>
                 {groupNavMeta.number ? (
-                  <span className="mt-0.5 text-[9px] font-semibold tabular-nums text-[#F0F0F0]/55">
+                  <span className="mt-0.5 text-[9px] font-semibold tabular-nums text-[#F0F0F0]/75">
                     {t("group_nav_number", { number: groupNavMeta.number })}
                   </span>
                 ) : null}
-                <span className="mt-1 max-w-[120px] truncate text-center text-[8px] font-semibold uppercase tracking-[0.1em] text-[#F0F0F0]/40">
+                <span className="mt-1 max-w-[120px] truncate text-center text-[8px] font-semibold uppercase tracking-[0.1em] text-[#F0F0F0]/75">
                   {groupNavHubLabel}
                 </span>
               </div>
@@ -2162,6 +2168,8 @@ const VisitorViewCore = () => {
               return (
                 <button
                   key={String(emo.id)}
+                  type="button"
+                  aria-pressed={selectedEmotion === String(emo.id)}
                   onClick={() =>
                     setSelectedEmotion((current) => (current === String(emo.id) ? null : String(emo.id)))
                   }
@@ -2270,44 +2278,44 @@ const VisitorViewCore = () => {
         </div>
       )}
 
-      {isArtistPhotoOpen && (
-        <div
-          className={`fixed inset-0 z-[10050] flex justify-center bg-black/70 px-0 ${
+      <Dialog
+        open={isArtistPhotoOpen}
+        onOpenChange={(next) => {
+          if (!next) closeArtistPhotoModal();
+        }}
+      >
+        <DialogContent
+          hideCloseButton
+          overlayClassName={`z-[10050] bg-black/70 ${
             isEmbedded
-              ? "items-start pt-[58px]"
+              ? ""
               : hasTopVisitorBar
-                ? "items-start pt-[68px] sm:items-center sm:pt-0"
-                : "items-start pt-[92px] sm:items-center sm:pt-0"
+                ? ""
+                : ""
           }`}
-          onClick={closeArtistPhotoModal}
-          role="presentation"
+          className={`z-[10050] w-full max-w-[320px] gap-0 overflow-hidden rounded-lg border-0 bg-white p-0 sm:rounded-lg ${
+            isArtistPhotoClosing
+              ? "animate-out zoom-out-75 fade-out duration-500"
+              : "animate-in zoom-in-75 fade-in duration-500"
+          }`}
         >
-          <div
-            className={`relative mx-auto flex w-full max-w-[320px] flex-col overflow-hidden rounded-lg bg-white ${
-              isArtistPhotoClosing
-                ? "animate-out zoom-out-75 fade-out duration-500"
-                : "animate-in zoom-in-75 fade-in duration-500"
-            }`}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("aria_artist_dialog")}
-          >
-            <header className="flex shrink-0 items-center justify-end border-b border-gray-200/70 bg-white/80 px-2 py-0 backdrop-blur-sm">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  closeArtistPhotoModal();
-                }}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10"
-                aria-label={t("btn_close")}
-              >
-                <X className="h-5 w-5" aria-hidden />
-              </button>
-            </header>
-            <div className="p-2">
+          <DialogTitle className="sr-only">{t("aria_artist_dialog")}</DialogTitle>
+          <DialogDescription className="sr-only">{artistDisplayName}</DialogDescription>
+          <header className="flex shrink-0 items-center justify-end border-b border-gray-200/70 bg-white/80 px-2 py-0 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeArtistPhotoModal();
+              }}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#E63946] transition-colors hover:bg-[#E63946]/10"
+              aria-label={t("btn_close")}
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </header>
+          <div className="p-2">
             {canShowArtistPhoto ? (
               <div className="relative w-full overflow-hidden rounded shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
                 <img
@@ -2357,170 +2365,156 @@ const VisitorViewCore = () => {
                 {artistBioText || t("artist_bio_unavailable")}
               </p>
             </div>
-            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {isCommentModalOpen && (
-        <div
-          className="fixed inset-0 z-[115] flex items-center justify-center bg-black/60 px-4"
-          onClick={closeCommentModal}
-          role="presentation"
+      <Dialog open={isCommentModalOpen} onOpenChange={(next) => { if (!next) closeCommentModal(); }}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[115] bg-black/60"
+          className="z-[115] w-full max-w-[320px] gap-0 rounded-lg border border-white/15 bg-[#1E1E1E] p-4 pt-10 text-left shadow-xl sm:rounded-lg"
         >
-          <div
-            className="relative w-full max-w-[320px] rounded-lg border border-white/15 bg-[#1E1E1E] p-4 pt-10 text-left shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("aria_comment_dialog")}
+          <button
+            type="button"
+            onClick={closeCommentModal}
+            className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#F0F0F0]/80 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label={t("btn_close")}
           >
-            <button
-              type="button"
-              onClick={closeCommentModal}
-              className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#F0F0F0]/80 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label={t("btn_close")}
-            >
-              <X className="h-5 w-5" aria-hidden />
-            </button>
-            <h2 className="pr-6 text-base font-semibold text-[#F0F0F0]">{t("comment_modal_title")}</h2>
-            <p className="mt-1 text-xs text-[#F0F0F0]/75">{t("comment_modal_hint")}</p>
-            <Textarea
-              value={commentDraft}
-              onChange={(e) => {
-                setCommentDraft(e.target.value);
-                if (commentError) setCommentError(null);
-              }}
-              placeholder={t("comment_placeholder")}
-              className="mt-3 min-h-[120px] resize-y border-white/25 bg-[#121212] text-sm text-[#F0F0F0] placeholder:text-[#F0F0F0]/45 focus-visible:ring-[#E63946]"
-              maxLength={2000}
-              aria-label={t("comment_placeholder")}
-            />
-            {commentError && (
-              <p className="mt-2 text-xs font-medium text-[#E63946]" role="alert">
-                {commentError}
-              </p>
-            )}
-            <div className="mt-4 flex flex-col gap-2">
-              <Button
-                type="button"
-                className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
-                onClick={handleSaveCommentDraft}
-              >
-                {t("comment_btn_save")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-white/35 bg-transparent text-[#F0F0F0] hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
-                onClick={closeCommentModal}
-              >
-                {t("btn_close")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isValidationPopupOpen && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setIsValidationPopupOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="w-full max-w-[320px] rounded-lg border border-gray-200 bg-white p-4 text-center shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("aria_validation_dialog")}
-          >
-            <p className="text-sm font-semibold leading-relaxed text-gray-900" style={{ whiteSpace: "pre-line" }}>
-              {t(
-                canContinueSeriesNavigation ? "validation_thanks_series" : "validation_thanks",
-                { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) },
-              )}
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+          <DialogTitle className="pr-6 text-base font-semibold text-[#F0F0F0]">
+            {t("comment_modal_title")}
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-xs text-[#F0F0F0]/75">
+            {t("comment_modal_hint")}
+          </DialogDescription>
+          <Textarea
+            value={commentDraft}
+            onChange={(e) => {
+              setCommentDraft(e.target.value);
+              if (commentError) setCommentError(null);
+            }}
+            placeholder={t("comment_placeholder")}
+            className="mt-3 min-h-[120px] resize-y border-white/25 bg-[#121212] text-sm text-[#F0F0F0] placeholder:text-[#F0F0F0]/70 focus-visible:ring-[#E63946]"
+            maxLength={2000}
+            aria-label={t("comment_placeholder")}
+            aria-invalid={Boolean(commentError)}
+            aria-describedby={commentError ? "visitor-comment-error" : undefined}
+          />
+          {commentError ? (
+            <p id="visitor-comment-error" className="mt-2 text-xs font-medium text-[#E63946]" role="alert">
+              {commentError}
             </p>
-            {communityInsightLoading ? (
-              <div className="mt-4 flex justify-center py-2" aria-busy="true">
-                <Loader2 className="h-5 w-5 animate-spin text-[#E63946]" aria-hidden />
-              </div>
-            ) : communityInsight ? (
-              <div className="mt-4">
-                <EmotionCommunityInsight insight={communityInsight} />
-              </div>
-            ) : null}
-            <div className="mt-4 flex flex-col gap-2">
-              <Button
-                type="button"
-                className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
-                onClick={canContinueSeriesNavigation ? handleContinueToNextArtworkInSeries : handleScanAnotherArtwork}
-              >
-                {t(canContinueSeriesNavigation ? nextSeriesButtonLabelKey : "btn_scan_another")}
-              </Button>
-              {canContinueSeriesNavigation ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
-                  onClick={handleLeaveSeriesNavigation}
-                >
-                  {t(leaveSeriesButtonLabelKey)}
-                </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
-                onClick={handleExitExpo}
-              >
-                {t("btn_exit_expo")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isExitPopupOpen && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setIsExitPopupOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="w-full max-w-[320px] rounded-lg bg-white p-4 text-center"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("aria_exit_dialog")}
-          >
-            <p className="text-sm font-semibold leading-relaxed text-black">
-              {hasAgencyThanksName
-                ? t("exit_thanks_with_agency", { agency: agencyThanksName })
-                : t("exit_thanks_solo")}
-              <br />
-              {t("exit_message")}
-            </p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-700">{t("diary.exit_offer")}</p>
+          ) : null}
+          <div className="mt-4 flex flex-col gap-2">
             <Button
               type="button"
-              className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={() => void handleDiaryOfferYes()}
+              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground"
+              onClick={handleSaveCommentDraft}
             >
-              <BookOpen className="h-4 w-4" aria-hidden />
-              {t("diary.exit_offer_yes")}
+              {t("comment_btn_save")}
             </Button>
             <Button
               type="button"
               variant="outline"
-              className="mt-2 w-full border-gray-300 text-gray-900"
-              onClick={handleDiaryOfferNo}
+              className="w-full border-white/35 bg-transparent text-[#F0F0F0] hover:border-[#E63946] hover:bg-[#2A2A2A] hover:text-white"
+              onClick={closeCommentModal}
             >
-              {t("diary.exit_offer_no")}
+              {t("btn_close")}
             </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isValidationPopupOpen} onOpenChange={setIsValidationPopupOpen}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[110] bg-black/60"
+          className="z-[110] w-full max-w-[320px] gap-0 rounded-lg border border-gray-200 bg-white p-4 text-center shadow-xl sm:rounded-lg"
+        >
+          <DialogTitle className="sr-only">{t("aria_validation_dialog")}</DialogTitle>
+          <DialogDescription
+            className="text-sm font-semibold leading-relaxed text-gray-900"
+            style={{ whiteSpace: "pre-line" }}
+          >
+            {t(
+              canContinueSeriesNavigation ? "validation_thanks_series" : "validation_thanks",
+              { name: isAnonymousVisitor ? "Anonymous" : (headerFirstName || t("header_visitor")) },
+            )}
+          </DialogDescription>
+          {communityInsightLoading ? (
+            <div className="mt-4 flex justify-center py-2" aria-busy="true">
+              <Loader2 className="h-5 w-5 animate-spin text-[#E63946]" aria-hidden />
+            </div>
+          ) : communityInsight ? (
+            <div className="mt-4">
+              <EmotionCommunityInsight insight={communityInsight} />
+            </div>
+          ) : null}
+          <div className="mt-4 flex flex-col gap-2">
+            <Button
+              type="button"
+              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
+              onClick={canContinueSeriesNavigation ? handleContinueToNextArtworkInSeries : handleScanAnotherArtwork}
+            >
+              {t(canContinueSeriesNavigation ? nextSeriesButtonLabelKey : "btn_scan_another")}
+            </Button>
+            {canContinueSeriesNavigation ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
+                onClick={handleLeaveSeriesNavigation}
+              >
+                {t(leaveSeriesButtonLabelKey)}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
+              onClick={handleExitExpo}
+            >
+              {t("btn_exit_expo")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isExitPopupOpen} onOpenChange={setIsExitPopupOpen}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[120] bg-black/60"
+          className="z-[120] w-full max-w-[320px] gap-0 rounded-lg border-0 bg-white p-4 text-center sm:rounded-lg"
+        >
+          <DialogTitle className="sr-only">{t("aria_exit_dialog")}</DialogTitle>
+          <DialogDescription className="text-sm font-semibold leading-relaxed text-black">
+            {hasAgencyThanksName
+              ? t("exit_thanks_with_agency", { agency: agencyThanksName })
+              : t("exit_thanks_solo")}
+            <br />
+            {t("exit_message")}
+          </DialogDescription>
+          <p className="mt-3 text-sm leading-relaxed text-neutral-700">{t("diary.exit_offer")}</p>
+          <Button
+            type="button"
+            className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+            onClick={() => void handleDiaryOfferYes()}
+          >
+            <BookOpen className="h-4 w-4" aria-hidden />
+            {t("diary.exit_offer_yes")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full border-gray-300 text-gray-900"
+            onClick={handleDiaryOfferNo}
+          >
+            {t("diary.exit_offer_no")}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       <VisitorDiaryRegistrationDialog
         open={isDiaryRegistrationOpen}

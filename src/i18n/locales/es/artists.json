@@ -147,5 +147,15 @@
     "desc": "Hay cambios sin guardar. ¿Cerrar la ficha?",
     "continue": "Seguir editando",
     "close": "Cerrar sin guardar"
+  },
+  "validation": {
+    "firstname_required": "El nombre es obligatorio.",
+    "lastname_required": "El apellido es obligatorio.",
+    "art_type_required": "Seleccione al menos un tipo de arte.",
+    "email_invalid": "Formato de correo no válido.",
+    "birth_after_today": "La fecha de nacimiento no puede ser posterior a hoy.",
+    "death_after_today": "La fecha de fallecimiento no puede ser posterior a hoy.",
+    "birth_before_death": "La fecha de nacimiento debe ser anterior a la de fallecimiento.",
+    "death_after_birth": "La fecha de fallecimiento debe ser posterior a la de nacimiento."
   }
 }

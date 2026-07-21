@@ -6,6 +6,12 @@ import { Trans, useTranslation } from "react-i18next";
 import { VisitorDiaryRegistrationDialog } from "@/components/visitor/VisitorDiaryRegistrationDialog";
 import { TravelDiaryPreviewFlipbook } from "@/components/visitor/TravelDiaryPreviewFlipbook";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { endVisitorExpoVisit, resolveStoredVisitorExpoIdsFromSession, resolveVisitorExpoIdForDiary, resolveVisitorHasScannedArtwork } from "@/lib/visitorExpoVisit";
 import { isDiaryProfileComplete, markDiaryUnlocked } from "@/lib/visitorDiaryAccess";
@@ -224,88 +230,82 @@ export function useVisitorExitDiaryFlow({
 
   const exitDiaryDialogs: ReactNode = (
     <>
-      {isExitPopupOpen ? (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setIsExitPopupOpen(false)}
-          role="presentation"
+      <Dialog open={isExitPopupOpen} onOpenChange={setIsExitPopupOpen}>
+        <DialogContent
+          hideCloseButton
+          overlayClassName="z-[120] bg-black/60"
+          className="z-[120] w-full max-w-[320px] gap-0 rounded-lg border-0 bg-white p-4 text-center sm:rounded-lg"
         >
-          <div
-            className="w-full max-w-[320px] rounded-lg bg-white p-4 text-center"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("aria_exit_dialog")}
-          >
-            {exitExpoLogo ? (
-              <div className="mx-auto mb-3 flex max-w-[200px] justify-center">
-                <img
-                  src={exitExpoLogo}
-                  alt={exitExpoName || t("diary.no_expo_logo")}
-                  className="max-h-16 max-w-full object-contain"
-                />
-              </div>
-            ) : null}
-            <div className="mx-auto w-[200px] text-left text-sm font-semibold leading-[23px] text-black">
-              <p>
-                <Trans
-                  i18nKey={hasAgencyThanksName ? "exit_thanks_with_agency" : "exit_thanks_solo"}
-                  ns="visitor"
-                  values={{ agency: effectiveAgencyThanksName }}
-                  components={{ brand: <span className="font-bold text-[#E63946]" /> }}
-                />
-              </p>
-              <p className="mt-2">{t("exit_presented_expo")}</p>
-              <p className="mt-2">{t("exit_see_you_soon")}</p>
-              <p className="mt-2">{t("exit_goodbye")}</p>
+          <DialogTitle className="sr-only">{t("aria_exit_dialog")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("exit_message")}</DialogDescription>
+          {exitExpoLogo ? (
+            <div className="mx-auto mb-3 flex max-w-[200px] justify-center">
+              <img
+                src={exitExpoLogo}
+                alt={exitExpoName || t("diary.no_expo_logo")}
+                className="max-h-16 max-w-full object-contain"
+              />
             </div>
-            <div className="relative mt-4">
-              <span className="visitor-exit-gift-burst" aria-hidden>
-                <span className="visitor-exit-gift-burst-label">{t("diary.exit_gift_badge")}</span>
-              </span>
-              <div className="flex items-start gap-3 text-left">
-                <TravelDiaryPreviewFlipbook
-                  variant="miniature"
-                  showHint={false}
-                  expoId={effectiveExpoId}
-                  visitorFirstName={profileFirstName}
-                  visitorLastName={profileLastName}
-                  className="shrink-0"
-                />
-                <p className="min-w-0 flex-1 text-xs leading-relaxed text-neutral-700">
-                  <Trans
-                    i18nKey="diary.exit_offer_gift"
-                    ns="visitor"
-                    components={{
+          ) : null}
+          <div className="mx-auto w-[200px] text-left text-sm font-semibold leading-[23px] text-black">
+            <p>
+              <Trans
+                i18nKey={hasAgencyThanksName ? "exit_thanks_with_agency" : "exit_thanks_solo"}
+                ns="visitor"
+                values={{ agency: effectiveAgencyThanksName }}
+                components={{ brand: <span className="font-bold text-[#E63946]" /> }}
+              />
+            </p>
+            <p className="mt-2">{t("exit_presented_expo")}</p>
+            <p className="mt-2">{t("exit_see_you_soon")}</p>
+            <p className="mt-2">{t("exit_goodbye")}</p>
+          </div>
+          <div className="relative mt-4">
+            <span className="visitor-exit-gift-burst" aria-hidden>
+              <span className="visitor-exit-gift-burst-label">{t("diary.exit_gift_badge")}</span>
+            </span>
+            <div className="flex items-start gap-3 text-left">
+              <TravelDiaryPreviewFlipbook
+                variant="miniature"
+                showHint={false}
+                expoId={effectiveExpoId}
+                visitorFirstName={profileFirstName}
+                visitorLastName={profileLastName}
+                className="shrink-0"
+              />
+              <p className="min-w-0 flex-1 text-xs leading-relaxed text-neutral-700">
+                <Trans
+                  i18nKey="diary.exit_offer_gift"
+                  ns="visitor"
+                  components={{
                     emphasis: <span className="font-bold uppercase" />,
                     underline: <span className="underline" />,
                   }}
-                  />
-                </p>
-              </div>
+                />
+              </p>
             </div>
-            <Button
-              type="button"
-              className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
-              onClick={() => void handleDiaryOfferYes()}
-            >
-              <BookOpen className="h-4 w-4" aria-hidden />
-              {t("diary.exit_offer_yes")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-2 w-full border-gray-300 text-gray-900"
-              onClick={() => {
-                setIsExitPopupOpen(false);
-                window.location.assign("https://www.aimediart.com");
-              }}
-            >
-              {t("diary.exit_offer_no")}
-            </Button>
           </div>
-        </div>
-      ) : null}
+          <Button
+            type="button"
+            className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"
+            onClick={() => void handleDiaryOfferYes()}
+          >
+            <BookOpen className="h-4 w-4" aria-hidden />
+            {t("diary.exit_offer_yes")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full border-gray-300 text-gray-900"
+            onClick={() => {
+              setIsExitPopupOpen(false);
+              window.location.assign("https://www.aimediart.com");
+            }}
+          >
+            {t("diary.exit_offer_no")}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       <VisitorDiaryRegistrationDialog
         open={isDiaryRegistrationOpen}

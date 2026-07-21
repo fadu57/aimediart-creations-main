@@ -54,7 +54,27 @@
     "temp_password_placeholder": "Inserisci una password provvisoria",
     "checking_username": "Verifica dello pseudonimo…",
     "username_taken": "Questo pseudonimo è già in uso. Il pulsante Salva è disattivato.",
-    "change_photo": "Cambia la foto"
+    "change_photo": "Cambia la foto",
+    "roles_title": "Ruoli",
+    "role_global": "Ruolo globale (uno solo)",
+    "roles_org": "Ruoli organizzazione",
+    "roles_org_with_global": " (cumulabili con un ruolo globale)",
+    "roles_org_with_admin": " (cumulabili: curatore, squadra)",
+    "organisation": "Organizzazione",
+    "choose_organisation": "Scegliere un'organizzazione",
+    "no_organisation": "Nessuna organizzazione disponibile",
+    "expos_label": "Mostra/e",
+    "select_org_first": "Selezionate prima un'organizzazione.",
+    "no_expo_for_org": "Nessuna mostra per questa organizzazione.",
+    "organisation_prefix": "Organizzazione: {{name}}",
+    "address_complement": "Complemento di indirizzo",
+    "address_complement_ph": "Edificio, piano, casella…",
+    "address": "Indirizzo",
+    "country": "Paese",
+    "zip": "CAP",
+    "city": "Città",
+    "alt_organisation": "Organizzazione",
+    "alt_exposition": "Mostra"
   },
   "list": {
     "title": "Utenti",
@@ -68,7 +88,9 @@
     "empty": "Nessun utente visibile.",
     "alias": "alias \"{{name}}\"",
     "last_sign_in": "Ultimo accesso",
-    "org_all_expos": "Responsabile di tutte le esposizioni dell'organizzazione"
+    "org_all_expos": "Responsabile di tutte le esposizioni dell'organizzazione",
+    "sortAsc": "Ordina crescente",
+    "sortDesc": "Ordina decrescente"
   },
   "messages": {
     "email_confirm_sent": "Un'e-mail di conferma è stata inviata al nuovo indirizzo. Convalida il link per finalizzare la modifica.",
@@ -97,6 +119,9 @@
     "repair_failed": "Riparazione Auth non riuscita.",
     "repair_success": "Accesso Auth riparato. Accesso: {{email}}",
     "no_agency_resolved": "Nessuna organizzazione risolta",
-    "save_failed": "Salvataggio non riuscito."
+    "save_failed": "Salvataggio non riuscito.",
+    "delete_forbidden_role": "Eliminazione non autorizzata per questo ruolo.",
+    "deleted_to_trash": "Utente spostato nel cestino.",
+    "delete_failed": "Eliminazione non riuscita."
   }
 }

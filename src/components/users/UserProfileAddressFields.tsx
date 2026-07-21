@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CountryFlagIcon } from "@/components/CountryFlagIcon";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ export function UserProfileAddressFields({
   onChange,
   disabled = false,
 }: UserProfileAddressFieldsProps) {
+  const { t } = useTranslation("utilisateurs");
   const country = values.country?.trim() || "France";
   const postalPlaceholder = useMemo(() => postalPlaceholderForCountryLabel(country), [country]);
 
@@ -38,11 +40,11 @@ export function UserProfileAddressFields({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
           <div className="order-2 min-w-0 flex-1 sm:order-1">
             <div className="space-y-[5px]">
-              <Label htmlFor={`${idPrefix}-compl-adresse`}>Complément d&apos;adresse</Label>
+              <Label htmlFor={`${idPrefix}-compl-adresse`}>{t("form.address_complement")}</Label>
               <Input
                 id={`${idPrefix}-compl-adresse`}
                 autoComplete="address-line2"
-                placeholder="Bâtiment, étage, boîte…"
+                placeholder={t("form.address_complement_ph")}
                 value={values.compl_adresse ?? ""}
                 onChange={(e) => onChange({ compl_adresse: e.target.value })}
                 disabled={disabled}
@@ -51,11 +53,11 @@ export function UserProfileAddressFields({
           </div>
           <div className="order-1 w-full max-w-full sm:order-2 sm:w-[363px] sm:shrink-0">
             <div className="space-y-[5px]">
-              <Label htmlFor={`${idPrefix}-adresse-postale`}>Adresse</Label>
+              <Label htmlFor={`${idPrefix}-adresse-postale`}>{t("form.address")}</Label>
               <Input
                 id={`${idPrefix}-adresse-postale`}
                 autoComplete="address-line1"
-                placeholder="Adresse"
+                placeholder={t("form.address")}
                 value={values.adresse_postale ?? ""}
                 onChange={(e) => onChange({ adresse_postale: e.target.value })}
                 disabled={disabled}
@@ -66,7 +68,7 @@ export function UserProfileAddressFields({
       </div>
 
       <div className="w-full max-w-full space-y-[5px] sm:col-span-1 sm:w-[100px] sm:justify-self-start">
-        <Label htmlFor={`${idPrefix}-country`}>Pays</Label>
+        <Label htmlFor={`${idPrefix}-country`}>{t("form.country")}</Label>
         <Select
           value={country}
           onValueChange={(label) => {
@@ -79,7 +81,7 @@ export function UserProfileAddressFields({
           disabled={disabled}
         >
           <SelectTrigger id={`${idPrefix}-country`} disabled={disabled}>
-            <SelectValue placeholder="Pays" />
+            <SelectValue placeholder={t("form.country")} />
           </SelectTrigger>
           <SelectContent className="max-h-72">
             {COUNTRY_OPTIONS.map((c) => (
@@ -95,7 +97,7 @@ export function UserProfileAddressFields({
       </div>
 
       <div className="w-full max-w-full space-y-[5px] sm:col-span-2 sm:w-[115px] sm:justify-self-start">
-        <Label htmlFor={`${idPrefix}-zip`}>Code postal</Label>
+        <Label htmlFor={`${idPrefix}-zip`}>{t("form.zip")}</Label>
         <Input
           id={`${idPrefix}-zip`}
           autoComplete="postal-code"
@@ -107,11 +109,11 @@ export function UserProfileAddressFields({
       </div>
 
       <div className="space-y-[5px] sm:col-span-7">
-        <Label htmlFor={`${idPrefix}-city`}>Ville</Label>
+        <Label htmlFor={`${idPrefix}-city`}>{t("form.city")}</Label>
         <Input
           id={`${idPrefix}-city`}
           autoComplete="address-level2"
-          placeholder="Ville"
+          placeholder={t("form.city")}
           value={values.city ?? ""}
           onChange={(e) => onChange({ city: e.target.value })}
           disabled={disabled}

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
 import { hasFullDataAccess } from "@/lib/authUser";
+import { A11Y_CLICKABLE_FOCUS_CLASS, a11yActivateProps } from "@/lib/a11yClickable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -182,7 +183,7 @@ export default function Catalogue2() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-4 pt-[70px] pb-6 space-y-4">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pt-4 pb-6 space-y-4">
       <div className="flex items-center justify-between">
         <Button type="button" variant="outline" onClick={() => navigate("/catalogue")}>{t("tableau_back")}</Button>
         <Button type="button" variant="outline" asChild>
@@ -221,8 +222,10 @@ export default function Catalogue2() {
                 {sortedRows.map((r) => (
                   <tr
                     key={r.artwork_id}
-                    className="border-b hover:bg-muted/30 cursor-pointer"
-                    onClick={() => navigate(`/artwork/${encodeURIComponent(r.artwork_id)}`)}
+                    className={`border-b hover:bg-muted/30 cursor-pointer ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                    {...a11yActivateProps(() =>
+                      navigate(`/catalogue?artwork=${encodeURIComponent(r.artwork_id)}`),
+                    )}
                   >
                     <td className="px-2 py-1 truncate" title={text(r.artwork_title) || "—"}>{text(r.artwork_title) || "—"}</td>
                     <td className="px-2 py-1 truncate" title={artistById.get(r.artwork_artist_id || "") || "—"}>{artistById.get(r.artwork_artist_id || "") || "—"}</td>

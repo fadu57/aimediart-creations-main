@@ -229,9 +229,15 @@
     "expo_limit_blocked": "Votre abonnement gratuit \"Etincelle\" ne permet pas de créer une autre exposition (1 exposition incluse)."
   },
   "commercial_kind": {
+    "standard": "Standard",
     "partner_showcase": "Partenaire vitrine",
     "sponsoring": "Sponsoring AIMediArt",
     "internal_test": "Organisation test"
+  },
+  "commercial_plan": {
+    "ATELIER": "Atelier",
+    "HORIZON": "Horizon",
+    "RAYONNEMENT": "Rayonnement"
   },
   "plan_actions": {
     "upgrade_prefix": "Passer à l'abonnement",
