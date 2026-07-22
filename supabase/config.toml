@@ -104,3 +104,9 @@ entrypoint = "./functions/cursor-git-stats/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/wakatime-stats/index.ts"
+
+# Partage public GED : accès par share_token sans JWT.
+[functions.aimediart-doc-share]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/aimediart-doc-share/index.ts"

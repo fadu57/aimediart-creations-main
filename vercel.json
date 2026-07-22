@@ -1,4 +1,11 @@
 {
+  "redirects": [
+    {
+      "source": "/aimediart-doc-share",
+      "destination": "https://ladhkvghtnzpnqolxybb.supabase.co/functions/v1/aimediart-doc-share",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/organisation", "destination": "/organisation/index.html" },
     { "source": "/organisation/", "destination": "/organisation/index.html" },

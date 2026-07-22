@@ -59,6 +59,7 @@ export const CookiesPage = lazy(() => import("@/pages/CookiesPage"));
 export const PrivacyPage = lazy(() => import("@/pages/PrivacyPage"));
 export const TermsPage = lazy(() => import("@/pages/TermsPage"));
 export const AiPolicyPage = lazy(() => import("@/pages/AiPolicyPage"));
+export const AimediartDocSharePage = lazy(() => import("@/pages/AimediartDocSharePage"));
 export const ExpoCastPage = lazy(() => import("@/pages/ExpoCastPage"));
 export const OeuvresArtiste = lazy(() => import("@/pages/OeuvresArtiste"));
 export const WelcomeLanding = lazy(() => import("@/pages/WelcomeLanding"));

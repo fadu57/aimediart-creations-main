@@ -239,6 +239,7 @@ const AppRoutes = () => (
     <Route path="/privacy" element={<Pages.PrivacyPage />} />
     <Route path="/terms" element={<Pages.TermsPage />} />
     <Route path="/ai-policy" element={<Pages.AiPolicyPage />} />
+    <Route path="/aimediart-doc-share" element={<Pages.AimediartDocSharePage />} />
     <Route path="/expo" element={<Pages.ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
       <Route index element={<RootEntryRoute />} />
