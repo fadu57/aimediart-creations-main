@@ -15,6 +15,8 @@ export const SETTINGS_KEYS = {
   presenceThresholds: "settings_presence_thresholds",
   /** Canopée p5 — vitrine / projection /expo. */
   forestCanopy: "settings_forest_canopy",
+  /** Libellés des 3 dossiers principaux GED (legal / bp / marketing). */
+  aimediartGedSections: "aimediart_ged_section_labels",
 } as const;
 
 /** `single_plus_optional` : langue UI (+ 1 langue optionnelle en fiche). `all_languages` : FR, EN, DE, ES, IT. */

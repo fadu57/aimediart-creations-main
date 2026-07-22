@@ -40,6 +40,7 @@ import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Bell, Users, A
 import PresenceThresholdSettings from "@/components/settings/PresenceThresholdSettings";
 import ForestCanopySettings from "@/components/settings/ForestCanopySettings";
 import { AimediartDocumentsPanel } from "@/components/settings/AimediartDocumentsPanel";
+import { VeilleActualitePanel } from "@/components/settings/VeilleActualitePanel";
 
 type SettingSection = {
   id: string;
@@ -796,6 +797,14 @@ export default function SettingsPage() {
         <Card className="border border-border/50 bg-white/80 shadow-none">
           <CardContent className="p-4 md:p-6">
             <AimediartDocumentsPanel />
+          </CardContent>
+        </Card>
+      )}
+
+      {canAccessGeneralSettings && (
+        <Card className="border border-border/50 bg-white/80 shadow-none">
+          <CardContent className="p-4 md:p-6">
+            <VeilleActualitePanel />
           </CardContent>
         </Card>
       )}

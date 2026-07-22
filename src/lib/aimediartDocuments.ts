@@ -1,45 +1,51 @@
 /**
  * aimediartDocuments.ts
- * Gestion des documents internes AIMEDIArt (Légal/INPI/Société, BP, Marketing).
- * Métadonnées dans public.aimediart_documents, dossiers dans aimediart_document_folders,
- * fichiers dans 3 buckets privés. Partage public via edge aimediart-doc-share.
+ * GED AIMEDIArt : sections dynamiques, sous-dossiers, documents.
+ * Buckets : aimediart-legal | aimediart-bp | aimediart-marketing | aimediart-ged.
+ * Partage public via edge aimediart-doc-share + route /aimediart-doc-share.
  *
  * Réservé aux admins globaux (role_id 1-3) — contrôle UI + RLS Supabase.
  */
 
 import { supabase } from "./supabase";
 
-/** Catégories de documents (= sous-sections de la page). */
-export type AimediartDocCategory =
-  | "legal"
-  | "legal_inpi"
-  | "legal_societe"
-  | "bp"
-  | "marketing";
-
-/** Bucket privé associé à chaque catégorie. */
-export const BUCKET_BY_CATEGORY: Record<AimediartDocCategory, string> = {
-  legal: "aimediart-legal",
-  legal_inpi: "aimediart-legal",
-  legal_societe: "aimediart-legal",
-  bp: "aimediart-bp",
-  marketing: "aimediart-marketing",
-};
-
-/** Préfixe (dossier) dans le bucket — sépare les axes dans le bucket légal. */
-const PREFIX_BY_CATEGORY: Record<AimediartDocCategory, string> = {
-  legal: "legal",
-  legal_inpi: "inpi",
-  legal_societe: "societe",
-  bp: "",
-  marketing: "",
-};
+/** Slug de section GED (= category documents / dossiers). */
+export type AimediartDocCategory = string;
 
 /** Durée de validité d'une URL signée pour prévisualisation (1 heure). */
 const SIGNED_URL_TTL_SEC = 3600;
 
 /** Taille maximale par fichier (25 Mo, aligné sur file_size_limit du bucket). */
 export const MAX_FILE_SIZE = 26214400;
+
+/** Bucket selon le slug de section. */
+export function bucketForCategory(category: string): string {
+  if (category === "legal" || category === "legal_inpi" || category === "legal_societe") {
+    return "aimediart-legal";
+  }
+  if (category === "bp") return "aimediart-bp";
+  if (category === "marketing") return "aimediart-marketing";
+  return "aimediart-ged";
+}
+
+/** Préfixe Storage dans le bucket. */
+function prefixForCategory(category: string): string {
+  if (category === "legal_inpi") return "inpi";
+  if (category === "legal_societe") return "societe";
+  if (category === "legal") return "legal";
+  if (category === "bp" || category === "marketing") return "";
+  return slugifyFolderName(category);
+}
+
+/** Ligne public.aimediart_ged_sections. */
+export type AimediartGedSection = {
+  id: string;
+  slug: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  created_by: string | null;
+};
 
 /** Ligne de la table aimediart_document_folders. */
 export type AimediartDocumentFolder = {
@@ -89,6 +95,118 @@ function slugifyFolderName(name: string): string {
       .toLowerCase()
       .slice(0, 40) || "dossier"
   );
+}
+
+/** Sections visibles dans l’UI (hors legacy). */
+const HIDDEN_SECTION_SLUGS = new Set(["legal_inpi", "legal_societe"]);
+
+/** Liste les dossiers principaux (ordre sort_order). */
+export async function listGedSections(): Promise<{
+  data: AimediartGedSection[];
+  error: string | null;
+}> {
+  const { data, error } = await supabase
+    .from("aimediart_ged_sections")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) return { data: [], error: error.message };
+  const rows = ((data as AimediartGedSection[] | null) ?? []).filter(
+    (s) => !HIDDEN_SECTION_SLUGS.has(s.slug),
+  );
+  return { data: rows, error: null };
+}
+
+/** Crée un dossier principal. */
+export async function createGedSection(
+  name: string,
+): Promise<{ data: AimediartGedSection | null; error: string | null }> {
+  const trimmed = name.trim();
+  if (!trimmed) return { data: null, error: "empty_name" };
+
+  let slug = slugifyFolderName(trimmed);
+  if (HIDDEN_SECTION_SLUGS.has(slug) || slug === "root") {
+    slug = `${slug}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  const { data: existing } = await supabase
+    .from("aimediart_ged_sections")
+    .select("id")
+    .ilike("slug", slug)
+    .maybeSingle();
+  if (existing) {
+    slug = `${slug}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  const { data: maxRow } = await supabase
+    .from("aimediart_ged_sections")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sortOrder = (maxRow?.sort_order ?? 0) + 10;
+
+  const { data, error } = await supabase
+    .from("aimediart_ged_sections")
+    .insert({ slug, name: trimmed, sort_order: sortOrder })
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as AimediartGedSection, error: null };
+}
+
+/** Renomme un dossier principal (le slug reste stable). */
+export async function renameGedSection(
+  sectionId: string,
+  name: string,
+): Promise<{ data: AimediartGedSection | null; error: string | null }> {
+  const trimmed = name.trim();
+  if (!trimmed) return { data: null, error: "empty_name" };
+
+  const { data, error } = await supabase
+    .from("aimediart_ged_sections")
+    .update({ name: trimmed })
+    .eq("id", sectionId)
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as AimediartGedSection, error: null };
+}
+
+/**
+ * Supprime un dossier principal vide (ni docs ni sous-dossiers).
+ */
+export async function deleteGedSection(
+  section: Pick<AimediartGedSection, "id" | "slug">,
+): Promise<{ error: string | null }> {
+  const [{ count: docCount, error: docErr }, { count: folderCount, error: folderErr }] =
+    await Promise.all([
+      supabase
+        .from("aimediart_documents")
+        .select("id", { count: "exact", head: true })
+        .eq("category", section.slug),
+      supabase
+        .from("aimediart_document_folders")
+        .select("id", { count: "exact", head: true })
+        .eq("category", section.slug),
+    ]);
+
+  if (docErr) return { error: docErr.message };
+  if (folderErr) return { error: folderErr.message };
+  if ((docCount ?? 0) > 0 || (folderCount ?? 0) > 0) {
+    return { error: "section_not_empty" };
+  }
+
+  const { error } = await supabase
+    .from("aimediart_ged_sections")
+    .delete()
+    .eq("id", section.id);
+
+  if (error) return { error: error.message };
+  return { error: null };
 }
 
 /** Liste les sous-dossiers d'une catégorie (ordre alphabétique). */
@@ -194,8 +312,8 @@ export async function uploadDocument(
     return { data: null, error: "file_too_big" };
   }
 
-  const bucket = BUCKET_BY_CATEGORY[category];
-  const prefix = PREFIX_BY_CATEGORY[category];
+  const bucket = bucketForCategory(category);
+  const prefix = prefixForCategory(category);
   const folderSeg = folderNameForPath ? slugifyFolderName(folderNameForPath) : "root";
   const safeName = slugifyFileName(file.name);
   const year = new Date().getFullYear();
@@ -271,7 +389,6 @@ const PUBLIC_SHARE_SITE_DEFAULT = "https://www.aimediart.com";
 /**
  * Lien de partage public stable sur le domaine du site.
  * Ex. https://www.aimediart.com/aimediart-doc-share?t=<token>
- * La page redirige vers l’edge (URL signée) — pas d’auth requise.
  */
 export function getDocumentShareUrl(shareToken: string): string | null {
   if (!shareToken) return null;

@@ -110,3 +110,8 @@ entrypoint = "./functions/wakatime-stats/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/aimediart-doc-share/index.ts"
+
+[functions.send-custom-email]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-custom-email/index.ts"

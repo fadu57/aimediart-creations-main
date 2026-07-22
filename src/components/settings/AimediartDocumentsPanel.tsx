@@ -35,16 +35,21 @@ import {
   type AimediartDocCategory,
   type AimediartDocument,
   type AimediartDocumentFolder,
+  type AimediartGedSection,
   createFolder,
+  createGedSection,
   deleteDocument,
   deleteFolder,
+  deleteGedSection,
   getDocumentShareUrl,
   getDocumentSignedUrl,
   listDocuments,
   listFolders,
+  listGedSections,
   MAX_FILE_SIZE,
   moveDocument,
   renameFolder,
+  renameGedSection,
   uploadDocument,
 } from "@/lib/aimediartDocuments";
 
@@ -610,53 +615,235 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
   );
 }
 
-/** 3 accordéons de documents internes AIMEDIArt, filtrés par la matrice d'accès. */
+/** Accordéons de documents internes AIMEDIArt, filtrés par la matrice d'accès. */
 export function AimediartDocumentsPanel() {
   const { t } = useTranslation("settings");
   const { can } = useNavigationMatrix();
+  const [sections, setSections] = useState<AimediartGedSection[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(true);
+  const [renamingSectionId, setRenamingSectionId] = useState<string | null>(null);
+  const [sectionRenameValue, setSectionRenameValue] = useState("");
+  const [sectionBusy, setSectionBusy] = useState(false);
+  const sectionRenameRef = useRef<HTMLInputElement | null>(null);
+
+  const loadSections = useCallback(async () => {
+    setSectionsLoading(true);
+    const { data, error } = await listGedSections();
+    if (error) toast.error(t("aimediart_docs.error_load", { detail: error }));
+    else setSections(data);
+    setSectionsLoading(false);
+  }, [t]);
+
+  useEffect(() => {
+    void loadSections();
+  }, [loadSections]);
 
   // Accès commun « GED » : un seul contrôle pilote les 3 sections.
   if (!can("page_group_ged")) return null;
 
+  const startRenameSection = (section: AimediartGedSection) => {
+    setRenamingSectionId(section.id);
+    setSectionRenameValue(section.name);
+    queueMicrotask(() => sectionRenameRef.current?.focus());
+  };
+
+  const cancelRenameSection = () => {
+    setRenamingSectionId(null);
+    setSectionRenameValue("");
+  };
+
+  const submitRenameSection = async (section: AimediartGedSection) => {
+    const trimmed = sectionRenameValue.trim();
+    if (!trimmed) {
+      toast.error(t("aimediart_docs.error_folder_empty"));
+      return;
+    }
+    if (trimmed === section.name) {
+      cancelRenameSection();
+      return;
+    }
+    setSectionBusy(true);
+    const { data, error } = await renameGedSection(section.id, trimmed);
+    setSectionBusy(false);
+    if (error) {
+      toast.error(t("aimediart_docs.error_folder_rename", { detail: error }));
+      return;
+    }
+    if (data) {
+      setSections((prev) => prev.map((s) => (s.id === section.id ? data : s)));
+    }
+    toast.success(t("aimediart_docs.folder_renamed"));
+    cancelRenameSection();
+  };
+
+  const handleCreateSection = async () => {
+    const name = window.prompt(t("aimediart_docs.section_name_prompt"));
+    if (name == null) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error(t("aimediart_docs.error_folder_empty"));
+      return;
+    }
+    setSectionBusy(true);
+    const { data, error } = await createGedSection(trimmed);
+    setSectionBusy(false);
+    if (error) {
+      toast.error(t("aimediart_docs.error_section_create", { detail: error }));
+      return;
+    }
+    toast.success(t("aimediart_docs.section_created"));
+    if (data) setSections((prev) => [...prev, data]);
+    else await loadSections();
+  };
+
+  const handleDeleteSection = async (section: AimediartGedSection) => {
+    if (!window.confirm(t("aimediart_docs.confirm_delete_section", { name: section.name }))) {
+      return;
+    }
+    setSectionBusy(true);
+    const { error } = await deleteGedSection(section);
+    setSectionBusy(false);
+    if (error === "section_not_empty") {
+      toast.error(t("aimediart_docs.error_section_not_empty"));
+      return;
+    }
+    if (error) {
+      toast.error(t("aimediart_docs.error_section_delete", { detail: error }));
+      return;
+    }
+    toast.success(t("aimediart_docs.section_deleted"));
+    setSections((prev) => prev.filter((s) => s.id !== section.id));
+  };
+
   return (
     <div className="space-y-4">
-      <h2 className="font-serif text-lg font-bold tracking-tight text-foreground md:text-xl">
-        {t("aimediart_docs.panel_title")}
-      </h2>
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="aimediart-legal" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">
-              {t("aimediart_docs.legal_title")}
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <DocumentManager category="legal" />
-          </AccordionContent>
-        </AccordionItem>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-serif text-lg font-bold tracking-tight text-foreground md:text-xl">
+          {t("aimediart_docs.panel_title")}
+        </h2>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={sectionBusy}
+          onClick={() => void handleCreateSection()}
+        >
+          <FolderPlus />
+          {t("aimediart_docs.btn_new_section")}
+        </Button>
+      </div>
 
-        <AccordionItem value="aimediart-bp" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">
-              {t("aimediart_docs.bp_title")}
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <DocumentManager category="bp" />
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="aimediart-marketing" className="border-border/50">
-          <AccordionTrigger className="px-1 hover:no-underline">
-            <span className="font-serif text-base font-bold">
-              {t("aimediart_docs.marketing_title")}
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="px-1 pb-3">
-            <DocumentManager category="marketing" />
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      {sectionsLoading ? (
+        <p className="py-2 text-sm text-muted-foreground">{t("aimediart_docs.loading")}</p>
+      ) : sections.length === 0 ? (
+        <p className="rounded-md border border-dashed border-border/60 py-6 text-center text-sm text-muted-foreground">
+          {t("aimediart_docs.empty_sections")}
+        </p>
+      ) : (
+        <Accordion type="single" collapsible className="w-full">
+          {sections.map((section) => (
+            <AccordionItem
+              key={section.id}
+              value={section.slug}
+              className="border-border/50"
+            >
+              <div className="flex items-center gap-1">
+                {renamingSectionId === section.id ? (
+                  <div
+                    className="flex flex-1 items-center gap-2 px-1 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Input
+                      ref={sectionRenameRef}
+                      value={sectionRenameValue}
+                      onChange={(e) => setSectionRenameValue(e.target.value)}
+                      className="h-9 font-serif text-base font-bold"
+                      aria-label={t("aimediart_docs.rename_folder")}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void submitRenameSection(section);
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          cancelRenameSection();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      disabled={sectionBusy}
+                      title={t("aimediart_docs.rename_folder")}
+                      onClick={() => void submitRenameSection(section)}
+                    >
+                      {sectionBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      disabled={sectionBusy}
+                      onClick={cancelRenameSection}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <AccordionTrigger className="flex-1 px-1 hover:no-underline">
+                      <span className="font-serif text-base font-bold">
+                        {section.name}
+                      </span>
+                    </AccordionTrigger>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      disabled={sectionBusy}
+                      title={t("aimediart_docs.rename_folder")}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startRenameSection(section);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                      disabled={sectionBusy}
+                      title={t("aimediart_docs.delete_section")}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDeleteSection(section);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <AccordionContent className="px-1 pb-3">
+                <DocumentManager category={section.slug} />
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      )}
     </div>
   );
 }
