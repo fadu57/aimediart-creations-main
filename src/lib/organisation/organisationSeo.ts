@@ -54,12 +54,21 @@ function padMetaDescription(text: string, min: number, max: number): string {
 }
 
 export function resolveSiteOrigin(env: NodeJS.ProcessEnv = process.env): string {
-  const fromEnv =
+  const explicit =
     env.VITE_PUBLIC_SITE_URL?.trim() ||
     env.VITE_PUBLIC_URL?.trim() ||
-    (env.VERCEL_URL ? `https://${env.VERCEL_URL.replace(/^https?:\/\//, "")}` : "");
-  const base = fromEnv || "https://www.aimediart.com";
-  return base.replace(/\/+$/, "");
+    "";
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  // Production Vercel : hostname prod du projet (pas l’URL éphémère de déploiement).
+  const vercelProd = env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercelProd) {
+    return `https://${vercelProd.replace(/^https?:\/\//, "")}`.replace(/\/+$/, "");
+  }
+
+  // Ne pas baker les hostnames *.vercel.app (preview) dans le HTML SEO / preload :
+  // sinon www.aimediart.com précharge une image d’un autre domaine.
+  return "https://www.aimediart.com";
 }
 
 export function buildOrganisationSeoPayload(
@@ -152,7 +161,7 @@ export function syncOrganisationLcpPreload(hash: string): void {
   link.rel = "preload";
   link.as = "image";
   link.type = "image/webp";
-  link.href = `${window.location.origin}${ORGANISATION_LCP_WEBP_PATH}`;
+  link.href = ORGANISATION_LCP_WEBP_PATH;
   link.setAttribute("fetchpriority", "high");
   document.head.appendChild(link);
 }
@@ -160,10 +169,11 @@ export function syncOrganisationLcpPreload(hash: string): void {
 /** Injecte / remplace les balises <head> SEO pour dist/organisation/index.html */
 export function injectOrganisationHead(html: string, seo: OrganisationSeoPayload): string {
   const jsonLd = JSON.stringify(buildOrganisationJsonLd(seo)).replace(/</g, "\\u003c");
-  const lcpWebpUrl = `${seo.siteOrigin}${ORGANISATION_LCP_WEBP_PATH}`;
+  // Chemin relatif : suit toujours l’origine courante (évite un preload vers un hostname Vercel preview).
+  const lcpWebpPath = ORGANISATION_LCP_WEBP_PATH;
   const preloadLcp = !seo.pageUrl.includes("#") || /#accueil(?:$|[?&])/.test(seo.pageUrl);
   const organisationLcpPreloadScript = preloadLcp
-    ? `<script>(function(){var h=location.hash.replace(/^#/,"");if(!h||h==="accueil"){var l=document.createElement("link");l.id="${ORGANISATION_LCP_PRELOAD_LINK_ID}";l.rel="preload";l.as="image";l.type="image/webp";l.href="${escapeHtmlAttribute(lcpWebpUrl)}";l.setAttribute("fetchpriority","high");document.head.appendChild(l);}})();</script>`
+    ? `<script>(function(){var h=location.hash.replace(/^#/,"");if(!h||h==="accueil"){var l=document.createElement("link");l.id="${ORGANISATION_LCP_PRELOAD_LINK_ID}";l.rel="preload";l.as="image";l.type="image/webp";l.href="${escapeHtmlAttribute(lcpWebpPath)}";l.setAttribute("fetchpriority","high");document.head.appendChild(l);}})();</script>`
     : "";
   const performanceHints = `
     <link rel="preconnect" href="https://fonts.googleapis.com" />
