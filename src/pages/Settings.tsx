@@ -758,18 +758,18 @@ export default function SettingsPage() {
             >
               {filteredSections.map((section) => (
                 <AccordionItem key={section.id} value={section.id} className="border-border/50">
-                  <AccordionTrigger className="px-3 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-4 pr-2 text-left">
-                      <div className="min-w-0">
-                        <h3 className="font-serif text-xl font-bold">{section.title}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
+                  <AccordionTrigger className="px-2 py-1.5 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
+                    <div className="flex w-full items-center justify-between gap-2 pr-1 text-left">
+                      <div className="min-w-0 leading-tight">
+                        <h3 className="font-serif text-sm font-bold md:text-base">{section.title}</h3>
+                        <p className="text-[11px] text-muted-foreground md:text-xs">{section.description}</p>
                       </div>
-                      <div className="shrink-0 rounded-md border border-border/60 bg-muted/40 p-2 shadow-none">
-                        <section.icon className="h-5 w-5 text-primary" />
+                      <div className="shrink-0 rounded border border-border/60 bg-muted/40 p-1 shadow-none">
+                        <section.icon className="h-3.5 w-3.5 text-primary" />
                       </div>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent className="px-3 pb-4">
+                  <AccordionContent className="px-2 pb-2">
                     {section.id === "general" ? (
                       renderGeneralContent()
                     ) : section.id === "visitors" ? (
@@ -795,7 +795,7 @@ export default function SettingsPage() {
 
       {canAccessGeneralSettings && (
         <Card className="border border-border/50 bg-white/80 shadow-none">
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 md:p-3">
             <AimediartDocumentsPanel />
           </CardContent>
         </Card>
@@ -803,7 +803,7 @@ export default function SettingsPage() {
 
       {canAccessGeneralSettings && (
         <Card className="border border-border/50 bg-white/80 shadow-none">
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 md:p-3">
             <VeilleActualitePanel />
           </CardContent>
         </Card>

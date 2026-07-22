@@ -77,23 +77,23 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
   const busy = busyId === doc.id;
 
   return (
-    <li className="flex items-center gap-2 px-3 py-2 sm:gap-3">
-      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div className="min-w-0 flex-1">
+    <li className="flex items-center gap-2 px-2 py-1 sm:gap-2">
+      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      <div className="min-w-0 flex-1 leading-tight">
         <p className="truncate text-sm font-medium" title={doc.name}>
           {doc.name}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           {new Date(doc.created_at).toLocaleDateString()}
           {formatSize(doc.size_bytes) ? ` · ${formatSize(doc.size_bytes)}` : ""}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-0">
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          className="h-8 w-8"
+          className="h-7 w-7"
           disabled={busy}
           title={t("aimediart_docs.open")}
           onClick={() => onOpen(doc)}
@@ -106,7 +106,7 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
               type="button"
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-7 w-7"
               disabled={busy}
               title={t("aimediart_docs.move")}
             >
@@ -138,7 +138,7 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
           type="button"
           size="icon"
           variant="ghost"
-          className="h-8 w-8"
+          className="h-7 w-7"
           disabled={busy}
           title={t("aimediart_docs.share")}
           onClick={() => onShare(doc)}
@@ -149,7 +149,7 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
           type="button"
           size="icon"
           variant="ghost"
-          className="h-8 w-8 text-destructive hover:text-destructive"
+          className="h-7 w-7 text-destructive hover:text-destructive"
           disabled={busy}
           title={t("aimediart_docs.delete")}
           onClick={() => onDelete(doc)}
@@ -184,7 +184,7 @@ function DocList({
 }: DocListProps) {
   if (docs.length === 0) {
     return (
-      <p className="rounded-md border border-dashed border-border/60 py-4 text-center text-sm text-muted-foreground">
+      <p className="rounded-md border border-dashed border-border/60 py-2 text-center text-sm text-muted-foreground">
         {emptyLabel}
       </p>
     );
@@ -406,10 +406,10 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
   const rootDocs = docs.filter((d) => d.folder_id == null);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">{t("aimediart_docs.hint")}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -422,6 +422,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
             type="button"
             size="sm"
             variant="outline"
+            className="h-7"
             disabled={uploading}
             onClick={() => void handleCreateFolder()}
           >
@@ -432,6 +433,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
             type="button"
             size="sm"
             variant="outline"
+            className="h-7"
             disabled={uploading}
             onClick={() => triggerUpload(null)}
           >
@@ -444,7 +446,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
       {loading ? (
         <p className="py-2 text-sm text-muted-foreground">{t("aimediart_docs.loading")}</p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           {folders.length > 0 && (
             <Accordion type="multiple" className="w-full">
               {folders.map((folder) => {
@@ -456,19 +458,19 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                     value={folder.id}
                     className="border-border/50"
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       {isRenaming ? (
                         <div
-                          className="flex flex-1 items-center gap-2 px-1 py-2"
+                          className="flex flex-1 items-center gap-1.5 px-1 py-1"
                           onClick={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
                         >
-                          <Folder className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                          <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                           <Input
                             ref={renameInputRef}
                             value={renameValue}
                             onChange={(e) => setRenameValue(e.target.value)}
-                            className="h-8"
+                            className="h-7"
                             aria-label={t("aimediart_docs.rename_folder")}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -485,33 +487,33 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0"
+                            className="h-7 w-7 shrink-0"
                             disabled={busyId === folder.id}
                             title={t("aimediart_docs.rename_folder")}
                             onClick={() => void submitRenameFolder(folder)}
                           >
                             {busyId === folder.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <Check className="h-4 w-4" />
+                              <Check className="h-3.5 w-3.5" />
                             )}
                           </Button>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0"
+                            className="h-7 w-7 shrink-0"
                             disabled={busyId === folder.id}
                             onClick={cancelRenameFolder}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       ) : (
                         <>
-                          <AccordionTrigger className="flex-1 px-1 hover:no-underline">
-                            <span className="flex items-center gap-2 text-sm font-semibold">
-                              <Folder className="h-4 w-4 text-muted-foreground" aria-hidden />
+                          <AccordionTrigger className="flex-1 px-1 py-1 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
+                            <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight">
+                              <Folder className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                               {folder.name}
                               <span className="font-normal text-muted-foreground">
                                 ({folderDocs.length})
@@ -522,7 +524,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0"
+                            className="h-7 w-7 shrink-0"
                             disabled={busyId === folder.id}
                             title={t("aimediart_docs.rename_folder")}
                             onPointerDown={(e) => e.stopPropagation()}
@@ -531,13 +533,13 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                               startRenameFolder(folder);
                             }}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0"
+                            className="h-7 w-7 shrink-0"
                             disabled={uploading}
                             title={t("aimediart_docs.btn_upload")}
                             onPointerDown={(e) => e.stopPropagation()}
@@ -546,13 +548,13 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                               triggerUpload(folder.id);
                             }}
                           >
-                            <Upload className="h-4 w-4" />
+                            <Upload className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             type="button"
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
                             disabled={busyId === folder.id || folderDocs.length > 0}
                             title={t("aimediart_docs.delete_folder")}
                             onPointerDown={(e) => e.stopPropagation()}
@@ -562,15 +564,15 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                             }}
                           >
                             {busyId === folder.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             )}
                           </Button>
                         </>
                       )}
                     </div>
-                    <AccordionContent className="px-1 pb-3">
+                    <AccordionContent className="px-1 pb-2">
                       <DocList
                         docs={folderDocs}
                         folders={folders}
@@ -716,15 +718,16 @@ export function AimediartDocumentsPanel() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-serif text-lg font-bold tracking-tight text-foreground md:text-xl">
+        <h2 className="font-serif text-base font-bold tracking-tight text-foreground md:text-lg">
           {t("aimediart_docs.panel_title")}
         </h2>
         <Button
           type="button"
           size="sm"
           variant="outline"
+          className="h-7"
           disabled={sectionBusy}
           onClick={() => void handleCreateSection()}
         >
@@ -734,9 +737,9 @@ export function AimediartDocumentsPanel() {
       </div>
 
       {sectionsLoading ? (
-        <p className="py-2 text-sm text-muted-foreground">{t("aimediart_docs.loading")}</p>
+        <p className="py-1 text-sm text-muted-foreground">{t("aimediart_docs.loading")}</p>
       ) : sections.length === 0 ? (
-        <p className="rounded-md border border-dashed border-border/60 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-md border border-dashed border-border/60 py-3 text-center text-sm text-muted-foreground">
           {t("aimediart_docs.empty_sections")}
         </p>
       ) : (
@@ -747,10 +750,10 @@ export function AimediartDocumentsPanel() {
               value={section.slug}
               className="border-border/50"
             >
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 {renamingSectionId === section.id ? (
                   <div
-                    className="flex flex-1 items-center gap-2 px-1 py-2"
+                    className="flex flex-1 items-center gap-1.5 px-1 py-1"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
@@ -758,7 +761,7 @@ export function AimediartDocumentsPanel() {
                       ref={sectionRenameRef}
                       value={sectionRenameValue}
                       onChange={(e) => setSectionRenameValue(e.target.value)}
-                      className="h-9 font-serif text-base font-bold"
+                      className="h-7 font-serif text-sm font-bold"
                       aria-label={t("aimediart_docs.rename_folder")}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -775,32 +778,32 @@ export function AimediartDocumentsPanel() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0"
                       disabled={sectionBusy}
                       title={t("aimediart_docs.rename_folder")}
                       onClick={() => void submitRenameSection(section)}
                     >
                       {sectionBusy ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-3.5 w-3.5" />
                       )}
                     </Button>
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0"
                       disabled={sectionBusy}
                       onClick={cancelRenameSection}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ) : (
                   <>
-                    <AccordionTrigger className="flex-1 px-1 hover:no-underline">
-                      <span className="font-serif text-base font-bold">
+                    <AccordionTrigger className="flex-1 px-1 py-1 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
+                      <span className="font-serif text-sm font-bold leading-tight">
                         {section.name}
                       </span>
                     </AccordionTrigger>
@@ -808,7 +811,7 @@ export function AimediartDocumentsPanel() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0"
                       disabled={sectionBusy}
                       title={t("aimediart_docs.rename_folder")}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -817,13 +820,13 @@ export function AimediartDocumentsPanel() {
                         startRenameSection(section);
                       }}
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                      className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
                       disabled={sectionBusy}
                       title={t("aimediart_docs.delete_section")}
                       onPointerDown={(e) => e.stopPropagation()}
@@ -832,12 +835,12 @@ export function AimediartDocumentsPanel() {
                         void handleDeleteSection(section);
                       }}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </>
                 )}
               </div>
-              <AccordionContent className="px-1 pb-3">
+              <AccordionContent className="px-1 pb-2">
                 <DocumentManager category={section.slug} />
               </AccordionContent>
             </AccordionItem>

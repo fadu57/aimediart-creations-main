@@ -48,7 +48,7 @@ export function VeilleActualitePanel() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [openId, setOpenId] = useState<string | undefined>(VEILLE_ACTUALITE_ITEMS[0]?.id);
+  const [openId, setOpenId] = useState<string | undefined>(undefined);
   const [suggestOpen, setSuggestOpen] = useState(false);
 
   const qNorm = query.trim().toLowerCase();
