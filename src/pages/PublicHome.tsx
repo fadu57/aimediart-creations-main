@@ -34,6 +34,8 @@ import {
   MapPin,
   MessagesSquare,
   MonitorPlay,
+  Pause,
+  Play,
   QrCode,
   ScanSearch,
   Smartphone,
@@ -170,15 +172,16 @@ function formatEurAuto(value: number | null | undefined, locale: string): string
   }).format(value);
 }
 
-/** Mensuel TTC : 0 → essai gratuit (jours depuis pricing), NULL → Sur Devis, sinon montant + €/mois. */
-function formatMonthlyTtcDisplay(
-  value: number | null | undefined,
+/** Mensuel : 0 → essai gratuit, NULL → Sur Devis, sinon montant + €/mois (TTC ou HT selon mode). */
+function formatMonthlyPriceDisplay(
+  ttcValue: number | null | undefined,
   t: TFunction,
   locale: string,
+  taxMode: "ttc" | "ht",
   trialDurationDays?: number | null,
 ): string {
-  if (value === null || value === undefined) return t("tarifs.sur_devis");
-  const n = typeof value === "number" && !Number.isNaN(value) ? value : Number(value);
+  if (ttcValue === null || ttcValue === undefined) return t("tarifs.sur_devis");
+  const n = typeof ttcValue === "number" && !Number.isNaN(ttcValue) ? ttcValue : Number(ttcValue);
   if (!Number.isFinite(n)) return t("tarifs.sur_devis");
   if (n === 0) {
     const days = trialDurationDays;
@@ -189,7 +192,23 @@ function formatMonthlyTtcDisplay(
     }
     return t("tarifs.gratuit");
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(n)}\u00a0${t("tarifs.per_month")}`;
+  const amount = taxMode === "ht" ? ttcToHt(n) : n;
+  const hasCents = Math.round(amount * 100) % 100 !== 0;
+  const formatted = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: taxMode === "ht" && hasCents ? 2 : taxMode === "ht" ? 2 : 0,
+    minimumFractionDigits: taxMode === "ht" && hasCents ? 2 : 0,
+  }).format(amount);
+  return `${formatted}\u00a0${t("tarifs.per_month")}`;
+}
+
+function amountFromTtc(ttc: number, taxMode: "ttc" | "ht"): number {
+  return taxMode === "ht" ? ttcToHt(ttc) : ttc;
+}
+
+function formatPriceAmount(ttc: number | null | undefined, locale: string, taxMode: "ttc" | "ht"): string {
+  if (typeof ttc !== "number" || Number.isNaN(ttc)) return "—";
+  const amount = amountFromTtc(ttc, taxMode);
+  return taxMode === "ht" ? formatEurAuto(amount, locale) : formatEur(amount, locale);
 }
 
 function normalizePlan(plan: string | null): string {
@@ -336,7 +355,7 @@ function CapacityBlockSummary({ row, t }: { row: PricingRow; t: TFunction }) {
   }
 
   return (
-    <div className="text-sm font-semibold leading-snug">
+    <div className="ph-pricing-capacity text-sm font-semibold leading-snug">
       {oeuvresLine ? <div>{oeuvresLine}</div> : null}
       {visitorsLine ? <div>{visitorsLine}</div> : null}
     </div>
@@ -353,18 +372,20 @@ function optionUnitPrice(row: PricingRow, optionCode: string): number | null {
   return optionUnitPriceFromRow(row, optionCode);
 }
 
-function formatCompactEur(value: number | null | undefined, locale: string): string {
+function formatCompactEur(value: number | null | undefined, locale: string, taxMode: "ttc" | "ht" = "ttc"): string {
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
+  const amount = amountFromTtc(value, taxMode);
+  if (taxMode === "ht") return formatEurAuto(amount, locale);
   return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(
-    value,
+    amount,
   );
 }
 
-function planStandbyLabel(row: PricingRow, t: TFunction, locale: string): string {
+function planStandbyLabel(row: PricingRow, t: TFunction, locale: string, taxMode: "ttc" | "ht" = "ttc"): string {
   if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.sur_devis");
   const price = optionUnitPrice(row, "STANDBY");
   if (typeof price !== "number" || price <= 0) return t("tarifs.usage_none");
-  return t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
+  return t("tarifs.standby_price", { price: formatCompactEur(price, locale, taxMode) });
 }
 
 function formatExtraOptionSuffix(
@@ -373,12 +394,13 @@ function formatExtraOptionSuffix(
   t: TFunction,
   locale: string,
   pricedKey: "languages_extra" | "audio_extra",
+  taxMode: "ttc" | "ht" = "ttc",
 ): string | null {
   const opt = findPricingOption(row, optionCode);
   if (!opt) return null;
   const price = opt.unit_price_ttc_eur;
   if (typeof price === "number" && price > 0) {
-    return t(`tarifs.${pricedKey}`, { price: formatCompactEur(price, locale) });
+    return t(`tarifs.${pricedKey}`, { price: formatCompactEur(price, locale, taxMode) });
   }
   if (opt.billing_mode === "on_quote" || price === null) {
     return t("tarifs.languages_extra_on_quote");
@@ -386,7 +408,7 @@ function formatExtraOptionSuffix(
   return null;
 }
 
-function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): string {
+function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string, taxMode: "ttc" | "ht" = "ttc"): string {
   if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
   const min = row.included_mediation_langs_min;
   const max = row.included_mediation_langs_max;
@@ -396,7 +418,7 @@ function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): stri
         max === 1
           ? t("tarifs.languages_included_one", { count: max })
           : t("tarifs.languages_included_many", { count: max });
-      const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra");
+      const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra", taxMode);
       return extraSuffix ? `${included} · ${extraSuffix}` : included;
     }
     return t("tarifs.usage_none");
@@ -410,11 +432,11 @@ function planLanguagesLabel(row: PricingRow, t: TFunction, locale: string): stri
         : t("tarifs.languages_included_many", { count: min })
       : t("tarifs.languages_included_range", { min, max: maxVal });
 
-  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra");
+  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_MEDIATION_LANG", t, locale, "languages_extra", taxMode);
   return extraSuffix ? `${included} · ${extraSuffix}` : included;
 }
 
-function planAudioLabel(row: PricingRow, t: TFunction, locale: string): string {
+function planAudioLabel(row: PricingRow, t: TFunction, locale: string, taxMode: "ttc" | "ht" = "ttc"): string {
   if (isCustomLanguagesPlanCode(planCodeFromRow(row))) return t("tarifs.languages_custom");
   const audioLangs = row.included_audio_langs;
   if (typeof audioLangs !== "number" || Number.isNaN(audioLangs) || audioLangs <= 0) {
@@ -424,7 +446,7 @@ function planAudioLabel(row: PricingRow, t: TFunction, locale: string): string {
     audioLangs === 1
       ? t("tarifs.audio_included_one", { count: audioLangs })
       : t("tarifs.audio_included_many", { count: audioLangs });
-  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_AUDIO_LANG", t, locale, "audio_extra");
+  const extraSuffix = formatExtraOptionSuffix(row, "EXTRA_AUDIO_LANG", t, locale, "audio_extra", taxMode);
   return extraSuffix ? `${included} · ${extraSuffix}` : included;
 }
 
@@ -448,12 +470,12 @@ function standbyPlanCodeFromRow(row: PricingRow): StandbyPlanCode | null {
   return null;
 }
 
-function planArtworksPackLine(row: PricingRow, t: TFunction, locale: string): string | null {
+function planArtworksPackLine(row: PricingRow, t: TFunction, locale: string, taxMode: "ttc" | "ht" = "ttc"): string | null {
   const opt = findPricingOption(row, "EXTRA_ARTWORKS_PACK");
   const label = opt?.description?.trim();
   const price = opt?.unit_price_ttc_eur;
   if (!label || typeof price !== "number" || price <= 0) return null;
-  const amount = t("tarifs.standby_price", { price: formatCompactEur(price, locale) });
+  const amount = t("tarifs.standby_price", { price: formatCompactEur(price, locale, taxMode) });
   return `${label} : ${amount}`;
 }
 
@@ -463,30 +485,32 @@ function PlanPricingDetails({
   locale,
   isQuoteOnly,
   hideStandbyRow = false,
+  taxMode = "ttc",
 }: {
   row: PricingRow;
   t: TFunction;
   locale: string;
   isQuoteOnly: boolean;
   hideStandbyRow?: boolean;
+  taxMode?: "ttc" | "ht";
 }) {
   const hideStandby = shouldHideStandbyDetailRow(row, hideStandbyRow);
   const usageValue = planUsageLabel(row, t);
   const showUsageRow = usageValue !== t("tarifs.usage_no_limit");
-  const artworksPackLine = planArtworksPackLine(row, t, locale);
+  const artworksPackLine = planArtworksPackLine(row, t, locale, taxMode);
   const rows = [
-    ...(!hideStandby ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale) }] : []),
+    ...(!hideStandby ? [{ label: t("tarifs.option_standby"), value: planStandbyLabel(row, t, locale, taxMode) }] : []),
     ...(!isQuoteOnly
       ? [
-          { label: t("tarifs.option_languages"), value: planLanguagesLabel(row, t, locale) },
-          { label: t("tarifs.option_audio"), value: planAudioLabel(row, t, locale) },
+          { label: t("tarifs.option_languages"), value: planLanguagesLabel(row, t, locale, taxMode) },
+          { label: t("tarifs.option_audio"), value: planAudioLabel(row, t, locale, taxMode) },
         ]
       : []),
     ...(showUsageRow ? [{ label: t("tarifs.option_usage"), value: usageValue }] : []),
   ];
 
   return (
-    <div className="mt-2 space-y-1 border-t border-neutral-200 pt-2 text-xs leading-relaxed text-muted-foreground">
+    <div className="ph-pricing-details mt-2 space-y-1 border-t border-neutral-200 pt-2 text-xs leading-relaxed text-muted-foreground">
       {artworksPackLine ? (
         <div className="text-foreground/80">{artworksPackLine}</div>
       ) : null}
@@ -535,6 +559,14 @@ function QuotePlanSummary({ kind, t }: { kind: "rayonnement" | "zenith"; t: TFun
 }
 
 /** Titre court en tête de carte : seul le nom du palier, traduit via i18n. */
+function planSortOrderLabel(rows: Array<{ sort_order?: number | null }>): string | null {
+  const orders = rows
+    .map((r) => (typeof r.sort_order === "number" && Number.isFinite(r.sort_order) ? r.sort_order : null))
+    .filter((n): n is number => n !== null);
+  if (orders.length === 0) return null;
+  return `${Math.min(...orders)}.`;
+}
+
 function planCardTitleShort(plan: string | null, t: TFunction): string {
   const ascii = planNameAsciiUpper(plan);
   const core = ascii
@@ -663,6 +695,7 @@ function Section({
   eyebrow,
   eyebrowClassName,
   titleClassName,
+  contentClassName,
   title,
   children,
   surfaceCard = false,
@@ -678,6 +711,8 @@ function Section({
   eyebrowClassName?: string;
   /** Classes additionnelles pour le titre h2, ex. max-w plus large */
   titleClassName?: string;
+  /** Classes pour le wrapper du contenu sous le titre (défaut mt-9) */
+  contentClassName?: string;
   title: ReactNode;
   children: ReactNode;
   /** Même enveloppe visuelle que le bloc principal du hero (#accueil) */
@@ -708,7 +743,7 @@ function Section({
       >
         {title}
       </h2>
-      <div className="mt-9">{children}</div>
+      <div className={cn("mt-9", contentClassName)}>{children}</div>
     </>
   );
 
@@ -765,6 +800,41 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
   const [selectedVariantByPlan, setSelectedVariantByPlan] = useState<Record<string, number>>({});
   const [promptIcons, setPromptIcons] = useState<string[]>(resolvedInitialData?.promptIcons ?? []);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  const [priceTaxMode, setPriceTaxMode] = useState<"ttc" | "ht">("ttc");
+  const [pricingAutoplayPaused, setPricingAutoplayPaused] = useState(false);
+  const [pricingNarrowViewport, setPricingNarrowViewport] = useState(false);
+  const pricingSwiperRef = useRef<SwiperClass | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPricingAutoplayPaused(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const sync = () => setPricingNarrowViewport(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const togglePricingAutoplay = () => {
+    const swiper = pricingSwiperRef.current;
+    if (!swiper?.autoplay) {
+      setPricingAutoplayPaused((prev) => !prev);
+      return;
+    }
+    if (pricingAutoplayPaused) {
+      swiper.autoplay.start();
+      setPricingAutoplayPaused(false);
+    } else {
+      swiper.autoplay.stop();
+      setPricingAutoplayPaused(true);
+    }
+  };
 
   // Coverflow tarifs : estompe les cartes selon leur distance au centre.
   // → centrale nette, 2 cartes inclinées de chaque côté, puis 1 carte en perspective derrière.
@@ -1484,12 +1554,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
           id="tarifs"
           title={t("tarifs.title")}
           titleClassName="max-w-[600px] text-left whitespace-pre-line"
+          contentClassName="!mt-3"
           backgroundImage={tarifsPhoto}
           backgroundWebp={tarifsWebp}
           backgroundImageAlt={t("tarifs.image_alt")}
           backgroundImageLayout="full-width"
         >
-          <div className="mt-7">
+          <div className="mt-0">
             {pricingLoading ? (
               <div className="flex items-center justify-center rounded-3xl border border-neutral-300/70 bg-white p-12 shadow-[0_10px_22px_rgba(0,0,0,0.05)]">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
@@ -1513,11 +1584,11 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
               </div>
             ) : (
               <>
-                <div className="mb-5 flex justify-center">
+                <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
                   <div
                     role="tablist"
                     aria-label={t("tarifs.billing_toggle_label", { defaultValue: "Périodicité de paiement" })}
-                    className="inline-flex items-center gap-1 rounded-full border border-neutral-300 bg-white p-1 shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
+                    className="inline-flex items-center gap-0.5 rounded-full border border-neutral-300 bg-white p-0.5 shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
                   >
                     <button
                       type="button"
@@ -1525,7 +1596,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       aria-selected={billingPeriod === "monthly"}
                       onClick={() => setBillingPeriod("monthly")}
                       className={cn(
-                        "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors duration-200",
+                        "rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-200 sm:text-sm",
                         billingPeriod === "monthly" ? "bg-[#9d2525] text-white shadow-sm" : "text-neutral-600 hover:text-[#9d2525]",
                       )}
                     >
@@ -1537,19 +1608,49 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       aria-selected={billingPeriod === "annual"}
                       onClick={() => setBillingPeriod("annual")}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors duration-200",
+                        "flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-200 sm:text-sm",
                         billingPeriod === "annual" ? "bg-[#9d2525] text-white shadow-sm" : "text-neutral-600 hover:text-[#9d2525]",
                       )}
                     >
                       {t("tarifs.toggle_annual", { defaultValue: "Annuel" })}
                       <span
                         className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                          "rounded-full px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
                           billingPeriod === "annual" ? "bg-white/20 text-white" : "bg-[#9d2525]/10 text-[#9d2525]",
                         )}
                       >
                         {t("tarifs.toggle_annual_badge", { defaultValue: "-2 mois" })}
                       </span>
+                    </button>
+                  </div>
+                  <div
+                    role="tablist"
+                    aria-label={t("tarifs.tax_toggle_label", { defaultValue: "Affichage des prix" })}
+                    className="inline-flex items-center gap-0.5 rounded-full border border-neutral-300 bg-white p-0.5 shadow-[0_4px_12px_rgba(0,0,0,0.06)]"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={priceTaxMode === "ttc"}
+                      onClick={() => setPriceTaxMode("ttc")}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-200 sm:text-sm",
+                        priceTaxMode === "ttc" ? "bg-[#9d2525] text-white shadow-sm" : "text-neutral-600 hover:text-[#9d2525]",
+                      )}
+                    >
+                      {t("tarifs.toggle_ttc", { defaultValue: "Prix TTC" })}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={priceTaxMode === "ht"}
+                      onClick={() => setPriceTaxMode("ht")}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-xs font-semibold transition-colors duration-200 sm:text-sm",
+                        priceTaxMode === "ht" ? "bg-[#9d2525] text-white shadow-sm" : "text-neutral-600 hover:text-[#9d2525]",
+                      )}
+                    >
+                      {t("tarifs.toggle_ht", { defaultValue: "Prix HT" })}
                     </button>
                   </div>
                 </div>
@@ -1567,11 +1668,19 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     autoplay={{ delay: 2200, disableOnInteraction: false, pauseOnMouseEnter: true }}
                     speed={650}
                     watchSlidesProgress
+                    onSwiper={(swiper) => {
+                      pricingSwiperRef.current = swiper;
+                      if (pricingAutoplayPaused) swiper.autoplay?.stop();
+                    }}
                     onInit={applyPricingCoverflowDepth}
                     onSetTranslate={applyPricingCoverflowDepth}
                     onSetTransition={syncPricingCoverflowTransition}
-                    coverflowEffect={{ rotate: 34, stretch: -12, depth: 110, modifier: 1, scale: 0.9, slideShadows: false }}
-                    className="ph-pricing-swiper !px-2 !py-8"
+                    coverflowEffect={
+                      pricingNarrowViewport
+                        ? { rotate: 16, stretch: -6, depth: 70, modifier: 1, scale: 0.95, slideShadows: false }
+                        : { rotate: 34, stretch: -12, depth: 110, modifier: 1, scale: 0.9, slideShadows: false }
+                    }
+                    className="ph-pricing-swiper ph-pricing-swiper-mobile-compact !px-2 !py-3"
                   >
                   {(() => {
                     return groupedPlans.map(({ planKey, variants }) => {
@@ -1592,6 +1701,10 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     const selectedIndexRaw = selectedVariantByPlan[planKey] ?? 0;
                     const selectedIndex = Math.min(Math.max(selectedIndexRaw, 0), Math.max(variants.length - 1, 0));
                     const selectedVariant = variants[selectedIndex];
+                    const sortOrderLabel = planSortOrderLabel(selectedVariant ? [selectedVariant] : variants);
+                    const cardTitleWithOrder = sortOrderLabel
+                      ? `${sortOrderLabel} ${cardTitleShort}`
+                      : cardTitleShort;
                     const isRayonnementCard = isRayonnementPlanName(displayPlan);
                     const isQuoteOnlyCard = selectedVariant
                       ? isQuoteOnlyRow(selectedVariant)
@@ -1607,7 +1720,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     return (
                       <SwiperSlide
                         key={planKey}
-                        className="ph-pricing-slide !h-auto !w-[275px]"
+                        className="ph-pricing-slide !h-auto !w-[min(255px,78vw)] sm:!w-[275px]"
                       >
                       <div className="ph-pricing-slide-inner h-full">
                       {topRank ? (
@@ -1618,13 +1731,13 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                       <article aria-labelledby={`plan-title-${planKey}`} className="h-full">
                       <Card
                         className={cn(
-                          "flex h-full min-h-[456px] flex-col rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
+                          "flex h-full min-h-0 flex-col rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card",
                           isHighlight && "ring-1 ring-[rgba(168,23,29,0.22)]",
                         )}
                       >
                         <span className="ph-corner-ribbon">{badgeLabel}</span>
-                        <CardHeader className="pb-3">
-                          <div className="mb-2 flex items-center justify-end">
+                        <CardHeader className="ph-pricing-card-header pb-2">
+                          <div className="mb-1.5 flex items-center justify-end">
                             <Link
                               to={
                                 isRayonnementCard
@@ -1636,7 +1749,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             >
                               <Button
                                 size="sm"
-                                className="h-8 rounded-lg px-3 text-xs font-semibold"
+                                className="h-7 rounded-lg px-2.5 text-[11px] font-semibold sm:h-8 sm:px-3 sm:text-xs"
                                 style={{ backgroundColor: "#9D2525", color: "white" }}
                               >
                                 {isRayonnementCard || !isQuoteOnlyCard
@@ -1645,15 +1758,20 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                               </Button>
                             </Link>
                           </div>
-                          <CardTitle id={`plan-title-${planKey}`} className="text-[1.75rem] leading-tight text-[#9d2525]">{cardTitleShort}</CardTitle>
-                          <p className="line-clamp-2 min-h-[2.6rem] text-sm leading-relaxed text-muted-foreground">
+                          <CardTitle
+                            id={`plan-title-${planKey}`}
+                            className="ph-pricing-card-title text-center text-xl leading-tight text-[#9d2525] sm:text-[1.45rem]"
+                          >
+                            {cardTitleWithOrder}
+                          </CardTitle>
+                          <p className="ph-pricing-card-subtitle line-clamp-2 min-h-0 text-center text-xs leading-snug text-muted-foreground sm:text-sm sm:leading-snug">
                             {highlightAimediartWord(subtitle)}
                           </p>
                         </CardHeader>
-                        <CardContent className="flex flex-1 flex-col space-y-3">
+                        <CardContent className="ph-pricing-card-body flex min-h-0 flex-1 flex-col space-y-2">
                           {variants.length > 1 ? (
-                            <div className="space-y-2">
-                              <label htmlFor={`plan-variant-${planKey}`} className="block text-xs font-medium text-muted-foreground">
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <label htmlFor={`plan-variant-${planKey}`} className="block text-[11px] font-medium text-muted-foreground sm:text-xs">
                                 {t("tarifs.select_option_label")}
                               </label>
                               <select
@@ -1663,7 +1781,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                   const value = Number(e.target.value);
                                   setSelectedVariantByPlan((prev) => ({ ...prev, [planKey]: Number.isNaN(value) ? 0 : value }));
                                 }}
-                                className="h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                                className="h-8 w-full rounded-xl border border-neutral-300 bg-white px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:h-10 sm:px-3 sm:text-sm"
                               >
                                 {variants.map((option, idx) => (
                                   <option key={`${planKey}-opt-${idx}`} value={idx}>
@@ -1675,9 +1793,9 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                           ) : null}
 
                           {selectedVariant ? (
-                            <div className="flex min-w-0 flex-1 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
-                              <div className="flex min-w-0 flex-1 flex-col gap-3">
-                                <div className="flex items-center justify-between gap-3">
+                            <div className="ph-pricing-card-panel flex min-h-0 min-w-0 flex-1 rounded-2xl border border-neutral-200 bg-[#faf9f7] p-2.5 sm:p-3">
+                              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                                <div className="flex shrink-0 items-center justify-between gap-3">
                                   <div>
                                     <CapacityBlockSummary row={selectedVariant} t={t} />
                                   </div>
@@ -1692,7 +1810,8 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                     <StandbyPlanTrigger
                                       planCode={standbyCode}
                                       planDisplayName={cardTitleShort}
-                                      monthlyPriceEur={standbyPrice}
+                                      monthlyPriceEur={amountFromTtc(standbyPrice, priceTaxMode)}
+                                      className="shrink-0"
                                     />
                                   );
                                 })()}
@@ -1704,74 +1823,72 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                   hideStandbyRow={
                                     billingPeriod !== "annual" && hasStandbyOffer(selectedVariant)
                                   }
+                                  taxMode={priceTaxMode}
                                 />
                                 {!isQuoteOnlyCard ? (() => {
                                   const effectivePeriod =
                                     billingPeriod === "annual" && showAnnualColumn ? "annual" : "monthly";
+                                  const monthlyLabel =
+                                    priceTaxMode === "ht" ? t("tarifs.col_monthly_ht") : t("tarifs.col_monthly");
+                                  const annualLabel =
+                                    priceTaxMode === "ht" ? t("tarifs.col_annual_ht") : t("tarifs.col_annual");
                                   return (
-                                    <div className="mt-auto">
+                                    <div className="mt-auto shrink-0">
                                       <AnimatePresence mode="wait" initial={false}>
                                         <motion.div
-                                          key={effectivePeriod}
+                                          key={`${effectivePeriod}-${priceTaxMode}`}
                                           initial={{ opacity: 0, y: 6 }}
                                           animate={{ opacity: 1, y: 0 }}
                                           exit={{ opacity: 0, y: -6 }}
                                           transition={{ duration: 0.18, ease: "easeOut" }}
-                                          className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center"
+                                          className="ph-pricing-price-box rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center"
                                         >
                                           {effectivePeriod === "monthly" ? (
                                             <>
                                               {selectedVariant.pricing_monthly_ttc_eur !== 0 ? (
                                                 <div className="text-[11px] font-medium text-muted-foreground">
-                                                  {t("tarifs.col_monthly")}
+                                                  {monthlyLabel}
                                                 </div>
                                               ) : null}
                                               <div
                                                 className={cn(
-                                                  "mt-0.5 text-[15px] font-semibold leading-none tracking-tight",
+                                                  "ph-pricing-price-main mt-0.5 text-[15px] font-semibold leading-none tracking-tight",
                                                   selectedVariant.pricing_monthly_ttc_eur === 0
                                                     ? "italic text-[#9d2525] text-[18px] leading-snug whitespace-normal"
                                                     : "whitespace-nowrap",
                                                 )}
                                               >
-                                                {formatMonthlyTtcDisplay(
+                                                {formatMonthlyPriceDisplay(
                                                   selectedVariant.pricing_monthly_ttc_eur,
                                                   t,
                                                   i18n.language,
+                                                  priceTaxMode,
                                                   selectedVariant.trial_duration_days,
                                                 )}
                                               </div>
-                                              {typeof selectedVariant.pricing_monthly_ttc_eur === "number" &&
-                                              selectedVariant.pricing_monthly_ttc_eur > 0 ? (
-                                                <div className="mt-1 whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
-                                                  {t("tarifs.ht_equiv", {
-                                                    price: formatEurAuto(ttcToHt(selectedVariant.pricing_monthly_ttc_eur), i18n.language),
-                                                  })}
-                                                </div>
-                                              ) : null}
                                             </>
                                           ) : (
                                             <>
-                                              <div className="text-[11px] font-medium text-muted-foreground">{t("tarifs.col_annual")}</div>
+                                              <div className="text-[11px] font-medium text-muted-foreground">{annualLabel}</div>
                                               <div className="mt-0.5 flex flex-nowrap items-center justify-center gap-x-1.5 whitespace-nowrap">
-                                                <span className="text-[15px] font-semibold leading-none tracking-tight">
-                                                  {formatEur(selectedVariant.pricing_annual_remis, i18n.language)}
+                                                <span className="ph-pricing-price-main text-[15px] font-semibold leading-none tracking-tight">
+                                                  {formatPriceAmount(
+                                                    selectedVariant.pricing_annual_remis,
+                                                    i18n.language,
+                                                    priceTaxMode,
+                                                  )}
                                                 </span>
                                                 {typeof selectedVariant.pricing_annuel === "number" &&
                                                 !Number.isNaN(selectedVariant.pricing_annuel) ? (
                                                   <span className="text-[15px] font-bold italic leading-none text-[#9d2525] line-through">
-                                                    {formatEur(selectedVariant.pricing_annuel, i18n.language)}
+                                                    {formatPriceAmount(
+                                                      selectedVariant.pricing_annuel,
+                                                      i18n.language,
+                                                      priceTaxMode,
+                                                    )}
                                                   </span>
                                                 ) : null}
                                               </div>
-                                              {typeof selectedVariant.pricing_annual_remis === "number" &&
-                                              selectedVariant.pricing_annual_remis > 0 ? (
-                                                <div className="mt-1 whitespace-nowrap text-[11px] font-medium leading-none text-muted-foreground">
-                                                  {t("tarifs.ht_equiv", {
-                                                    price: formatEurAuto(ttcToHt(selectedVariant.pricing_annual_remis), i18n.language),
-                                                  })}
-                                                </div>
-                                              ) : null}
                                               <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#9d2525]">
                                                 {t("tarifs.annual_badge")}
                                               </div>
@@ -1796,18 +1913,18 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                   {zenithPlan ? (
                     <SwiperSlide
                       key="zenith"
-                      className="ph-pricing-slide !h-auto !w-[275px]"
+                      className="ph-pricing-slide !h-auto !w-[min(255px,78vw)] sm:!w-[275px]"
                     >
                       <div className="ph-pricing-slide-inner h-full">
                       <article aria-labelledby="plan-title-zenith" className="h-full">
-                        <Card className="flex h-full min-h-[456px] flex-col rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card ring-1 ring-[rgba(168,23,29,0.22)]">
+                        <Card className="flex h-full min-h-0 flex-col rounded-3xl border-neutral-300/70 bg-white shadow-[0_12px_24px_rgba(0,0,0,0.05)] ph-fold-card ring-1 ring-[rgba(168,23,29,0.22)]">
                           <span className="ph-corner-ribbon">{t("tarifs.badge_zenith")}</span>
-                          <CardHeader className="pb-3">
-                            <div className="mb-2 flex items-center justify-end gap-3">
+                          <CardHeader className="ph-pricing-card-header pb-2">
+                            <div className="mb-1.5 flex items-center justify-end gap-3">
                               <Link to="/organisation/commencer?intent=devis&plan=ZENITH">
                                 <Button
                                   size="sm"
-                                  className="h-8 rounded-lg px-3 text-xs font-semibold"
+                                  className="h-7 rounded-lg px-2.5 text-[11px] font-semibold sm:h-8 sm:px-3 sm:text-xs"
                                   style={{ backgroundColor: "#9D2525", color: "white" }}
                                 >
                                   {t("tarifs.cta_devis")}
@@ -1816,16 +1933,20 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                             </div>
                             <CardTitle
                               id="plan-title-zenith"
-                              className="text-[1.75rem] leading-tight text-[#9d2525]"
+                              className="ph-pricing-card-title text-center text-xl leading-tight text-[#9d2525] sm:text-[1.45rem]"
                             >
-                              {planCardTitleShort(zenithPlan.pricing_plan, t)}
+                              {(() => {
+                                const zenithTitle = planCardTitleShort(zenithPlan.pricing_plan, t);
+                                const zenithOrder = planSortOrderLabel([zenithPlan]);
+                                return zenithOrder ? `${zenithOrder} ${zenithTitle}` : zenithTitle;
+                              })()}
                             </CardTitle>
-                            <p className="line-clamp-2 min-h-[2.6rem] text-sm leading-relaxed text-muted-foreground">
+                            <p className="ph-pricing-card-subtitle line-clamp-2 min-h-0 text-center text-xs leading-snug text-muted-foreground sm:text-sm sm:leading-snug">
                               {highlightAimediartWord(t("tarifs.plan_desc_zenith"))}
                             </p>
                           </CardHeader>
-                          <CardContent className="flex flex-1 flex-col space-y-3">
-                            <div className="rounded-2xl border border-neutral-200 bg-[#faf9f7] p-4">
+                          <CardContent className="ph-pricing-card-body flex min-h-0 flex-1 flex-col space-y-2">
+                            <div className="ph-pricing-card-panel rounded-2xl border border-neutral-200 bg-[#faf9f7] p-2.5 sm:p-3">
                               <QuotePlanSummary kind="zenith" t={t} />
                               <PlanPricingDetails
                                 row={zenithPlan}
@@ -1833,6 +1954,7 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                                 locale={i18n.language}
                                 isQuoteOnly
                                 hideStandbyRow
+                                taxMode={priceTaxMode}
                               />
                             </div>
                           </CardContent>
@@ -1842,6 +1964,30 @@ export default function PublicHome({ initialData: initialDataProp }: PublicHomeP
                     </SwiperSlide>
                   ) : null}
                   </Swiper>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center sm:bottom-4">
+                    <button
+                      type="button"
+                      onClick={togglePricingAutoplay}
+                      aria-pressed={pricingAutoplayPaused}
+                      aria-label={
+                        pricingAutoplayPaused
+                          ? t("tarifs.carousel_play", { defaultValue: "Reprendre le carrousel" })
+                          : t("tarifs.carousel_pause", { defaultValue: "Mettre en pause le carrousel" })
+                      }
+                      title={
+                        pricingAutoplayPaused
+                          ? t("tarifs.carousel_play", { defaultValue: "Reprendre le carrousel" })
+                          : t("tarifs.carousel_pause", { defaultValue: "Mettre en pause le carrousel" })
+                      }
+                      className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(157,37,37,0.35)] bg-white/90 text-[#9d2525] shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9d2525]/40"
+                    >
+                      {pricingAutoplayPaused ? (
+                        <Play className="h-4 w-4 fill-current" aria-hidden />
+                      ) : (
+                        <Pause className="h-4 w-4 fill-current" aria-hidden />
+                      )}
+                    </button>
+                  </div>
                   </div>
                 </div>
 

@@ -1155,17 +1155,31 @@
 }
 
 /* ---- Carrousel tarifs (Swiper Coverflow) ---- */
+/* Desktop : hauteur fixe 600px. Mobile : hauteur auto pour afficher tout le texte. */
+.ph-pricing-coverflow {
+  height: 600px;
+  max-height: 600px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Clip horizontal pour l'effet peek-a-boo : les cartes voisines sont coupées
-   au bord du cadre et laissent juste deviner leur tranche. La marge verticale
-   (py-8) laisse respirer la carte centrale agrandie (scale 1.1). */
+   au bord du cadre et laissent juste deviner leur tranche. */
 .ph-pricing-swiper {
   overflow: hidden;
   border-radius: 6px;
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
 }
 
 .ph-pricing-swiper .ph-pricing-slide {
   display: flex;
   align-items: stretch;
+  height: auto;
+  max-height: 100%;
 }
 
 /* Wrapper interne : la profondeur/échelle 3D est gérée par l'effet Coverflow,
@@ -1175,8 +1189,17 @@
 .ph-pricing-slide-inner {
   position: relative;
   width: 100%;
+  height: 100%;
+  max-height: calc(600px - 2.75rem);
   transition: transform 0.35s ease, opacity 0.35s ease;
   will-change: transform, opacity;
+}
+
+.ph-pricing-slide-inner > article,
+.ph-pricing-slide-inner .ph-fold-card {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0 !important;
 }
 
 /* Flash promo "Top 1/2/3" — éclaté centré en haut de la carte */
@@ -1225,13 +1248,85 @@
 /* Note : bloc reduced-motion global (ph-*, logo, bounce…) plus bas, après le swiper pricing. */
 
 .ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner {
-  transform: scale(1.1);
+  transform: scale(1.04);
   z-index: 3;
 }
 
 /* Ombre portée plus marquée sur la carte centrale */
 .ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner .ph-fold-card {
   box-shadow: 0 26px 50px -12px rgba(157, 37, 37, 0.4) !important;
+}
+
+/* Densité desktop pour tenir dans 600px */
+.ph-pricing-coverflow .ph-pricing-card-header {
+  padding-top: 0.85rem;
+  padding-bottom: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.ph-pricing-coverflow .ph-pricing-card-title {
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.ph-pricing-coverflow .ph-pricing-card-subtitle {
+  min-height: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ph-pricing-coverflow .ph-pricing-card-body {
+  min-height: 0;
+  overflow: hidden;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 0.85rem;
+  gap: 0.55rem;
+}
+
+.ph-pricing-coverflow .ph-pricing-card-panel {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.65rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.ph-pricing-coverflow .ph-pricing-capacity {
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.ph-pricing-coverflow .standby-plan-trigger {
+  flex-shrink: 0 !important;
+  padding: 0.4rem 0.5rem;
+  gap: 0.35rem;
+}
+
+.ph-pricing-coverflow .ph-pricing-capacity,
+.ph-pricing-coverflow .ph-pricing-price-box {
+  flex-shrink: 0;
+}
+
+.ph-pricing-coverflow .ph-pricing-details {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.ph-pricing-coverflow .ph-top-flash {
+  top: -6px;
+  width: 48px;
+  height: 48px;
+  font-size: 10px;
+}
+
+.ph-pricing-swiper.ph-pricing-swiper-mobile-compact {
+  padding-top: 0.75rem !important;
+  padding-bottom: 2.75rem !important;
 }
 
 /* Flèches de navigation discrètes */
@@ -1266,6 +1361,15 @@
 
 /* Sur mobile : flèches encore plus discrètes, swipe au doigt privilégié */
 @media (max-width: 640px) {
+  .ph-pricing-coverflow {
+    height: auto;
+    max-height: none;
+  }
+
+  .ph-pricing-slide-inner {
+    max-height: none;
+  }
+
   .ph-pricing-swiper .swiper-button-prev,
   .ph-pricing-swiper .swiper-button-next {
     width: 28px;
@@ -1275,6 +1379,151 @@
   .ph-pricing-swiper .swiper-button-prev::after,
   .ph-pricing-swiper .swiper-button-next::after {
     font-size: 11px;
+  }
+
+  /* Carte entière visible sur smartphones (~393×851) : pas de scale, densités réduites */
+  .ph-pricing-swiper.ph-pricing-swiper-mobile-compact {
+    padding-top: 0.5rem !important;
+    padding-bottom: 2.75rem !important;
+  }
+
+  .ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner {
+    transform: scale(1);
+  }
+
+  .ph-pricing-swiper .swiper-slide-active .ph-pricing-slide-inner .ph-fold-card {
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08) !important;
+  }
+
+  .ph-pricing-coverflow .ph-top-flash {
+    top: -4px;
+    width: 42px;
+    height: 42px;
+    font-size: 9px;
+  }
+
+  .ph-pricing-coverflow .ph-fold-card {
+    min-height: 0 !important;
+    border-radius: 1.25rem;
+  }
+
+  .ph-pricing-coverflow .ph-fold-card > [class*="CardHeader"],
+  .ph-pricing-coverflow .ph-pricing-card-header {
+    padding-bottom: 0.5rem !important;
+    padding-top: 0.75rem !important;
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-title {
+    font-size: 1.25rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-subtitle {
+    min-height: 0 !important;
+    font-size: 0.75rem !important;
+    line-height: 1.35 !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-body {
+    padding-left: 0.85rem !important;
+    padding-right: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+    gap: 0.5rem !important;
+    overflow: visible !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-panel {
+    padding: 0.55rem 0.65rem !important;
+    gap: 0.45rem !important;
+    border-radius: 0.85rem !important;
+    overflow: visible !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-capacity {
+    font-size: 0.75rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-details {
+    margin-top: 0.25rem !important;
+    padding-top: 0.35rem !important;
+    font-size: 0.65rem !important;
+    line-height: 1.35 !important;
+    flex: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .ph-pricing-coverflow .standby-plan-trigger {
+    display: flex !important;
+    flex-shrink: 0 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex-direction: row;
+    gap: 0.35rem;
+    padding: 0.3rem 0.45rem;
+    border-width: 1.5px;
+    min-height: 2.25rem;
+  }
+
+  .ph-pricing-coverflow .standby-plan-trigger svg {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+
+  .ph-pricing-coverflow .standby-plan-trigger > span {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.15rem 0.35rem;
+    font-size: 0.625rem;
+  }
+
+  .ph-pricing-coverflow .standby-plan-trigger > span > span:last-child {
+    font-size: 0.575rem;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-price-box {
+    padding: 0.35rem 0.5rem !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-price-box .ph-pricing-price-main {
+    font-size: 0.875rem !important;
+  }
+
+  .ph-pricing-coverflow .ph-corner-ribbon {
+    top: 18px;
+    left: -44px;
+    width: 132px;
+    padding: 3px 0;
+    font-size: 9px;
+  }
+}
+
+/* Très petits viewports (ex. 393×851) : densifier encore un peu */
+@media (max-width: 430px) and (max-height: 900px) {
+  .ph-pricing-coverflow {
+    padding: 3px;
+  }
+
+  .ph-pricing-swiper.ph-pricing-swiper-mobile-compact {
+    padding-top: 0.25rem !important;
+    padding-bottom: 2.5rem !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-header {
+    padding-top: 0.55rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+
+  .ph-pricing-coverflow .ph-pricing-card-body {
+    padding-bottom: 0.65rem !important;
   }
 }
 
