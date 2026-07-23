@@ -1,0 +1,103 @@
+# CI baseline — garde-fous côté serveur (agnostiques de l'agent).
+# Applique en CI ce que les hooks Claude Code garantissent en local :
+# scan de secrets, audit de dépendances, lint/tests, isolation tenant.
+# Référence : ~/.claude/pilotage/engineering-standards.md et fleet-structure.md.
+#
+# Adapté pour Aimediart (Vite/React + Supabase) :
+#   - NODE_VERSION 24 (engines: "24.x" dans package.json) ;
+#   - scripts présents : `lint` (eslint), `typecheck` (tsc --noEmit) et
+#     `test` (vitest run) — un job indépendant chacun, bloquants sans
+#     --if-present : chaque signal reste visible même si un autre échoue ;
+#   - `test:tenant-isolation` n'existe pas encore : le job passe en
+#     --if-present, ne pas considérer le repo couvert (voir TODO ci-dessous).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main] # les branches de PR sont couvertes par pull_request
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  # Scan de secrets — bloquant sur tout push et PR.
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks inspecte l'historique, pas juste HEAD
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Audit de vulnérabilités des dépendances — bloquant (high et au-dessus).
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+
+  # Lint, types, tests — trois jobs indépendants et bloquants : l'échec de
+  # l'un ne masque pas le signal des autres.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+
+  # Isolation multi-tenant — invariant SaaS critique (le mode d'échec n°1
+  # d'un SaaS, voir engineering-standards.md « Invariants SaaS »).
+  # TODO Aimediart : l'isolation repose sur les politiques RLS Supabase
+  # (supabase/rls_*.sql, migrations). Ce job DOIT exécuter des tests qui
+  # prouvent qu'un tenant ne lit/n'écrit jamais les données d'un autre.
+  # Tant que le script npm `test:tenant-isolation` n'existe pas, le job
+  # passe silencieusement (--if-present) — le repo n'est PAS couvert.
+  tenant-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Tenant isolation tests # TODO Aimediart
+        run: npm run test:tenant-isolation --if-present

@@ -13,6 +13,7 @@
     "vercel-build": "node scripts/optimize-organisation-images.mjs && vite build && node --import ./scripts/prerender-register.mjs --import tsx scripts/prerender-organisation.tsx",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
