@@ -112,13 +112,22 @@ export async function uploadVisitorAnonymousAvatar(
 export async function uploadAgencyLogo(agencyId: string, file: File | Blob, fileName?: string): Promise<string> {
   const ext = fileName ? extensionFromFileName(fileName) : "webp";
   const path = buildLogoObjectPath("agencies", agencyId, ext);
-  return uploadToStorageBucket(STORAGE_BUCKET_LOGOS, path, file, { upsert: true });
+  const url = await uploadToStorageBucket(STORAGE_BUCKET_LOGOS, path, file, {
+    upsert: true,
+    // Court : le logo est souvent réécrit sous le même chemin.
+    cacheControl: "60",
+  });
+  return withStorageCacheBust(url);
 }
 
 export async function uploadExpoLogo(expoId: string, file: File | Blob, fileName?: string): Promise<string> {
   const ext = fileName ? extensionFromFileName(fileName) : "webp";
   const path = buildLogoObjectPath("expos", expoId, ext);
-  return uploadToStorageBucket(STORAGE_BUCKET_LOGOS, path, file, { upsert: true });
+  const url = await uploadToStorageBucket(STORAGE_BUCKET_LOGOS, path, file, {
+    upsert: true,
+    cacheControl: "60",
+  });
+  return withStorageCacheBust(url);
 }
 
 /**

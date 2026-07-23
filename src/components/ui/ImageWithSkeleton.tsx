@@ -1,4 +1,4 @@
-import { useState, type ImgHTMLAttributes } from "react";
+import { useEffect, useState, type ImgHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -19,6 +19,11 @@ export function ImageWithSkeleton({
 }: ImageWithSkeletonProps) {
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Réinitialise l’état au changement d’URL (sinon l’ancienne image « reste » visuelle).
+  useEffect(() => {
+    setIsLoaded(false);
+  }, [src]);
+
   return (
     <div className={cn("relative overflow-hidden", wrapperClassName)}>
       {!isLoaded && (
@@ -29,6 +34,7 @@ export function ImageWithSkeleton({
       )}
       <img
         {...imgProps}
+        key={src ?? ""}
         src={src}
         alt={alt ?? ""}
         className={cn("transition-opacity duration-200", isLoaded ? "opacity-100" : "opacity-0", className)}
@@ -44,4 +50,3 @@ export function ImageWithSkeleton({
     </div>
   );
 }
-

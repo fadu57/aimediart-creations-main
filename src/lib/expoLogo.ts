@@ -44,3 +44,25 @@ export function resolveExpoLogoImgSrc(raw: string): string {
   const { data } = supabase.storage.from("images").getPublicUrl(path);
   return data.publicUrl;
 }
+
+/**
+ * Pour l’affichage liste : si l’URL storage n’a pas encore de `?v=`,
+ * on ajoute un cache-bust basé sur un jeton stable (ex. updated_at / id) pour forcer le refresh navigateur.
+ */
+export function resolveExpoLogoImgSrcForDisplay(
+  raw: string | null | undefined,
+  cacheToken?: string | number | null,
+): string {
+  const base = resolveExpoLogoImgSrc((raw ?? "").trim());
+  if (!base || base.startsWith("data:") || base.startsWith("blob:")) return base;
+  if (/[?&]v=/.test(base)) return base;
+  if (cacheToken == null || String(cacheToken).trim() === "") return base;
+  try {
+    const parsed = new URL(base);
+    parsed.searchParams.set("v", String(cacheToken));
+    return parsed.toString();
+  } catch {
+    const clean = base.split("?")[0] ?? base;
+    return `${clean}?v=${encodeURIComponent(String(cacheToken))}`;
+  }
+}

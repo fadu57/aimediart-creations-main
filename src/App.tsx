@@ -163,7 +163,7 @@ function VisitorShell() {
 
 function AdminShell() {
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1200px] overflow-x-hidden text-[#F0F0F0]">
+    <div className="mx-auto w-full min-w-0 max-w-[1600px] overflow-x-hidden text-[#F0F0F0]">
       <StandbyModeNavGuard />
     </div>
   );
@@ -319,6 +319,8 @@ const AppRoutes = () => (
           <Route path="settings" element={<Pages.SettingsPage />} />
           <Route path="settings/couts" element={<Pages.SettingsCouts />} />
           <Route path="settings/acces" element={<Pages.SettingsAcces />} />
+          <Route path="settings/actu" element={<Pages.SettingsActu />} />
+          <Route path="settings/ged" element={<Pages.SettingsGed />} />
           <Route path="settings/prompts-ia" element={<Pages.SettingsPromptsIa />} />
           <Route path="settings/controle-ia" element={<Pages.SettingsControleIa />} />
           <Route path="suivi_temps" element={<Pages.SettingsSuiviTemps />} />

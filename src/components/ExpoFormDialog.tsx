@@ -39,7 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
-import { uploadExpoLogo } from "@/lib/storagePaths";
+import { uploadExpoLogo, withStorageCacheBust } from "@/lib/storagePaths";
 import {
   fieldLabel as expoFieldLabelFallback,
   filterExpoFormKeys,
@@ -107,7 +107,7 @@ async function uploadExpoLogoToStorage(file: File, expoId: string, t: TFunction)
       throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
     }
     const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(legacyPath);
-    return pub.publicUrl;
+    return withStorageCacheBust(pub.publicUrl || "");
   }
 }
 

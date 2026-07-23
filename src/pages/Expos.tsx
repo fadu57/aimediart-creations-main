@@ -29,7 +29,7 @@ import { useOrganisationPlanLimits } from "@/hooks/useOrganisationPlanLimits";
 import { useDataScope } from "@/hooks/useDataScope";
 import { ETINCELLE_UI } from "@/lib/organisation/planLimits";
 import { createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
-import { expoLogoRawFromRow, resolveExpoLogoImgSrc } from "@/lib/expoLogo";
+import { expoLogoRawFromRow, resolveExpoLogoImgSrc, resolveExpoLogoImgSrcForDisplay } from "@/lib/expoLogo";
 import { sanitizeTranslationOutput } from "@/lib/sanitizeTranslationOutput";
 import { useTranslation } from "react-i18next";
 import { ImageWithSkeleton } from "@/components/ui/ImageWithSkeleton";
@@ -100,7 +100,17 @@ function parseSupabasePublicStorageUrl(
 }
 
 /** Logo exposition : affichage avec repli URL signée si le bucket est privé. */
-function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | null; title: string; fallbackIcon: ReactNode }) {
+function ExpoLogoThumb({
+  logoUrl,
+  title,
+  fallbackIcon,
+  cacheToken,
+}: {
+  logoUrl: string | null;
+  title: string;
+  fallbackIcon: ReactNode;
+  cacheToken?: string | number | null;
+}) {
   const [failed, setFailed] = useState(false);
   const [displaySrc, setDisplaySrc] = useState("");
   const triedSignedRef = useRef(false);
@@ -109,8 +119,8 @@ function ExpoLogoThumb({ logoUrl, title, fallbackIcon }: { logoUrl: string | nul
     triedSignedRef.current = false;
     setFailed(false);
     const raw = logoUrl?.trim() || "";
-    setDisplaySrc(raw ? resolveExpoLogoImgSrc(raw) : "");
-  }, [logoUrl]);
+    setDisplaySrc(raw ? resolveExpoLogoImgSrcForDisplay(raw, cacheToken) : "");
+  }, [logoUrl, cacheToken]);
 
   const handleImgError = useCallback(() => {
     if (!displaySrc || triedSignedRef.current) {
@@ -996,8 +1006,9 @@ const Expos = () => {
               >
                 <div className="flex w-full shrink-0 flex-row items-center gap-3 md:w-auto md:flex-col md:items-center md:gap-1">
                   <ExpoLogoThumb
-                    key={`${ex.id}-${logoRaw ?? "no-logo"}`}
+                    key={`${ex.id}-${logoRaw ?? "no-logo"}-${String((ex as { updated_at?: string }).updated_at ?? "")}`}
                     logoUrl={logoRaw}
+                    cacheToken={(ex as { updated_at?: string }).updated_at ?? logoRaw}
                     title={expoTitle(ex)}
                     fallbackIcon={<Images className="h-12 w-12 text-muted-foreground" aria-hidden />}
                   />

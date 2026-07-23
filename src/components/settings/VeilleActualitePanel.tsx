@@ -43,7 +43,7 @@ function matchesQuery(item: VeilleActualiteItem, q: string) {
 }
 
 /** Bloc Settings : veille IA & médiation d’exposition. */
-export function VeilleActualitePanel() {
+export function VeilleActualitePanel({ hideTitle = false }: { hideTitle?: boolean }) {
   const { t } = useTranslation("settings");
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -85,12 +85,14 @@ export function VeilleActualitePanel() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 md:gap-3">
-        <div className="flex shrink-0 items-center gap-2">
-          <Newspaper className="h-5 w-5 text-muted-foreground" aria-hidden />
-          <h2 className="font-serif text-lg font-bold tracking-tight text-foreground md:text-xl">
-            {t("veille_actualite.panel_title")}
-          </h2>
-        </div>
+        {!hideTitle ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <Newspaper className="h-5 w-5 text-muted-foreground" aria-hidden />
+            <h2 className="font-serif text-lg font-bold tracking-tight text-foreground md:text-xl">
+              {t("veille_actualite.panel_title")}
+            </h2>
+          </div>
+        ) : null}
 
         <div className="relative min-w-[12rem] flex-1 md:max-w-sm">
           <Search
@@ -195,7 +197,7 @@ export function VeilleActualitePanel() {
           >
             <AccordionTrigger className="py-1.5 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
               <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0 text-left leading-tight">
-                <span className="w-fit shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="max-w-[9.5rem] whitespace-normal break-words text-[10px] font-medium uppercase leading-snug tracking-wide text-muted-foreground sm:max-w-none sm:w-fit sm:shrink-0 sm:leading-tight">
                   {item.category}
                 </span>
                 <span className="min-w-0 flex-1 font-serif text-sm font-bold text-foreground">

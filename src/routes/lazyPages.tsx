@@ -16,6 +16,8 @@ export const Statistics = lazy(() => import("@/pages/Statistics"));
 export const SettingsPage = lazy(() => import("@/pages/Settings"));
 export const SettingsCouts = lazy(() => import("@/pages/SettingsCouts"));
 export const SettingsAcces = lazy(() => import("@/pages/SettingsAcces"));
+export const SettingsActu = lazy(() => import("@/pages/SettingsActu"));
+export const SettingsGed = lazy(() => import("@/pages/SettingsGed"));
 export const SettingsPromptsIa = lazy(() => import("@/pages/SettingsPromptsIa"));
 export const SettingsControleIa = lazy(() => import("@/pages/SettingsControleIa"));
 export const SettingsSuiviTemps = lazy(() => import("@/pages/SettingsSuiviTemps"));

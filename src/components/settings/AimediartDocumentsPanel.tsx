@@ -618,7 +618,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
 }
 
 /** Accordéons de documents internes AIMEDIArt, filtrés par la matrice d'accès. */
-export function AimediartDocumentsPanel() {
+export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boolean } = {}) {
   const { t } = useTranslation("settings");
   const { can } = useNavigationMatrix();
   const [sections, setSections] = useState<AimediartGedSection[]>([]);
@@ -720,9 +720,13 @@ export function AimediartDocumentsPanel() {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-serif text-base font-bold tracking-tight text-foreground md:text-lg">
-          {t("aimediart_docs.panel_title")}
-        </h2>
+        {!hideTitle ? (
+          <h2 className="font-serif text-base font-bold tracking-tight text-foreground md:text-lg">
+            {t("aimediart_docs.panel_title")}
+          </h2>
+        ) : (
+          <span className="sr-only">{t("aimediart_docs.panel_title")}</span>
+        )}
         <Button
           type="button"
           size="sm"

@@ -39,8 +39,6 @@ import { hasFullDataAccess } from "@/lib/authUser";
 import { Search, Settings as SettingsGearIcon, SlidersHorizontal, Bell, Users, Activity, Trees } from "lucide-react";
 import PresenceThresholdSettings from "@/components/settings/PresenceThresholdSettings";
 import ForestCanopySettings from "@/components/settings/ForestCanopySettings";
-import { AimediartDocumentsPanel } from "@/components/settings/AimediartDocumentsPanel";
-import { VeilleActualitePanel } from "@/components/settings/VeilleActualitePanel";
 
 type SettingSection = {
   id: string;
@@ -705,8 +703,8 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="container py-8 space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="w-full min-w-0 px-2 py-6 space-y-3 sm:px-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
           <h2 className="text-3xl font-serif font-bold">{t("page_main_title")}</h2>
         </div>
@@ -719,8 +717,8 @@ export default function SettingsPage() {
       </div>
 
       <Card className="border-border/50 bg-card/70 backdrop-blur-sm shadow-none">
-        <CardContent className="p-4 md:p-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+        <CardContent className="p-2 md:p-3">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <label htmlFor="settings-search" className="sr-only">
                 {t("search_aria")}
@@ -732,7 +730,7 @@ export default function SettingsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("search_placeholder")}
-                className="pl-9 h-10 shadow-none"
+                className="pl-9 h-9 shadow-none"
                 autoComplete="off"
               />
             </div>
@@ -789,22 +787,6 @@ export default function SettingsPage() {
                 </AccordionItem>
               ))}
             </Accordion>
-          </CardContent>
-        </Card>
-      )}
-
-      {canAccessGeneralSettings && (
-        <Card className="border border-border/50 bg-white/80 shadow-none">
-          <CardContent className="p-2 md:p-3">
-            <AimediartDocumentsPanel />
-          </CardContent>
-        </Card>
-      )}
-
-      {canAccessGeneralSettings && (
-        <Card className="border border-border/50 bg-white/80 shadow-none">
-          <CardContent className="p-2 md:p-3">
-            <VeilleActualitePanel />
           </CardContent>
         </Card>
       )}

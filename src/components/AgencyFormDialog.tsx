@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { assertImageFileAllowed, prepareImageForSupabaseUpload } from "@/lib/imageUpload";
-import { uploadAgencyLogo } from "@/lib/storagePaths";
+import { uploadAgencyLogo, withStorageCacheBust } from "@/lib/storagePaths";
 import {
   COMMERCIAL_AGENCY_KEYS,
   defaultCommercialAgencyValues,
@@ -215,7 +215,7 @@ async function uploadAgencyLogoToStorage(file: File, agencyId: string, t: TFunct
       throw primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr));
     }
     const { data: pub } = supabase.storage.from(legacyBucket).getPublicUrl(legacyPath);
-    return pub.publicUrl;
+    return withStorageCacheBust(pub.publicUrl || "");
   }
 }
 

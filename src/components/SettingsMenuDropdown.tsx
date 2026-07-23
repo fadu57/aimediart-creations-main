@@ -10,6 +10,8 @@ import {
   Coins,
   Database,
   Euro,
+  FolderOpen,
+  Newspaper,
   Settings,
   Shield,
   Sparkles,
@@ -35,6 +37,12 @@ import { cn } from "@/lib/utils";
 
 /** Page « Accès » (matrice des droits) — réservée aux admins (rôles 1-3). */
 const ACCES_LINK = { to: "/settings/acces", labelKey: "settings_submenu_acces", Icon: Shield } as const;
+
+/** Veille actualité — réservée aux admins (rôles 1-3). */
+const ACTU_LINK = { to: "/settings/actu", labelKey: "settings_submenu_actu", Icon: Newspaper } as const;
+
+/** G.E.D. — réservée aux admins (rôles 1-3). */
+const GED_LINK = { to: "/settings/ged", labelKey: "settings_submenu_ged", Icon: FolderOpen } as const;
 
 /** Sous-menu « IA » : Prompts + Contrôle — réservé aux admins (rôles 1-3). */
 const IA_LINKS = [
@@ -98,8 +106,10 @@ export function SettingsMenuDropdown({
   const showConfigLinks = typeof role_id === "number" && role_id >= 1 && role_id <= 3;
 
   const accesActive = location.pathname.startsWith(ACCES_LINK.to);
+  const actuActive = location.pathname.startsWith(ACTU_LINK.to);
+  const gedActive = location.pathname.startsWith(GED_LINK.to);
   const iaActive = IA_LINKS.some((link) => location.pathname.startsWith(link.to));
-  const configActive = accesActive || iaActive;
+  const configActive = accesActive || actuActive || gedActive || iaActive;
   const suiviActive =
     SUIVI_LINKS.some((link) => location.pathname.startsWith(link.to)) ||
     (showOnlinePresence && location.pathname.startsWith(ONLINE_PRESENCE_LINK.to));
@@ -144,6 +154,24 @@ export function SettingsMenuDropdown({
             >
               <ACCES_LINK.Icon className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
               <span>{t(ACCES_LINK.labelKey)}</span>
+            </NavLink>
+
+            <NavLink
+              to={ACTU_LINK.to}
+              className={cn(fabRowClass, actuActive && "font-medium text-[#E63946]")}
+              onClick={handleFabNavigate}
+            >
+              <ACTU_LINK.Icon className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+              <span>{t(ACTU_LINK.labelKey)}</span>
+            </NavLink>
+
+            <NavLink
+              to={GED_LINK.to}
+              className={cn(fabRowClass, gedActive && "font-medium text-[#E63946]")}
+              onClick={handleFabNavigate}
+            >
+              <GED_LINK.Icon className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
+              <span>{t(GED_LINK.labelKey)}</span>
             </NavLink>
 
             <button
@@ -322,6 +350,26 @@ export function SettingsMenuDropdown({
               >
                 <ACCES_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
                 {t(ACCES_LINK.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <Link
+                to={ACTU_LINK.to}
+                className={cn("flex items-center gap-2", actuActive && "font-medium text-[#E63946]")}
+              >
+                <ACTU_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
+                {t(ACTU_LINK.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem asChild>
+              <Link
+                to={GED_LINK.to}
+                className={cn("flex items-center gap-2", gedActive && "font-medium text-[#E63946]")}
+              >
+                <GED_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
+                {t(GED_LINK.labelKey)}
               </Link>
             </DropdownMenuItem>
 
