@@ -12,4 +12,5 @@ export const SETTINGS_TRASH_MENU_LINKS: TrashMenuLink[] = [
   { id: "catalogue", to: "/catalogue-corbeille", labelKey: "settings_submenu_trash_catalogue" },
   { id: "expos", to: "/expos-corbeille", labelKey: "settings_submenu_trash_expos" },
   { id: "visitors", to: "/visiteurs-corbeille", labelKey: "settings_submenu_trash_visitors" },
+  { id: "ged", to: "/settings/ged-corbeille", labelKey: "settings_submenu_trash_ged" },
 ];

@@ -20,6 +20,7 @@
   "title_agencies": "Papelera — Organizaciones",
   "title_users": "Papelera — Usuarios",
   "title_visitors": "Papelera — Visitantes",
+  "title_ged": "Papelera — G.E.D.",
   "restore_no_rows": "Restauración enviada pero ninguna fila modificada (verifique los permisos RLS).",
   "visitor_anonymous_label": "Visitante anónimo",
   "visitor_registered_label": "Visitante registrado",

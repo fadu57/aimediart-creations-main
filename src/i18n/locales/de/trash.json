@@ -20,6 +20,7 @@
   "title_agencies": "Papierkorb — Organisationen",
   "title_users": "Papierkorb — Benutzer",
   "title_visitors": "Papierkorb — Besucher",
+  "title_ged": "Papierkorb — G.E.D.",
   "restore_no_rows": "Wiederherstellung gesendet, aber keine Zeile geändert (RLS-Berechtigungen prüfen).",
   "visitor_anonymous_label": "Anonymer Besucher",
   "visitor_registered_label": "Registrierter Besucher",

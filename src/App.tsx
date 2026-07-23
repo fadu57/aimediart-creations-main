@@ -321,6 +321,7 @@ const AppRoutes = () => (
           <Route path="settings/acces" element={<Pages.SettingsAcces />} />
           <Route path="settings/actu" element={<Pages.SettingsActu />} />
           <Route path="settings/ged" element={<Pages.SettingsGed />} />
+          <Route path="settings/ged-corbeille" element={<Pages.SettingsGedCorbeille />} />
           <Route path="settings/prompts-ia" element={<Pages.SettingsPromptsIa />} />
           <Route path="settings/controle-ia" element={<Pages.SettingsControleIa />} />
           <Route path="suivi_temps" element={<Pages.SettingsSuiviTemps />} />

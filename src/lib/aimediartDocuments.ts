@@ -43,8 +43,10 @@ export type AimediartGedSection = {
   slug: string;
   name: string;
   sort_order: number;
+  share_token: string;
   created_at: string;
   created_by: string | null;
+  deleted_at?: string | null;
 };
 
 /** Ligne de la table aimediart_document_folders. */
@@ -52,6 +54,7 @@ export type AimediartDocumentFolder = {
   id: string;
   category: AimediartDocCategory;
   name: string;
+  share_token: string;
   created_at: string;
   created_by: string | null;
 };
@@ -100,7 +103,7 @@ function slugifyFolderName(name: string): string {
 /** Sections visibles dans l’UI (hors legacy). */
 const HIDDEN_SECTION_SLUGS = new Set(["legal_inpi", "legal_societe"]);
 
-/** Liste les dossiers principaux (ordre sort_order). */
+/** Liste les dossiers principaux actifs (ordre sort_order). */
 export async function listGedSections(): Promise<{
   data: AimediartGedSection[];
   error: string | null;
@@ -108,8 +111,27 @@ export async function listGedSections(): Promise<{
   const { data, error } = await supabase
     .from("aimediart_ged_sections")
     .select("*")
+    .is("deleted_at", null)
     .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
+
+  if (error) return { data: [], error: error.message };
+  const rows = ((data as AimediartGedSection[] | null) ?? []).filter(
+    (s) => !HIDDEN_SECTION_SLUGS.has(s.slug),
+  );
+  return { data: rows, error: null };
+}
+
+/** Liste les dossiers principaux en corbeille. */
+export async function listGedSectionsTrash(): Promise<{
+  data: AimediartGedSection[];
+  error: string | null;
+}> {
+  const { data, error } = await supabase
+    .from("aimediart_ged_sections")
+    .select("*")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: true });
 
   if (error) return { data: [], error: error.message };
   const rows = ((data as AimediartGedSection[] | null) ?? []).filter(
@@ -176,34 +198,28 @@ export async function renameGedSection(
   return { data: data as AimediartGedSection, error: null };
 }
 
-/**
- * Supprime un dossier principal vide (ni docs ni sous-dossiers).
- */
+/** Met un dossier principal à la corbeille (soft-delete). */
 export async function deleteGedSection(
-  section: Pick<AimediartGedSection, "id" | "slug">,
+  section: Pick<AimediartGedSection, "id">,
 ): Promise<{ error: string | null }> {
-  const [{ count: docCount, error: docErr }, { count: folderCount, error: folderErr }] =
-    await Promise.all([
-      supabase
-        .from("aimediart_documents")
-        .select("id", { count: "exact", head: true })
-        .eq("category", section.slug),
-      supabase
-        .from("aimediart_document_folders")
-        .select("id", { count: "exact", head: true })
-        .eq("category", section.slug),
-    ]);
-
-  if (docErr) return { error: docErr.message };
-  if (folderErr) return { error: folderErr.message };
-  if ((docCount ?? 0) > 0 || (folderCount ?? 0) > 0) {
-    return { error: "section_not_empty" };
-  }
-
   const { error } = await supabase
     .from("aimediart_ged_sections")
-    .delete()
-    .eq("id", section.id);
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", section.id)
+    .is("deleted_at", null);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+/** Restaure un dossier principal depuis la corbeille. */
+export async function restoreGedSection(
+  sectionId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("aimediart_ged_sections")
+    .update({ deleted_at: null })
+    .eq("id", sectionId);
 
   if (error) return { error: error.message };
   return { error: null };
@@ -298,6 +314,19 @@ export async function listDocuments(
   return { data: (data as AimediartDocument[] | null) ?? [], error: null };
 }
 
+/** Nombre total de fichiers d'une section (racine + sous-dossiers). */
+export async function countDocuments(
+  category: AimediartDocCategory,
+): Promise<{ count: number; error: string | null }> {
+  const { count, error } = await supabase
+    .from("aimediart_documents")
+    .select("id", { count: "exact", head: true })
+    .eq("category", category);
+
+  if (error) return { count: 0, error: error.message };
+  return { count: count ?? 0, error: null };
+}
+
 /**
  * Téléverse un fichier dans le bon bucket puis enregistre sa ligne de métadonnées.
  * En cas d'échec de l'insert, le fichier téléversé est nettoyé.
@@ -387,10 +416,10 @@ export async function getDocumentSignedUrl(
 const PUBLIC_SHARE_SITE_DEFAULT = "https://www.aimediart.com";
 
 /**
- * Lien de partage public stable sur le domaine du site.
+ * Lien de partage public stable sur le domaine du site (document, sous-dossier ou section).
  * Ex. https://www.aimediart.com/aimediart-doc-share?t=<token>
  */
-export function getDocumentShareUrl(shareToken: string): string | null {
+export function getGedShareUrl(shareToken: string): string | null {
   if (!shareToken) return null;
   const fromEnv = import.meta.env.VITE_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ?? "";
   const site =
@@ -399,3 +428,6 @@ export function getDocumentShareUrl(shareToken: string): string | null {
       : PUBLIC_SHARE_SITE_DEFAULT;
   return `${site}/aimediart-doc-share?t=${encodeURIComponent(shareToken)}`;
 }
+
+/** @deprecated alias — préférer getGedShareUrl */
+export const getDocumentShareUrl = getGedShareUrl;

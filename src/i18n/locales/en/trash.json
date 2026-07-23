@@ -20,6 +20,7 @@
   "title_agencies": "Trash — Organizations",
   "title_users": "Trash — Users",
   "title_visitors": "Trash — Visitors",
+  "title_ged": "Trash — G.E.D.",
   "restore_no_rows": "Restore sent but no row changed (check RLS permissions).",
   "visitor_anonymous_label": "Anonymous visitor",
   "visitor_registered_label": "Registered visitor",

@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, FolderOpen } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { AimediartDocumentsPanel } from "@/components/settings/AimediartDocumentsPanel";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { hasFullDataAccess } from "@/lib/authUser";
@@ -32,15 +31,11 @@ export default function SettingsGed() {
         </h1>
       </div>
 
-      <Card className="border border-border/50 bg-white/80 shadow-none">
-        <CardContent className="p-2 md:p-3">
-          {!canAccess ? (
-            <p className="text-sm text-muted-foreground">{t("subpage_no_access")}</p>
-          ) : (
-            <AimediartDocumentsPanel hideTitle />
-          )}
-        </CardContent>
-      </Card>
+      {!canAccess ? (
+        <p className="text-sm text-muted-foreground">{t("subpage_no_access")}</p>
+      ) : (
+        <AimediartDocumentsPanel hideTitle />
+      )}
     </div>
   );
 }

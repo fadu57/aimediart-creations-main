@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import {
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
+import { cn } from "@/lib/utils";
 import {
   type AimediartDocCategory,
   type AimediartDocument,
@@ -41,8 +42,9 @@ import {
   deleteDocument,
   deleteFolder,
   deleteGedSection,
-  getDocumentShareUrl,
+  getGedShareUrl,
   getDocumentSignedUrl,
+  countDocuments,
   listDocuments,
   listFolders,
   listGedSections,
@@ -60,6 +62,57 @@ function formatSize(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+function useIsLgUp(): boolean {
+  const [isLg, setIsLg] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : false,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setIsLg(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
+  }, []);
+  return isLg;
+}
+
+/** Deux cartes distinctes côte à côte (lg+ uniquement). */
+function TwoColumnBlocks({
+  left,
+  right,
+}: {
+  left: ReactNode;
+  right: ReactNode;
+}) {
+  const cardClass =
+    "min-w-0 flex-1 rounded-lg border border-border/50 bg-white/90 p-2 text-neutral-900 shadow-none md:p-3 [&_.text-muted-foreground]:text-neutral-600";
+
+  return (
+    <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+      <div className={cardClass}>{left}</div>
+      <div className={cardClass}>{right}</div>
+    </div>
+  );
+}
+
+/** Un seul bloc (mobile / écrans < lg). */
+function SingleBlock({ children }: { children: ReactNode }) {
+  return (
+    <div className="w-full rounded-lg border border-border/50 bg-white/90 p-2 text-neutral-900 shadow-none md:p-3 [&_.text-muted-foreground]:text-neutral-600">
+      {children}
+    </div>
+  );
+}
+
+function splitTwoColumns<T>(items: T[]): [T[], T[]] {
+  const left: T[] = [];
+  const right: T[] = [];
+  for (let i = 0; i < items.length; i++) {
+    (i % 2 === 0 ? left : right).push(items[i]!);
+  }
+  return [left, right];
 }
 
 type DocRowProps = {
@@ -208,10 +261,23 @@ function DocList({
 }
 
 /** Gestion (liste + upload + dossiers + suppression) des documents d'une catégorie. */
-function DocumentManager({ category }: { category: AimediartDocCategory }) {
+function DocumentManager({
+  category,
+  onDocsCountChange,
+  onNestedOpenChange,
+}: {
+  category: AimediartDocCategory;
+  onDocsCountChange?: (count: number) => void;
+  /** true si un sous-dossier est ouvert (pour masquer les boutons de l’étage section). */
+  onNestedOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useTranslation("settings");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadTargetRef = useRef<string | null>(null);
+  const onDocsCountChangeRef = useRef(onDocsCountChange);
+  onDocsCountChangeRef.current = onDocsCountChange;
+  const onNestedOpenChangeRef = useRef(onNestedOpenChange);
+  onNestedOpenChangeRef.current = onNestedOpenChange;
   const [docs, setDocs] = useState<AimediartDocument[]>([]);
   const [folders, setFolders] = useState<AimediartDocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,6 +285,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [openFolderId, setOpenFolderId] = useState<string>("");
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
@@ -228,7 +295,10 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
       listFolders(category),
     ]);
     if (docsRes.error) toast.error(t("aimediart_docs.error_load", { detail: docsRes.error }));
-    else setDocs(docsRes.data);
+    else {
+      setDocs(docsRes.data);
+      onDocsCountChangeRef.current?.(docsRes.data.length);
+    }
     if (foldersRes.error) {
       toast.error(t("aimediart_docs.error_load", { detail: foldersRes.error }));
     } else {
@@ -240,6 +310,14 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    onNestedOpenChangeRef.current?.(Boolean(openFolderId));
+  }, [openFolderId]);
+
+  useEffect(() => {
+    return () => onNestedOpenChangeRef.current?.(false);
+  }, []);
 
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -362,8 +440,8 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const handleShare = async (doc: AimediartDocument) => {
-    const url = getDocumentShareUrl(doc.share_token);
+  const copyShareToken = async (shareToken: string | undefined | null) => {
+    const url = getGedShareUrl(shareToken ?? "");
     if (!url) {
       toast.error(t("aimediart_docs.error_share"));
       return;
@@ -374,6 +452,14 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
     } catch {
       window.prompt(t("aimediart_docs.share_copy_manual"), url);
     }
+  };
+
+  const handleShare = async (doc: AimediartDocument) => {
+    await copyShareToken(doc.share_token);
+  };
+
+  const handleShareFolder = async (folder: AimediartDocumentFolder) => {
+    await copyShareToken(folder.share_token);
   };
 
   const handleMove = async (doc: AimediartDocument, folderId: string | null) => {
@@ -407,58 +493,66 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{t("aimediart_docs.hint")}</p>
-        <div className="flex items-center gap-1.5">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={ACCEPT}
-            className="hidden"
-            onChange={handleFiles}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7"
-            disabled={uploading}
-            onClick={() => void handleCreateFolder()}
-          >
-            <FolderPlus />
-            {t("aimediart_docs.btn_new_folder")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7"
-            disabled={uploading}
-            onClick={() => triggerUpload(null)}
-          >
-            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-            {t("aimediart_docs.btn_upload")}
-          </Button>
+      {!openFolderId && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">{t("aimediart_docs.hint")}</p>
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ACCEPT}
+              className="hidden"
+              onChange={handleFiles}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={uploading}
+              onClick={() => void handleCreateFolder()}
+            >
+              <FolderPlus />
+              {t("aimediart_docs.btn_new_folder")}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
+      {openFolderId && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          className="hidden"
+          onChange={handleFiles}
+        />
+      )}
 
       {loading ? (
         <p className="py-2 text-sm text-muted-foreground">{t("aimediart_docs.loading")}</p>
       ) : (
         <div className="flex flex-col gap-2">
           {folders.length > 0 && (
-            <Accordion type="multiple" className="w-full">
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full"
+              value={openFolderId}
+              onValueChange={setOpenFolderId}
+            >
               {folders.map((folder) => {
                 const folderDocs = docs.filter((d) => d.folder_id === folder.id);
                 const isRenaming = renamingId === folder.id;
+                const folderOpen = openFolderId === folder.id;
                 return (
                   <AccordionItem
                     key={folder.id}
                     value={folder.id}
                     className="border-border/50"
                   >
-                    <div className="flex items-center gap-0.5">
+                    <div className="relative flex w-full min-h-8 items-center">
                       {isRenaming ? (
                         <div
                           className="flex flex-1 items-center gap-1.5 px-1 py-1"
@@ -511,64 +605,95 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
                         </div>
                       ) : (
                         <>
-                          <AccordionTrigger className="flex-1 px-1 py-1 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
-                            <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight">
-                              <Folder className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                          <AccordionTrigger className="w-full px-1 py-1.5 hover:no-underline [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0">
+                            <span
+                              className={cn(
+                                "flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-sm font-semibold leading-tight",
+                                folderOpen ? "pr-36" : "pr-8",
+                              )}
+                            >
+                              <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                               {folder.name}
                               <span className="font-normal text-muted-foreground">
                                 ({folderDocs.length})
                               </span>
                             </span>
                           </AccordionTrigger>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            disabled={busyId === folder.id}
-                            title={t("aimediart_docs.rename_folder")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startRenameFolder(folder);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            disabled={uploading}
-                            title={t("aimediart_docs.btn_upload")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              triggerUpload(folder.id);
-                            }}
-                          >
-                            <Upload className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                            disabled={busyId === folder.id || folderDocs.length > 0}
-                            title={t("aimediart_docs.delete_folder")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleDeleteFolder(folder);
-                            }}
-                          >
-                            {busyId === folder.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
+                          {folderOpen && (
+                            <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
+                              <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 shrink-0 gap-1 px-2"
+                                  disabled={uploading}
+                                  title={t("aimediart_docs.btn_upload_folder_title")}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    triggerUpload(folder.id);
+                                  }}
+                                >
+                                  {uploading ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Upload className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline">{t("aimediart_docs.btn_upload")}</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 shrink-0"
+                                  disabled={!folder.share_token}
+                                  title={t("aimediart_docs.share_folder")}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleShareFolder(folder);
+                                  }}
+                                >
+                                  <Link2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 shrink-0"
+                                  disabled={busyId === folder.id}
+                                  title={t("aimediart_docs.rename_folder")}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    startRenameFolder(folder);
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                                  disabled={busyId === folder.id || folderDocs.length > 0}
+                                  title={t("aimediart_docs.delete_folder")}
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleDeleteFolder(folder);
+                                  }}
+                                >
+                                  {busyId === folder.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -590,12 +715,25 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
             </Accordion>
           )}
 
+          {!openFolderId && (
           <div className="flex flex-col gap-2">
-            {(folders.length > 0 || rootDocs.length > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("aimediart_docs.root_files")}
               </p>
-            )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7"
+                disabled={uploading}
+                title={t("aimediart_docs.btn_upload_root_title")}
+                onClick={() => triggerUpload(null)}
+              >
+                {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+                {t("aimediart_docs.btn_upload")}
+              </Button>
+            </div>
             <DocList
               docs={rootDocs}
               folders={folders}
@@ -611,6 +749,7 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
               onDelete={handleDelete}
             />
           </div>
+          )}
         </div>
       )}
     </div>
@@ -621,18 +760,33 @@ function DocumentManager({ category }: { category: AimediartDocCategory }) {
 export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boolean } = {}) {
   const { t } = useTranslation("settings");
   const { can } = useNavigationMatrix();
+  const isLgUp = useIsLgUp();
   const [sections, setSections] = useState<AimediartGedSection[]>([]);
+  const [sectionDocCounts, setSectionDocCounts] = useState<Record<string, number>>({});
   const [sectionsLoading, setSectionsLoading] = useState(true);
   const [renamingSectionId, setRenamingSectionId] = useState<string | null>(null);
   const [sectionRenameValue, setSectionRenameValue] = useState("");
   const [sectionBusy, setSectionBusy] = useState(false);
+  const [openSectionSlug, setOpenSectionSlug] = useState<string>("");
+  const [nestedFolderOpen, setNestedFolderOpen] = useState(false);
   const sectionRenameRef = useRef<HTMLInputElement | null>(null);
 
   const loadSections = useCallback(async () => {
     setSectionsLoading(true);
     const { data, error } = await listGedSections();
-    if (error) toast.error(t("aimediart_docs.error_load", { detail: error }));
-    else setSections(data);
+    if (error) {
+      toast.error(t("aimediart_docs.error_load", { detail: error }));
+      setSectionsLoading(false);
+      return;
+    }
+    setSections(data);
+    const counts = await Promise.all(
+      data.map(async (section) => {
+        const { count } = await countDocuments(section.slug);
+        return [section.slug, count] as const;
+      }),
+    );
+    setSectionDocCounts(Object.fromEntries(counts));
     setSectionsLoading(false);
   }, [t]);
 
@@ -642,6 +796,24 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
 
   // Accès commun « GED » : un seul contrôle pilote les 3 sections.
   if (!can("page_group_ged")) return null;
+
+  const setSectionCount = (slug: string, count: number) => {
+    setSectionDocCounts((prev) => (prev[slug] === count ? prev : { ...prev, [slug]: count }));
+  };
+
+  const copySectionShare = async (section: AimediartGedSection) => {
+    const url = getGedShareUrl(section.share_token);
+    if (!url) {
+      toast.error(t("aimediart_docs.error_share"));
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("aimediart_docs.share_copied"));
+    } catch {
+      window.prompt(t("aimediart_docs.share_copy_manual"), url);
+    }
+  };
 
   const startRenameSection = (section: AimediartGedSection) => {
     setRenamingSectionId(section.id);
@@ -705,10 +877,6 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
     setSectionBusy(true);
     const { error } = await deleteGedSection(section);
     setSectionBusy(false);
-    if (error === "section_not_empty") {
-      toast.error(t("aimediart_docs.error_section_not_empty"));
-      return;
-    }
     if (error) {
       toast.error(t("aimediart_docs.error_section_delete", { detail: error }));
       return;
@@ -727,17 +895,19 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
         ) : (
           <span className="sr-only">{t("aimediart_docs.panel_title")}</span>
         )}
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7"
-          disabled={sectionBusy}
-          onClick={() => void handleCreateSection()}
-        >
-          <FolderPlus />
-          {t("aimediart_docs.btn_new_section")}
-        </Button>
+        {!openSectionSlug && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7"
+            disabled={sectionBusy}
+            onClick={() => void handleCreateSection()}
+          >
+            <FolderPlus />
+            {t("aimediart_docs.btn_new_section")}
+          </Button>
+        )}
       </div>
 
       {sectionsLoading ? (
@@ -747,14 +917,27 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
           {t("aimediart_docs.empty_sections")}
         </p>
       ) : (
-        <Accordion type="single" collapsible className="w-full">
-          {sections.map((section) => (
+        (() => {
+          const [sectionsLeft, sectionsRight] = splitTwoColumns(sections);
+          const sectionOpen = (slug: string) => openSectionSlug === slug;
+          const showSectionActions = (slug: string) =>
+            sectionOpen(slug) && !nestedFolderOpen;
+
+          const handleSectionAccordionChange = (value: string) => {
+            setOpenSectionSlug(value);
+            if (!value) setNestedFolderOpen(false);
+          };
+
+          const renderSection = (section: AimediartGedSection) => {
+            const open = sectionOpen(section.slug);
+            const actionsVisible = showSectionActions(section.slug);
+            return (
             <AccordionItem
               key={section.id}
               value={section.slug}
               className="border-border/50"
             >
-              <div className="flex items-center gap-0.5">
+              <div className="relative flex w-full min-h-8 items-center">
                 {renamingSectionId === section.id ? (
                   <div
                     className="flex flex-1 items-center gap-1.5 px-1 py-1"
@@ -806,50 +989,127 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                   </div>
                 ) : (
                   <>
-                    <AccordionTrigger className="flex-1 px-1 py-1 hover:no-underline [&>svg]:h-3.5 [&>svg]:w-3.5">
-                      <span className="font-serif text-sm font-bold leading-tight">
-                        {section.name}
+                    <AccordionTrigger className="w-full px-1 py-1.5 hover:no-underline [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0">
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate text-left font-serif text-sm font-bold leading-tight",
+                          actionsVisible ? "pr-24" : "pr-8",
+                        )}
+                      >
+                        {section.name}{" "}
+                        <span className="font-sans font-normal text-muted-foreground">
+                          ({sectionDocCounts[section.slug] ?? 0})
+                        </span>
                       </span>
                     </AccordionTrigger>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 shrink-0"
-                      disabled={sectionBusy}
-                      title={t("aimediart_docs.rename_folder")}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startRenameSection(section);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                      disabled={sectionBusy}
-                      title={t("aimediart_docs.delete_section")}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleDeleteSection(section);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {actionsVisible && (
+                      <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
+                        <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            disabled={!section.share_token}
+                            title={t("aimediart_docs.share_section")}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void copySectionShare(section);
+                            }}
+                          >
+                            <Link2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0"
+                            disabled={sectionBusy}
+                            title={t("aimediart_docs.rename_folder")}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startRenameSection(section);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                            disabled={sectionBusy}
+                            title={t("aimediart_docs.delete_section")}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleDeleteSection(section);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
               <AccordionContent className="px-1 pb-2">
-                <DocumentManager category={section.slug} />
+                {open && (
+                  <DocumentManager
+                    category={section.slug}
+                    onDocsCountChange={(count) => setSectionCount(section.slug, count)}
+                    onNestedOpenChange={setNestedFolderOpen}
+                  />
+                )}
               </AccordionContent>
             </AccordionItem>
-          ))}
-        </Accordion>
+            );
+          };
+          if (!isLgUp) {
+            return (
+              <SingleBlock>
+                <Accordion
+                  type="single"
+                  collapsible
+                  className="w-full"
+                  value={openSectionSlug}
+                  onValueChange={handleSectionAccordionChange}
+                >
+                  {sections.map(renderSection)}
+                </Accordion>
+              </SingleBlock>
+            );
+          }
+          return (
+            <TwoColumnBlocks
+              left={
+                <Accordion
+                  type="single"
+                  collapsible
+                  className="w-full"
+                  value={openSectionSlug}
+                  onValueChange={handleSectionAccordionChange}
+                >
+                  {sectionsLeft.map(renderSection)}
+                </Accordion>
+              }
+              right={
+                <Accordion
+                  type="single"
+                  collapsible
+                  className="w-full"
+                  value={openSectionSlug}
+                  onValueChange={handleSectionAccordionChange}
+                >
+                  {sectionsRight.map(renderSection)}
+                </Accordion>
+              }
+            />
+          );
+        })()
       )}
     </div>
   );

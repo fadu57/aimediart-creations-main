@@ -20,6 +20,7 @@
   "title_agencies": "Corbeille — Organisations",
   "title_users": "Corbeille — Utilisateurs",
   "title_visitors": "Corbeille — Visiteurs",
+  "title_ged": "Corbeille — G.E.D.",
   "restore_no_rows": "Restauration envoyée mais aucune ligne modifiée (vérifier les permissions RLS).",
   "visitor_anonymous_label": "Visiteur anonyme",
   "visitor_registered_label": "Visiteur inscrit",

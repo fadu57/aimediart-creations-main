@@ -20,6 +20,7 @@
   "title_agencies": "Cestino — Organizzazioni",
   "title_users": "Cestino — Utenti",
   "title_visitors": "Cestino — Visitatori",
+  "title_ged": "Cestino — G.E.D.",
   "restore_no_rows": "Ripristino inviato ma nessuna riga modificata (verifica i permessi RLS).",
   "visitor_anonymous_label": "Visitatore anonimo",
   "visitor_registered_label": "Visitatore registrato",
