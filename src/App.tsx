@@ -31,7 +31,7 @@ import { SkipToContentLink } from "./components/SkipToContentLink";
 import { getAudienceChoice } from "./lib/audienceChoice";
 import { isVisitorRole } from "./lib/authUser";
 import { Loader2 } from "lucide-react";
-import { Suspense, useEffect, useLayoutEffect } from "react";
+import { Component, Suspense, useEffect, useLayoutEffect, type ErrorInfo, type ReactNode } from "react";
 import * as Pages from "./routes/lazyPages";
 import {
   ensureFullI18n,
@@ -48,6 +48,42 @@ function RouteLoadingFallback() {
       <span className="sr-only">Chargement…</span>
     </div>
   );
+}
+
+/** Catch les échecs de chunks lazy (réseau / déploiement) pour éviter une page noire. */
+class RouteChunkErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[RouteChunkErrorBoundary]", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-4 text-center">
+          <p className="text-sm text-[#F0F0F0]/90">
+            Échec du chargement de la page (réseau ou mise à jour en cours).
+          </p>
+          <button
+            type="button"
+            className="rounded-md border border-white/30 bg-white/10 px-3 py-1.5 text-sm text-[#F0F0F0] hover:bg-white/20"
+            onClick={() => window.location.reload()}
+          >
+            Recharger
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 /**
@@ -223,6 +259,7 @@ function RootEntryRoute() {
  * - autres routes : `RequireBackoffice` (session + rôle gestion)
  */
 const AppRoutes = () => (
+  <RouteChunkErrorBoundary>
   <Suspense fallback={<RouteLoadingFallback />}>
   <Routes>
     {/* Landing marketing publique (sans header) */}
@@ -339,6 +376,7 @@ const AppRoutes = () => (
     </Route>
   </Routes>
   </Suspense>
+  </RouteChunkErrorBoundary>
 );
 
 const App = () => {
