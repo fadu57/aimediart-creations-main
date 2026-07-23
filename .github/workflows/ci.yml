@@ -5,11 +5,8 @@
 #
 # Adapté pour Aimediart (Vite/React + Supabase) :
 #   - NODE_VERSION 24 (engines: "24.x" dans package.json) ;
-#   - scripts présents : `lint` (eslint) et `test` (vitest run) — exécutés en
-#     bloquant direct, sans --if-present ;
-#   - pas de script `typecheck` dans package.json : étape retirée (le repo est
-#     en TypeScript ; ajouter `"typecheck": "tsc --noEmit"` réactiverait la
-#     vérification — à décider séparément) ;
+#   - scripts présents : `lint` (eslint), `typecheck` (tsc --noEmit) et
+#     `test` (vitest run) — exécutés en bloquant direct, sans --if-present ;
 #   - `test:tenant-isolation` n'existe pas encore : le job passe en
 #     --if-present, ne pas considérer le repo couvert (voir TODO ci-dessous).
 
@@ -50,7 +47,7 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
 
-  # Lint et tests — bloquants (scripts présents dans package.json).
+  # Lint, types, tests — bloquants (scripts présents dans package.json).
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -62,6 +59,8 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
       - name: Tests
         run: npm run test
 
