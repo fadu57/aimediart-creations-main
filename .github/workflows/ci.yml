@@ -16,7 +16,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: ["**"] # toutes les branches : garantie serveur même sans PR
+    branches: [main] # les branches de PR sont couvertes par pull_request
 
 permissions:
   contents: read
