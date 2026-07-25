@@ -17,19 +17,19 @@ import { cn } from "@/lib/utils";
 type GedFolderCommentControlProps = {
   description: string | null | undefined;
   disabled?: boolean;
-  /** Affiché même si le bandeau d’actions n’est pas ouvert (icône à côté du titre). */
-  compact?: boolean;
+  /** Affiche le bouton « ajouter » quand le dossier est ouvert (sinon icône seulement s’il y a un commentaire). */
+  allowAdd?: boolean;
   onSave: (value: string | null) => Promise<{ error: string | null }>;
 };
 
 /**
- * Commentaire dossier / sous-dossier : survol = popup lecture ;
- * clic = édition (2–3 lignes).
+ * Symbole visible uniquement s’il y a un commentaire (survol = lecture).
+ * Ouverture du dossier : bouton pour ajouter / modifier.
  */
 export function GedFolderCommentControl({
   description,
   disabled,
-  compact,
+  allowAdd = false,
   onSave,
 }: GedFolderCommentControlProps) {
   const { t } = useTranslation("settings");
@@ -37,10 +37,13 @@ export function GedFolderCommentControl({
   const [draft, setDraft] = useState(description ?? "");
   const [saving, setSaving] = useState(false);
   const hasComment = Boolean(description?.trim());
+  const showControl = hasComment || allowAdd || open;
 
   useEffect(() => {
     if (open) setDraft(description ?? "");
   }, [open, description]);
+
+  if (!showControl) return null;
 
   const save = async () => {
     setSaving(true);
@@ -60,22 +63,21 @@ export function GedFolderCommentControl({
         hasComment && "text-[#E63946] hover:text-[#E63946]",
       )}
       disabled={disabled || saving}
-      aria-label={t("aimediart_docs.comment_edit")}
-      title={t("aimediart_docs.comment_edit")}
+      aria-label={hasComment ? t("aimediart_docs.comment_edit") : t("aimediart_docs.comment_add")}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
       {saving ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
       ) : (
-        <MessageSquareText className="h-3.5 w-3.5" />
+        <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
       )}
     </Button>
   );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider delayDuration={250}>
         <Tooltip open={open ? false : undefined}>
           <TooltipTrigger asChild>
             <span className="inline-flex">
@@ -98,7 +100,7 @@ export function GedFolderCommentControl({
       </TooltipProvider>
       <PopoverContent
         align="start"
-        className={cn("w-[min(20rem,92vw)] space-y-2 p-3", compact && "z-[60]")}
+        className="z-[60] w-[min(20rem,92vw)] space-y-2 p-3"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >

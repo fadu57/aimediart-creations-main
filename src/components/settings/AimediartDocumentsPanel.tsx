@@ -625,7 +625,7 @@ function DocumentManager({
                             <span
                               className={cn(
                                 "flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-sm font-semibold leading-tight",
-                                folderOpen ? "pr-44" : "pr-16",
+                                folderOpen ? "pr-44" : folder.description?.trim() ? "pr-16" : "pr-8",
                               )}
                             >
                               <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -640,6 +640,7 @@ function DocumentManager({
                               <GedFolderCommentControl
                                 description={folder.description}
                                 disabled={busyId === folder.id}
+                                allowAdd={folderOpen}
                                 onSave={(value) => saveFolderComment(folder, value)}
                               />
                               {folderOpen && (
@@ -1029,7 +1030,11 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                       <span
                         className={cn(
                           "min-w-0 flex-1 truncate text-left font-serif text-sm font-bold leading-tight",
-                          actionsVisible ? "pr-32" : "pr-16",
+                          actionsVisible
+                            ? "pr-32"
+                            : section.description?.trim()
+                              ? "pr-16"
+                              : "pr-8",
                         )}
                       >
                         {section.name}{" "}
@@ -1043,6 +1048,7 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                         <GedFolderCommentControl
                           description={section.description}
                           disabled={sectionBusy}
+                          allowAdd={actionsVisible}
                           onSave={(value) => saveSectionComment(section, value)}
                         />
                         {actionsVisible && (
