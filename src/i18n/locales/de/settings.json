@@ -157,7 +157,15 @@
     "error_folder_not_empty": "Ordner ist nicht leer — Dokumente zuerst verschieben oder löschen.",
     "error_section_create": "Hauptordner konnte nicht erstellt werden: {{detail}}",
     "error_section_delete": "Hauptordner konnte nicht gelöscht werden: {{detail}}",
-    "error_section_not_empty": "Hauptordner ist nicht leer — zuerst leeren."
+    "error_section_not_empty": "Hauptordner ist nicht leer — zuerst leeren.",
+    "comment_title": "Ordnerkommentar",
+    "comment_placeholder": "2–3 Zeilen zur Beschreibung dieses Ordners…",
+    "comment_add": "Kommentar hinzufügen",
+    "comment_edit": "Kommentar anzeigen / bearbeiten",
+    "comment_save": "Speichern",
+    "comment_cancel": "Abbrechen",
+    "comment_saved": "Kommentar gespeichert.",
+    "error_comment_save": "Kommentar konnte nicht gespeichert werden: {{detail}}"
   },
   "veille_actualite": {
     "panel_title": "Nachrichten-Watch",

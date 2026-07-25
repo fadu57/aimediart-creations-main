@@ -157,7 +157,15 @@
     "error_folder_not_empty": "Le dossier n’est pas vide — déplacez ou supprimez les documents d’abord.",
     "error_section_create": "Échec de création du dossier principal : {{detail}}",
     "error_section_delete": "Échec de suppression du dossier principal : {{detail}}",
-    "error_section_not_empty": "Le dossier principal n’est pas vide — videz-le d’abord."
+    "error_section_not_empty": "Le dossier principal n’est pas vide — videz-le d’abord.",
+    "comment_title": "Commentaire du dossier",
+    "comment_placeholder": "2 ou 3 lignes pour décrire ce dossier…",
+    "comment_add": "Ajouter un commentaire",
+    "comment_edit": "Voir / modifier le commentaire",
+    "comment_save": "Enregistrer",
+    "comment_cancel": "Annuler",
+    "comment_saved": "Commentaire enregistré.",
+    "error_comment_save": "Échec de l’enregistrement du commentaire : {{detail}}"
   },
   "veille_actualite": {
     "panel_title": "Veille actualité",

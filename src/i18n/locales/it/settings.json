@@ -157,7 +157,15 @@
     "error_folder_not_empty": "La cartella non è vuota — sposta o elimina prima i documenti.",
     "error_section_create": "Creazione cartella principale non riuscita: {{detail}}",
     "error_section_delete": "Eliminazione cartella principale non riuscita: {{detail}}",
-    "error_section_not_empty": "La cartella principale non è vuota — svuotala prima."
+    "error_section_not_empty": "La cartella principale non è vuota — svuotala prima.",
+    "comment_title": "Commento della cartella",
+    "comment_placeholder": "2 o 3 righe per descrivere questa cartella…",
+    "comment_add": "Aggiungi un commento",
+    "comment_edit": "Vedi / modifica il commento",
+    "comment_save": "Salva",
+    "comment_cancel": "Annulla",
+    "comment_saved": "Commento salvato.",
+    "error_comment_save": "Salvataggio del commento non riuscito: {{detail}}"
   },
   "veille_actualite": {
     "panel_title": "Rassegna attualità",

@@ -52,8 +52,11 @@ import {
   moveDocument,
   renameFolder,
   renameGedSection,
+  updateFolderDescription,
+  updateGedSectionDescription,
   uploadDocument,
 } from "@/lib/aimediartDocuments";
+import { GedFolderCommentControl } from "@/components/settings/GedFolderCommentControl";
 
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,.gif,.svg,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.zip";
 
@@ -392,6 +395,19 @@ function DocumentManager({
     setFolders((prev) => prev.filter((f) => f.id !== folder.id));
   };
 
+  const saveFolderComment = async (folder: AimediartDocumentFolder, value: string | null) => {
+    const { data, error } = await updateFolderDescription(folder.id, value);
+    if (error) {
+      toast.error(t("aimediart_docs.error_comment_save", { detail: error }));
+      return { error };
+    }
+    if (data) {
+      setFolders((prev) => prev.map((f) => (f.id === folder.id ? data : f)));
+    }
+    toast.success(t("aimediart_docs.comment_saved"));
+    return { error: null };
+  };
+
   const startRenameFolder = (folder: AimediartDocumentFolder) => {
     setRenamingId(folder.id);
     setRenameValue(folder.name);
@@ -609,7 +625,7 @@ function DocumentManager({
                             <span
                               className={cn(
                                 "flex min-w-0 flex-1 items-center gap-1.5 truncate text-left text-sm font-semibold leading-tight",
-                                folderOpen ? "pr-36" : "pr-8",
+                                folderOpen ? "pr-44" : "pr-16",
                               )}
                             >
                               <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -619,81 +635,88 @@ function DocumentManager({
                               </span>
                             </span>
                           </AccordionTrigger>
-                          {folderOpen && (
-                            <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
-                              <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 shrink-0 gap-1 px-2"
-                                  disabled={uploading}
-                                  title={t("aimediart_docs.btn_upload_folder_title")}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    triggerUpload(folder.id);
-                                  }}
-                                >
-                                  {uploading ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Upload className="h-3.5 w-3.5" />
-                                  )}
-                                  <span className="hidden sm:inline">{t("aimediart_docs.btn_upload")}</span>
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 shrink-0"
-                                  disabled={!folder.share_token}
-                                  title={t("aimediart_docs.share_folder")}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleShareFolder(folder);
-                                  }}
-                                >
-                                  <Link2 className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 shrink-0"
-                                  disabled={busyId === folder.id}
-                                  title={t("aimediart_docs.rename_folder")}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    startRenameFolder(folder);
-                                  }}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                                  disabled={busyId === folder.id || folderDocs.length > 0}
-                                  title={t("aimediart_docs.delete_folder")}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleDeleteFolder(folder);
-                                  }}
-                                >
-                                  {busyId === folder.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  )}
-                                </Button>
-                              </div>
+                          <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
+                            <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
+                              <GedFolderCommentControl
+                                description={folder.description}
+                                disabled={busyId === folder.id}
+                                onSave={(value) => saveFolderComment(folder, value)}
+                              />
+                              {folderOpen && (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 shrink-0 gap-1 px-2"
+                                    disabled={uploading}
+                                    title={t("aimediart_docs.btn_upload_folder_title")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      triggerUpload(folder.id);
+                                    }}
+                                  >
+                                    {uploading ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Upload className="h-3.5 w-3.5" />
+                                    )}
+                                    <span className="hidden sm:inline">{t("aimediart_docs.btn_upload")}</span>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 shrink-0"
+                                    disabled={!folder.share_token}
+                                    title={t("aimediart_docs.share_folder")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleShareFolder(folder);
+                                    }}
+                                  >
+                                    <Link2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 shrink-0"
+                                    disabled={busyId === folder.id}
+                                    title={t("aimediart_docs.rename_folder")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startRenameFolder(folder);
+                                    }}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                                    disabled={busyId === folder.id || folderDocs.length > 0}
+                                    title={t("aimediart_docs.delete_folder")}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void handleDeleteFolder(folder);
+                                    }}
+                                  >
+                                    {busyId === folder.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </>
                       )}
                     </div>
@@ -813,6 +836,19 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
     } catch {
       window.prompt(t("aimediart_docs.share_copy_manual"), url);
     }
+  };
+
+  const saveSectionComment = async (section: AimediartGedSection, value: string | null) => {
+    const { data, error } = await updateGedSectionDescription(section.id, value);
+    if (error) {
+      toast.error(t("aimediart_docs.error_comment_save", { detail: error }));
+      return { error };
+    }
+    if (data) {
+      setSections((prev) => prev.map((s) => (s.id === section.id ? data : s)));
+    }
+    toast.success(t("aimediart_docs.comment_saved"));
+    return { error: null };
   };
 
   const startRenameSection = (section: AimediartGedSection) => {
@@ -993,7 +1029,7 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                       <span
                         className={cn(
                           "min-w-0 flex-1 truncate text-left font-serif text-sm font-bold leading-tight",
-                          actionsVisible ? "pr-24" : "pr-8",
+                          actionsVisible ? "pr-32" : "pr-16",
                         )}
                       >
                         {section.name}{" "}
@@ -1002,57 +1038,64 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                         </span>
                       </span>
                     </AccordionTrigger>
-                    {actionsVisible && (
-                      <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
-                        <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            disabled={!section.share_token}
-                            title={t("aimediart_docs.share_section")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void copySectionShare(section);
-                            }}
-                          >
-                            <Link2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            disabled={sectionBusy}
-                            title={t("aimediart_docs.rename_folder")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startRenameSection(section);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
-                            disabled={sectionBusy}
-                            title={t("aimediart_docs.delete_section")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleDeleteSection(section);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                    <div className="pointer-events-none absolute inset-y-0 right-7 z-10 flex items-center gap-0.5">
+                      <div className="pointer-events-auto flex items-center gap-0.5 rounded-md bg-background/90">
+                        <GedFolderCommentControl
+                          description={section.description}
+                          disabled={sectionBusy}
+                          onSave={(value) => saveSectionComment(section, value)}
+                        />
+                        {actionsVisible && (
+                          <>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              disabled={!section.share_token}
+                              title={t("aimediart_docs.share_section")}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void copySectionShare(section);
+                              }}
+                            >
+                              <Link2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              disabled={sectionBusy}
+                              title={t("aimediart_docs.rename_folder")}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startRenameSection(section);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                              disabled={sectionBusy}
+                              title={t("aimediart_docs.delete_section")}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteSection(section);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </>
                 )}
               </div>

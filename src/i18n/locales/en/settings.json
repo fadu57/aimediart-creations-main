@@ -157,7 +157,15 @@
     "error_folder_not_empty": "Folder is not empty — move or delete documents first.",
     "error_section_create": "Could not create main folder: {{detail}}",
     "error_section_delete": "Could not delete main folder: {{detail}}",
-    "error_section_not_empty": "Main folder is not empty — clear it first."
+    "error_section_not_empty": "Main folder is not empty — clear it first.",
+    "comment_title": "Folder comment",
+    "comment_placeholder": "2 or 3 lines to describe this folder…",
+    "comment_add": "Add a comment",
+    "comment_edit": "View / edit comment",
+    "comment_save": "Save",
+    "comment_cancel": "Cancel",
+    "comment_saved": "Comment saved.",
+    "error_comment_save": "Failed to save comment: {{detail}}"
   },
   "veille_actualite": {
     "panel_title": "News watch",

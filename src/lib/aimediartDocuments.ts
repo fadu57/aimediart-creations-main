@@ -37,11 +37,15 @@ function prefixForCategory(category: string): string {
   return slugifyFolderName(category);
 }
 
+/** Longueur max d’un commentaire dossier / sous-dossier (~3 lignes). */
+export const GED_DESCRIPTION_MAX_LEN = 280;
+
 /** Ligne public.aimediart_ged_sections. */
 export type AimediartGedSection = {
   id: string;
   slug: string;
   name: string;
+  description: string | null;
   sort_order: number;
   share_token: string;
   created_at: string;
@@ -54,6 +58,7 @@ export type AimediartDocumentFolder = {
   id: string;
   category: AimediartDocCategory;
   name: string;
+  description: string | null;
   share_token: string;
   created_at: string;
   created_by: string | null;
@@ -198,6 +203,28 @@ export async function renameGedSection(
   return { data: data as AimediartGedSection, error: null };
 }
 
+function normalizeGedDescription(raw: string | null | undefined): string | null {
+  const trimmed = (raw ?? "").trim().slice(0, GED_DESCRIPTION_MAX_LEN);
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Met à jour le commentaire d’un dossier principal. */
+export async function updateGedSectionDescription(
+  sectionId: string,
+  description: string | null,
+): Promise<{ data: AimediartGedSection | null; error: string | null }> {
+  const normalized = normalizeGedDescription(description);
+  const { data, error } = await supabase
+    .from("aimediart_ged_sections")
+    .update({ description: normalized })
+    .eq("id", sectionId)
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as AimediartGedSection, error: null };
+}
+
 /** Met un dossier principal à la corbeille (soft-delete). */
 export async function deleteGedSection(
   section: Pick<AimediartGedSection, "id">,
@@ -268,6 +295,23 @@ export async function renameFolder(
   const { data, error } = await supabase
     .from("aimediart_document_folders")
     .update({ name: trimmed })
+    .eq("id", folderId)
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as AimediartDocumentFolder, error: null };
+}
+
+/** Met à jour le commentaire d’un sous-dossier. */
+export async function updateFolderDescription(
+  folderId: string,
+  description: string | null,
+): Promise<{ data: AimediartDocumentFolder | null; error: string | null }> {
+  const normalized = normalizeGedDescription(description);
+  const { data, error } = await supabase
+    .from("aimediart_document_folders")
+    .update({ description: normalized })
     .eq("id", folderId)
     .select("*")
     .single();

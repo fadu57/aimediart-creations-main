@@ -157,7 +157,15 @@
     "error_folder_not_empty": "La carpeta no está vacía: mueva o elimine los documentos primero.",
     "error_section_create": "No se pudo crear la carpeta principal: {{detail}}",
     "error_section_delete": "No se pudo eliminar la carpeta principal: {{detail}}",
-    "error_section_not_empty": "La carpeta principal no está vacía: vacíela primero."
+    "error_section_not_empty": "La carpeta principal no está vacía: vacíela primero.",
+    "comment_title": "Comentario de la carpeta",
+    "comment_placeholder": "2 o 3 líneas para describir esta carpeta…",
+    "comment_add": "Añadir un comentario",
+    "comment_edit": "Ver / editar el comentario",
+    "comment_save": "Guardar",
+    "comment_cancel": "Cancelar",
+    "comment_saved": "Comentario guardado.",
+    "error_comment_save": "Error al guardar el comentario: {{detail}}"
   },
   "veille_actualite": {
     "panel_title": "Vigilancia de actualidad",
