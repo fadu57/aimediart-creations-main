@@ -72,6 +72,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/check-ai-limits/index.ts"
 
+[functions.check-cost-spike]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/check-cost-spike/index.ts"
+
 [functions.google-tts]
 verify_jwt = false
 entrypoint = "./functions/google-tts/index.ts"
