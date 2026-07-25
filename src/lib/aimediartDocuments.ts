@@ -419,18 +419,82 @@ export async function uploadDocument(
   return { data: data as AimediartDocument, error: null };
 }
 
-/** Déplace un document vers un autre dossier (ou racine si folderId null). */
-export async function moveDocument(
-  docId: string,
-  folderId: string | null,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from("aimediart_documents")
-    .update({ folder_id: folderId })
-    .eq("id", docId);
+export type MoveDocumentTarget = {
+  /** Slug du dossier principal cible ; omis = rester dans la même section. */
+  category?: string;
+  /** Sous-dossier cible, ou null = racine de la section. */
+  folderId: string | null;
+  /** Nom du sous-dossier (pour le chemin Storage en cas de changement de section). */
+  folderNameForPath?: string | null;
+};
 
-  if (error) return { error: error.message };
-  return { error: null };
+/**
+ * Déplace un document vers un sous-dossier et/ou un autre dossier principal.
+ * Si la section change, le fichier est déplacé dans le bucket / préfixe adéquat.
+ */
+export async function moveDocument(
+  doc: AimediartDocument,
+  target: MoveDocumentTarget,
+): Promise<{ data: AimediartDocument | null; error: string | null }> {
+  const targetCategory = (target.category ?? doc.category).trim();
+  if (!targetCategory) return { data: null, error: "empty_category" };
+
+  const sameCategory = targetCategory === doc.category;
+
+  if (sameCategory) {
+    const { data, error } = await supabase
+      .from("aimediart_documents")
+      .update({ folder_id: target.folderId })
+      .eq("id", doc.id)
+      .select("*")
+      .single();
+    if (error) return { data: null, error: error.message };
+    return { data: data as AimediartDocument, error: null };
+  }
+
+  const newBucket = bucketForCategory(targetCategory);
+  const prefix = prefixForCategory(targetCategory);
+  const folderSeg = target.folderNameForPath
+    ? slugifyFolderName(target.folderNameForPath)
+    : "root";
+  const safeName = slugifyFileName(doc.name);
+  const year = new Date().getFullYear();
+  const newPath = `${prefix ? `${prefix}/` : ""}${folderSeg}/${year}/${crypto.randomUUID()}-${safeName}`;
+
+  if (doc.bucket === newBucket) {
+    const { error: moveErr } = await supabase.storage
+      .from(doc.bucket)
+      .move(doc.path, newPath);
+    if (moveErr) return { data: null, error: moveErr.message };
+  } else {
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from(doc.bucket)
+      .download(doc.path);
+    if (dlErr || !blob) {
+      return { data: null, error: dlErr?.message ?? "download_failed" };
+    }
+    const { error: upErr } = await supabase.storage.from(newBucket).upload(newPath, blob, {
+      upsert: false,
+      contentType: doc.mime_type || undefined,
+    });
+    if (upErr) return { data: null, error: upErr.message };
+    await supabase.storage.from(doc.bucket).remove([doc.path]).catch(() => undefined);
+  }
+
+  const { data, error } = await supabase
+    .from("aimediart_documents")
+    .update({
+      category: targetCategory,
+      folder_id: target.folderId,
+      bucket: newBucket,
+      path: newPath,
+    })
+    .eq("id", doc.id)
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as AimediartDocument, error: null };
 }
 
 /** Supprime un document (ligne + fichier du bucket). */

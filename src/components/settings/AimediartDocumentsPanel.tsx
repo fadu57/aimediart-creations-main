@@ -27,6 +27,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -50,6 +52,7 @@ import {
   listGedSections,
   MAX_FILE_SIZE,
   moveDocument,
+  type MoveDocumentTarget,
   renameFolder,
   renameGedSection,
   updateFolderDescription,
@@ -121,14 +124,25 @@ function splitTwoColumns<T>(items: T[]): [T[], T[]] {
 type DocRowProps = {
   doc: AimediartDocument;
   folders: AimediartDocumentFolder[];
+  /** Autres dossiers principaux (hors section courante). */
+  otherSections: AimediartGedSection[];
   busyId: string | null;
   onOpen: (doc: AimediartDocument) => void;
   onShare: (doc: AimediartDocument) => void;
-  onMove: (doc: AimediartDocument, folderId: string | null) => void;
+  onMove: (doc: AimediartDocument, target: MoveDocumentTarget) => void;
   onDelete: (doc: AimediartDocument) => void;
 };
 
-function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: DocRowProps) {
+function DocRow({
+  doc,
+  folders,
+  otherSections,
+  busyId,
+  onOpen,
+  onShare,
+  onMove,
+  onDelete,
+}: DocRowProps) {
   const { t } = useTranslation("settings");
   const busy = busyId === doc.id;
 
@@ -170,9 +184,12 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-64 overflow-y-auto">
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {t("aimediart_docs.move_within")}
+            </DropdownMenuLabel>
             <DropdownMenuItem
               disabled={doc.folder_id === null}
-              onClick={() => onMove(doc, null)}
+              onClick={() => onMove(doc, { folderId: null })}
             >
               {t("aimediart_docs.move_to_root")}
             </DropdownMenuItem>
@@ -180,13 +197,31 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
               <DropdownMenuItem
                 key={f.id}
                 disabled={doc.folder_id === f.id}
-                onClick={() => onMove(doc, f.id)}
+                onClick={() => onMove(doc, { folderId: f.id })}
               >
                 {f.name}
               </DropdownMenuItem>
             ))}
             {folders.length === 0 && (
               <DropdownMenuItem disabled>{t("aimediart_docs.no_folders")}</DropdownMenuItem>
+            )}
+            {otherSections.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  {t("aimediart_docs.move_to_section")}
+                </DropdownMenuLabel>
+                {otherSections.map((section) => (
+                  <DropdownMenuItem
+                    key={section.id}
+                    onClick={() =>
+                      onMove(doc, { category: section.slug, folderId: null })
+                    }
+                  >
+                    {t("aimediart_docs.move_to_section_root", { name: section.name })}
+                  </DropdownMenuItem>
+                ))}
+              </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -220,17 +255,19 @@ function DocRow({ doc, folders, busyId, onOpen, onShare, onMove, onDelete }: Doc
 type DocListProps = {
   docs: AimediartDocument[];
   folders: AimediartDocumentFolder[];
+  otherSections: AimediartGedSection[];
   busyId: string | null;
   emptyLabel: string;
   onOpen: (doc: AimediartDocument) => void;
   onShare: (doc: AimediartDocument) => void;
-  onMove: (doc: AimediartDocument, folderId: string | null) => void;
+  onMove: (doc: AimediartDocument, target: MoveDocumentTarget) => void;
   onDelete: (doc: AimediartDocument) => void;
 };
 
 function DocList({
   docs,
   folders,
+  otherSections,
   busyId,
   emptyLabel,
   onOpen,
@@ -252,6 +289,7 @@ function DocList({
           key={doc.id}
           doc={doc}
           folders={folders}
+          otherSections={otherSections}
           busyId={busyId}
           onOpen={onOpen}
           onShare={onShare}
@@ -266,13 +304,18 @@ function DocList({
 /** Gestion (liste + upload + dossiers + suppression) des documents d'une catégorie. */
 function DocumentManager({
   category,
+  sections,
   onDocsCountChange,
   onNestedOpenChange,
+  onCrossSectionMove,
 }: {
   category: AimediartDocCategory;
+  sections: AimediartGedSection[];
   onDocsCountChange?: (count: number) => void;
   /** true si un sous-dossier est ouvert (pour masquer les boutons de l’étage section). */
   onNestedOpenChange?: (open: boolean) => void;
+  /** Compteurs après déplacement vers un autre dossier principal. */
+  onCrossSectionMove?: (fromSlug: string, toSlug: string) => void;
 }) {
   const { t } = useTranslation("settings");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -478,17 +521,27 @@ function DocumentManager({
     await copyShareToken(folder.share_token);
   };
 
-  const handleMove = async (doc: AimediartDocument, folderId: string | null) => {
+  const handleMove = async (doc: AimediartDocument, target: MoveDocumentTarget) => {
     setBusyId(doc.id);
-    const { error } = await moveDocument(doc.id, folderId);
+    const { error } = await moveDocument(doc, target);
     setBusyId(null);
     if (error) {
       toast.error(t("aimediart_docs.error_move", { detail: error }));
       return;
     }
     toast.success(t("aimediart_docs.moved"));
+    const toCategory = target.category ?? doc.category;
+    if (toCategory !== doc.category) {
+      setDocs((prev) => {
+        const next = prev.filter((d) => d.id !== doc.id);
+        onDocsCountChangeRef.current?.(next.length);
+        return next;
+      });
+      onCrossSectionMove?.(doc.category, toCategory);
+      return;
+    }
     setDocs((prev) =>
-      prev.map((d) => (d.id === doc.id ? { ...d, folder_id: folderId } : d)),
+      prev.map((d) => (d.id === doc.id ? { ...d, folder_id: target.folderId } : d)),
     );
   };
 
@@ -506,6 +559,7 @@ function DocumentManager({
   };
 
   const rootDocs = docs.filter((d) => d.folder_id == null);
+  const otherSections = sections.filter((s) => s.slug !== category);
 
   return (
     <div className="flex flex-col gap-2">
@@ -725,6 +779,7 @@ function DocumentManager({
                       <DocList
                         docs={folderDocs}
                         folders={folders}
+                        otherSections={otherSections}
                         busyId={busyId}
                         emptyLabel={t("aimediart_docs.empty")}
                         onOpen={handleOpen}
@@ -761,6 +816,7 @@ function DocumentManager({
             <DocList
               docs={rootDocs}
               folders={folders}
+              otherSections={otherSections}
               busyId={busyId}
               emptyLabel={
                 folders.length === 0
@@ -823,6 +879,14 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
 
   const setSectionCount = (slug: string, count: number) => {
     setSectionDocCounts((prev) => (prev[slug] === count ? prev : { ...prev, [slug]: count }));
+  };
+
+  const handleCrossSectionMove = (fromSlug: string, toSlug: string) => {
+    setSectionDocCounts((prev) => ({
+      ...prev,
+      [fromSlug]: Math.max(0, (prev[fromSlug] ?? 1) - 1),
+      [toSlug]: (prev[toSlug] ?? 0) + 1,
+    }));
   };
 
   const copySectionShare = async (section: AimediartGedSection) => {
@@ -1109,8 +1173,10 @@ export function AimediartDocumentsPanel({ hideTitle = false }: { hideTitle?: boo
                 {open && (
                   <DocumentManager
                     category={section.slug}
+                    sections={sections}
                     onDocsCountChange={(count) => setSectionCount(section.slug, count)}
                     onNestedOpenChange={setNestedFolderOpen}
+                    onCrossSectionMove={handleCrossSectionMove}
                   />
                 )}
               </AccordionContent>
