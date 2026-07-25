@@ -46,7 +46,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npm audit --audit-level=high
+      # Prod deps only : les high restants sont dans la chaîne eslint (dev), hors runtime.
+      - run: npm audit --audit-level=high --omit=dev
 
   # Lint, types, tests — trois jobs indépendants et bloquants : l'échec de
   # l'un ne masque pas le signal des autres.

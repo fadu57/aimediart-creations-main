@@ -173,16 +173,10 @@ const RegisterSaaS = () => {
 
   const strengthLabel = password.length > 0 ? t(`register_saas.strength_level_${passwordStrength.score}`) : "";
 
-  // Redirect already-authenticated users
-  if (!authLoading && session) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   // ---------------------------------------------------------------------------
   // Username check
   // ---------------------------------------------------------------------------
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const trimmed = username.trim();
     if (trimmed.length < 3) {
@@ -289,7 +283,6 @@ const RegisterSaaS = () => {
   }, [avatarPreview, stopStream]);
 
   // Cleanup on unmount
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     return () => {
       stopStream();
@@ -439,6 +432,10 @@ const RegisterSaaS = () => {
         <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden />
       </div>
     );
+  }
+
+  if (session) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   // ---------------------------------------------------------------------------

@@ -302,7 +302,7 @@ const Expos = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const applyScope = (query: any) => {
+    const applyScope = (query: ReturnType<typeof supabase.from>) => {
       let scoped = query;
       if ((role_id === 5 || role_id === 6) && userExpoId) {
         scoped = scoped.eq("id", userExpoId);

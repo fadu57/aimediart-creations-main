@@ -165,7 +165,7 @@ export function parseArtworkGroupIdFromInput(raw: string | null | undefined): st
 
 /** Interprète le contenu d'un QR (œuvre, groupe, expo, UUID seul, URL absolue ou relative). */
 export function resolveScanTargetFromQr(raw: string | null | undefined): QrScanTarget | null {
-  let t = (raw ?? "").trim();
+  const t = (raw ?? "").trim();
   if (!t) return null;
 
   let href = t;

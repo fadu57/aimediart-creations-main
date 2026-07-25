@@ -311,7 +311,7 @@ export function computeCartelLayout(
   const centerX = slotX + slotW / 2;
 
   let scale = cartelScaleForSlot(slotW, slotH);
-  let maxTextWidth = Math.max(10, slotW * REF_TEXT_WIDTH_RATIO);
+  const maxTextWidth = Math.max(10, slotW * REF_TEXT_WIDTH_RATIO);
 
   // Si trop de traductions : réduire un peu le scale pour tout faire tenir.
   let measured = contentHeightAtScale(pdf, content, scale, maxTextWidth);

@@ -50,7 +50,8 @@ export async function generatePersonasBatchWithRetry(
     };
   }
 
-  let { stylesById, analyseGlobale } = await fetchBatch(sourceText, styles, lang, artworkId);
+  const { stylesById, analyseGlobale: initialAnalyseGlobale } = await fetchBatch(sourceText, styles, lang, artworkId);
+  let analyseGlobale = initialAnalyseGlobale;
   let missing = emptyStyleIds(styles, stylesById);
 
   if (missing.length > 0) {

@@ -160,13 +160,13 @@ export function waitForQrReaderLayout(elementId: string, timeoutMs = 4000): Prom
 
     let settled = false;
     let observer: ResizeObserver | null = null;
-    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    const timeoutRef: { id?: ReturnType<typeof window.setTimeout> } = {};
 
     const finish = (ok: boolean) => {
       if (settled) return;
       settled = true;
       observer?.disconnect();
-      if (timer !== undefined) window.clearTimeout(timer);
+      if (timeoutRef.id !== undefined) window.clearTimeout(timeoutRef.id);
       if (ok) resolve();
       else reject(new Error("Zone scanner non prête."));
     };
@@ -185,7 +185,7 @@ export function waitForQrReaderLayout(elementId: string, timeoutMs = 4000): Prom
       observer.observe(el);
     }
 
-    timer = window.setTimeout(() => finish(isReady()), timeoutMs);
+    timeoutRef.id = window.setTimeout(() => finish(isReady()), timeoutMs);
   });
 }
 

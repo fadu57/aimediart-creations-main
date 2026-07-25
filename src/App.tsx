@@ -232,11 +232,11 @@ function ScanEntryRedirect() {
 
 function RootEntryRoute() {
   const [searchParams] = useSearchParams();
+  const { session, loading, role_name, role_id } = useEffectiveAuth();
   const visitorLanding = buildVisitorLandingPath(searchParams);
   if (visitorLanding) {
     return <Navigate to={visitorLanding} replace />;
   }
-  const { session, loading, role_name, role_id } = useEffectiveAuth();
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">

@@ -176,8 +176,8 @@ const Agencies = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const applyScope = async (query: any) => {
-      let scoped = query as any;
+    const applyScope = async (query: ReturnType<typeof supabase.from>) => {
+      let scoped = query;
       if (role_id === 4 && userAgencyId) {
         scoped = scoped.eq("id", userAgencyId);
       } else if (scope.mode === "agency" && scope.agencyId) {

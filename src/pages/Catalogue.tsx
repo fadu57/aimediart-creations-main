@@ -551,7 +551,7 @@ const Catalogue = () => {
     setLoading(true);
     setError(null);
 
-    let query = supabase
+    const query = supabase
       .from("artworks")
       .select(
         "artwork_id, artwork_title, artwork_title_i18n, artwork_title_i18n_enabled, artwork_description_i18n, artwork_source_material, artwork_image_url, artwork_photo_url, artwork_qr_code_url, artwork_qrcode_image, artwork_artist_id, artwork_agency_id, artwork_expo_id, artwork_status, artists!left(*)",
