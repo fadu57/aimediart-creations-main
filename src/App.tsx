@@ -115,6 +115,11 @@ function NormalizeMultipleSlashPathname() {
 function I18nRouteLoader() {
   const { pathname } = useLocation();
 
+  // Sync avant le paint des routes enfants (sinon 1er rendu = clés i18n brutes).
+  if (isPublicMarketingPath(pathname)) {
+    ensureVitrineNamespacesForPath(pathname);
+  }
+
   useLayoutEffect(() => {
     if (isPublicMarketingPath(pathname)) {
       ensureVitrineNamespacesForPath(pathname);

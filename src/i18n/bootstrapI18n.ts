@@ -80,9 +80,14 @@ async function ensureInitialized(extraNs: string[] = []): Promise<void> {
     fallbackLng: "fr",
     ns,
     defaultNS: "header",
+    // Les JSON légaux sont ajoutés à la demande : sans ce flag,
+    // hasLoadedNamespace renvoie true même si le bundle n’existe pas encore
+    // → pages légales figées sur les clés (meta.title) après navigation SPA.
+    partialBundledLanguages: true,
     interpolation: { escapeValue: false },
     react: {
       useSuspense: false,
+      bindI18n: "languageChanged loaded",
       bindI18nStore: "added removed",
     },
   });
@@ -95,9 +100,9 @@ async function ensureInitialized(extraNs: string[] = []): Promise<void> {
 /** Initialise i18n pour la vitrine (léger) ou charge tout le catalogue applicatif. */
 export async function initI18nForPath(pathname: string): Promise<void> {
   if (isPublicMarketingPath(pathname)) {
-    const legalNs = legalNamespaceForPath(pathname);
-    const extra = legalNs ? [legalNs] : [];
-    await ensureInitialized(extra);
+    // Bundles déjà importés statiquement dans legalResources — on les enregistre
+    // tous dès la vitrine pour éviter le trou au clic footer (F5 OK, SPA KO).
+    await ensureInitialized([...VITRINE_LEGAL_NAMESPACES]);
     return;
   }
 
@@ -108,10 +113,19 @@ export async function initI18nForPath(pathname: string): Promise<void> {
 export function ensureVitrineNamespacesForPath(pathname: string): void {
   if (!isPublicMarketingPath(pathname)) return;
 
-  const legalNs = legalNamespaceForPath(pathname);
-  if (!legalNs || loadedLegalNamespaces.has(legalNs)) return;
+  // Idempotent : enregistre tout le pack légal (coût négligeable, JSON déjà en mémoire).
+  if (!legalBundlesRegistered) {
+    ensureLegalResourceBundles(VITRINE_LEGAL_NAMESPACES);
+  }
 
-  ensureLegalResourceBundles([legalNs]);
+  const legalNs = legalNamespaceForPath(pathname);
+  if (!legalNs) return;
+
+  const registeredNs = i18n.options.ns;
+  const nsList = Array.isArray(registeredNs) ? registeredNs : registeredNs ? [registeredNs] : [];
+  if (!nsList.includes(legalNs)) {
+    void i18n.loadNamespaces(legalNs);
+  }
 }
 
 function addAppResourceBundles(): void {
