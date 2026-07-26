@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-d
 import { VisitorMediationMarkdown } from "@/components/VisitorMediationMarkdown";
 import { AudioPlayer } from "@/components/AudioPlayer";
 import { VisitorIndoorAudioGuard } from "@/components/visitor/VisitorIndoorAudioGuard";
+import { playbackRateForMediationStyle } from "@/lib/mediationAudioPlaybackRate";
 import {
   VisitorProfilePopup,
   type VisitorProfilePopupData,
@@ -2000,13 +2001,14 @@ const VisitorViewCore = () => {
           ) : (
             <>
               <div className="relative mt-1 px-0.5">
-                {/* Zone cliquable gauche — toute la hauteur du carrousel */}
+                {/* Zones flèches : démarrent sous l’en-tête (persona + voix) pour ne pas
+                    masquer / bloquer les boutons Voix F/M (surtout Safari iOS). */}
                 <button
                   type="button"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_prev")}
                   onClick={goMediationPrev}
-                  className="absolute left-0 top-0 bottom-0 z-10 w-8 flex items-start justify-center pt-3 text-[#E63946]/50 transition-all duration-200 hover:text-[#E63946] hover:bg-[#E63946]/8 rounded-l-2xl disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute bottom-0 left-0 top-14 z-10 flex w-8 items-start justify-center pt-2 text-[#E63946]/50 transition-all duration-200 hover:bg-[#E63946]/8 hover:text-[#E63946] rounded-l-2xl disabled:pointer-events-none disabled:opacity-20"
                 >
                   <ChevronLeft className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 </button>
@@ -2028,7 +2030,7 @@ const VisitorViewCore = () => {
                     autoHeight
                     slidesPerView={1}
                     spaceBetween={10}
-                    className="px-0"
+                    className="œuvre-mediation-swiper px-0"
                     onSlideChange={(swiper) => {
                       if (suppressMediationSlideChangeRef.current) return;
                       const raw = swiper.params.loop ? swiper.realIndex : swiper.activeIndex;
@@ -2039,48 +2041,50 @@ const VisitorViewCore = () => {
                     {carouselSlides.map((slide) => {
                       const isConteur = slide.canonicalCode === "conteur";
                       return (
-                        <SwiperSlide key={`main-ai-${slide.loopSlideKey}`}>
-                          <article className="rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 text-left text-sm leading-5 text-[#F0F0F0]/90 w-full">
-                            <div className="mb-2 flex flex-wrap items-center justify-between gap-x-1.5 gap-y-2">
-                              <div className="flex min-w-0 max-w-full items-center gap-1.5">
+                        <SwiperSlide key={`main-ai-${slide.loopSlideKey}`} className="!h-auto pt-3">
+                          <article className="relative w-full overflow-visible rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 pt-3.5 text-left text-sm leading-5 text-[#F0F0F0]/90">
+                            {/* Voix : ancrées sur le trait haut du bloc (hors flux) → label persona en entier. */}
+                            {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
+                              <div className="absolute -top-3 right-2 z-30 rounded-full bg-[#1E1E1E] p-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                                <AudioPlayer
+                                  text_id={artwork.artwork_id}
+                                  text_type="mediation"
+                                  lang={language}
+                                  prompt_style_id={slide.sid}
+                                  playOnly
+                                  compact
+                                  playbackRate={playbackRateForMediationStyle(slide.canonicalCode)}
+                                />
+                              </div>
+                            ) : null}
+                            <div className="relative z-20 mb-1.5 flex flex-col gap-1.5">
+                              <div className="flex min-w-0 items-center gap-1.5">
                                 {slide.icon ? (
                                   <span
-                                    className={`shrink-0 text-2xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
+                                    className={`shrink-0 text-xl leading-none ${isConteur ? "text-[#E63946]" : ""}`}
                                     aria-hidden
                                   >
                                     {slide.icon}
                                   </span>
                                 ) : null}
-                                <span className="inline max-w-full truncate rounded-full bg-white/10 px-2 py-0 text-sm font-semibold leading-5 text-white">
+                                <span className="max-w-full rounded-full bg-white/10 px-2 py-0.5 text-sm font-semibold leading-5 text-white whitespace-nowrap">
                                   {slide.label}
                                 </span>
                               </div>
-                              {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
-                                <div className="ml-auto shrink-0">
-                                  <AudioPlayer
-                                    text_id={artwork.artwork_id}
-                                    text_type="mediation"
-                                    lang={language}
-                                    prompt_style_id={slide.sid}
-                                    playOnly
-                                    compact
+                              {!slide.sid.startsWith("code:") ? (
+                                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] leading-tight text-[#F0F0F0]/75">
+                                  <Checkbox
+                                    checked={visitorPromptStyleIdsMatch(defaultPromptStyleId, slide.sid)}
+                                    onCheckedChange={(value) =>
+                                      toggleDefaultPersona(slide.sid, value === true)
+                                    }
+                                    aria-label={t("default_persona_aria")}
+                                    className="h-3.5 w-3.5 border-white/40 data-[state=checked]:border-[#E63946] data-[state=checked]:bg-[#E63946] data-[state=checked]:text-white"
                                   />
-                                </div>
+                                  <span className="min-w-0">{t("default_persona_label")}</span>
+                                </label>
                               ) : null}
                             </div>
-                            {!slide.sid.startsWith("code:") ? (
-                              <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs text-[#F0F0F0]/75">
-                                <Checkbox
-                                  checked={visitorPromptStyleIdsMatch(defaultPromptStyleId, slide.sid)}
-                                  onCheckedChange={(value) =>
-                                    toggleDefaultPersona(slide.sid, value === true)
-                                  }
-                                  aria-label={t("default_persona_aria")}
-                                  className="border-white/40 data-[state=checked]:border-[#E63946] data-[state=checked]:bg-[#E63946] data-[state=checked]:text-white"
-                                />
-                                <span>{t("default_persona_label")}</span>
-                              </label>
-                            ) : null}
                             <VisitorMediationMarkdown
                               text={slide.text}
                               verseMode={slide.canonicalCode === "poetique"}
@@ -2093,13 +2097,13 @@ const VisitorViewCore = () => {
                   </Swiper>
                 </div>
 
-                {/* Zone cliquable droite — toute la hauteur du carrousel */}
+                {/* Zone cliquable droite — sous l’en-tête persona/voix */}
                 <button
                   type="button"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_next")}
                   onClick={goMediationNext}
-                  className="absolute right-0 top-0 bottom-0 z-10 w-8 flex items-start justify-center pt-3 text-[#E63946]/50 transition-all duration-200 hover:text-[#E63946] hover:bg-[#E63946]/8 rounded-r-2xl disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute bottom-0 right-0 top-14 z-10 flex w-8 items-start justify-center pt-2 text-[#E63946]/50 transition-all duration-200 hover:bg-[#E63946]/8 hover:text-[#E63946] rounded-r-2xl disabled:pointer-events-none disabled:opacity-20"
                 >
                   <ChevronRight className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 </button>
@@ -2324,13 +2328,13 @@ const VisitorViewCore = () => {
                   className="h-auto w-full object-cover"
                   onError={() => setArtistPhotoError(true)}
                 />
-                <div className="absolute inset-x-0 bottom-0 bg-black/45 px-3 py-2">
-                  <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5">
-                    <p className="min-w-0 max-w-full flex-1 truncate text-sm font-semibold text-white">
+                  <div className="absolute inset-x-0 bottom-0 bg-black/45 px-3 py-2">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="min-w-0 truncate text-sm font-semibold text-white">
                       {artistDisplayName}
                     </p>
                     {artistBioAudioTarget && bioPromptStyleId ? (
-                      <div className="ml-auto shrink-0">
+                      <div className="flex w-full justify-end">
                         <AudioPlayer
                           text_id={artistBioAudioTarget.text_id}
                           text_type="bio"

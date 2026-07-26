@@ -183,7 +183,7 @@ function AppShell() {
         id="main-content"
         tabIndex={-1}
         className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] outline-none ${
-          hideGlobalHeader ? "" : "scroll-mt-[4.75rem] pt-[4.75rem]"
+          hideGlobalHeader ? "" : "scroll-mt-[4.25rem] pt-[4.25rem]"
         }`}
       >
         <Outlet />

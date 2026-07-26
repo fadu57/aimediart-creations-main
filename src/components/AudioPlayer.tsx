@@ -56,6 +56,9 @@ type AudioPlayerProps = {
 
   compact?: boolean;
 
+  /** Vitesse de lecture HTML (1 = normal). Ex. personae Pote / Conteur. */
+  playbackRate?: number;
+
   /** Ouvre le dialogue de génération (fiche œuvre) au lieu de lancer F+M sur la langue courante. */
   onGenerateClick?: () => void;
 
@@ -228,6 +231,8 @@ export function AudioPlayer({
 
   compact = false,
 
+  playbackRate = 1,
+
   onGenerateClick,
 
   onManageVoicesClick,
@@ -396,6 +401,19 @@ export function AudioPlayer({
       const url = await getAudioUrl(file.storage_path);
 
       const audio = new Audio(url);
+      const rate =
+        typeof playbackRate === "number" && Number.isFinite(playbackRate) && playbackRate > 0
+          ? Math.min(1.25, Math.max(0.85, playbackRate))
+          : 1;
+      audio.playbackRate = rate;
+      // Garde le pitch perçu plus naturel sur navigateurs qui supportent preservesPitch.
+      try {
+        (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+        (audio as HTMLAudioElement & { mozPreservesPitch?: boolean }).mozPreservesPitch = true;
+        (audio as HTMLAudioElement & { webkitPreservesPitch?: boolean }).webkitPreservesPitch = true;
+      } catch {
+        /* ignore */
+      }
 
       audioRef.current = audio;
 
@@ -628,33 +646,22 @@ export function AudioPlayer({
         return (
 
           <button
-
             key={gender}
-
             type="button"
-
             disabled={!ready}
-
             onClick={(e) => void handlePlay(gender, e)}
-
             className={cn(
-
-              "inline-flex touch-manipulation items-center rounded-full border font-semibold transition-colors",
-
-              compact ? "min-h-[28px] gap-1 px-2 py-1 text-xs leading-none" : "min-h-[28px] gap-1.5 px-2.5 py-1 text-xs leading-none",
-
+              // appearance-none : Safari iOS peut styler/écraser les <button> natifs
+              "inline-flex shrink-0 touch-manipulation appearance-none items-center rounded-full border font-semibold transition-colors [-webkit-tap-highlight-color:transparent]",
+              compact
+                ? "min-h-[28px] min-w-0 gap-0.5 px-2 py-1 text-[11px] leading-none"
+                : "min-h-[28px] gap-1.5 px-2.5 py-1 text-xs leading-none",
               btnClass,
-
               !playOnly && !ready && busy && "cursor-wait opacity-70",
-
               !ready && "cursor-not-allowed opacity-50",
-
               isPlaying && "border-[#E63946] text-[#E63946]",
-
             )}
-
             aria-label={t(gender === "F" ? "audio_player.play_f" : "audio_player.play_m")}
-
           >
 
             {!playOnly && busy && !ready ? (
@@ -671,7 +678,7 @@ export function AudioPlayer({
 
             )}
 
-            <span>{gender === "F" ? t("audio_player.voice_f") : t("audio_player.voice_m")}</span>
+            <span className="whitespace-nowrap">{gender === "F" ? t("audio_player.voice_f") : t("audio_player.voice_m")}</span>
 
           </button>
 

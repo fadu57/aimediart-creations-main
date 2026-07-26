@@ -1,7 +1,11 @@
-/** Hauteur fixe des cartes œuvre dans le catalogue (isolées et à l’intérieur d’un regroupement). */
+/** Hauteur fixe des cartes œuvre en layout horizontal (sm+). */
 export const CATALOGUE_CARD_HEIGHT_PX = 296;
 
-export const CATALOGUE_CARD_HEIGHT_CLASS = "h-[296px]";
+/**
+ * Mobile : hauteur auto (stack vertical).
+ * sm+ : hauteur fixe pour le layout horizontal image | contenu.
+ */
+export const CATALOGUE_CARD_HEIGHT_CLASS = "h-auto sm:h-[296px]";
 
 /** Espace entre les cartes dans le défilement vertical d’un regroupement. */
 export const CATALOGUE_DECK_SLIDE_GAP_PX = 20;
@@ -9,11 +13,11 @@ export const CATALOGUE_DECK_SLIDE_GAP_PX = 20;
 /** Aperçu de la carte suivante dans la zone de scroll du regroupement. */
 export const CATALOGUE_DECK_PEEK_PX = 64;
 
-/** Hauteur visible de la zone de scroll (carte active + aperçu). */
+/** Hauteur visible de la zone de scroll (carte active + aperçu) — sm+ uniquement. */
 export const CATALOGUE_DECK_VIEWPORT_PX =
   CATALOGUE_CARD_HEIGHT_PX + CATALOGUE_DECK_PEEK_PX;
 
-/** Pas de scroll vertical (carte + gap). */
+/** Pas de scroll vertical (carte + gap) — sm+ uniquement. */
 export const CATALOGUE_DECK_SLIDE_STRIDE_PX =
   CATALOGUE_CARD_HEIGHT_PX + CATALOGUE_DECK_SLIDE_GAP_PX;
 

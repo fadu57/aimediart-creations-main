@@ -230,10 +230,10 @@ function resolveExpoIdForArtwork(
   return match?.id ?? null;
 }
 
-/** Largeur commune des badges IA (image, médiations, voix) en bas de carte. */
+/** Largeur commune des badges IA (image, médiations, voix) en bas de carte — desktop. */
 const CATALOG_IA_BADGE_WIDTH_CLASS = "w-full sm:w-[14.5rem]";
 const catalogIaBadgeClass =
-  "inline-flex w-full min-w-0 items-center rounded-full border px-3 py-0.5 text-left text-[11px] font-medium";
+  "inline-flex w-full min-w-0 items-center rounded-full border px-2 py-0.5 text-left text-[10px] font-medium leading-snug sm:px-3 sm:text-[11px] sm:leading-normal";
 
 const Catalogue = () => {
   const { t, i18n } = useTranslation("catalogue");
@@ -1417,19 +1417,20 @@ const Catalogue = () => {
   ]);
 
   return (
-    <div className="container min-w-0 max-w-full pt-2 pb-8 space-y-8">
-      <div className="sticky top-16 z-30 flex flex-col gap-2 bg-[#121212]/95 backdrop-blur-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex w-full min-w-0 flex-col gap-2 md:max-w-[576px]">
-          <div className="flex w-full items-baseline justify-between gap-4">
-            <h2 className="text-3xl font-serif font-bold text-white">{t("page_title")}</h2>
+      <div className="container min-w-0 max-w-full pt-1 pb-8 space-y-3 sm:pt-2 sm:space-y-8">
+      {/* Mobile : pas de sticky (barre trop haute → masquait la 1re carte). md+ : sticky sous le header. */}
+      <div className="z-30 flex min-w-0 flex-col gap-1.5 border-b border-border/40 bg-[#121212] pb-2 pt-0 sm:gap-2 md:sticky md:top-[4.25rem] md:bg-[#121212]/95 md:backdrop-blur-sm">
+        <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
+        <div className="flex w-full min-w-0 flex-col gap-1.5 md:max-w-[576px] md:gap-2">
+          <div className="flex w-full items-baseline justify-between gap-3 sm:gap-4">
+            <h2 className="min-w-0 text-2xl font-serif font-bold leading-tight text-white sm:text-3xl">{t("page_title")}</h2>
             {!loading && (
               <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">
                 {t("filtered_count", { count: filtered.length })}
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
             <Popover
               open={artworkFilterOpen}
               onOpenChange={(open) => {
@@ -1442,7 +1443,7 @@ const Catalogue = () => {
                   role="combobox"
                   aria-expanded={artworkFilterOpen}
                   aria-controls="catalogue-artwork-suggestions"
-                  className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                  className="relative flex h-9 w-full min-w-0 max-w-full cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]"
                   onMouseDown={(e) => {
                     if ((e.target as HTMLElement).closest("button")) return;
                     e.preventDefault();
@@ -1509,7 +1510,7 @@ const Catalogue = () => {
                 align="start"
                 side="bottom"
                 sideOffset={4}
-                className="w-[210px] p-0"
+                className="w-[var(--radix-popover-trigger-width)] p-0 sm:w-[210px]"
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
@@ -1547,7 +1548,7 @@ const Catalogue = () => {
                   role="combobox"
                   aria-expanded={expoFilterOpen}
                   aria-controls="catalogue-expo-suggestions"
-                  className="relative flex h-9 w-[210px] min-w-[210px] max-w-[210px] cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5"
+                  className="relative flex h-9 w-full min-w-0 max-w-full cursor-text items-center gap-1.5 rounded-md border border-input bg-white px-2.5 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]"
                   onMouseDown={(e) => {
                     if ((e.target as HTMLElement).closest("button")) return;
                     e.preventDefault();
@@ -1615,7 +1616,7 @@ const Catalogue = () => {
                 align="start"
                 side="bottom"
                 sideOffset={4}
-                className="w-[210px] p-0"
+                className="w-[var(--radix-popover-trigger-width)] p-0 sm:w-[210px]"
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >
                 <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
@@ -1645,17 +1646,17 @@ const Catalogue = () => {
             <p className="text-xs text-muted-foreground">{t("scope_expo_hint", { expoId: scope.expoId })}</p>
           )}
         </div>
-        <BackofficeStickyAgencyLogoSlot />
-        <div className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 md:w-auto md:max-w-[576px] md:justify-end">
+        <BackofficeStickyAgencyLogoSlot className="hidden md:flex" />
+        <div className="flex w-full min-w-0 shrink-0 flex-row flex-wrap items-center gap-2 md:w-auto md:max-w-[576px] md:justify-end">
           <Button
-            className="gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground shrink-0"
+            className="min-w-0 flex-1 gap-2 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground sm:flex-none sm:w-auto sm:shrink-0"
             onClick={() => openCreateArtwork()}
             disabled={planLimits?.isEtincelle && !planLimits.canCreateArtwork}
           >
             <Plus className="h-4 w-4" />
             {t("btn_new_artwork")}
           </Button>
-          <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn gap-2" asChild>
+          <Button type="button" variant="outline" className="backoffice-toolbar-outline-btn min-w-0 flex-1 gap-2 sm:flex-none sm:w-auto" asChild>
             <Link to="/catalogue/catalogue2">{t("btn_table_view")}</Link>
           </Button>
         </div>
@@ -1723,7 +1724,7 @@ const Catalogue = () => {
         </p>
       )}
 
-      <div className={cn("grid grid-cols-1 items-stretch gap-4 md:grid-cols-2", CATALOGUE_GRID_ROW_CLASS)}>
+      <div className={cn("grid grid-cols-1 items-stretch gap-4 pt-1 md:grid-cols-2 md:pt-0", CATALOGUE_GRID_ROW_CLASS)}>
         {loading && <p className="col-span-full text-sm text-muted-foreground text-center py-12">{t("loading_catalogue")}</p>}
         {filtered.length === 0 && !showScopeHint && !error && (
           <p className="col-span-full text-sm text-muted-foreground text-center py-12">
@@ -1803,7 +1804,7 @@ const Catalogue = () => {
               <Card
                 key={row.artwork_id}
                 className={cn(
-                  "relative flex flex-col overflow-hidden border-border bg-card/80 shadow-none backdrop-blur-xl hover:shadow-none",
+                  "relative flex flex-col overflow-visible border-border bg-card/80 shadow-none backdrop-blur-xl hover:shadow-none sm:overflow-hidden",
                   CATALOGUE_CARD_HEIGHT_CLASS,
                   selectedArtworkIds.has(row.artwork_id) && "ring-2 ring-[#E63946]/70",
                 )}
@@ -1824,7 +1825,7 @@ const Catalogue = () => {
                   </label>
                 </div>
                 <CardContent
-                  className={`relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-4 overflow-hidden p-4 sm:flex-row ${A11Y_CLICKABLE_FOCUS_CLASS}`}
+                  className={`relative flex h-full flex-1 cursor-pointer flex-col items-stretch gap-2 overflow-visible p-3 sm:flex-row sm:gap-4 sm:overflow-hidden sm:p-4 ${A11Y_CLICKABLE_FOCUS_CLASS}`}
                   role="button"
                   tabIndex={0}
                   onClick={() => openEditArtwork(row.artwork_id)}
@@ -1835,21 +1836,106 @@ const Catalogue = () => {
                     }
                   }}
                 >
-                  <div className="mx-auto flex w-full max-w-[150px] shrink-0 flex-col items-center gap-2 sm:mx-0 sm:w-[150px] sm:min-w-[150px]">
-                    <div className="flex shrink-0 flex-col pt-[10px] pb-[10px] items-center">
+                  {/* Mobile : photo à gauche + titre/artiste à droite ; sm+ : colonne photo */}
+                  <div className="flex w-full shrink-0 items-start gap-3 sm:w-[150px] sm:min-w-[150px] sm:flex-col sm:items-center sm:gap-2">
+                    <div className="flex shrink-0 flex-col items-center sm:pt-[10px] sm:pb-[10px]">
                       <img
                         src={rowImage}
                         alt={artworkDisplayTitle(row, i18n.language, t("artwork_untitled"))}
-                        className="h-[150px] w-[150px] rounded-xl object-cover shrink-0"
+                        className="h-[96px] w-[96px] shrink-0 rounded-xl object-cover sm:h-[150px] sm:w-[150px]"
                       />
                     </div>
+
+                    <div className="flex min-w-0 flex-1 flex-col justify-start gap-0.5 pt-0.5 sm:hidden">
+                      <h3 className="min-w-0 w-full truncate text-left font-serif text-base font-bold leading-tight">
+                        {artworkDisplayTitle(row, i18n.language, t("artwork_untitled"))}
+                      </h3>
+                      <p className="min-w-0 w-full truncate text-left text-sm italic leading-tight text-primary">
+                        {rowArtistLabel}
+                      </p>
+                      <div
+                        className="pointer-events-auto mt-1 inline-flex min-w-0 max-w-full items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <label className="inline-flex items-center gap-2 text-xs text-foreground">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-[#E63946]"
+                            checked={rowIsActive}
+                            disabled={updatingArtworkStatusId === row.artwork_id || rowIsDraft}
+                            onChange={(e) => {
+                              void updateArtworkStatus(row.artwork_id, e.target.checked);
+                            }}
+                          />
+                        </label>
+                        <span className="min-w-0 truncate text-xs font-semibold text-foreground">{rowStatusLabel}</span>
+                      </div>
+                      <div
+                        className="mt-1.5 flex w-full min-w-0 flex-col gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-[10px] leading-tight text-muted-foreground">
+                          {t("expo_selector_move_label")}
+                        </span>
+                        <Select
+                          value={rowSelectedExpoValue}
+                          onValueChange={(value) => {
+                            requestExpoMove(
+                              row.artwork_id,
+                              row.artwork_title,
+                              rowSelectedExpo?.id ?? null,
+                              value === "__none__" ? null : value,
+                            );
+                          }}
+                          disabled={isAssigningExpo}
+                        >
+                          <SelectTrigger className="h-7 w-full px-1.5 text-[11px] rounded-none border border-input bg-background shadow-none hover:bg-background [&>span]:min-w-0 [&>span]:truncate">
+                            <SelectValue placeholder={t("expo_selector_placeholder")} />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-none shadow-none z-[60]">
+                            <SelectItem value="__none__" className="text-xs">
+                              <span className="italic">{t("expo_selector_none")}</span>
+                            </SelectItem>
+                            {rowExpoOptions.length > 0 ? (
+                              rowExpoOptions.map((expo) => (
+                                <SelectItem key={expo.id} value={expo.id} className="text-xs">
+                                  {expo.name}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="__empty__" disabled className="text-xs">
+                                {t("expo_selector_empty")}
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {expoUndoByArtwork[row.artwork_id] !== undefined ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 w-full gap-1 px-1.5 text-[10px]"
+                            disabled={isAssigningExpo}
+                            aria-label={t("expo_move_undo_aria")}
+                            onClick={() => void undoExpoMove(row.artwork_id)}
+                          >
+                            <Undo2 className="h-3 w-3 shrink-0" aria-hidden />
+                            {t("expo_move_undo")}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
                     <div
-                      className="flex w-full max-w-[150px] flex-col gap-1"
+                      className="hidden w-full max-w-[150px] flex-col gap-1 sm:flex"
                       onClick={(e) => e.stopPropagation()}
                       onPointerDown={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                     >
-                      <span className="text-[10px] leading-tight text-muted-foreground text-center">
+                      <span className="text-center text-[10px] leading-tight text-muted-foreground">
                         {t("expo_selector_move_label")}
                       </span>
                       <Select
@@ -1903,8 +1989,8 @@ const Catalogue = () => {
                     </div>
                   </div>
 
-                  <div className="relative flex min-w-0 flex-1 flex-col gap-3 sm:min-h-[156px] sm:gap-0">
-                    <div className="flex min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20">
+                  <div className="relative flex min-w-0 flex-1 flex-col gap-2 sm:min-h-[156px] sm:gap-0">
+                    <div className="hidden min-w-0 w-full flex-col sm:pointer-events-none sm:absolute sm:inset-x-0 sm:top-0 sm:z-20 sm:flex">
                       <h3 className="min-w-0 w-full truncate font-serif text-lg font-bold">
                         {artworkDisplayTitle(row, i18n.language, t("artwork_untitled"))}
                       </h3>
@@ -1929,15 +2015,15 @@ const Catalogue = () => {
                       </div>
                     </div>
 
-                    <div className="relative z-0 flex w-full min-w-0 flex-col gap-3 sm:min-h-[156px] sm:flex-1 sm:gap-0">
+                    <div className="relative z-0 flex w-full min-w-0 flex-col gap-2 sm:min-h-[156px] sm:flex-1 sm:gap-0">
                       <div
-                        className="flex w-full flex-col gap-2 sm:ml-auto sm:w-[120px] sm:max-w-full sm:pt-[35px]"
+                        className="flex w-full flex-wrap gap-2 sm:mx-0 sm:ml-auto sm:w-[120px] sm:max-w-full sm:flex-col sm:flex-nowrap sm:gap-2 sm:pt-[35px]"
                         onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
                       >
                         {deck && deck.total > 1 ? (
                           <span
-                            className="text-center text-sm font-semibold tabular-nums text-amber-300"
+                            className="w-full basis-full text-center text-sm font-semibold tabular-nums text-amber-300"
                             aria-label={t("group_deck_position", {
                               current: deck.index + 1,
                               total: deck.total,
@@ -1953,7 +2039,7 @@ const Catalogue = () => {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="w-full justify-center"
+                          className="h-9 min-w-0 flex-1 justify-center px-2 text-xs sm:h-9 sm:w-full sm:flex-none sm:text-sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             openCartelFormatDialog(row);
@@ -1963,7 +2049,7 @@ const Catalogue = () => {
                         </Button>
                         <Button
                           type="button"
-                          className="w-full justify-center gap-2 px-4 text-[14px] gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none"
+                          className="h-9 min-w-0 flex-1 justify-center gap-1 px-2 text-xs gradient-gold gradient-gold-hover-bg text-primary-foreground !shadow-none sm:h-10 sm:w-full sm:flex-none sm:gap-2 sm:px-4 sm:text-[14px]"
                           onClick={(e) => {
                             e.stopPropagation();
                             void (async () => {
@@ -1981,14 +2067,26 @@ const Catalogue = () => {
                       </div>
                       <div
                         className={cn(
-                          "flex w-full shrink-0 flex-col items-stretch gap-2 sm:ml-auto sm:mt-auto sm:pt-3",
+                          "grid w-full grid-cols-2 gap-1.5 sm:ml-auto sm:mt-auto sm:flex sm:max-w-none sm:flex-col sm:gap-2 sm:pt-3",
                           CATALOG_IA_BADGE_WIDTH_CLASS,
                         )}
                       >
-                        <span className={cn(catalogIaBadgeClass, rowHasImageAnalysis ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white")}>
+                        <span
+                          className={cn(
+                            catalogIaBadgeClass,
+                            "h-full whitespace-normal break-words sm:whitespace-nowrap",
+                            rowHasImageAnalysis ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white",
+                          )}
+                        >
                           {t(rowHasImageAnalysis ? "badge_ia_image_yes" : "badge_ia_image_no")}
                         </span>
-                        <span className={cn(catalogIaBadgeClass, rowHasMediation ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white")}>
+                        <span
+                          className={cn(
+                            catalogIaBadgeClass,
+                            "h-full whitespace-normal break-words sm:whitespace-nowrap",
+                            rowHasMediation ? "border-emerald-300 bg-emerald-50 text-emerald-700" : "border-[#E63946] bg-[#E63946] text-white",
+                          )}
+                        >
                           {t("badge_ia_mediation", { count: rowTextsCount, langs: rowMediationLangs })}
                         </span>
                         <span
@@ -1996,6 +2094,7 @@ const Catalogue = () => {
                           tabIndex={rowHasVoices ? 0 : undefined}
                           className={cn(
                             catalogIaBadgeClass,
+                            "h-full whitespace-normal break-words sm:whitespace-nowrap",
                             !rowHasVoices
                               ? "border-muted-foreground/30 bg-muted/40 text-muted-foreground"
                               : rowVoiceGenerating
@@ -2016,12 +2115,15 @@ const Catalogue = () => {
                               : undefined
                           }
                         >
-                          <span className="min-w-0 truncate">
-                            {rowVoiceBadgeLabel}
-                          </span>
+                          <span className="min-w-0 sm:truncate">{rowVoiceBadgeLabel}</span>
                         </span>
                         {isGlobalCostViewer ? (
-                          <span className={cn(catalogIaBadgeClass, "border-destructive/30 bg-destructive/5 tabular-nums")}>
+                          <span
+                            className={cn(
+                              catalogIaBadgeClass,
+                              "h-full whitespace-normal break-words border-destructive/30 bg-destructive/5 tabular-nums sm:whitespace-nowrap",
+                            )}
+                          >
                             <EntityCostLabel
                               display={resolveEntityCostDisplay(
                                 costsReady ? costByArtworkId[row.artwork_id] : undefined,
@@ -2033,7 +2135,7 @@ const Catalogue = () => {
                             />
                           </span>
                         ) : (
-                          <span className="block h-8 shrink-0" aria-hidden />
+                          <span className="hidden sm:block sm:h-8" aria-hidden />
                         )}
                       </div>
                     </div>

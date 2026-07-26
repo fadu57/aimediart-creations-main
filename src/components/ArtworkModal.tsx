@@ -37,6 +37,7 @@ import {
   type MediationVoiceFillState,
 } from "@/services/audioService";
 import { AudioPlayer } from "@/components/AudioPlayer";
+import { playbackRateForMediationStyle } from "@/lib/mediationAudioPlaybackRate";
 import { MediationPersonaAudioDialog } from "@/components/MediationPersonaAudioDialog";
 import { generatePersonasBatchWithRetry } from "@/lib/mediationBatchGenerate";
 import { analyzeArtworkImage, type ImageAnalysisPersonaItem } from "@/services/imageAnalysisService";
@@ -3567,6 +3568,7 @@ export function ArtworkModal({
                       lang={mediationEditLang}
                       prompt_style_id={tab.promptStyleId}
                       variant="onLight"
+                      playbackRate={playbackRateForMediationStyle(tab.key)}
                       generateDisabled={isEtincellePlan}
                       generateDisabledHint={isEtincellePlan ? ETINCELLE_UI.audioBlocked : undefined}
                       onGenerateClick={() =>

@@ -219,7 +219,7 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
             size="sm"
             className="shrink-0"
           />
-          <div className={cn("relative min-w-0 flex-1", onPrintCartel && !reorderMode && "pr-[7.25rem]")}>
+          <div className={cn("relative min-w-0 flex-1", onPrintCartel && !reorderMode && "sm:pr-[7.25rem]")}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">
                 <Layers className="h-3 w-3 shrink-0" aria-hidden />
@@ -254,7 +254,7 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
                 type="button"
                 variant="outline"
                 size="sm"
-                className="absolute right-0 top-0 h-auto w-[6.75rem] flex-col items-center justify-center gap-0 whitespace-normal border-amber-500/50 bg-white px-2 py-1.5 text-center text-[11px] font-black leading-tight text-black hover:bg-white hover:text-black"
+                className="mt-2 h-auto w-full flex-col items-center justify-center gap-0 whitespace-normal border-amber-500/50 bg-white px-2 py-1.5 text-center text-[11px] font-black leading-tight text-black hover:bg-white hover:text-black sm:absolute sm:right-0 sm:top-0 sm:mt-0 sm:w-[6.75rem]"
                 onClick={onPrintCartel}
               >
                 <span className="block w-full">{t("btn_print_cartel_group_line1")}</span>
@@ -414,49 +414,58 @@ export function CatalogueArtworkGroupDeck<T extends { artwork_id: string; artwor
       </div>
 
       {!reorderMode ? (
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-xl p-2">
-          {count > 1 ? (
-            <>
-              <div
-                className="pointer-events-none absolute inset-x-0 top-0 z-20 h-10 rounded-t-xl"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-14 rounded-b-xl bg-gradient-to-t from-[#241a0c] via-[#241a0c]/90 to-transparent"
-                aria-hidden
-              />
-              <p className="relative z-10 mb-2 flex shrink-0 items-center justify-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-amber-200/90 sm:text-xs">
-                <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
-                {t("group_deck_scroll_hint")}
-                <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
-              </p>
-            </>
-          ) : null}
-          <div
-            ref={scrollRef}
-            onScroll={handleDeckScroll}
-            style={{ height: count > 1 ? CATALOGUE_DECK_VIEWPORT_PX : undefined }}
-            className={cn(
-              "relative z-0 min-h-0 w-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain scroll-smooth",
-              count > 1
-                ? "cursor-ns-resize [scrollbar-width:thin] [scrollbar-color:rgba(217,150,60,0.7)_transparent]"
-                : "overflow-y-hidden",
-              count === 1 && CATALOGUE_CARD_HEIGHT_CLASS,
-            )}
-            aria-label={t("group_deck_scroll_label")}
-          >
-            {displayedArtworks.map((aw, index) => (
-              <div
-                key={aw.artwork_id}
-                className={cn("relative shrink-0 snap-start snap-always px-1", CATALOGUE_CARD_HEIGHT_CLASS)}
-                style={{ marginBottom: index < count - 1 ? CATALOGUE_DECK_SLIDE_GAP_PX : 0 }}
-              >
-                {renderStackLayers(index)}
-                <div className="relative z-10 h-full">{renderCard(aw, { index, total: count })}</div>
-              </div>
-            ))}
+        <>
+          {/* Mobile : carte active à hauteur naturelle (pas de carrousel à hauteur fixe). */}
+          <div className="relative min-w-0 sm:hidden">
+            {count > 1 ? renderStackLayers(safeIndex) : null}
+            <div className="relative z-10">{renderCard(activeArtwork, { index: safeIndex, total: count })}</div>
           </div>
-        </div>
+
+          {/* sm+ : carrousel vertical avec aperçu de la carte suivante. */}
+          <div className="relative hidden min-h-0 min-w-0 flex-1 flex-col rounded-xl p-2 sm:flex">
+            {count > 1 ? (
+              <>
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 z-20 h-10 rounded-t-xl"
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-14 rounded-b-xl bg-gradient-to-t from-[#241a0c] via-[#241a0c]/90 to-transparent"
+                  aria-hidden
+                />
+                <p className="relative z-10 mb-2 flex shrink-0 items-center justify-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-amber-200/90 sm:text-xs">
+                  <ArrowUp className="h-3 w-3 shrink-0" aria-hidden />
+                  {t("group_deck_scroll_hint")}
+                  <ArrowDown className="h-3 w-3 shrink-0" aria-hidden />
+                </p>
+              </>
+            ) : null}
+            <div
+              ref={scrollRef}
+              onScroll={handleDeckScroll}
+              style={{ height: count > 1 ? CATALOGUE_DECK_VIEWPORT_PX : undefined }}
+              className={cn(
+                "relative z-0 min-h-0 w-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain scroll-smooth",
+                count > 1
+                  ? "cursor-ns-resize [scrollbar-width:thin] [scrollbar-color:rgba(217,150,60,0.7)_transparent]"
+                  : "overflow-y-hidden",
+                count === 1 && CATALOGUE_CARD_HEIGHT_CLASS,
+              )}
+              aria-label={t("group_deck_scroll_label")}
+            >
+              {displayedArtworks.map((aw, index) => (
+                <div
+                  key={aw.artwork_id}
+                  className={cn("relative shrink-0 snap-start snap-always px-1", CATALOGUE_CARD_HEIGHT_CLASS)}
+                  style={{ marginBottom: index < count - 1 ? CATALOGUE_DECK_SLIDE_GAP_PX : 0 }}
+                >
+                  {renderStackLayers(index)}
+                  <div className="relative z-10 h-full">{renderCard(aw, { index, total: count })}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       ) : (
         <p className="rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-2 text-center text-xs text-amber-100">
           {t("group_deck_reorder_active")}
