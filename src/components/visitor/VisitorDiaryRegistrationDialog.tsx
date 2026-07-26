@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, X } from "lucide-react";
@@ -181,7 +182,21 @@ export function VisitorDiaryRegistrationDialog({
           },
         });
 
-        if (fnErr) throw new Error(fnErr.message);
+        if (fnErr) {
+          let msg = fnErr.message;
+          if (fnErr instanceof FunctionsHttpError) {
+            try {
+              const body = (await (fnErr.context as Response).clone().json()) as {
+                error?: string;
+                code?: string;
+              };
+              if (body?.error) msg = body.error;
+            } catch {
+              /* ignore */
+            }
+          }
+          throw new Error(msg);
+        }
 
         const payload = data as {
           ok?: boolean;

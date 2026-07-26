@@ -448,6 +448,82 @@ serve(async (req: Request) => {
   const userPrenom = prenom;
   const fullName = `${prenom} ${nom}`.trim();
 
+  // Même navigateur déjà lié à un compte auth → ne pas créer un 2ᵉ profil (évite Roro×N).
+  if (visitorUuid) {
+    const { data: linkedRow } = await admin
+      .from("visitors")
+      .select("auth_user_id")
+      .eq("visitor_client_id", visitorUuid)
+      .not("auth_user_id", "is", null)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    const linkedAuthId =
+      linkedRow && typeof linkedRow === "object" && "auth_user_id" in linkedRow
+        ? String((linkedRow as { auth_user_id?: string | null }).auth_user_id ?? "").trim()
+        : "";
+
+    if (linkedAuthId) {
+      const { data: linkedProfile } = await admin
+        .from("profiles")
+        .select("id, deleted_at")
+        .eq("id", linkedAuthId)
+        .maybeSingle();
+      const stillActive =
+        linkedProfile &&
+        typeof linkedProfile === "object" &&
+        !(linkedProfile as { deleted_at?: string | null }).deleted_at;
+
+      if (stillActive) {
+        return jsonResponse(409, {
+          ok: false,
+          code: "visitor_already_registered",
+          error:
+            "Ce navigateur est déjà lié à un compte visiteur. Connectez-vous avec l’e-mail déjà utilisé, au lieu de créer un nouveau compte.",
+          user_id: linkedAuthId,
+        });
+      }
+    }
+  }
+
+  if (deviceFingerprint) {
+    const { data: fpLinked } = await admin
+      .from("visitors")
+      .select("auth_user_id")
+      .or(`device_fingerprint.eq.${deviceFingerprint},fingerprint.eq.${deviceFingerprint}`)
+      .not("auth_user_id", "is", null)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    const fpAuthId =
+      fpLinked && typeof fpLinked === "object" && "auth_user_id" in fpLinked
+        ? String((fpLinked as { auth_user_id?: string | null }).auth_user_id ?? "").trim()
+        : "";
+
+    if (fpAuthId) {
+      const { data: fpProfile } = await admin
+        .from("profiles")
+        .select("id, deleted_at")
+        .eq("id", fpAuthId)
+        .maybeSingle();
+      const stillActive =
+        fpProfile &&
+        typeof fpProfile === "object" &&
+        !(fpProfile as { deleted_at?: string | null }).deleted_at;
+
+      if (stillActive) {
+        return jsonResponse(409, {
+          ok: false,
+          code: "visitor_already_registered",
+          error:
+            "Cet appareil est déjà lié à un compte visiteur. Connectez-vous avec l’e-mail déjà utilisé, au lieu de créer un nouveau compte.",
+          user_id: fpAuthId,
+        });
+      }
+    }
+  }
+
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
     password,

@@ -290,7 +290,9 @@
   .visitor-page-shell {
     width: 375px !important;
     margin: 0 auto !important;
-    overflow-x: hidden !important;
+    /* clip (pas hidden) : évite overflow-y:auto implicite qui coupe Voix F/M sur Safari iOS */
+    overflow-x: clip !important;
+    overflow-y: visible !important;
   }
 
   .œuvre-page-container {
@@ -300,23 +302,30 @@
     padding-right: 0 !important;
     box-sizing: border-box !important;
     background-color: #121212 !important;
+    overflow: visible !important;
   }
 
   .œuvre-full-width-box {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
+    overflow: visible !important;
   }
 
   /**
-   * Carrousel médiation (page œuvre) : Safari iOS clippe agressivement le contenu
-   * hors slide. On laisse un peu d’air en haut (pt slide) pour les boutons voix
-   * ancrés sur le trait du bloc, sans overflow:hidden sur le slide.
+   * Carrousel médiation : Voix F/M en absolute sur le bord haut de la carte.
+   * padding-top = zone visible DANS overflow:hidden (Safari iOS).
+   * Pas de margin-top négatif : ça recouvrait le titre « comment l'IA doit vous parler ».
    */
   .œuvre-mediation-swiper {
     overflow: hidden;
     width: 100%;
-    padding-top: 2px;
+    /* Assez d’air pour Voix F/M (moitié hors carte) sans les tronquer */
+    padding-top: 4px;
+    margin-top: 0;
+  }
+  .œuvre-mediation-swiper .swiper-wrapper {
+    overflow: visible;
   }
   .œuvre-mediation-swiper .swiper-slide {
     box-sizing: border-box;
@@ -326,6 +335,7 @@
   .œuvre-mediation-swiper .swiper-slide > article {
     max-width: 100%;
     box-sizing: border-box;
+    overflow: visible;
   }
 
   .œuvre-fixed-header {

@@ -479,7 +479,7 @@ export function AudioPlayer({
 
     variant === "onLight"
 
-      ? "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100"
+      ? "border-neutral-300 bg-white text-black hover:bg-neutral-100"
 
       : "border-white/30 bg-[#2A2A2A] text-[#F0F0F0] hover:bg-[#353535]";
 

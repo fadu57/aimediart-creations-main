@@ -17,6 +17,7 @@ import { endVisitorExpoVisit, resolveStoredVisitorExpoIdsFromSession, resolveVis
 import { isDiaryProfileComplete, markDiaryUnlocked } from "@/lib/visitorDiaryAccess";
 import { fetchExpoRowForVisitor, mapExpoRowToInfo } from "@/lib/visitorExpoFetch";
 import { AGENCY_NAME_MISSING } from "@/lib/resolveAgencyName";
+import { highlightAimediartCom } from "@/lib/highlightAimediartCom";
 import { supabase } from "@/lib/supabase";
 import { resolveFeedbackVisitorId } from "@/lib/registerAnonymousVisitorSession";
 import { readOAuthNameParts, VISITOR_DIARY_OAUTH_FLAG } from "@/lib/visitorOAuth";
@@ -249,16 +250,15 @@ export function useVisitorExitDiaryFlow({
           ) : null}
           <div className="mx-auto w-[200px] text-left text-sm font-semibold leading-[23px] text-black">
             <p>
-              <Trans
-                i18nKey={hasAgencyThanksName ? "exit_thanks_with_agency" : "exit_thanks_solo"}
-                ns="visitor"
-                values={{ agency: effectiveAgencyThanksName }}
-                components={{ brand: <span className="font-bold text-[#E63946]" /> }}
-              />
+              {highlightAimediartCom(
+                t(hasAgencyThanksName ? "exit_thanks_with_agency" : "exit_thanks_solo", {
+                  agency: effectiveAgencyThanksName,
+                }),
+              )}
             </p>
-            <p className="mt-2">{t("exit_presented_expo")}</p>
-            <p className="mt-2">{t("exit_see_you_soon")}</p>
-            <p className="mt-2">{t("exit_goodbye")}</p>
+            <p className="mt-2">{highlightAimediartCom(t("exit_presented_expo"))}</p>
+            <p className="mt-2">{highlightAimediartCom(t("exit_see_you_soon"))}</p>
+            <p className="mt-2">{highlightAimediartCom(t("exit_goodbye"))}</p>
           </div>
           <div className="relative mt-4">
             <span className="visitor-exit-gift-burst" aria-hidden>

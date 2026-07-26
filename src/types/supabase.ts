@@ -792,6 +792,53 @@ export interface Database {
         };
         Returns: boolean;
       };
+      soft_delete_visitor: {
+        Args: {
+          p_id: string;
+          p_source: string;
+        };
+        Returns: Json;
+      };
+      restore_visitor: {
+        Args: {
+          p_id: string;
+          p_source: string;
+        };
+        Returns: Json;
+      };
+      list_backoffice_anonymous_visitors: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          id: string;
+          visitor_pseudo: string | null;
+          last_seen_at: string | null;
+          auth_user_id: string | null;
+          fingerprint: string | null;
+          device_fingerprint: string | null;
+          avatar_url: string | null;
+          selfie_url: string | null;
+        }>;
+      };
+      list_backoffice_profile_selfies: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          profile_id: string;
+          selfie_url: string | null;
+          visitor_id: string | null;
+        }>;
+      };
+      list_backoffice_trashed_visitors: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          id: string;
+          source: string;
+          first_name: string | null;
+          last_name: string | null;
+          pseudo: string | null;
+          deleted_at: string | null;
+          auth_user_id: string | null;
+        }>;
+      };
       patch_visitor_feedback_age: {
         Args: {
           p_visitor_id: string;

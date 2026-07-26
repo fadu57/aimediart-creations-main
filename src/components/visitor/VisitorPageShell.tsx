@@ -245,7 +245,7 @@ export function VisitorPageShell({
   return (
     <div
       className={cn(
-        "visitor-page-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#F0F0F0]",
+        "visitor-page-shell min-h-screen overflow-x-clip bg-[#121212] text-[#F0F0F0]",
         isEmbedded && "embedded-view",
         className,
       )}

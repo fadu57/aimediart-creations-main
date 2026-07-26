@@ -59,7 +59,7 @@ export default function CatalogueCorbeille() {
     try {
       const { error } = await supabase
         .from("artworks")
-        .update({ deleted_at: null })
+        .update({ deleted_at: null, artwork_deleted_at: null })
         .eq("artwork_id", artworkId);
       if (error) throw error;
       toast.success(t("success_restore"));

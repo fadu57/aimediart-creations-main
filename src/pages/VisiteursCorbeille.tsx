@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArchiveRestore, ArrowLeft } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
+import { restoreVisitor } from "@/lib/visitorSoftDelete";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useRetentionSettings } from "@/hooks/useRetentionSettings";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,12 @@ type VisitorTrashRow = {
   pseudo?: string | null;
   expo_id?: string | null;
   deleted_at?: string | null;
+  auth_user_id?: string | null;
 };
 
 export default function VisiteursCorbeille() {
   const { t } = useTranslation("trash");
-  const { loading: authLoading, role_id: currentRoleId, agency_id: currentAgencyId } = useAuthUser();
+  const { loading: authLoading, role_id: currentRoleId } = useAuthUser();
   const canAccess = typeof currentRoleId === "number" && currentRoleId >= 1 && currentRoleId <= 4;
   const canRestore = typeof currentRoleId === "number" && currentRoleId < 4;
 
@@ -39,20 +41,7 @@ export default function VisiteursCorbeille() {
   const loadTrash = useCallback(async () => {
     setLoading(true);
 
-    const [{ data: exposData }, { data: anonData, error: anonErr }, { data: agencyRows }] = await Promise.all([
-      supabase.from("expos").select("id, expo_name"),
-      supabase
-        .from("visitors")
-        .select("id, visitor_pseudo, deleted_at")
-        .not("deleted_at", "is", null)
-        .order("deleted_at", { ascending: true }),
-      supabase.from("agency_users").select("user_id, agency_id").eq("role_id", 7),
-    ]);
-
-    if (anonErr) {
-      toast.error(anonErr.message);
-    }
-
+    const { data: exposData } = await supabase.from("expos").select("id, expo_name");
     setExpoById(
       new Map(
         ((exposData ?? []) as Array<{ id: string; expo_name?: string | null }>).map((e) => [
@@ -62,69 +51,117 @@ export default function VisiteursCorbeille() {
       ),
     );
 
-    const agencyByUser = new Map(
-      ((agencyRows ?? []) as Array<{ user_id?: string | null; agency_id?: string | null }>)
-        .filter((r) => r.user_id)
-        .map((r) => [String(r.user_id), r.agency_id?.trim() || null]),
+    const { data: trashData, error: trashErr } = await supabase.rpc("list_backoffice_trashed_visitors");
+
+    if (trashErr) {
+      // Repli si RPC absente : anciennes requêtes (peuvent rester vides sous RLS)
+      console.warn("[VisiteursCorbeille] RPC trash :", trashErr.message);
+      const [{ data: anonData }, { data: profileData }] = await Promise.all([
+        supabase
+          .from("visitors")
+          .select("id, visitor_pseudo, deleted_at, auth_user_id")
+          .not("deleted_at", "is", null)
+          .order("deleted_at", { ascending: true }),
+        supabase
+          .from("profiles")
+          .select("id, first_name, last_name, username, deleted_at")
+          .not("deleted_at", "is", null)
+          .order("deleted_at", { ascending: true }),
+      ]);
+
+      const profileRows: VisitorTrashRow[] = ((profileData ?? []) as Array<{
+        id?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        username?: string | null;
+        deleted_at?: string | null;
+      }>).map((p) => ({
+        id: String(p.id ?? ""),
+        source: "profiles" as const,
+        first_name: p.first_name ?? null,
+        last_name: p.last_name ?? null,
+        pseudo: p.username ?? null,
+        deleted_at: p.deleted_at ?? null,
+      })).filter((r) => r.id);
+
+      const profileIds = new Set(profileRows.map((r) => r.id));
+      const anonRows: VisitorTrashRow[] = ((anonData ?? []) as Array<{
+        id?: string | null;
+        visitor_pseudo?: string | null;
+        deleted_at?: string | null;
+        auth_user_id?: string | null;
+      }>).map((v) => ({
+        id: String(v.id ?? ""),
+        source: "visitors" as const,
+        first_name: t("anonymous"),
+        last_name: null,
+        pseudo: v.visitor_pseudo?.trim() || null,
+        deleted_at: v.deleted_at ?? null,
+        auth_user_id: v.auth_user_id?.trim() || null,
+      })).filter((r) => {
+        if (!r.id) return false;
+        const authId = r.auth_user_id?.trim();
+        return !authId || !profileIds.has(authId);
+      });
+
+      setRows(
+        [...profileRows, ...anonRows].sort((a, b) => {
+          const da = a.deleted_at ? new Date(a.deleted_at).getTime() : 0;
+          const db = b.deleted_at ? new Date(b.deleted_at).getTime() : 0;
+          return da - db;
+        }),
+      );
+      setLoading(false);
+      return;
+    }
+
+    type TrashRpcRow = {
+      id?: string | null;
+      source?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+      pseudo?: string | null;
+      deleted_at?: string | null;
+      auth_user_id?: string | null;
+    };
+
+    const raw = (trashData ?? []) as TrashRpcRow[];
+    const profileIds = new Set(
+      raw.filter((r) => r.source === "profiles" && r.id).map((r) => String(r.id)),
     );
 
-    let visitorUserIds = [...agencyByUser.keys()];
-    if (currentRoleId === 4 && currentAgencyId) {
-      const agency = currentAgencyId.trim();
-      visitorUserIds = visitorUserIds.filter((id) => agencyByUser.get(id) === agency);
-    }
+    const mapped: VisitorTrashRow[] = raw
+      .map((r): VisitorTrashRow | null => {
+        const id = String(r.id ?? "").trim();
+        if (!id) return null;
+        const source = r.source === "visitors" ? "visitors" : "profiles";
+        if (source === "visitors") {
+          const authId = r.auth_user_id?.trim() || null;
+          if (authId && profileIds.has(authId)) return null;
+          return {
+            id,
+            source,
+            first_name: t("anonymous"),
+            last_name: null,
+            pseudo: r.pseudo?.trim() || null,
+            deleted_at: r.deleted_at ?? null,
+            auth_user_id: authId,
+          };
+        }
+        return {
+          id,
+          source,
+          first_name: r.first_name ?? null,
+          last_name: r.last_name ?? null,
+          pseudo: r.pseudo?.trim() || null,
+          deleted_at: r.deleted_at ?? null,
+        };
+      })
+      .filter((r): r is VisitorTrashRow => Boolean(r));
 
-    let profileRows: VisitorTrashRow[] = [];
-    if (visitorUserIds.length > 0) {
-      const { data: profileData, error: profileErr } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, username, deleted_at")
-        .in("id", visitorUserIds)
-        .not("deleted_at", "is", null)
-        .order("deleted_at", { ascending: true });
-
-      if (profileErr) {
-        toast.error(profileErr.message);
-      } else {
-        profileRows = ((profileData ?? []) as Array<{
-          id?: string | null;
-          first_name?: string | null;
-          last_name?: string | null;
-          username?: string | null;
-          deleted_at?: string | null;
-        }>).map((p) => ({
-          id: String(p.id ?? ""),
-          source: "profiles" as const,
-          first_name: p.first_name ?? null,
-          last_name: p.last_name ?? null,
-          pseudo: p.username ?? null,
-          deleted_at: p.deleted_at ?? null,
-        })).filter((r) => r.id);
-      }
-    }
-
-    const anonTrash: VisitorTrashRow[] = ((anonData ?? []) as Array<{
-      id?: string | null;
-      visitor_pseudo?: string | null;
-      deleted_at?: string | null;
-    }>).map((v) => ({
-      id: String(v.id ?? ""),
-      source: "visitors" as const,
-      first_name: t("anonymous"),
-      last_name: null,
-      pseudo: v.visitor_pseudo?.trim() || null,
-      deleted_at: v.deleted_at ?? null,
-    })).filter((r) => r.id);
-
-    const merged = [...profileRows, ...anonTrash].sort((a, b) => {
-      const da = a.deleted_at ? new Date(a.deleted_at).getTime() : 0;
-      const db = b.deleted_at ? new Date(b.deleted_at).getTime() : 0;
-      return da - db;
-    });
-
-    setRows(merged);
+    setRows(mapped);
     setLoading(false);
-  }, [currentRoleId, currentAgencyId, t]);
+  }, [t]);
 
   useEffect(() => {
     if (!canAccess) return;
@@ -133,13 +170,9 @@ export default function VisiteursCorbeille() {
 
   const handleRestore = async (row: VisitorTrashRow) => {
     if (!canRestore) return;
-    const table = row.source === "visitors" ? "visitors" : "profiles";
-    const { error } = await supabase
-      .from(table)
-      .update({ deleted_at: null })
-      .eq("id", row.id);
-    if (error) {
-      toast.error(error.message || t("error_restore"));
+    const result = await restoreVisitor(row.id, row.source);
+    if (!result.ok) {
+      toast.error(result.message || t("error_restore"));
       return;
     }
     toast.success(t("success_restore"));
@@ -165,7 +198,6 @@ export default function VisiteursCorbeille() {
         </Button>
       </div>
 
-      {/* Paramètres de rétention (édition admin) */}
       <RetentionSettingCard tableNames={["visitors", "profiles"]} roleId={currentRoleId} />
 
       {loading ? (

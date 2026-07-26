@@ -182,7 +182,7 @@ function AppShell() {
       <main
         id="main-content"
         tabIndex={-1}
-        className={`flex min-w-0 flex-1 flex-col overflow-x-hidden bg-[#121212] outline-none ${
+        className={`flex min-w-0 flex-1 flex-col overflow-x-clip bg-[#121212] outline-none ${
           hideGlobalHeader ? "" : "scroll-mt-[4.25rem] pt-[4.25rem]"
         }`}
       >
@@ -204,7 +204,7 @@ function VisitorShell() {
 
 function AdminShell() {
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1600px] overflow-x-hidden text-[#F0F0F0]">
+    <div className="mx-auto w-full min-w-0 max-w-[1600px] overflow-x-clip text-[#F0F0F0]">
       <StandbyModeNavGuard />
     </div>
   );

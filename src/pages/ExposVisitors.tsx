@@ -15,9 +15,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
+import { softDeleteVisitor } from "@/lib/visitorSoftDelete";
 
 import { formatFrenchDateTime } from "@/lib/userLastSignIn";
 
@@ -32,7 +38,89 @@ type VisitorRow = {
   expo_id?: string | null;
   created_at?: string | null;
   deleted_at?: string | null;
+  auth_user_id?: string | null;
+  avatar_url?: string | null;
+  selfie_url?: string | null;
+  /** Nombre de comptes profils fusionnés sous le même nom (affichage). */
+  duplicate_accounts?: number;
 };
+
+function isHttpUrl(u: string | null | undefined): boolean {
+  const s = (u ?? "").trim();
+  return s.startsWith("http://") || s.startsWith("https://");
+}
+
+/** Uniquement le selfie (jamais l’avatar pool / profil). */
+function visitorSelfieUrl(row: VisitorRow): string | null {
+  if (isHttpUrl(row.selfie_url)) return row.selfie_url!.trim();
+  return null;
+}
+
+function profileNameKey(first?: string | null, last?: string | null): string | null {
+  const f = (first ?? "").trim().toLowerCase();
+  const l = (last ?? "").trim().toLowerCase();
+  if (!f && !l) return null;
+  // Ne pas fusionner les libellés génériques
+  if (f === "anonyme" || f === "anonymous") return null;
+  return `${f}|${l}`;
+}
+
+/** Une ligne par id, puis une ligne par nom complet identique (plusieurs auth.users de test). */
+function dedupeRegisteredProfiles(rows: VisitorRow[]): VisitorRow[] {
+  const byId = new Map<string, VisitorRow>();
+  for (const row of rows) {
+    const id = row.id.trim();
+    if (!id) continue;
+    const prev = byId.get(id);
+    if (!prev) {
+      byId.set(id, row);
+      continue;
+    }
+    // Même id (JOIN multi-agence) : garder la ligne la plus « riche »
+    const prevScore =
+      (prev.email ? 2 : 0) +
+      (prev.agency_id ? 1 : 0) +
+      (visitorSelfieUrl(prev) ? 3 : 0) +
+      (prev.created_at || "").length;
+    const nextScore =
+      (row.email ? 2 : 0) +
+      (row.agency_id ? 1 : 0) +
+      (visitorSelfieUrl(row) ? 3 : 0) +
+      (row.created_at || "").length;
+    if (nextScore > prevScore) byId.set(id, row);
+  }
+
+  const byName = new Map<string, VisitorRow>();
+  const noName: VisitorRow[] = [];
+  for (const row of byId.values()) {
+    const key = profileNameKey(row.first_name, row.last_name);
+    if (!key) {
+      noName.push(row);
+      continue;
+    }
+    const prev = byName.get(key);
+    if (!prev) {
+      byName.set(key, { ...row, duplicate_accounts: 1 });
+      continue;
+    }
+    const prevTs = prev.created_at || "";
+    const nextTs = row.created_at || "";
+    const preferPhoto = !visitorSelfieUrl(prev) && visitorSelfieUrl(row);
+    const keep = preferPhoto || nextTs >= prevTs ? row : prev;
+    const drop = keep === row ? prev : row;
+    byName.set(key, {
+      ...keep,
+      email: keep.email || drop.email || null,
+      pseudo: keep.pseudo || drop.pseudo || null,
+      agency_id: keep.agency_id || drop.agency_id || null,
+      expo_id: keep.expo_id || drop.expo_id || null,
+      avatar_url: keep.avatar_url || drop.avatar_url || null,
+      selfie_url: keep.selfie_url || drop.selfie_url || null,
+      duplicate_accounts: (prev.duplicate_accounts ?? 1) + 1,
+    });
+  }
+  return [...byName.values(), ...noName];
+}
 
 type AgencyOption = { id: string; name_agency: string | null };
 type ExpoOption  = { id: string; expo_name: string | null };
@@ -80,6 +168,7 @@ export default function ExposVisitors() {
   const [filterDateTo, setFilterDateTo]     = useState("");
 
   const [deleteConfirmRow, setDeleteConfirmRow] = useState<VisitorRow | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<{ url: string; label: string } | null>(null);
   const canRestore = typeof currentRoleId === "number" && currentRoleId < 4;
 
   const agencyById = useMemo(
@@ -103,38 +192,78 @@ export default function ExposVisitors() {
     setAgencies((agenciesData as AgencyOption[] | null) ?? []);
     setExpos((exposData as ExpoOption[] | null) ?? []);
 
-    // ── 1. Visiteurs anonymes depuis public.visitors ──────────────────────────
-    const { data: anonData, error: anonErr } = await supabase
-      .from("visitors")
-      .select("id, visitor_name, visitor_pseudo, last_seen_at, deleted_at");
-
-    if (anonErr) {
-      console.warn("[ExposVisitors] visitors RLS/erreur :", anonErr.code, anonErr.message);
-    } else {
-      console.debug("[ExposVisitors] visitors count :", anonData?.length ?? 0);
-    }
-
+    // ── 1. Visiteurs anonymes (RPC backoffice, sinon SELECT direct) ───────────
     type AnonRow = {
       id?: string | null;
-      visitor_name?: string | null;
       visitor_pseudo?: string | null;
       last_seen_at?: string | null;
       deleted_at?: string | null;
+      auth_user_id?: string | null;
+      fingerprint?: string | null;
+      device_fingerprint?: string | null;
+      avatar_url?: string | null;
+      selfie_url?: string | null;
     };
-    const anonRows: VisitorRow[] = ((anonData ?? []) as AnonRow[])
-      .filter((v) => v.id && !v.deleted_at)
-      .map((v) => ({
-        id: String(v.id),
-        source: "visitors" as const,
-        first_name: t("visitors.anonymous"),
-        last_name: null,
-        pseudo: v.visitor_pseudo?.trim() || null,
-        email: null,
-        agency_id: null,
-        expo_id: null,
-        created_at: v.last_seen_at ?? null,
-        deleted_at: v.deleted_at ?? null,
-      }));
+
+    let anonRaw: AnonRow[] = [];
+    const { data: anonRpcData, error: anonRpcErr } = await supabase.rpc("list_backoffice_anonymous_visitors");
+    if (!anonRpcErr && Array.isArray(anonRpcData)) {
+      anonRaw = anonRpcData as AnonRow[];
+    } else {
+      if (anonRpcErr) {
+        console.warn("[ExposVisitors] list_backoffice_anonymous_visitors :", anonRpcErr.code, anonRpcErr.message);
+      }
+      const { data: anonData, error: anonErr } = await supabase
+        .from("visitors")
+        .select("id, visitor_pseudo, last_seen_at, deleted_at, auth_user_id, fingerprint, device_fingerprint, avatar_url, selfie_url")
+        .is("deleted_at", null);
+      if (anonErr) {
+        console.warn("[ExposVisitors] visitors RLS/erreur :", anonErr.code, anonErr.message);
+      }
+      anonRaw = (anonData ?? []) as AnonRow[];
+    }
+
+    const mapAnonRow = (v: AnonRow): VisitorRow & {
+      auth_user_id?: string | null;
+      fingerprint?: string | null;
+      device_fingerprint?: string | null;
+    } => ({
+      id: String(v.id),
+      source: "visitors" as const,
+      first_name: t("visitors.anonymous"),
+      last_name: null,
+      pseudo: v.visitor_pseudo?.trim() || null,
+      email: null,
+      agency_id: null,
+      expo_id: null,
+      created_at: v.last_seen_at ?? null,
+      deleted_at: v.deleted_at ?? null,
+      auth_user_id: v.auth_user_id?.trim() || null,
+      fingerprint: v.fingerprint?.trim() || null,
+      device_fingerprint: v.device_fingerprint?.trim() || null,
+      avatar_url: v.avatar_url?.trim() || null,
+      selfie_url: v.selfie_url?.trim() || null,
+    });
+
+    // Une ligne par identité (auth / fingerprint / device), la plus récente (préfère selfie)
+    const anonByIdentity = new Map<string, ReturnType<typeof mapAnonRow>>();
+    for (const raw of anonRaw) {
+      if (!raw.id || raw.deleted_at) continue;
+      const row = mapAnonRow(raw);
+      const key =
+        row.auth_user_id ||
+        (row.fingerprint ? `fp:${row.fingerprint}` : null) ||
+        (row.device_fingerprint ? `dfp:${row.device_fingerprint}` : null) ||
+        `id:${row.id}`;
+      const prev = anonByIdentity.get(key);
+      const prefer =
+        !prev ||
+        (isHttpUrl(row.selfie_url) && !isHttpUrl(prev.selfie_url)) ||
+        ((row.created_at || "") > (prev.created_at || "") && !(isHttpUrl(prev.selfie_url) && !isHttpUrl(row.selfie_url)));
+      if (prefer) anonByIdentity.set(key, row);
+    }
+    const anonRowsRaw = [...anonByIdentity.values()];
+    console.debug("[ExposVisitors] visitors actifs (dédup) :", anonRowsRaw.length);
 
     const { data: deletedProfiles } = await supabase
       .from("profiles")
@@ -146,6 +275,74 @@ export default function ExposVisitors() {
         .filter(Boolean) as string[],
     );
 
+    /** Selfie uniquement — via auth_user_id, empreinte appareil, ou meta user_photo_url type selfie. */
+    const enrichProfilesFromSelfies = async (registered: VisitorRow[]) => {
+      const selfieByProfileId = new Map<string, string>();
+      const linkedVisitorIds = new Set<string>();
+
+      const { data: selfieRpc, error: selfieErr } = await supabase.rpc("list_backoffice_profile_selfies");
+      if (selfieErr) {
+        console.warn("[ExposVisitors] list_backoffice_profile_selfies :", selfieErr.code, selfieErr.message);
+      } else if (Array.isArray(selfieRpc)) {
+        for (const row of selfieRpc as Array<{
+          profile_id?: string | null;
+          selfie_url?: string | null;
+          visitor_id?: string | null;
+        }>) {
+          const pid = row.profile_id?.trim();
+          const url = row.selfie_url?.trim();
+          if (pid && isHttpUrl(url) && !selfieByProfileId.has(pid)) {
+            selfieByProfileId.set(pid, url!);
+          }
+          const vid = row.visitor_id?.trim();
+          if (vid) linkedVisitorIds.add(vid);
+        }
+      }
+
+      // Fallback : sessions anonymes déjà chargées, liées par auth_user_id
+      for (const anon of anonRowsRaw) {
+        const authId = anon.auth_user_id?.trim();
+        if (!authId || !isHttpUrl(anon.selfie_url)) continue;
+        if (!selfieByProfileId.has(authId)) selfieByProfileId.set(authId, anon.selfie_url!.trim());
+        linkedVisitorIds.add(anon.id);
+      }
+
+      const enriched = registered.map((r) => {
+        const fromMap = selfieByProfileId.get(r.id);
+        const linkedAnon = anonRowsRaw.find((a) => a.auth_user_id?.trim() === r.id);
+        return {
+          ...r,
+          pseudo: r.pseudo?.trim() || linkedAnon?.pseudo || null,
+          selfie_url: r.selfie_url || fromMap || null,
+        };
+      });
+
+      return { enriched, linkedVisitorIds };
+    };
+
+    const mergeRegisteredAndAnon = async (registeredRaw: VisitorRow[]) => {
+      const allRegisteredIds = new Set(registeredRaw.map((r) => r.id));
+      const { enriched, linkedVisitorIds } = await enrichProfilesFromSelfies(registeredRaw);
+      const registered = dedupeRegisteredProfiles(enriched);
+
+      const anonRows = anonRowsRaw.filter((a) => {
+        if (linkedVisitorIds.has(a.id)) return false;
+        const authId = a.auth_user_id?.trim();
+        if (authId && allRegisteredIds.has(authId)) return false;
+        return true;
+      });
+
+      const seen = new Set<string>();
+      const merged: VisitorRow[] = [];
+      for (const r of [...registered, ...anonRows]) {
+        if (!seen.has(r.id)) {
+          seen.add(r.id);
+          merged.push(r);
+        }
+      }
+      return merged;
+    };
+
     // ── 2. Tente le RPC global (utilisateurs enregistrés) ────────────────────
     const { data: rpcData, error: rpcErr } = await supabase.rpc("get_all_users_with_roles");
     if (!rpcErr && Array.isArray(rpcData)) {
@@ -153,9 +350,12 @@ export default function ExposVisitors() {
         id?: string | null; user_id?: string | null;
         role_id?: unknown;
         first_name?: string | null; last_name?: string | null;
+        username?: string | null;
+        avatar_url?: string | null;
         email?: string | null;
         agency_id?: string | null; expo_id?: string | null;
         created_at?: string | null;
+        last_sign_in_at?: string | null;
       };
       let registered = (rpcData as R[])
         .filter((r) => {
@@ -165,14 +365,16 @@ export default function ExposVisitors() {
           return rid === 7 || rid === null;
         })
         .map((r): VisitorRow => ({
-          id: (typeof r.id === "string" ? r.id : r.user_id as string) || "",
+          id: String((typeof r.id === "string" ? r.id : r.user_id) || "").trim(),
           source: "profiles",
           first_name: r.first_name ?? null,
           last_name: r.last_name ?? null,
+          pseudo: r.username?.trim() || null,
           email: r.email ?? null,
           agency_id: r.agency_id ?? null,
           expo_id: r.expo_id ?? null,
-          created_at: r.created_at ?? null,
+          created_at: r.last_sign_in_at ?? r.created_at ?? null,
+          avatar_url: r.avatar_url?.trim() || null,
         }))
         .filter((r) => r.id && !deletedProfileIds.has(r.id));
 
@@ -180,13 +382,7 @@ export default function ExposVisitors() {
         registered = registered.filter((r) => r.agency_id?.trim() === currentAgencyId.trim());
       }
 
-      // Déduplique par id (anon en premier, registered en priorité si même id)
-      const seen = new Set<string>();
-      const merged: VisitorRow[] = [];
-      for (const r of [...registered, ...anonRows]) {
-        if (!seen.has(r.id)) { seen.add(r.id); merged.push(r); }
-      }
-      setRows(merged);
+      setRows(await mergeRegisteredAndAnon(registered));
       setLoading(false);
       return;
     }
@@ -194,7 +390,8 @@ export default function ExposVisitors() {
     // ── 3. Fallback profiles (role_id = 7 ou NULL) ───────────────────────────
     const { data: profileData, error: profileErr } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, username");
+      .select("id, first_name, last_name, username, avatar_url")
+      .is("deleted_at", null);
 
     if (profileErr) {
       setError(profileErr.message);
@@ -204,7 +401,7 @@ export default function ExposVisitors() {
 
     const profileRows: VisitorRow[] = (
       (profileData ?? []) as Array<{
-        id?: string | null; first_name?: string | null; last_name?: string | null; username?: string | null;
+        id?: string | null; first_name?: string | null; last_name?: string | null; username?: string | null; avatar_url?: string | null;
       }>
     ).map((p) => ({
       id: String(p.id ?? ""),
@@ -216,23 +413,21 @@ export default function ExposVisitors() {
       agency_id: null,
       expo_id: null,
       created_at: null,
+      avatar_url: p.avatar_url?.trim() || null,
     })).filter((r) => r.id && !deletedProfileIds.has(r.id));
 
-    // Fusionner profiles + anonymes (dédupliqué)
-    const seen = new Set<string>(profileRows.map((r) => r.id));
-    const merged = [...profileRows, ...anonRows.filter((r) => !seen.has(r.id))];
-    setRows(merged);
+    setRows(await mergeRegisteredAndAnon(profileRows));
     setLoading(false);
   }, [canAccess, currentRoleId, currentAgencyId, t]);
 
   const softDelete = async (row: VisitorRow) => {
-    const table = row.source === "visitors" ? "visitors" : "profiles";
-    const { error: err } = await supabase
-      .from(table)
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", row.id);
-    if (err) { alert(t("visitors.alert_error", { message: err.message })); return; }
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    const result = await softDeleteVisitor(row.id, row.source);
+    if (!result.ok) {
+      alert(t("visitors.alert_error", { message: result.message }));
+      return;
+    }
+    // Recharge : cascade fingerprint / jumeaux côté SQL
+    await load();
   };
 
   useEffect(() => { void load(); }, [load]);
@@ -404,11 +599,43 @@ export default function ExposVisitors() {
                       onClick={goDetail}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium leading-snug" title={name}>{name}</p>
+                        <div className="flex min-w-0 flex-1 items-start gap-2">
+                          {(() => {
+                            const photo = visitorSelfieUrl(row);
+                            if (!photo) return null;
+                            return (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-md p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPhotoPreview({ url: photo, label: name });
+                                }}
+                                aria-label={t("visitors.col_selfie")}
+                              >
+                                <img
+                                  src={photo}
+                                  alt=""
+                                  className="h-10 w-10 rounded-md object-cover ring-1 ring-border"
+                                />
+                              </button>
+                            );
+                          })()}
+                          <div className="min-w-0 flex-1">
+                          <p className="font-medium leading-snug" title={name}>
+                            <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+                              <span className="truncate">{name}</span>
+                              {(row.duplicate_accounts ?? 1) > 1 ? (
+                                <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                                  {t("visitors.duplicate_accounts", { count: row.duplicate_accounts })}
+                                </span>
+                              ) : null}
+                            </span>
+                          </p>
                           {pseudo !== "—" ? (
                             <p className="truncate text-xs text-muted-foreground" title={pseudo}>@{pseudo}</p>
                           ) : null}
+                          </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
@@ -450,6 +677,7 @@ export default function ExposVisitors() {
               <thead>
                 <tr className="border-b text-left">
                   <th className="w-8 px-1 py-1" />
+                  <th className="w-12 px-1 py-1 text-center">{t("visitors.col_selfie")}</th>
                   <th className="w-44 px-2 py-1">{t("visitors.col_name")} <SortButtons column="name" /></th>
                   <th className="w-36 px-2 py-1">{t("visitors.col_pseudo")} <SortButtons column="pseudo" /></th>
                   <th className="w-52 px-2 py-1">{t("visitors.col_email")} <SortButtons column="email" /></th>
@@ -460,6 +688,7 @@ export default function ExposVisitors() {
                   <th className="w-8 px-1 py-1" />
                 </tr>
                 <tr className="border-b bg-muted/20">
+                  <td className="px-1 py-1" />
                   <td className="px-1 py-1" />
                   <td className="px-2 py-1">
                     <Input
@@ -520,6 +749,7 @@ export default function ExposVisitors() {
                   const name   = `${row.first_name || ""} ${row.last_name || ""}`.trim() || "—";
                   const pseudo = row.pseudo?.trim() || "—";
                   const expo   = (row.expo_id && expoById.get(row.expo_id)) || "—";
+                  const photo  = visitorSelfieUrl(row);
                   const goDetail = () => navigate(`/expos/visitors/${row.id}?source=${row.source}`);
                   return (
                     <tr
@@ -533,7 +763,34 @@ export default function ExposVisitors() {
                           <Eye className="h-4 w-4 text-muted-foreground" />
                         </span>
                       </td>
-                      <td className="px-2 py-1 truncate" title={name}>{name}</td>
+                      <td className="px-1 py-1 text-center" onClick={(e) => e.stopPropagation()}>
+                        {photo ? (
+                          <button
+                            type="button"
+                            className="inline-flex rounded-md p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            onClick={() => setPhotoPreview({ url: photo, label: name })}
+                            aria-label={t("visitors.col_selfie")}
+                          >
+                            <img
+                              src={photo}
+                              alt=""
+                              className="h-8 w-8 rounded-md object-cover ring-1 ring-border"
+                            />
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1 truncate" title={name}>
+                        <span className="inline-flex max-w-full items-center gap-1.5">
+                          <span className="truncate">{name}</span>
+                          {(row.duplicate_accounts ?? 1) > 1 ? (
+                            <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300">
+                              {t("visitors.duplicate_accounts", { count: row.duplicate_accounts })}
+                            </span>
+                          ) : null}
+                        </span>
+                      </td>
                       <td className="px-2 py-1 truncate" title={pseudo}>{pseudo}</td>
                       <td className="px-2 py-1 truncate" title={row.email || ""}>{row.email || "—"}</td>
                       <td className="px-2 py-1 truncate" title={expo}>{expo}</td>
@@ -554,7 +811,7 @@ export default function ExposVisitors() {
                 })}
                 {sortedRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-2 py-2 text-muted-foreground">
+                    <td colSpan={8} className="px-2 py-2 text-muted-foreground">
                       {t("visitors.none")}
                     </td>
                   </tr>
@@ -625,6 +882,26 @@ export default function ExposVisitors() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={Boolean(photoPreview)} onOpenChange={(open) => !open && setPhotoPreview(null)}>
+        <DialogContent
+          hideCloseButton={false}
+          className="w-[calc(100vw-2rem)] max-w-lg gap-3 overflow-hidden border-border bg-background p-3 sm:p-4"
+        >
+          <DialogTitle className="text-sm font-medium">
+            {photoPreview?.label || t("visitors.col_selfie")}
+          </DialogTitle>
+          <div className="flex max-h-[min(75dvh,640px)] items-center justify-center overflow-hidden rounded-lg bg-muted/40">
+            {photoPreview ? (
+              <img
+                src={photoPreview.url}
+                alt={photoPreview.label}
+                className="max-h-[min(75dvh,640px)] max-w-full object-contain"
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -636,6 +636,7 @@ const Statistics = () => {
       let query = supabase
         .from("artworks")
         .select("artwork_id, artwork_artist_id, artists!left(artist_firstname, artist_lastname, deleted_at)")
+        .is("deleted_at", null)
         .is("artwork_deleted_at", null)
         .in("artwork_expo_id", scopedExpoIds);
       if (targetAgencyId) query = query.eq("artwork_agency_id", targetAgencyId);
@@ -978,6 +979,7 @@ const Statistics = () => {
       let query = supabase
         .from("artworks")
         .select("artwork_id", { count: "exact", head: true })
+        .is("deleted_at", null)
         .is("artwork_deleted_at", null)
         .eq("artwork_status", "active");
       if (targetAgencyId) query = query.eq("artwork_agency_id", targetAgencyId);
@@ -1284,6 +1286,7 @@ const Statistics = () => {
       let artworksQuery = supabase
         .from("artworks")
         .select("artwork_id, artwork_title, artwork_artist_id, artwork_image_url, artwork_photo_url, artists!left(artist_firstname, artist_lastname)")
+        .is("deleted_at", null)
         .is("artwork_deleted_at", null);
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
@@ -1584,7 +1587,11 @@ const Statistics = () => {
       const targetExpoId =
         drillExpoId !== "all" ? drillExpoId : scope.mode === "expo" ? scope.expoId : null;
 
-      let artworksQuery = supabase.from("artworks").select("artwork_id, artwork_title").is("artwork_deleted_at", null);
+      let artworksQuery = supabase
+        .from("artworks")
+        .select("artwork_id, artwork_title")
+        .is("deleted_at", null)
+        .is("artwork_deleted_at", null);
       if (targetAgencyId) artworksQuery = artworksQuery.eq("artwork_agency_id", targetAgencyId);
       if (targetExpoId) artworksQuery = artworksQuery.eq("artwork_expo_id", targetExpoId);
       if (selectedArtistId !== "all") artworksQuery = artworksQuery.eq("artwork_artist_id", selectedArtistId);
@@ -2666,9 +2673,9 @@ const Statistics = () => {
             <table className="w-full min-w-[32rem] text-xs leading-tight">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("top.colRank")}</th>
-                  <th className="text-left py-1 px-1.5 font-medium text-muted-foreground">{t("top.colArtwork")}</th>
-                  <th className="text-right py-1 px-1.5 font-medium text-muted-foreground">
+                  <th className="px-1.5 py-0.5 text-left font-medium text-muted-foreground">{t("top.colRank")}</th>
+                  <th className="px-1.5 py-0.5 text-left font-medium text-muted-foreground">{t("top.colArtwork")}</th>
+                  <th className="px-1.5 py-0.5 text-right font-medium text-muted-foreground">
                     <button
                       type="button"
                       className="inline-flex items-center gap-0.5 hover:text-foreground"
@@ -2682,7 +2689,7 @@ const Statistics = () => {
                       )}
                     </button>
                   </th>
-                  <th className="text-right py-1 px-1.5 font-medium text-muted-foreground">
+                  <th className="px-1.5 py-0.5 text-right font-medium text-muted-foreground">
                     <button
                       type="button"
                       className="inline-flex items-center gap-0.5 hover:text-foreground"
@@ -2701,22 +2708,22 @@ const Statistics = () => {
               <tbody>
                 {sortedTopArtworks.map((row, index) => (
                   <tr key={row.artworkId} className="border-b border-border/50">
-                    <td className="py-1 px-1.5">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold">
+                    <td className="px-1.5 py-0.5">
+                      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold">
                         {index + 1}
                       </div>
                     </td>
-                    <td className="py-1 px-1.5">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="relative h-[50px] w-[50px] shrink-0 overflow-hidden rounded-md">
+                    <td className="px-1.5 py-0.5">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded">
                           {row.imageUrl ? (
                             <ImageWithSkeleton
                               src={row.imageUrl}
                               alt={row.title}
-                              className="h-[50px] w-[50px] shrink-0 rounded-md object-cover"
+                              className="h-8 w-8 shrink-0 rounded object-cover"
                             />
                           ) : (
-                            <div className="h-[50px] w-[50px] rounded-md bg-muted" />
+                            <div className="h-8 w-8 rounded bg-muted" />
                           )}
                         </div>
                         <div className="min-w-0 truncate">
@@ -2725,8 +2732,8 @@ const Statistics = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-1.5 py-1 text-right tabular-nums">{formatFrNumber(row.visits)} visite(s)</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums">
+                    <td className="px-1.5 py-0.5 text-right tabular-nums">{formatFrNumber(row.visits)} visite(s)</td>
+                    <td className="px-1.5 py-0.5 text-right tabular-nums">
                       {row.avgHearts == null
                         ? "—"
                         : formatFrNumber(row.avgHearts, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}

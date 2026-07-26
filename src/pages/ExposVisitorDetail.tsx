@@ -5,6 +5,11 @@ import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { OpenStreetMap } from "@/components/OpenStreetMap";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { supabase } from "@/lib/supabase";
@@ -35,20 +40,47 @@ function Field({ label, value }: { label: string; value: string | null | undefin
 }
 
 function HeaderPhoto({ src, alt, label, shape }: { src: string; alt: string; label: string; shape: "round" | "square" }) {
+  const [open, setOpen] = useState(false);
+  const rounded = shape === "round" ? "rounded-full" : "rounded-lg";
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <img
-        src={src}
-        alt={alt}
-        className={`h-12 w-12 object-cover ring-2 ring-border ${shape === "round" ? "rounded-full" : "rounded-lg"}`}
-        onError={(e) => {
-          const el = e.currentTarget as HTMLImageElement;
-          el.closest<HTMLElement>("[data-photo-wrapper]")!.style.display = "none";
-        }}
-        data-photo-wrapper=""
-      />
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-    </div>
+    <>
+      <div className="flex flex-col items-center gap-0.5" data-photo-wrapper="">
+        <button
+          type="button"
+          className="rounded-none p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          onClick={() => setOpen(true)}
+          aria-label={label}
+        >
+          <img
+            src={src}
+            alt={alt}
+            className={`h-12 w-12 cursor-zoom-in object-cover ring-2 ring-border transition-opacity hover:opacity-90 ${rounded}`}
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              el.closest<HTMLElement>("[data-photo-wrapper]")!.style.display = "none";
+            }}
+          />
+        </button>
+        <span className="text-[10px] text-muted-foreground">{label}</span>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          hideCloseButton={false}
+          className="w-[calc(100vw-2rem)] max-w-lg gap-3 overflow-hidden border-border bg-background p-3 sm:p-4"
+        >
+          <DialogTitle className="text-sm font-medium">{label}</DialogTitle>
+          <div className="flex max-h-[min(75dvh,640px)] items-center justify-center overflow-hidden rounded-lg bg-muted/40">
+            <img
+              src={src}
+              alt={alt}
+              className="max-h-[min(75dvh,640px)] max-w-full object-contain"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

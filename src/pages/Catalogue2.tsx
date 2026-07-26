@@ -117,7 +117,10 @@ export default function Catalogue2() {
     setArchiving(true);
     const { error: updErr } = await supabase
       .from("artworks")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({
+        deleted_at: new Date().toISOString(),
+        artwork_deleted_at: new Date().toISOString(),
+      })
       .eq("artwork_id", archiveTarget.artwork_id);
     if (updErr) {
       toast.error(updErr.message);

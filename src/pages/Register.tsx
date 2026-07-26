@@ -54,14 +54,15 @@ const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
 
 function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
   const c = (code ?? "").toLowerCase();
-  if (c === "email_exists" || c === "user_already_exists") return true;
+  if (c === "email_exists" || c === "user_already_exists" || c === "visitor_already_registered") return true;
   const m = message.toLowerCase();
   return (
     m.includes("already registered") ||
     m.includes("already been registered") ||
     m.includes("user already registered") ||
     m.includes("already exists") ||
-    m.includes("email address is already registered")
+    m.includes("email address is already registered") ||
+    m.includes("déjà lié à un compte")
   );
 }
 

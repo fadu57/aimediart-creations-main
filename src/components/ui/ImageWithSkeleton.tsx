@@ -1,4 +1,4 @@
-import { useEffect, useState, type ImgHTMLAttributes } from "react";
+import { useLayoutEffect, useRef, useState, type ImgHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -6,6 +6,10 @@ type ImageWithSkeletonProps = ImgHTMLAttributes<HTMLImageElement> & {
   wrapperClassName?: string;
   skeletonClassName?: string;
 };
+
+function isImgReady(img: HTMLImageElement | null): boolean {
+  return Boolean(img && img.complete && img.naturalWidth > 0);
+}
 
 export function ImageWithSkeleton({
   wrapperClassName,
@@ -17,10 +21,15 @@ export function ImageWithSkeleton({
   alt,
   ...imgProps
 }: ImageWithSkeletonProps) {
+  const imgRef = useRef<HTMLImageElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Réinitialise l’état au changement d’URL (sinon l’ancienne image « reste » visuelle).
-  useEffect(() => {
+  // Cache navigateur : onLoad peut avoir déjà eu lieu avant l’effet — ne pas rester bloqué en opacity-0.
+  useLayoutEffect(() => {
+    if (isImgReady(imgRef.current)) {
+      setIsLoaded(true);
+      return;
+    }
     setIsLoaded(false);
   }, [src]);
 
@@ -34,6 +43,7 @@ export function ImageWithSkeleton({
       )}
       <img
         {...imgProps}
+        ref={imgRef}
         key={src ?? ""}
         src={src}
         alt={alt ?? ""}

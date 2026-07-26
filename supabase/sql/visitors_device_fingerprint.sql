@@ -57,18 +57,24 @@ DECLARE
 BEGIN
   -- 1. Recherche par FingerprintJS visitorId (précis, mono-navigateur)
   IF fp IS NOT NULL THEN
-    SELECT v.id INTO v_id FROM public.visitors v WHERE v.fingerprint = fp LIMIT 1;
+    SELECT v.id INTO v_id FROM public.visitors v
+    WHERE v.fingerprint = fp AND v.deleted_at IS NULL
+    LIMIT 1;
   END IF;
 
   -- 2. Recherche par UUID navigateur localStorage (précis, mono-navigateur)
   IF v_id IS NULL AND cid IS NOT NULL THEN
-    SELECT v.id INTO v_id FROM public.visitors v WHERE v.visitor_client_id = cid LIMIT 1;
+    SELECT v.id INTO v_id FROM public.visitors v
+    WHERE v.visitor_client_id = cid AND v.deleted_at IS NULL
+    LIMIT 1;
   END IF;
 
   -- 3. Recherche par device_fingerprint (probabiliste, cross-navigateur)
   --    N'est utilisée que si les deux premiers ont échoué ET que le hash n'est pas vide.
   IF v_id IS NULL AND dfp IS NOT NULL THEN
-    SELECT v.id INTO v_id FROM public.visitors v WHERE v.device_fingerprint = dfp LIMIT 1;
+    SELECT v.id INTO v_id FROM public.visitors v
+    WHERE v.device_fingerprint = dfp AND v.deleted_at IS NULL
+    LIMIT 1;
   END IF;
 
   -- Mise à jour si trouvé

@@ -89,6 +89,7 @@ import {
   fetchArtworkEmotionCommunityInsight,
   type EmotionCommunityInsight as EmotionCommunityInsightData,
 } from "@/lib/visitorTravelDiary";
+import { highlightAimediartCom } from "@/lib/highlightAimediartCom";
 
 type QuickFeedbackHint = "both" | "emotion" | "heart";
 
@@ -1608,7 +1609,7 @@ const VisitorViewCore = () => {
   }
 
   return (
-    <div className={`visitor-page-shell ${isEmbedded ? "embedded-view" : ""} min-h-screen overflow-x-hidden bg-[#121212] text-[#F0F0F0]`}>
+    <div className={`visitor-page-shell ${isEmbedded ? "embedded-view" : ""} min-h-screen overflow-x-clip bg-[#121212] text-[#F0F0F0]`}>
       {/* Mobile header */}
       <div className={`œuvre-fixed-header overflow-visible border-b border-white/10 ${isEmbedded ? "py-1" : "py-1.5"}`}>
         <div className="flex min-w-0 w-full items-center justify-between gap-1 px-2 sm:px-[15px]">
@@ -1987,9 +1988,9 @@ const VisitorViewCore = () => {
 
         {/* Résultats IA — navigation par flèches */}
         <div className="œuvre-full-width-box mb-[16px] rounded-2xl bg-[rgba(18,18,18,0.65)] px-0 pb-3 pt-2">
-          <div className="mb-2 flex items-center gap-2 px-5">
-            <span className="text-xl">📖</span>
-            <h3 className="font-bold text-[14px] text-[#F0F0F0]">{t("ai_select_style")}</h3>
+          <div className="mb-3 flex items-center gap-2 px-5">
+            <span className="text-xl shrink-0">📖</span>
+            <h3 className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-[11px] font-bold leading-snug text-[#F0F0F0] sm:text-[12px]">{t("ai_select_style")}</h3>
           </div>
           {stylesQueryError ? (
             <p className="mb-2 text-center text-xs text-red-600">{stylesQueryError}</p>
@@ -2001,19 +2002,18 @@ const VisitorViewCore = () => {
           ) : (
             <>
               <div className="relative mt-1 px-0.5">
-                {/* Zones flèches : démarrent sous l’en-tête (persona + voix) pour ne pas
-                    masquer / bloquer les boutons Voix F/M (surtout Safari iOS). */}
+                {/* Flèches = toute la hauteur du carrousel, cliquables (z-30). */}
                 <button
                   type="button"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_prev")}
                   onClick={goMediationPrev}
-                  className="absolute bottom-0 left-0 top-14 z-10 flex w-8 items-start justify-center pt-2 text-[#E63946]/50 transition-all duration-200 hover:bg-[#E63946]/8 hover:text-[#E63946] rounded-l-2xl disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute inset-y-0 left-0 z-30 flex w-8 items-center justify-center bg-[#E63946]/15 text-[#E63946] transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
                 >
-                  <ChevronLeft className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                  <ChevronLeft className="h-6 w-6" strokeWidth={2.5} aria-hidden />
                 </button>
 
-                <div className="min-w-0 px-4 sm:px-8">
+                <div className="relative z-0 min-w-0 px-4 sm:px-8">
                   <Swiper
                     key={`med-main-${artwork?.artwork_id ?? "none"}-${mediationSlideCount}`}
                     onSwiper={(swiper) => {
@@ -2040,24 +2040,31 @@ const VisitorViewCore = () => {
                   >
                     {carouselSlides.map((slide) => {
                       const isConteur = slide.canonicalCode === "conteur";
+                      const showVoiceButtons =
+                        Boolean(artwork?.artwork_id) && !slide.sid.startsWith("code:");
                       return (
-                        <SwiperSlide key={`main-ai-${slide.loopSlideKey}`} className="!h-auto pt-3">
+                        <SwiperSlide key={`main-ai-${slide.loopSlideKey}`} className="!h-auto pt-5">
                           <article className="relative w-full overflow-visible rounded-2xl border border-white/15 bg-[#1E1E1E] p-3 pt-3.5 text-left text-sm leading-5 text-[#F0F0F0]/90">
-                            {/* Voix : ancrées sur le trait haut du bloc (hors flux) → label persona en entier. */}
-                            {artwork?.artwork_id && !slide.sid.startsWith("code:") ? (
-                              <div className="absolute -top-3 right-2 z-30 rounded-full bg-[#1E1E1E] p-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.35)]">
+                            {/* Voix sur le bord haut, décalées de la flèche droite (w-8) pour rester cliquables. */}
+                            {showVoiceButtons ? (
+                              <div
+                                className="pointer-events-auto absolute left-auto right-2 top-0 z-40 -translate-y-[65%] rounded-full p-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
                                 <AudioPlayer
-                                  text_id={artwork.artwork_id}
+                                  text_id={artwork!.artwork_id}
                                   text_type="mediation"
                                   lang={language}
                                   prompt_style_id={slide.sid}
                                   playOnly
                                   compact
+                                  variant="onLight"
                                   playbackRate={playbackRateForMediationStyle(slide.canonicalCode)}
                                 />
                               </div>
                             ) : null}
-                            <div className="relative z-20 mb-1.5 flex flex-col gap-1.5">
+                            <div className="relative z-20 mb-1.5 flex min-w-0 flex-col gap-1.5">
                               <div className="flex min-w-0 items-center gap-1.5">
                                 {slide.icon ? (
                                   <span
@@ -2067,21 +2074,21 @@ const VisitorViewCore = () => {
                                     {slide.icon}
                                   </span>
                                 ) : null}
-                                <span className="max-w-full rounded-full bg-white/10 px-2 py-0.5 text-sm font-semibold leading-5 text-white whitespace-nowrap">
+                                <span className="min-w-0 whitespace-nowrap rounded-full bg-white/10 px-2 py-0.5 text-sm font-semibold leading-5 text-white">
                                   {slide.label}
                                 </span>
                               </div>
                               {!slide.sid.startsWith("code:") ? (
-                                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] leading-tight text-[#F0F0F0]/75">
+                                <label className="flex min-w-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px] leading-none text-[#F0F0F0]/75">
                                   <Checkbox
                                     checked={visitorPromptStyleIdsMatch(defaultPromptStyleId, slide.sid)}
                                     onCheckedChange={(value) =>
                                       toggleDefaultPersona(slide.sid, value === true)
                                     }
                                     aria-label={t("default_persona_aria")}
-                                    className="h-3.5 w-3.5 border-white/40 data-[state=checked]:border-[#E63946] data-[state=checked]:bg-[#E63946] data-[state=checked]:text-white"
+                                    className="h-3.5 w-3.5 shrink-0 border-white/40 data-[state=checked]:border-[#E63946] data-[state=checked]:bg-[#E63946] data-[state=checked]:text-white"
                                   />
-                                  <span className="min-w-0">{t("default_persona_label")}</span>
+                                  <span className="whitespace-nowrap">{t("default_persona_label")}</span>
                                 </label>
                               ) : null}
                             </div>
@@ -2097,15 +2104,14 @@ const VisitorViewCore = () => {
                   </Swiper>
                 </div>
 
-                {/* Zone cliquable droite — sous l’en-tête persona/voix */}
                 <button
                   type="button"
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_next")}
                   onClick={goMediationNext}
-                  className="absolute bottom-0 right-0 top-14 z-10 flex w-8 items-start justify-center pt-2 text-[#E63946]/50 transition-all duration-200 hover:bg-[#E63946]/8 hover:text-[#E63946] rounded-r-2xl disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute inset-y-0 right-0 z-30 flex w-8 items-center justify-center bg-[#E63946]/15 text-[#E63946] transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
                 >
-                  <ChevronRight className="h-5 w-5" strokeWidth={2.5} aria-hidden />
+                  <ChevronRight className="h-6 w-6" strokeWidth={2.5} aria-hidden />
                 </button>
               </div>
 
@@ -2177,17 +2183,19 @@ const VisitorViewCore = () => {
                   onClick={() =>
                     setSelectedEmotion((current) => (current === String(emo.id) ? null : String(emo.id)))
                   }
-                  className={`h-[60px] w-full rounded-xl border px-1 py-1 text-sm font-semibold whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-150 ${
+                  className={`flex h-[64px] w-full items-center justify-center rounded-xl border px-1 py-1 transition-all duration-150 ${
                     selectedEmotion === String(emo.id)
                       ? "border-[#E63946] bg-[#E63946] text-white shadow-none"
                       : "border-white/70 bg-white text-black hover:border-[#E63946]/85 hover:bg-white hover:text-black shadow-none"
                   }`}
                 >
-                  <span className="inline-flex items-center gap-1">
+                  <span className="flex max-w-full flex-col items-center justify-center gap-0.5">
                     <span className="text-xl leading-none" aria-hidden>
                       {displayedEmotionIcon}
                     </span>
-                    <span>{emotionDisplayLabel}</span>
+                    <span className="line-clamp-2 max-w-full text-center text-[11px] font-semibold leading-tight break-words">
+                      {emotionDisplayLabel}
+                    </span>
                   </span>
                 </button>
               );
@@ -2435,11 +2443,11 @@ const VisitorViewCore = () => {
         <DialogContent
           hideCloseButton
           overlayClassName="z-[110] bg-black/60"
-          className="z-[110] w-full max-w-[320px] gap-0 rounded-lg border border-gray-200 bg-white p-4 text-center shadow-xl sm:rounded-lg"
+          className="z-[110] w-[calc(100vw-2rem)] max-w-[320px] max-h-none gap-0 overflow-hidden rounded-lg border border-gray-200 bg-white p-3 text-center shadow-xl sm:rounded-lg sm:p-4"
         >
           <DialogTitle className="sr-only">{t("aria_validation_dialog")}</DialogTitle>
           <DialogDescription
-            className="text-sm font-semibold leading-relaxed text-gray-900"
+            className="min-w-0 break-words text-[13px] font-semibold leading-snug text-gray-900"
             style={{ whiteSpace: "pre-line" }}
           >
             {t(
@@ -2448,18 +2456,18 @@ const VisitorViewCore = () => {
             )}
           </DialogDescription>
           {communityInsightLoading ? (
-            <div className="mt-4 flex justify-center py-2" aria-busy="true">
+            <div className="mt-3 flex justify-center py-1" aria-busy="true">
               <Loader2 className="h-5 w-5 animate-spin text-[#E63946]" aria-hidden />
             </div>
           ) : communityInsight ? (
-            <div className="mt-4">
+            <div className="mt-3 min-w-0">
               <EmotionCommunityInsight insight={communityInsight} />
             </div>
           ) : null}
-          <div className="mt-4 flex flex-col gap-2">
+          <div className="mt-3 flex min-w-0 flex-col gap-1.5">
             <Button
               type="button"
-              className="w-full gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
+              className="h-auto min-h-10 w-full whitespace-normal break-words px-2 py-2 text-center text-[13px] leading-snug gradient-gold gradient-gold-hover-bg text-primary-foreground transition-all duration-200 hover:brightness-105 hover:saturate-125"
               onClick={canContinueSeriesNavigation ? handleContinueToNextArtworkInSeries : handleScanAnotherArtwork}
             >
               {t(canContinueSeriesNavigation ? nextSeriesButtonLabelKey : "btn_scan_another")}
@@ -2468,7 +2476,7 @@ const VisitorViewCore = () => {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
+                className="h-auto min-h-10 w-full whitespace-normal break-words border-gray-300 bg-white px-2 py-2 text-center text-[13px] leading-snug text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
                 onClick={handleLeaveSeriesNavigation}
               >
                 {t(leaveSeriesButtonLabelKey)}
@@ -2477,7 +2485,7 @@ const VisitorViewCore = () => {
             <Button
               type="button"
               variant="outline"
-              className="w-full border-gray-300 bg-white text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
+              className="h-auto min-h-10 w-full whitespace-normal break-words border-gray-300 bg-white px-2 py-2 text-center text-[13px] leading-snug text-gray-900 transition-colors duration-150 hover:border-primary hover:bg-primary/10 hover:text-primary"
               onClick={handleExitExpo}
             >
               {t("btn_exit_expo")}
@@ -2494,13 +2502,17 @@ const VisitorViewCore = () => {
         >
           <DialogTitle className="sr-only">{t("aria_exit_dialog")}</DialogTitle>
           <DialogDescription className="text-sm font-semibold leading-relaxed text-black">
-            {hasAgencyThanksName
-              ? t("exit_thanks_with_agency", { agency: agencyThanksName })
-              : t("exit_thanks_solo")}
+            {highlightAimediartCom(
+              hasAgencyThanksName
+                ? t("exit_thanks_with_agency", { agency: agencyThanksName })
+                : t("exit_thanks_solo"),
+            )}
             <br />
-            {t("exit_message")}
+            {highlightAimediartCom(t("exit_message"))}
           </DialogDescription>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-700">{t("diary.exit_offer")}</p>
+          <p className="mt-3 text-sm leading-relaxed text-neutral-700">
+            {highlightAimediartCom(t("diary.exit_offer"))}
+          </p>
           <Button
             type="button"
             className="mt-4 w-full gap-2 gradient-gold gradient-gold-hover-bg text-primary-foreground"

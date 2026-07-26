@@ -1417,13 +1417,13 @@ const Catalogue = () => {
   ]);
 
   return (
-      <div className="container min-w-0 max-w-full pt-1 pb-8 space-y-3 sm:pt-2 sm:space-y-8">
-      {/* Mobile : pas de sticky (barre trop haute → masquait la 1re carte). md+ : sticky sous le header. */}
-      <div className="z-30 flex min-w-0 flex-col gap-1.5 border-b border-border/40 bg-[#121212] pb-2 pt-0 sm:gap-2 md:sticky md:top-[4.25rem] md:bg-[#121212]/95 md:backdrop-blur-sm">
+      <div className="container flex min-w-0 max-w-full flex-col gap-4 pt-1 pb-8 sm:gap-8">
+      {/* Juste sous le header (main = pt-[4.25rem]). Pas de sticky. */}
+      <div className="z-30 flex shrink-0 min-w-0 flex-col gap-1.5 border-b border-border/40 bg-[#121212] pb-2 pt-0 sm:gap-2">
         <div className="flex min-w-0 flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
         <div className="flex w-full min-w-0 flex-col gap-1.5 md:max-w-[576px] md:gap-2">
           <div className="flex w-full items-baseline justify-between gap-3 sm:gap-4">
-            <h2 className="min-w-0 text-2xl font-serif font-bold leading-tight text-white sm:text-3xl">{t("page_title")}</h2>
+            <h2 className="min-w-0 overflow-visible text-2xl font-serif font-bold leading-snug text-white sm:text-3xl">{t("page_title")}</h2>
             {!loading && (
               <span className="shrink-0 text-sm font-medium tabular-nums text-muted-foreground">
                 {t("filtered_count", { count: filtered.length })}
@@ -1724,7 +1724,7 @@ const Catalogue = () => {
         </p>
       )}
 
-      <div className={cn("grid grid-cols-1 items-stretch gap-4 pt-1 md:grid-cols-2 md:pt-0", CATALOGUE_GRID_ROW_CLASS)}>
+      <div className={cn("grid grid-cols-1 items-stretch gap-4 md:grid-cols-2", CATALOGUE_GRID_ROW_CLASS)}>
         {loading && <p className="col-span-full text-sm text-muted-foreground text-center py-12">{t("loading_catalogue")}</p>}
         {filtered.length === 0 && !showScopeHint && !error && (
           <p className="col-span-full text-sm text-muted-foreground text-center py-12">
