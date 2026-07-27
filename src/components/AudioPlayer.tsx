@@ -517,10 +517,9 @@ export function AudioPlayer({
 
 
 
+  // playOnly (vue visiteur) : n'afficher les boutons que si au moins une voix est prête.
   if (playOnly) {
-
     if (!readyF && !readyM) return null;
-
   } else if (!readyF && !readyM && !isGenerating) {
 
     return (
@@ -632,13 +631,9 @@ export function AudioPlayer({
 
 
         if (playOnly) {
-
           if (!ready) return null;
-
         } else if (!file && !busy && !ready) {
-
           return null;
-
         }
 
 

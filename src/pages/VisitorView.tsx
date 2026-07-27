@@ -1696,18 +1696,19 @@ const VisitorViewCore = () => {
                     ) : (
                       <BarChart3 className="h-5 w-5 text-[#121212]" aria-hidden />
                     );
+                  const itemLabel = item.key === "menu_catalogue" ? "Œuvres" : item.label;
                   return (
                     <NavLink
                       key={`œuvre-fab-nav-${item.key}`}
                       to={item.to}
                       className="fab-item fab-nav-link"
-                      aria-label={item.label}
+                      aria-label={itemLabel}
                       target={isEmbedded ? "_top" : undefined}
                       rel={isEmbedded ? "noopener noreferrer" : undefined}
                       onClick={() => setIsFabOpen(false)}
                     >
                       {icon}
-                      <span className="fab-item-label">{item.label}</span>
+                      <span className="fab-item-label">{itemLabel}</span>
                     </NavLink>
                   );
                 })}
@@ -2048,7 +2049,7 @@ const VisitorViewCore = () => {
                             {/* Voix sur le bord haut, décalées de la flèche droite (w-8) pour rester cliquables. */}
                             {showVoiceButtons ? (
                               <div
-                                className="pointer-events-auto absolute left-auto right-2 top-0 z-40 -translate-y-[65%] rounded-full p-0.5"
+                                className="pointer-events-auto absolute left-auto right-2 top-1 z-40 rounded-full p-0.5 sm:top-0 sm:-translate-y-[65%]"
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
                               >

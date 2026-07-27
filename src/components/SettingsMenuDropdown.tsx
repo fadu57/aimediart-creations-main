@@ -27,9 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SETTINGS_TRASH_MENU_LINKS } from "@/lib/trashMenuLinks";
@@ -68,7 +65,7 @@ const ONLINE_PRESENCE_LINK = {
   Icon: Users,
 } as const;
 
-type FabSection = "ia" | "suivis" | "errors" | "trash";
+type NestedSection = "ia" | "suivis" | "errors" | "trash";
 
 type SettingsMenuDropdownProps = {
   triggerClassName?: string;
@@ -76,12 +73,12 @@ type SettingsMenuDropdownProps = {
   onNavigate?: () => void;
 };
 
-function resolveInitialFabSection(
+function resolveInitialNestedSection(
   iaActive: boolean,
   suiviActive: boolean,
   errorLogsActive: boolean,
   trashActive: boolean,
-): FabSection | null {
+): NestedSection | null {
   if (iaActive) return "ia";
   if (suiviActive) return "suivis";
   if (errorLogsActive) return "errors";
@@ -93,6 +90,10 @@ const fabRowClass =
   "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium hover:bg-muted/60";
 const fabSubLinkClass =
   "flex items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-xs hover:bg-muted/60";
+const headerSubLinkClass =
+  "flex cursor-default select-none items-center gap-2 rounded-sm py-1.5 pl-6 pr-2 text-xs outline-none focus:bg-accent";
+const headerSectionTriggerClass =
+  "flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent";
 
 export function SettingsMenuDropdown({
   triggerClassName,
@@ -118,12 +119,12 @@ export function SettingsMenuDropdown({
   const paramsActive = location.pathname === "/settings";
   const menuActive = paramsActive || configActive || suiviActive || errorLogsActive || trashActive;
 
-  const [openFabSection, setOpenFabSection] = useState<FabSection | null>(() =>
-    resolveInitialFabSection(iaActive, suiviActive, errorLogsActive, trashActive),
+  const [openNestedSection, setOpenNestedSection] = useState<NestedSection | null>(() =>
+    resolveInitialNestedSection(iaActive, suiviActive, errorLogsActive, trashActive),
   );
 
-  const toggleFabSection = (section: FabSection) => {
-    setOpenFabSection((prev) => (prev === section ? null : section));
+  const toggleNestedSection = (section: NestedSection) => {
+    setOpenNestedSection((prev) => (prev === section ? null : section));
   };
 
   const handleFabNavigate = () => {
@@ -177,17 +178,17 @@ export function SettingsMenuDropdown({
             <button
               type="button"
               className={cn(fabRowClass, iaActive && "text-[#E63946]")}
-              aria-expanded={openFabSection === "ia"}
-              onClick={() => toggleFabSection("ia")}
+              aria-expanded={openNestedSection === "ia"}
+              onClick={() => toggleNestedSection("ia")}
             >
               <BrainCircuit className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
               <span className="flex-1">{t("settings_submenu_ia")}</span>
               <ChevronDown
-                className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "ia" && "rotate-180")}
+                className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openNestedSection === "ia" && "rotate-180")}
                 aria-hidden
               />
             </button>
-            {openFabSection === "ia" && (
+            {openNestedSection === "ia" && (
               <div className="flex flex-col gap-0.5 pb-1">
                 {IA_LINKS.map(({ to, labelKey, Icon }) => (
                   <NavLink
@@ -208,17 +209,17 @@ export function SettingsMenuDropdown({
         <button
           type="button"
           className={cn(fabRowClass, suiviActive && "text-[#E63946]")}
-          aria-expanded={openFabSection === "suivis"}
-          onClick={() => toggleFabSection("suivis")}
+          aria-expanded={openNestedSection === "suivis"}
+          onClick={() => toggleNestedSection("suivis")}
         >
           <BarChart3 className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span className="flex-1">{t("settings_submenu_suivis")}</span>
           <ChevronDown
-            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "suivis" && "rotate-180")}
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openNestedSection === "suivis" && "rotate-180")}
             aria-hidden
           />
         </button>
-        {openFabSection === "suivis" && (
+        {openNestedSection === "suivis" && (
           <div className="flex flex-col gap-0.5 pb-1">
             {SUIVI_LINKS.map(({ to, labelKey, Icon }) => (
               <NavLink
@@ -253,17 +254,17 @@ export function SettingsMenuDropdown({
         <button
           type="button"
           className={cn(fabRowClass, errorLogsActive && "text-[#E63946]")}
-          aria-expanded={openFabSection === "errors"}
-          onClick={() => toggleFabSection("errors")}
+          aria-expanded={openNestedSection === "errors"}
+          onClick={() => toggleNestedSection("errors")}
         >
           <AlertTriangle className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span className="flex-1">{t("settings_submenu_error_logs")}</span>
           <ChevronDown
-            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "errors" && "rotate-180")}
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openNestedSection === "errors" && "rotate-180")}
             aria-hidden
           />
         </button>
-        {openFabSection === "errors" && (
+        {openNestedSection === "errors" && (
           <div className="flex flex-col gap-0.5 pb-1">
             {ERROR_LOG_LINKS.map((link) => (
               <NavLink
@@ -285,17 +286,17 @@ export function SettingsMenuDropdown({
         <button
           type="button"
           className={cn(fabRowClass, trashActive && "text-[#E63946]")}
-          aria-expanded={openFabSection === "trash"}
-          onClick={() => toggleFabSection("trash")}
+          aria-expanded={openNestedSection === "trash"}
+          onClick={() => toggleNestedSection("trash")}
         >
           <ArchiveRestore className="h-5 w-5 shrink-0 text-[#121212]" aria-hidden />
           <span className="flex-1">{t("settings_submenu_trash")}</span>
           <ChevronDown
-            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openFabSection === "trash" && "rotate-180")}
+            className={cn("h-4 w-4 shrink-0 opacity-70 transition-transform", openNestedSection === "trash" && "rotate-180")}
             aria-hidden
           />
         </button>
-        {openFabSection === "trash" && (
+        {openNestedSection === "trash" && (
           <div className="flex flex-col gap-0.5 pb-1">
             {SETTINGS_TRASH_MENU_LINKS.map((link) => (
               <Link
@@ -330,7 +331,11 @@ export function SettingsMenuDropdown({
         <Settings className="h-5 w-5" aria-hidden />
         <ChevronDown className="h-3.5 w-3.5 opacity-80" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent
+        align="end"
+        collisionPadding={12}
+        className="max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,14rem)] overflow-y-auto"
+      >
         <DropdownMenuLabel>{t("settings")}</DropdownMenuLabel>
         <DropdownMenuItem asChild>
           <Link
@@ -373,50 +378,66 @@ export function SettingsMenuDropdown({
               </Link>
             </DropdownMenuItem>
 
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger
-                className={cn("flex items-center gap-2", iaActive && "text-[#E63946] focus:text-[#E63946]")}
-              >
-                <BrainCircuit className="h-4 w-4 opacity-70" aria-hidden />
-                {t("settings_submenu_ia")}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {IA_LINKS.map(({ to, labelKey, Icon }) => (
-                  <DropdownMenuItem key={to} asChild>
-                    <Link
-                      to={to}
-                      className={cn(
-                        "flex items-center gap-2",
-                        location.pathname.startsWith(to) && "font-medium text-[#E63946]",
-                      )}
-                    >
-                      <Icon className="h-4 w-4 opacity-70" aria-hidden />
-                      {t(labelKey)}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            <DropdownMenuItem
+              className={cn(headerSectionTriggerClass, iaActive && "text-[#E63946] focus:text-[#E63946]")}
+              aria-expanded={openNestedSection === "ia"}
+              onSelect={(e) => {
+                e.preventDefault();
+                toggleNestedSection("ia");
+              }}
+            >
+              <BrainCircuit className="h-4 w-4 opacity-70" aria-hidden />
+              <span className="flex-1">{t("settings_submenu_ia")}</span>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 opacity-70 transition-transform",
+                  openNestedSection === "ia" && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </DropdownMenuItem>
+            {openNestedSection === "ia" &&
+              IA_LINKS.map(({ to, labelKey, Icon }) => (
+                <DropdownMenuItem key={to} asChild className={headerSubLinkClass}>
+                  <Link
+                    to={to}
+                    className={cn(
+                      location.pathname.startsWith(to) && "font-medium text-[#E63946]",
+                    )}
+                  >
+                    <Icon className="h-4 w-4 opacity-70" aria-hidden />
+                    {t(labelKey)}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
           </>
         )}
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger
+        <DropdownMenuItem
+          className={cn(headerSectionTriggerClass, suiviActive && "text-[#E63946] focus:text-[#E63946]")}
+          aria-expanded={openNestedSection === "suivis"}
+          onSelect={(e) => {
+            e.preventDefault();
+            toggleNestedSection("suivis");
+          }}
+        >
+          <BarChart3 className="h-4 w-4 opacity-70" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_suivis")}</span>
+          <ChevronDown
             className={cn(
-              "flex items-center gap-2",
-              suiviActive && "text-[#E63946] focus:text-[#E63946]",
+              "h-4 w-4 shrink-0 opacity-70 transition-transform",
+              openNestedSection === "suivis" && "rotate-180",
             )}
-          >
-            <BarChart3 className="h-4 w-4 opacity-70" aria-hidden />
-            {t("settings_submenu_suivis")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
+            aria-hidden
+          />
+        </DropdownMenuItem>
+        {openNestedSection === "suivis" && (
+          <>
             {SUIVI_LINKS.map(({ to, labelKey, Icon }) => (
-              <DropdownMenuItem key={to} asChild>
+              <DropdownMenuItem key={to} asChild className={headerSubLinkClass}>
                 <Link
                   to={to}
                   className={cn(
-                    "flex items-center gap-2",
                     location.pathname.startsWith(to) && "font-medium text-[#E63946]",
                   )}
                 >
@@ -426,12 +447,12 @@ export function SettingsMenuDropdown({
               </DropdownMenuItem>
             ))}
             {showOnlinePresence && (
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild className={headerSubLinkClass}>
                 <Link
                   to={ONLINE_PRESENCE_LINK.to}
                   className={cn(
-                    "flex items-center gap-2",
-                    location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) && "font-medium text-[#E63946]",
+                    location.pathname.startsWith(ONLINE_PRESENCE_LINK.to) &&
+                      "font-medium text-[#E63946]",
                   )}
                 >
                   <ONLINE_PRESENCE_LINK.Icon className="h-4 w-4 opacity-70" aria-hidden />
@@ -439,62 +460,77 @@ export function SettingsMenuDropdown({
                 </Link>
               </DropdownMenuItem>
             )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+          </>
+        )}
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger
+        <DropdownMenuItem
+          className={cn(
+            headerSectionTriggerClass,
+            errorLogsActive && "text-[#E63946] focus:text-[#E63946]",
+          )}
+          aria-expanded={openNestedSection === "errors"}
+          onSelect={(e) => {
+            e.preventDefault();
+            toggleNestedSection("errors");
+          }}
+        >
+          <AlertTriangle className="h-4 w-4 opacity-70" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_error_logs")}</span>
+          <ChevronDown
             className={cn(
-              "flex items-center gap-2",
-              errorLogsActive && "text-[#E63946] focus:text-[#E63946]",
+              "h-4 w-4 shrink-0 opacity-70 transition-transform",
+              openNestedSection === "errors" && "rotate-180",
             )}
-          >
-            <AlertTriangle className="h-4 w-4 opacity-70" aria-hidden />
-            {t("settings_submenu_error_logs")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {ERROR_LOG_LINKS.map((link) => (
-              <DropdownMenuItem key={link.to} asChild>
-                <Link
-                  to={link.to}
-                  className={cn(
-                    location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
-                  )}
-                >
-                  {t(link.labelKey)}
-                </Link>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+            aria-hidden
+          />
+        </DropdownMenuItem>
+        {openNestedSection === "errors" &&
+          ERROR_LOG_LINKS.map((link) => (
+            <DropdownMenuItem key={link.to} asChild className={headerSubLinkClass}>
+              <Link
+                to={link.to}
+                className={cn(
+                  location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
+                )}
+              >
+                {t(link.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+          ))}
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger
+        <DropdownMenuItem
+          className={cn(headerSectionTriggerClass, trashActive && "text-[#E63946] focus:text-[#E63946]")}
+          aria-expanded={openNestedSection === "trash"}
+          onSelect={(e) => {
+            e.preventDefault();
+            toggleNestedSection("trash");
+          }}
+        >
+          <ArchiveRestore className="h-4 w-4 opacity-70" aria-hidden />
+          <span className="flex-1">{t("settings_submenu_trash")}</span>
+          <ChevronDown
             className={cn(
-              "flex items-center gap-2",
-              trashActive && "text-[#E63946] focus:text-[#E63946]",
+              "h-4 w-4 shrink-0 opacity-70 transition-transform",
+              openNestedSection === "trash" && "rotate-180",
             )}
-          >
-            <ArchiveRestore className="h-4 w-4 opacity-70" aria-hidden />
-            {t("settings_submenu_trash")}
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {SETTINGS_TRASH_MENU_LINKS.map((link) => (
-              <DropdownMenuItem key={link.id} asChild>
-                <Link
-                  to={link.to}
-                  className={cn(
-                    location.pathname.startsWith(link.to) && "text-[#E63946] font-medium",
-                  )}
-                >
-                  {t(link.labelKey)}
-                </Link>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+            aria-hidden
+          />
+        </DropdownMenuItem>
+        {openNestedSection === "trash" &&
+          SETTINGS_TRASH_MENU_LINKS.map((link) => (
+            <DropdownMenuItem key={link.id} asChild className={headerSubLinkClass}>
+              <Link
+                to={link.to}
+                className={cn(
+                  location.pathname.startsWith(link.to) && "font-medium text-[#E63946]",
+                )}
+              >
+                {t(link.labelKey)}
+              </Link>
+            </DropdownMenuItem>
+          ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

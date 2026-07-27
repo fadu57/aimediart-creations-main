@@ -336,18 +336,19 @@ export function VisitorPageShell({
                     ) : (
                       <BarChart3 className="h-5 w-5 text-[#121212]" aria-hidden />
                     );
+                  const itemLabel = item.key === "menu_catalogue" ? "Oeuvres" : item.label;
                   return (
                     <NavLink
                       key={`visitor-fab-nav-${item.key}`}
                       to={item.to}
                       className="fab-item fab-nav-link"
-                      aria-label={item.label}
+                      aria-label={itemLabel}
                       target={isEmbedded ? "_top" : undefined}
                       rel={isEmbedded ? "noopener noreferrer" : undefined}
                       onClick={() => setIsFabOpen(false)}
                     >
                       {icon}
-                      <span className="fab-item-label">{item.label}</span>
+                      <span className="fab-item-label">{itemLabel}</span>
                     </NavLink>
                   );
                 })}
