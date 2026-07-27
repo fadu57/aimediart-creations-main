@@ -92,19 +92,15 @@ jobs:
   # audio_files, rôle anon — AIM-30). À étendre à d'autres tables/policies
   # au fil des tickets suivants.
   #
-  # NON BLOQUANT (continue-on-error) pour l'instant : AIM-173 a remplacé les
-  # 74 migrations legacy (`migration_NN_*.sql`, jamais rejouées par le CLI
-  # Supabase à froid) par une baseline unique
-  # (supabase/migrations/20260101000000_baseline_schema.sql), vérifiée
-  # empiriquement sur un volume Docker vierge en local (rejeu complet sans
-  # erreur SQL, `rls_is_global_admin()` présente, test:tenant-isolation vert).
-  # `continue-on-error` reste en place jusqu'à preuve empirique que ce job
-  # passe réellement de bout en bout sur un runner GitHub Actions — un volume
-  # authentiquement vierge, distinct du local. Retirer seulement une fois ce
-  # run confirmé vert (AC3, AIM-173).
+  # BLOQUANT depuis AIM-173 : les 74 migrations legacy (`migration_NN_*.sql`,
+  # jamais rejouées par le CLI Supabase à froid) ont été remplacées par une
+  # baseline unique (supabase/migrations/20260101000000_baseline_schema.sql).
+  # Vérifié empiriquement sur volume Docker vierge (local ET runner GitHub
+  # Actions, run 30300500805) : rejeu complet sans erreur SQL,
+  # `rls_is_global_admin()` présente, test:tenant-isolation vert. AC3 prouvé
+  # — `continue-on-error` retiré, ce job bloque désormais réellement la CI.
   tenant-isolation:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
