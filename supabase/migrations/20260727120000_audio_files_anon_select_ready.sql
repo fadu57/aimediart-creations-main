@@ -16,8 +16,15 @@
 --   backoffice garde l'accès à tous les statuts pour son suivi de génération.
 --
 -- Hors périmètre : le mécanisme de bannissement (visitor_audio_presence.banned_at,
---   AIM-39/AIM-93) gate la session/lecture audio ailleurs, pas la liste des
---   fichiers disponibles — non traité par cette policy.
+--   AIM-39/AIM-93) n'est PAS un garde-fou serveur sur cette policy ni sur la
+--   lecture du fichier storage — vérifié (supabase/functions/visitor-audio-session
+--   /index.ts) : banned_at n'est renvoyé au client que comme un simple flag
+--   `banned: boolean`, à charge pour le front de cesser d'afficher/lire l'audio.
+--   Un visiteur banni garde donc un accès SELECT technique intact à audio_files
+--   et au fichier storage tant qu'aucune policy serveur ne consulte
+--   visitor_audio_presence. Risque de sécurité résiduel connu, distinct de
+--   celui traité ici — non couvert par cette policy (nécessiterait une décision
+--   PM explicite sur l'ajout d'un check serveur, hors périmètre AIM-30).
 --
 -- =============================================================================
 

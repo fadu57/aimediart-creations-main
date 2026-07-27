@@ -1169,13 +1169,24 @@ export async function fetchAudioVoiceStatusMapByCell(
   return result;
 }
 
-/** Tous les fichiers audio liés à un texte. */
+/**
+ * Tous les fichiers audio liés à un texte.
+ *
+ * Le visiteur anonyme n'a plus d'accès direct à `audio_files` (colonnes de
+ * coût/télémétrie interne — provider, model, cost_usd — non destinées à
+ * anon) : il passe par la vue `audio_files_visitor`, restreinte aux colonnes
+ * utiles et aux fichiers `ready`. Le backoffice authentifié garde l'accès à
+ * la table complète (tous statuts, pour son suivi de génération).
+ */
 export async function getAudioFiles(
   text_id: string,
   text_type: AudioTextType,
 ): Promise<AudioFile[]> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const relation = sessionData.session ? "audio_files" : "audio_files_visitor";
+
   const { data, error } = await supabase
-    .from("audio_files")
+    .from(relation)
     .select("*")
     .eq("text_id", text_id)
     .eq("text_type", text_type)
