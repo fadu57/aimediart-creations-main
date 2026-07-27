@@ -8,8 +8,9 @@
 #   - scripts présents : `lint` (eslint), `typecheck` (tsc --noEmit) et
 #     `test` (vitest run) — un job indépendant chacun, bloquants sans
 #     --if-present : chaque signal reste visible même si un autre échoue ;
-#   - `test:tenant-isolation` n'existe pas encore : le job passe en
-#     --if-present, ne pas considérer le repo couvert (voir TODO ci-dessous).
+#   - `test:tenant-isolation` (AIM-30, scripts/test-tenant-isolation-audio-files.mjs) :
+#     démarre le stack Supabase local et vérifie l'isolation RLS/GRANT du
+#     rôle anon sur audio_files. À étendre table par table au fil des tickets.
 
 name: CI
 
@@ -86,13 +87,22 @@ jobs:
 
   # Isolation multi-tenant — invariant SaaS critique (le mode d'échec n°1
   # d'un SaaS, voir engineering-standards.md « Invariants SaaS »).
-  # TODO Aimediart : l'isolation repose sur les politiques RLS Supabase
-  # (supabase/rls_*.sql, migrations). Ce job DOIT exécuter des tests qui
-  # prouvent qu'un tenant ne lit/n'écrit jamais les données d'un autre.
-  # Tant que le script npm `test:tenant-isolation` n'existe pas, le job
-  # passe silencieusement (--if-present) — le repo n'est PAS couvert.
+  # Démarre le stack Supabase local (Docker, migrations appliquées
+  # automatiquement) puis exécute test:tenant-isolation (RLS/GRANT sur
+  # audio_files, rôle anon — AIM-30). À étendre à d'autres tables/policies
+  # au fil des tickets suivants.
+  #
+  # NON BLOQUANT (continue-on-error) pour l'instant : ce job est le premier
+  # à faire un `supabase start` réel sur une base vierge en CI, ce qui révèle
+  # que 74 migrations au format legacy (`migration_NN_*.sql`) ne sont jamais
+  # rejouées par le CLI Supabase à froid — des fonctions comme
+  # `rls_is_global_admin()` sont donc absentes en CI alors qu'elles existent
+  # sur les instances persistantes (local, prod). Dette pré-existante, sans
+  # lien avec AIM-30, suivie dans AIM-173. Retirer `continue-on-error` une
+  # fois AIM-173 résolu.
   tenant-isolation:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,5 +110,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - name: Tenant isolation tests # TODO Aimediart
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Démarrer le stack Supabase local
+        run: supabase start
+      - name: Tenant isolation tests
         run: npm run test:tenant-isolation --if-present
+      - name: Arrêter le stack Supabase local
+        if: always()
+        run: supabase stop
