@@ -16,6 +16,19 @@ const DB_URL =
 const READY_PATH = "test/tenant-isolation-ready.mp3";
 const PENDING_PATH = "test/tenant-isolation-pending.mp3";
 
+const AC2_READY_A = "test/tenant-isolation-ac2-ready-a.mp3";
+const AC2_READY_B = "test/tenant-isolation-ac2-ready-b.mp3";
+const AC2_PENDING = "test/tenant-isolation-ac2-pending.mp3";
+
+const AC2_FIXTURES = `
+  INSERT INTO public.audio_files
+    (text_id, text_type, lang, prompt_style_id, voice_id, gender, storage_path, status, provider, model, cost_usd)
+  VALUES
+    (gen_random_uuid(), 'mediation', 'fr', NULL, 'voice-f-1', 'F', '${AC2_READY_A}', 'ready', 'openai', 'tts-1', 0.42),
+    (gen_random_uuid(), 'mediation', 'fr', NULL, 'voice-m-1', 'M', '${AC2_READY_B}', 'ready', 'openai', 'tts-1', 0.55),
+    (gen_random_uuid(), 'mediation', 'fr', NULL, 'voice-f-2', 'F', '${AC2_PENDING}', 'pending', 'openai', 'tts-1', 0.10);
+`;
+
 const FIXTURES = `
   INSERT INTO public.audio_files
     (text_id, text_type, lang, prompt_style_id, voice_id, gender, storage_path, status, provider, model, cost_usd)
@@ -54,6 +67,38 @@ function check(name, fn) {
     console.error(`       ${err.message}`);
   }
 }
+
+check("AC2 - anon (vue) et authenticated (table, status=ready) voient exactement le même ensemble de fichiers ready", () => {
+  const out = psql(
+    `BEGIN; ${AC2_FIXTURES}
+     SET ROLE anon;
+     SELECT string_agg(storage_path, ',' ORDER BY storage_path)
+     FROM public.audio_files_visitor
+     WHERE storage_path IN ('${AC2_READY_A}', '${AC2_READY_B}', '${AC2_PENDING}');
+     RESET ROLE;
+     SET ROLE authenticated;
+     -- audio_files_select vérifie auth.role() (claim JWT), pas le rôle Postgres :
+     -- SET ROLE seul ne suffit pas à satisfaire cette policy.
+     SET LOCAL request.jwt.claim.role TO 'authenticated';
+     SELECT string_agg(storage_path, ',' ORDER BY storage_path)
+     FROM public.audio_files
+     WHERE storage_path IN ('${AC2_READY_A}', '${AC2_READY_B}', '${AC2_PENDING}')
+       AND status = 'ready';
+     RESET ROLE;
+     ROLLBACK;`,
+  );
+  const [anonSet, authSet] = out
+    .trim()
+    .split("\n")
+    .map((line) => line.trim());
+  const expected = [AC2_READY_A, AC2_READY_B].sort().join(",");
+  if (anonSet !== expected) {
+    throw new Error(`anon: attendu "${expected}", obtenu "${anonSet}"`);
+  }
+  if (authSet !== expected) {
+    throw new Error(`authenticated: attendu "${expected}", obtenu "${authSet}"`);
+  }
+});
 
 check("anon voit uniquement les fichiers ready via audio_files_visitor", () => {
   const out = psql(
