@@ -1,6 +1,12 @@
 -- Cron mensuel : sync coût fixe Cursor → ai_usage_events
 -- Prérequis Supabase : extensions pg_cron + pg_net activées
 --
+-- Rendu explicite (AIM-173) : sur une base vierge (CI, cold start), ces extensions
+-- ne sont pas activées automatiquement ; le dump prod utilisé pour la baseline ne
+-- les contient pas non plus (schéma "extensions", hors périmètre du dump).
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+--
 -- Secret Vault (interface 2025+) :
 --   Dashboard → Settings (engrenage) → INTEGRATIONS → Vault (BETA)
 --   → New secret → Name: service_role_key

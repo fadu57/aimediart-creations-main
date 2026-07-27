@@ -102,3 +102,20 @@ jobs:
       - run: npm ci
       - name: Tenant isolation tests # TODO Aimediart
         run: npm run test:tenant-isolation --if-present
+
+  # Cold start des migrations — AIM-173. Un runner GitHub Actions est nativement
+  # vierge à chaque run : ce job prouve que la baseline unique
+  # (supabase/migrations/20260101000000_baseline_schema.sql) et les migrations
+  # timestampées qui la suivent reconstruisent le schéma complet sans erreur sur
+  # une base Postgres neuve — indépendant de tenant-isolation ci-dessus.
+  # --ignore-health-check : n'ignore que la santé des services annexes (analytics,
+  # edge-runtime...) après coup ; une erreur SQL dans une migration fait toujours
+  # échouer ce job avant d'atteindre cette phase.
+  migrations-cold-start:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start --ignore-health-check
