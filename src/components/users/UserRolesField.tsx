@@ -24,6 +24,9 @@ type UserRolesFieldProps = {
   roleOptions: RoleOption[];
   roleIds: number[];
   onRoleIdsChange: (next: number[]) => void;
+  /** Associé(e) de l'entreprise (profiles.is_company_associate). */
+  isCompanyAssociate?: boolean;
+  onIsCompanyAssociateChange?: (checked: boolean) => void;
   agencyId: string | null;
   onAgencyIdChange: (agencyId: string) => void;
   expoIds: string[];
@@ -45,6 +48,8 @@ export function UserRolesField({
   roleOptions,
   roleIds,
   onRoleIdsChange,
+  isCompanyAssociate = false,
+  onIsCompanyAssociateChange,
   agencyId,
   onAgencyIdChange,
   expoIds,
@@ -87,10 +92,29 @@ export function UserRolesField({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>
-          {t("form.roles_title")}
-          {rolesRequired ? <span className="text-[#E63946]"> *</span> : null}
-        </Label>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <Label>
+            {t("form.roles_title")}
+            {rolesRequired ? <span className="text-[#E63946]"> *</span> : null}
+          </Label>
+          {onIsCompanyAssociateChange ? (
+            <label
+              htmlFor={`${idPrefix}-company-associate`}
+              className={cn(
+                "flex items-center gap-2 text-sm font-medium leading-none",
+                disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+              )}
+            >
+              <Checkbox
+                id={`${idPrefix}-company-associate`}
+                checked={isCompanyAssociate}
+                disabled={disabled}
+                onCheckedChange={(v) => onIsCompanyAssociateChange(v === true)}
+              />
+              <span>{t("form.company_associate")}</span>
+            </label>
+          ) : null}
+        </div>
         {globalOptions.length > 0 ? (
           <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
             <p className="text-xs font-medium text-muted-foreground">{t("form.role_global")}</p>

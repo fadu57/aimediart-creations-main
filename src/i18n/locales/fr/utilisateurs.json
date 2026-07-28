@@ -58,6 +58,7 @@
     "username_taken": "Ce pseudo est déjà utilisé. Le bouton Enregistrer est désactivé.",
     "change_photo": "Changer la photo",
     "roles_title": "Rôles",
+    "company_associate": "Associé(e) de l'entreprise",
     "role_global": "Rôle global (un seul)",
     "roles_org": "Rôles organisation",
     "roles_org_with_global": " (cumulables avec un rôle global)",

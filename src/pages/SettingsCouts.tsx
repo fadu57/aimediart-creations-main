@@ -7,11 +7,12 @@ import {
 import {
   ArrowLeft, Download, Loader2, RotateCcw, AlertCircle,
   Euro, Activity, TrendingUp, Award, RefreshCw, Search, CheckCircle2, XCircle, HelpCircle, History, ExternalLink,
-  ArrowUp, ArrowDown, ArrowUpDown, Plus, Paperclip, Trash2, Upload, FileText, Pencil,
+  ArrowUp, ArrowDown, ArrowUpDown, Plus, Paperclip, Trash2, Upload, FileText, Pencil, ChevronDown, Check,
+  ListChecks, CheckSquare,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,6 +21,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Tooltip as UiTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getCostIntegrityReport, type CostIntegrityReport } from "@/lib/costIntegrity";
 import { fetchVerifiedCostKpi } from "@/lib/costKpiApi";
 import {
@@ -75,6 +85,7 @@ import {
 import {
   createManualCost, updateManualCost, deleteManualCost, uploadCostDocument, deleteCostDocument,
   getCostDocumentSignedUrl, manualCostDocuments, isManualCostEvent, updateCostDocuments,
+  bulkSetCostEventsPreIncorporation, bulkSetCostEventsToolType,
   type CostDocument,
 } from "@/lib/manualCosts";
 import { formatTokenCount } from "@/lib/aiTokenUsage";
@@ -288,6 +299,7 @@ const EMPTY_FILTERS: CostFilters = {
   dateFrom: "", dateTo: "", toolType: "", provider: "",
   apiName: "", modelName: "", operationName: "", status: "", currency: "",
   artworkId: "", expoId: "", agencyId: "", mediationLangCount: "",
+  preIncorporation: "", paidByUserId: "",
 };
 
 // ---------------------------------------------------------------------------
@@ -526,7 +538,27 @@ function FiltersBar({ filters, options, onChange, onReset, loading }: FiltersBar
 // ---------------------------------------------------------------------------
 
 /** Catégories proposées pour une saisie manuelle (tool_type). */
-const MANUAL_COST_TOOL_TYPES = ["infrastructure", "service", "abonnement", "materiel", "other"] as const;
+/** Catégories manuelles : base demandée + détail métier (rétrocompat données existantes). */
+const MANUAL_COST_TOOL_TYPES = [
+  "infrastructure",
+  "service",
+  "abonnement",
+  "materiel",
+  "immatriculation_juridique",
+  "actifs_marque_domaines",
+  "cloud_hebergement",
+  "licences_saas",
+  "actifs_ip",
+  "honoraires_juridiques",
+  "marketing_acquisition",
+  "materiel_equipements",
+  "deplacement_representation",
+  "other",
+] as const;
+
+const DEFAULT_MANUAL_TOOL_TYPE = MANUAL_COST_TOOL_TYPES[0];
+
+type ManualCostAssociateOption = { id: string; label: string };
 const MANUAL_COST_CURRENCIES = ["EUR", "USD", "GBP"] as const;
 /** Taille max document (10 Mo) — alignée sur la policy du bucket. */
 const MANUAL_DOC_MAX_BYTES = 10 * 1024 * 1024;
@@ -549,12 +581,19 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
   const inputClass = BACKOFFICE_FORM_CONTROL_CLASS;
   const isEdit = editEvent != null;
 
+  const [isPreIncorporation, setIsPreIncorporation] = useState(false);
+  const [paidByUserId, setPaidByUserId] = useState("");
+  const [associates, setAssociates] = useState<ManualCostAssociateOption[]>([]);
+  const [associatesLoading, setAssociatesLoading] = useState(false);
+  const [toolTypeOpen, setToolTypeOpen] = useState(false);
   const [date, setDate] = useState(TODAY);
   const [label, setLabel] = useState("");
   const [provider, setProvider] = useState("");
-  const [toolType, setToolType] = useState<string>("service");
+  const [toolType, setToolType] = useState<string>(DEFAULT_MANUAL_TOOL_TYPE);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<string>("EUR");
+  /** Taux de TVA (ex. 20) — utilisé pour HT/TVA si société en formation. */
+  const [vatRate, setVatRate] = useState("20");
   const [invoiceRef, setInvoiceRef] = useState("");
   const [note, setNote] = useState("");
   /** Nouveaux fichiers à téléverser. */
@@ -571,24 +610,80 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
       setDate(editEvent.created_at.slice(0, 10));
       setLabel(metaString(meta, "label") || editEvent.operation_name || "");
       setProvider(editEvent.provider);
-      setToolType(editEvent.tool_type || "service");
+      setToolType(editEvent.tool_type || DEFAULT_MANUAL_TOOL_TYPE);
       setAmount(String(editEvent.cost_estimated ?? ""));
       setCurrency(editEvent.currency || "EUR");
+      const rawVat = meta.vat_rate;
+      setVatRate(
+        typeof rawVat === "number" && Number.isFinite(rawVat)
+          ? String(rawVat)
+          : typeof rawVat === "string" && rawVat.trim()
+            ? rawVat.trim()
+            : "20",
+      );
       setInvoiceRef(metaString(meta, "invoice_ref"));
       setNote(metaString(meta, "note"));
       setExistingDocs(manualCostDocuments(meta));
+      const preInc = meta.is_pre_incorporation === true;
+      setIsPreIncorporation(preInc);
+      setPaidByUserId(preInc ? metaString(meta, "paid_by_user_id") : "");
     } else {
-      setDate(TODAY); setLabel(""); setProvider(""); setToolType("service");
-      setAmount(""); setCurrency("EUR"); setInvoiceRef(""); setNote("");
+      setDate(TODAY); setLabel(""); setProvider(""); setToolType(DEFAULT_MANUAL_TOOL_TYPE);
+      setAmount(""); setCurrency("EUR"); setVatRate("20"); setInvoiceRef(""); setNote("");
       setExistingDocs([]);
+      setIsPreIncorporation(false);
+      setPaidByUserId("");
     }
     setNewFiles([]); setError(null); setSaving(false);
+    setToolTypeOpen(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [editEvent]);
 
   useEffect(() => {
     if (open) reset();
   }, [open, reset]);
+
+  /** Charge les associé(e)s de l'entreprise (profiles.is_company_associate). */
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      setAssociatesLoading(true);
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, username")
+        .eq("is_company_associate", true);
+
+      if (cancelled) return;
+      if (error || !profiles?.length) {
+        setAssociates([]);
+        setAssociatesLoading(false);
+        return;
+      }
+
+      const options: ManualCostAssociateOption[] = ((profiles ?? []) as Array<{
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        username: string | null;
+      }>)
+        .map((p) => {
+          const full = [p.first_name?.trim(), p.last_name?.trim()].filter(Boolean).join(" ");
+          const label = full || p.username?.trim() || p.id.slice(0, 8);
+          return { id: p.id, label };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+
+      setAssociates(options);
+      setAssociatesLoading(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setAssociates([]);
+        setAssociatesLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
@@ -621,6 +716,15 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
       setError(t("couts.manual.error_amount"));
       return;
     }
+    if (isPreIncorporation && !paidByUserId.trim()) {
+      setError(t("couts.manual.error_paid_by_required"));
+      return;
+    }
+    const vatRateNum = Number(String(vatRate).replace(",", "."));
+    if (isPreIncorporation && (!Number.isFinite(vatRateNum) || vatRateNum < 0 || vatRateNum > 100)) {
+      setError(t("couts.manual.error_vat_rate"));
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -644,8 +748,18 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
     const documents: CostDocument[] = [...existingDocs, ...uploaded];
 
     const payload = {
-      date, label: label.trim(), provider, toolType,
-      amount: amountNum, currency, invoiceRef, note, documents,
+      date,
+      label: label.trim(),
+      provider,
+      toolType,
+      amount: amountNum,
+      currency,
+      invoiceRef,
+      note,
+      documents,
+      isPreIncorporation,
+      paidByUserId: isPreIncorporation ? paidByUserId.trim() : null,
+      vatRate: isPreIncorporation ? vatRateNum : undefined,
     };
 
     const { error: saveErr } = isEdit
@@ -683,6 +797,37 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-1">
+          <div className="flex flex-col gap-2">
+            <label
+              htmlFor="mc-pre-incorporation"
+              className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2.5"
+            >
+              <Switch
+                id="mc-pre-incorporation"
+                checked={isPreIncorporation}
+                onCheckedChange={(v) => {
+                  setIsPreIncorporation(v);
+                  if (!v) setPaidByUserId("");
+                }}
+                className="mt-0.5"
+              />
+              <span className="text-xs font-medium leading-snug text-foreground">
+                {t("couts.manual.field_pre_incorporation")}
+              </span>
+            </label>
+
+            {isPreIncorporation && (
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
+                <AlertTitle className="text-xs font-semibold text-amber-950 dark:text-amber-100">
+                  {t("couts.manual.pre_incorporation_alert_title")}
+                </AlertTitle>
+                <AlertDescription className="text-[11px] leading-relaxed text-amber-950/90 dark:text-amber-50/90">
+                  {t("couts.manual.pre_incorporation_alert_desc")}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="mc-date" className="text-xs">{t("couts.manual.field_date")}</Label>
@@ -693,15 +838,92 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
             </div>
             <div className="flex flex-1 flex-col gap-1.5">
               <Label htmlFor="mc-toolType" className="text-xs">{t("couts.manual.field_tooltype")}</Label>
-              <select
-                id="mc-toolType" className={inputClass} value={toolType}
-                onChange={(e) => setToolType(e.target.value)}
-              >
-                {!knownToolType && toolType && <option value={toolType}>{toolType}</option>}
-                {MANUAL_COST_TOOL_TYPES.map((tt) => (
-                  <option key={tt} value={tt}>{t(`couts.manual.tooltype_${tt}`)}</option>
-                ))}
-              </select>
+              <Popover open={toolTypeOpen} onOpenChange={setToolTypeOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    id="mc-toolType"
+                    type="button"
+                    className={cn(inputClass, "flex items-center justify-between gap-2 text-left")}
+                    aria-haspopup="listbox"
+                    aria-expanded={toolTypeOpen}
+                  >
+                    <span className="min-w-0 truncate">
+                      {knownToolType
+                        ? t(`couts.manual.tooltype_${toolType}`)
+                        : (toolType || t("couts.manual.field_tooltype"))}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="z-[200] w-[var(--radix-popover-trigger-width)] min-w-[18rem] max-w-[min(100vw-2rem,28rem)] p-1"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <TooltipProvider delayDuration={250}>
+                    <div role="listbox" aria-labelledby="mc-toolType" className="max-h-64 overflow-y-auto">
+                      {!knownToolType && toolType && (
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-accent"
+                          onClick={() => {
+                            setToolTypeOpen(false);
+                          }}
+                        >
+                          <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                          <span className="min-w-0 truncate">{toolType}</span>
+                        </button>
+                      )}
+                      {MANUAL_COST_TOOL_TYPES.map((tt) => {
+                        const selected = toolType === tt;
+                        const hintKey = `couts.manual.tooltype_${tt}_hint`;
+                        const hint = t(hintKey);
+                        const hasHint = hint !== hintKey;
+                        const optionBtn = (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            title={hasHint ? hint : undefined}
+                            className={cn(
+                              "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-accent",
+                              selected && "bg-accent/60",
+                            )}
+                            onClick={() => {
+                              setToolType(tt);
+                              setToolTypeOpen(false);
+                            }}
+                          >
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                              {selected ? <Check className="h-4 w-4 text-primary" aria-hidden /> : null}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-snug text-foreground">
+                              {t(`couts.manual.tooltype_${tt}`)}
+                            </span>
+                          </button>
+                        );
+                        if (!hasHint) return <div key={tt}>{optionBtn}</div>;
+                        return (
+                          <UiTooltip key={tt}>
+                            <TooltipTrigger asChild>
+                              {optionBtn}
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="right"
+                              sideOffset={8}
+                              className="z-[300] max-w-xs text-xs leading-relaxed"
+                            >
+                              {hint}
+                            </TooltipContent>
+                          </UiTooltip>
+                        );
+                      })}
+                    </div>
+                  </TooltipProvider>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -714,8 +936,42 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
             />
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex flex-1 flex-col gap-1.5">
+          {isPreIncorporation ? (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label htmlFor="mc-provider" className="text-xs">{t("couts.manual.field_provider")}</Label>
+                <input
+                  id="mc-provider" type="text" className={inputClass} value={provider}
+                  placeholder={t("couts.manual.field_provider_ph")}
+                  onChange={(e) => setProvider(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-1 flex-col gap-1.5">
+                <Label htmlFor="mc-paid-by" className="text-xs">{t("couts.manual.field_paid_by")}</Label>
+                <select
+                  id="mc-paid-by"
+                  className={inputClass}
+                  value={paidByUserId}
+                  onChange={(e) => setPaidByUserId(e.target.value)}
+                  disabled={associatesLoading}
+                >
+                  <option value="">
+                    {associatesLoading
+                      ? t("couts.manual.field_paid_by_loading")
+                      : t("couts.manual.field_paid_by_ph")}
+                  </option>
+                  {paidByUserId &&
+                    !associates.some((a) => a.id === paidByUserId) && (
+                      <option value={paidByUserId}>{paidByUserId.slice(0, 8)}…</option>
+                    )}
+                  {associates.map((a) => (
+                    <option key={a.id} value={a.id}>{a.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
               <Label htmlFor="mc-provider" className="text-xs">{t("couts.manual.field_provider")}</Label>
               <input
                 id="mc-provider" type="text" className={inputClass} value={provider}
@@ -723,7 +979,10 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
                 onChange={(e) => setProvider(e.target.value)}
               />
             </div>
-            <div className="flex w-full flex-col gap-1.5 sm:w-32">
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex w-full flex-col gap-1.5 sm:flex-1">
               <Label htmlFor="mc-amount" className="text-xs">{t("couts.manual.field_amount")}</Label>
               <input
                 id="mc-amount" type="text" inputMode="decimal" className={inputClass} value={amount}
@@ -731,6 +990,20 @@ function ManualCostDialog({ open, onOpenChange, onSaved, editEvent = null }: Man
                 onChange={(e) => setAmount(e.target.value)}
               />
             </div>
+            {isPreIncorporation && (
+              <div className="flex w-full flex-col gap-1.5 sm:w-28">
+                <Label htmlFor="mc-vat" className="text-xs">{t("couts.manual.field_vat_rate")}</Label>
+                <input
+                  id="mc-vat"
+                  type="text"
+                  inputMode="decimal"
+                  className={inputClass}
+                  value={vatRate}
+                  placeholder="20"
+                  onChange={(e) => setVatRate(e.target.value)}
+                />
+              </div>
+            )}
             <div className="flex w-full flex-col gap-1.5 sm:w-24">
               <Label htmlFor="mc-currency" className="text-xs">{t("couts.manual.field_currency")}</Label>
               <select
@@ -1117,6 +1390,9 @@ type CostsTableProps = {
   onPageChange: (p: number) => void;
   onExport: () => void;
   exportingCsv?: boolean;
+  /** Export État des actes (société en formation) — admins uniquement. */
+  onExportPreIncorporation?: (format: "pdf" | "md") => void;
+  exportingPreIncorporation?: boolean;
   currency: string;
   totals: CostEventsTotals | null;
   loadingTotals: boolean;
@@ -1228,14 +1504,100 @@ function CostsTable({
   totals, loadingTotals, usdEurRate, isAdmin = false, filters, linkedFilterOptions, artworkMetaById,
   onFiltersChange,
   onAddCost, onEditCost, onAttachCost, onDeleted,
+  onExportPreIncorporation, exportingPreIncorporation = false,
 }: CostsTableProps) {
   const { t } = useTranslation("settings");
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [preIncDialogOpen, setPreIncDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [bulkPaidByUserId, setBulkPaidByUserId] = useState("");
+  const [bulkToolType, setBulkToolType] = useState<string>(DEFAULT_MANUAL_TOOL_TYPE);
   const filterSelectClass = cn(BACKOFFICE_FORM_CONTROL_CLASS, "h-9 w-full min-w-0 text-xs");
-  const { artworks, expos, agencies, selectOptions, mediationLangCounts } = linkedFilterOptions;
+  const { artworks, expos, agencies, selectOptions, mediationLangCounts, paidByAssociates } =
+    linkedFilterOptions;
 
-  const setEntityFilter = (key: "artworkId" | "expoId" | "agencyId" | "toolType" | "mediationLangCount", value: string) => {
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters]);
+
+  useEffect(() => {
+    if (!selectionMode) setSelectedIds(new Set());
+  }, [selectionMode]);
+
+  const pageIds = useMemo(() => events.map((e) => e.id), [events]);
+  const selectedCount = selectedIds.size;
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  const toggleSelectId = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllPage = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of pageIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkPreIncorporation = async () => {
+    if (selectedCount === 0) return;
+    if (!bulkPaidByUserId.trim()) {
+      toast.error(t("couts.manual.error_paid_by_required"));
+      return;
+    }
+    setBulkBusy(true);
+    const { updated, error: bulkErr } = await bulkSetCostEventsPreIncorporation(
+      [...selectedIds],
+      { isPreIncorporation: true, paidByUserId: bulkPaidByUserId.trim(), vatRate: 20 },
+    );
+    setBulkBusy(false);
+    if (bulkErr) {
+      toast.error(t("couts.bulk.error", { detail: bulkErr }));
+      return;
+    }
+    toast.success(t("couts.bulk.pre_inc_done", { count: updated }));
+    setPreIncDialogOpen(false);
+    setCategoryDialogOpen(true);
+    onDeleted?.();
+  };
+
+  const handleBulkCategory = async () => {
+    if (selectedCount === 0 || !bulkToolType.trim()) return;
+    setBulkBusy(true);
+    const { updated, error: bulkErr } = await bulkSetCostEventsToolType(
+      [...selectedIds],
+      bulkToolType,
+    );
+    setBulkBusy(false);
+    if (bulkErr) {
+      toast.error(t("couts.bulk.error", { detail: bulkErr }));
+      return;
+    }
+    toast.success(t("couts.bulk.category_done", { count: updated }));
+    setCategoryDialogOpen(false);
+    setSelectionMode(false);
+    onDeleted?.();
+  };
+
+  const setEntityFilter = (
+    key: "artworkId" | "expoId" | "agencyId" | "toolType" | "mediationLangCount" | "preIncorporation" | "paidByUserId",
+    value: string,
+  ) => {
     const next: CostFilters = { ...filters };
     if (key === "toolType") {
       next.toolType = value;
@@ -1244,6 +1606,18 @@ function CostsTable({
     }
     if (key === "mediationLangCount") {
       next.mediationLangCount = value;
+      onFiltersChange(next);
+      return;
+    }
+    if (key === "preIncorporation") {
+      next.preIncorporation = value;
+      if (value === "no") next.paidByUserId = "";
+      onFiltersChange(next);
+      return;
+    }
+    if (key === "paidByUserId") {
+      next.paidByUserId = value;
+      if (value && next.preIncorporation !== "yes") next.preIncorporation = "yes";
       onFiltersChange(next);
       return;
     }
@@ -1303,7 +1677,7 @@ function CostsTable({
   return (
     <div>
       <div className="mb-3 flex flex-col gap-3">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
               {t("couts.filter_artwork")}
@@ -1381,17 +1755,133 @@ function CostsTable({
               ))}
             </select>
           </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_pre_incorporation")}
+            </label>
+            <select
+              value={filters.preIncorporation ?? ""}
+              onChange={(e) => setEntityFilter("preIncorporation", e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              <option value="yes">{t("couts.filter_pre_incorporation_yes")}</option>
+              <option value="no">{t("couts.filter_pre_incorporation_no")}</option>
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              {t("couts.filter_paid_by")}
+            </label>
+            <select
+              value={filters.paidByUserId ?? ""}
+              onChange={(e) => setEntityFilter("paidByUserId", e.target.value)}
+              className={filterSelectClass}
+              disabled={(filters.preIncorporation ?? "") === "no"}
+            >
+              <option value="">{t("couts.filter_all")}</option>
+              {filters.paidByUserId &&
+                !paidByAssociates.some((a) => a.id === filters.paidByUserId) && (
+                  <option value={filters.paidByUserId}>
+                    {filters.paidByUserId.slice(0, 8)}…
+                  </option>
+                )}
+              {paidByAssociates.map((a) => (
+                <option key={a.id} value={a.id}>{a.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">
           {total.toLocaleString("fr-FR")} {t("couts.events_count")}
+          {selectionMode && selectedCount > 0 ? (
+            <span className="ml-2 font-medium text-foreground">
+              · {t("couts.bulk.selected_count", { count: selectedCount })}
+            </span>
+          ) : null}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <Button
+              type="button"
+              variant={selectionMode ? "default" : "outline"}
+              size="sm"
+              className="gap-2"
+              onClick={() => setSelectionMode((v) => !v)}
+            >
+              {selectionMode ? (
+                <CheckSquare className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <ListChecks className="h-3.5 w-3.5" aria-hidden />
+              )}
+              {selectionMode ? t("couts.bulk.btn_cancel_select") : t("couts.bulk.btn_select")}
+            </Button>
+          )}
+          {isAdmin && selectionMode && selectedCount > 0 && (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={bulkBusy}
+                onClick={() => {
+                  setBulkPaidByUserId("");
+                  setPreIncDialogOpen(true);
+                }}
+              >
+                {t("couts.bulk.btn_assign_pre_inc")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2"
+                disabled={bulkBusy}
+                onClick={() => {
+                  setBulkToolType(DEFAULT_MANUAL_TOOL_TYPE);
+                  setCategoryDialogOpen(true);
+                }}
+              >
+                {t("couts.bulk.btn_assign_category")}
+              </Button>
+            </>
+          )}
           {isAdmin && onAddCost && (
             <Button type="button" size="sm" onClick={onAddCost} className="gap-2">
               <Plus className="h-3.5 w-3.5" aria-hidden />
               {t("couts.manual.btn_add")}
             </Button>
+          )}
+          {isAdmin && onExportPreIncorporation && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={exportingPreIncorporation}
+                  className="gap-2"
+                >
+                  {exportingPreIncorporation ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                  {t("couts.manual.btn_export_actes")}
+                  <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onExportPreIncorporation("pdf")}>
+                  {t("couts.manual.export_actes_pdf")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onExportPreIncorporation("md")}>
+                  {t("couts.manual.export_actes_md")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button
             type="button"
@@ -1426,6 +1916,7 @@ function CostsTable({
       <div className="max-h-[540px] overflow-x-auto overflow-y-auto rounded-xl border border-border/50">
         <table className="w-full min-w-[1100px] table-fixed text-[12px]">
           <colgroup>
+            {selectionMode ? <col className="w-[36px]" /> : null}
             <col className="w-[96px]" />
             <col className="w-[60px]" />
             <col className="w-[78px]" />
@@ -1443,6 +1934,15 @@ function CostsTable({
           </colgroup>
           <thead>
             <tr className="border-b border-border/50 bg-muted/40">
+              {selectionMode ? (
+                <th className="px-1.5 py-2.5 text-center">
+                  <Checkbox
+                    checked={allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => toggleSelectAllPage(v === true)}
+                    aria-label={t("couts.bulk.select_all_page")}
+                  />
+                </th>
+              ) : null}
               {COST_TABLE_SORTABLE_COLUMNS.map(({ column, labelKey }) => (
                 <SortableTh
                   key={column}
@@ -1508,6 +2008,7 @@ function CostsTable({
               })}
             </tr>
             <tr className="border-b border-border/50 bg-muted/25">
+              {selectionMode ? <td /> : null}
               <td colSpan={5} className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("couts.table_totals_label")}
               </td>
@@ -1550,6 +2051,7 @@ function CostsTable({
               const entityLabel =
                 entityTitle ??
                 (entityPending ? "…" : (isCostBioEvent(e) && bioRowId ? "…" : "—"));
+              const rowSelected = selectedIds.has(e.id);
 
               return (
               <tr
@@ -1558,8 +2060,18 @@ function CostsTable({
                   "border-b border-border/30 transition-colors hover:bg-muted/20",
                   i % 2 !== 0 && "bg-muted/10",
                   e.status === "partial" && "italic",
+                  selectionMode && rowSelected && "bg-primary/5",
                 )}
               >
+                {selectionMode ? (
+                  <td className="px-1.5 py-1 text-center align-middle">
+                    <Checkbox
+                      checked={rowSelected}
+                      onCheckedChange={(v) => toggleSelectId(e.id, v === true)}
+                      aria-label={t("couts.bulk.select_row")}
+                    />
+                  </td>
+                ) : null}
                 <td className="px-2 py-1 text-[12px] text-muted-foreground font-mono truncate leading-tight" title={frDate(e.created_at)}>
                   {frDate(e.created_at)}
                 </td>
@@ -1706,6 +2218,80 @@ function CostsTable({
       )}
         </>
       )}
+
+      <Dialog open={preIncDialogOpen} onOpenChange={(o) => { if (!bulkBusy) setPreIncDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("couts.bulk.pre_inc_title")}</DialogTitle>
+            <DialogDescription>
+              {t("couts.bulk.pre_inc_desc", { count: selectedCount })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-1">
+            <Alert className="border-amber-500/40 bg-amber-500/10 text-foreground">
+              <AlertDescription className="text-[11px] leading-relaxed">
+                {t("couts.manual.pre_incorporation_alert_desc")}
+              </AlertDescription>
+            </Alert>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="bulk-paid-by" className="text-xs">{t("couts.manual.field_paid_by")}</Label>
+              <select
+                id="bulk-paid-by"
+                className={filterSelectClass}
+                value={bulkPaidByUserId}
+                onChange={(e) => setBulkPaidByUserId(e.target.value)}
+              >
+                <option value="">{t("couts.manual.field_paid_by_ph")}</option>
+                {paidByAssociates.map((a) => (
+                  <option key={a.id} value={a.id}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={bulkBusy} onClick={() => setPreIncDialogOpen(false)}>
+              {t("couts.manual.cancel")}
+            </Button>
+            <Button type="button" disabled={bulkBusy} className="gap-2" onClick={() => void handleBulkPreIncorporation()}>
+              {bulkBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {t("couts.bulk.pre_inc_submit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={(o) => { if (!bulkBusy) setCategoryDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("couts.bulk.category_title")}</DialogTitle>
+            <DialogDescription>
+              {t("couts.bulk.category_desc", { count: selectedCount })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5 py-1">
+            <Label htmlFor="bulk-tooltype" className="text-xs">{t("couts.manual.field_tooltype")}</Label>
+            <select
+              id="bulk-tooltype"
+              className={filterSelectClass}
+              value={bulkToolType}
+              onChange={(e) => setBulkToolType(e.target.value)}
+            >
+              {MANUAL_COST_TOOL_TYPES.map((tt) => (
+                <option key={tt} value={tt}>{t(`couts.manual.tooltype_${tt}`)}</option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" disabled={bulkBusy} onClick={() => setCategoryDialogOpen(false)}>
+              {t("couts.manual.cancel")}
+            </Button>
+            <Button type="button" disabled={bulkBusy} className="gap-2" onClick={() => void handleBulkCategory()}>
+              {bulkBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+              {t("couts.bulk.category_submit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -3368,6 +3954,88 @@ export default function SettingsCouts() {
   }, []);
 
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPreIncorporation, setExportingPreIncorporation] = useState(false);
+
+  const handleExportPreIncorporation = useCallback((format: "pdf" | "md") => {
+    // Pop-up synchrone (geste utilisateur) — un window.open après await est bloqué.
+    let previewWin: Window | null = null;
+    if (format === "pdf") {
+      previewWin = window.open("about:blank", "_blank", "width=900,height=1100");
+      if (!previewWin) {
+        toast.error(t("couts.manual.export_actes_popup_blocked"));
+        return;
+      }
+      try {
+        previewWin.document.open();
+        previewWin.document.write(
+          `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"/><title>ALTIVART…</title></head>` +
+            `<body style="font-family:system-ui,sans-serif;padding:2rem"><p>Génération de l'état des actes…</p></body></html>`,
+        );
+        previewWin.document.close();
+      } catch {
+        // ignore
+      }
+    }
+
+    void (async () => {
+      setExportingPreIncorporation(true);
+      try {
+        const {
+          generatePreIncorporationReport,
+          downloadPreIncorporationMarkdown,
+          openPreIncorporationPrintPreview,
+          buildPreIncorporationPrintHtml,
+        } = await import("@/lib/preIncorporationReport");
+        const { report, error } = await generatePreIncorporationReport();
+        if (error || !report) {
+          previewWin?.close();
+          toast.error(t("couts.manual.export_actes_error", { detail: error ?? "—" }));
+          return;
+        }
+        if (report.lines.length === 0) {
+          previewWin?.close();
+          toast.warning(t("couts.manual.export_actes_empty"));
+          return;
+        }
+        if (format === "md") {
+          downloadPreIncorporationMarkdown(report);
+          toast.success(t("couts.manual.export_actes_md_done", { count: report.lines.length }));
+          return;
+        }
+
+        if (previewWin && !previewWin.closed) {
+          openPreIncorporationPrintPreview(report, previewWin);
+          toast.success(t("couts.manual.export_actes_pdf_done", { count: report.lines.length }));
+          return;
+        }
+
+        const html = buildPreIncorporationPrintHtml(report);
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, "_blank", "width=900,height=1100");
+        if (!w) {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "ALTIVART-etat-actes-accomplis.html";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          toast.success(t("couts.manual.export_actes_pdf_download", { count: report.lines.length }));
+        } else {
+          toast.success(t("couts.manual.export_actes_pdf_done", { count: report.lines.length }));
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } catch (e) {
+        previewWin?.close();
+        const msg = e instanceof Error && e.message === "popup_blocked"
+          ? t("couts.manual.export_actes_popup_blocked")
+          : t("couts.manual.export_actes_error", { detail: String(e) });
+        toast.error(msg);
+      } finally {
+        setExportingPreIncorporation(false);
+      }
+    })();
+  }, [t]);
 
   const handleExport = useCallback(() => {
     void (async () => {
@@ -3579,6 +4247,8 @@ export default function SettingsCouts() {
             onPageChange={setPage}
             onExport={handleExport}
             exportingCsv={exportingCsv}
+            onExportPreIncorporation={handleExportPreIncorporation}
+            exportingPreIncorporation={exportingPreIncorporation}
             currency={currency}
             totals={eventsTotals}
             loadingTotals={loadingEventsTotals}

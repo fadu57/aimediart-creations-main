@@ -30,6 +30,8 @@ function mapFiltersToApi(filters: CostFilters): Record<string, string | undefine
     artwork_id: filters.artworkId?.trim() || undefined,
     expo_id: filters.expoId?.trim() || undefined,
     agency_id: filters.agencyId?.trim() || undefined,
+    pre_incorporation: filters.preIncorporation?.trim() || undefined,
+    paid_by_user_id: filters.paidByUserId?.trim() || undefined,
   };
 }
 
