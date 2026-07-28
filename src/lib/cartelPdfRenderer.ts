@@ -10,7 +10,7 @@ import {
   type CartelFormatSelection,
   type CartelSlot,
 } from "@/lib/cartelPdfFormats";
-import { computeCartelLayout, CARTEL_FREE_STAMP_URL } from "@/lib/cartelPdfLayout";
+import { computeCartelLayout, CARTEL_FREE_STAMP_URL, CARTEL_FREE_STAMP_ROTATION_DEG } from "@/lib/cartelPdfLayout";
 import { brandLogoSizeMm, createAimediaHeaderLogoBlockPng } from "@/lib/pdfHeaderLogoBlock";
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -40,6 +40,30 @@ async function loadStampWithTransparency(url: string): Promise<HTMLImageElement>
     }
   }
   ctx.putImageData(imageData, 0, 0);
+  return loadImage(canvas.toDataURL("image/png"));
+}
+
+/** Pré-tourne le tampon pour le PDF (rotation = CARTEL_FREE_STAMP_ROTATION_DEG). */
+async function loadRotatedStamp(
+  url: string,
+  rotationDeg: number = CARTEL_FREE_STAMP_ROTATION_DEG,
+): Promise<HTMLImageElement> {
+  const img = await loadStampWithTransparency(url);
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  const bw = Math.ceil(w * cos + h * sin);
+  const bh = Math.ceil(w * sin + h * cos);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, bw);
+  canvas.height = Math.max(1, bh);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return img;
+  ctx.translate(bw / 2, bh / 2);
+  ctx.rotate(rad);
+  ctx.drawImage(img, -w / 2, -h / 2);
   return loadImage(canvas.toDataURL("image/png"));
 }
 
@@ -78,6 +102,7 @@ function renderCartelInSlot(
     stampY,
     stampW,
     stampH,
+    headerX,
     headerLines,
     headerFontSize,
     headerBaseline,
@@ -98,21 +123,21 @@ function renderCartelInSlot(
     artistY,
   } = layout;
 
-  // Stamp FREE
+  // 1) Stamp 5/5 — 2) Header 12/12 par-dessus — 3) QR fixe puis titres
   pdf.addImage(stampImg, "PNG", stampX, stampY, stampW, stampH, undefined, "NONE");
 
   pdf.setTextColor(0, 0, 0);
   if (headerLines.length > 0) {
-    // Helvetica ≈ Arial (jsPDF standard)
     pdf.setFont("helvetica", "bolditalic");
     pdf.setFontSize(headerFontSize);
     let y = headerBaseline;
     for (const line of headerLines) {
-      pdf.text(line, centerX, y, { align: "center" });
+      pdf.text(line, headerX, y, { align: "left" });
       y += headerLineHeight;
     }
   }
 
+  // 3) QR centré, puis titres / artiste
   pdf.addImage(qrImg, "PNG", qrX, qrY, qrSize, qrSize, undefined, "NONE");
 
   const centerLogoW = qrSize * 0.52;
@@ -202,7 +227,7 @@ export async function generateCartelPdfBatch(items: GenerateCartelPdfInput[]): P
   const headerLogo = await createAimediaHeaderLogoBlockPng();
   const { widthMm: logoWidthMm, heightMm: logoHeightMm } = brandLogoSizeMm();
   const logoImg = await loadImage(headerLogo.dataUrl);
-  const stampImg = await loadStampWithTransparency(CARTEL_FREE_STAMP_URL);
+  const stampImg = await loadRotatedStamp(CARTEL_FREE_STAMP_URL);
 
   for (let i = 0; i < items.length; i++) {
     const input = items[i];
