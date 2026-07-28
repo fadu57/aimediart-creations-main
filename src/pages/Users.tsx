@@ -57,6 +57,7 @@ import {
 } from "@/lib/userRoleAssignment";
 import { formatUserLastSignIn } from "@/lib/userLastSignIn";
 import { A11Y_CLICKABLE_FOCUS_CLASS } from "@/lib/a11yClickable";
+import { cn } from "@/lib/utils";
 
 /** Boutons barre d'outils /utilisateurs : même largeur et hauteur. */
 const USERS_TOOLBAR_BTN_GOLD =
@@ -91,6 +92,8 @@ type UserRow = {
   expo_id?: string | null;
   expo_ids?: string[];
   last_sign_in_at?: string | null;
+  /** Associé(e) de l'entreprise (profiles.is_company_associate). */
+  is_company_associate?: boolean;
 };
 
 type ExpoOption = {
@@ -162,14 +165,52 @@ function userFullName(row: UserRow): string {
   return full || "Utilisateur";
 }
 
-function roleLabelFromUserRow(row: UserRow, roleOptions: RoleOption[]): string {
-  const roleId =
-    row.role_ids?.length
-      ? Math.min(...row.role_ids)
-      : Number(row.role_id ?? NaN);
-  if (!Number.isFinite(roleId)) return "—";
-  const option = roleOptions.find((r) => r.role_id === roleId);
-  return option?.label || `Rôle ${roleId}`;
+function roleLabelsFromUserRow(
+  row: UserRow,
+  roleOptions: RoleOption[],
+  associateLabel: string,
+): Array<{ label: string; special?: boolean }> {
+  const ids = row.role_ids?.length
+    ? [...new Set(row.role_ids)].sort((a, b) => a - b)
+    : row.role_id != null && Number.isFinite(row.role_id)
+      ? [row.role_id]
+      : [];
+
+  const parts = ids.map((id) => {
+    const option = roleOptions.find((r) => r.role_id === id);
+    return { label: option?.label || `Rôle ${id}` };
+  });
+
+  if (row.is_company_associate === true) {
+    parts.push({ label: associateLabel, special: true });
+  }
+
+  return parts;
+}
+
+function UserCardRolesLine({
+  user,
+  roleOptions,
+  associateLabel,
+}: {
+  user: UserRow;
+  roleOptions: RoleOption[];
+  associateLabel: string;
+}) {
+  const parts = roleLabelsFromUserRow(user, roleOptions, associateLabel);
+  if (parts.length === 0) {
+    return <p className="text-sm font-bold italic">—</p>;
+  }
+  return (
+    <p className="text-sm font-bold italic">
+      {parts.map((part, index) => (
+        <span key={`${user.id}-role-${index}`}>
+          {index > 0 ? " · " : null}
+          <span className={part.special ? "text-[#E63946]" : undefined}>{part.label}</span>
+        </span>
+      ))}
+    </p>
+  );
 }
 
 /** Résout des identifiants expo vers expos.id (FK expo_user_role). */
@@ -238,7 +279,7 @@ async function enrichUserRowsWithMergedRoles(rows: UserRow[]): Promise<UserRow[]
   }
 
   return rows.map((row) => {
-    const globalRoleId = globalByUser.get(row.id) ?? null;
+    const globalRoleId = globalByUser.get(row.id) ?? parseGlobalRoleId(row.role_id);
     const agencyRec = agencyByUser.get(row.id);
     const agencyRoleId = agencyRec?.role_id ?? parseAgencyRoleId(row.role_id);
     const mergedRoleId = resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId);
@@ -350,6 +391,7 @@ type RpcUserWithRolesRow = {
   birth_year?: number | string | null;
   birth_month?: string | number | null;
   last_sign_in_at?: string | null;
+  is_company_associate?: boolean | null;
 };
 
 function rpcRowUserId(row: RpcUserWithRolesRow): string {
@@ -420,7 +462,7 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "avatar_url, birth_year, first_name, last_name, username, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, role_id",
+      "avatar_url, birth_year, first_name, last_name, username, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, role_id, is_company_associate",
     )
     .eq("id", row.id)
     .maybeSingle();
@@ -439,6 +481,7 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     zip_code?: string | null;
     country_code?: string | null;
     role_id?: number | null;
+    is_company_associate?: boolean | null;
   } | null;
 
   if (details) {
@@ -472,6 +515,7 @@ async function enrichUserRowForEdit(row: UserRow, sessionUser: User | null): Pro
     birth_year:
       typeof p?.birth_year === "number" && Number.isFinite(p.birth_year) ? String(p.birth_year) : null,
   });
+  enriched.is_company_associate = p?.is_company_associate === true;
 
   if (isSelf && sessionUser) {
     if (sessionUser.email?.trim()) enriched.email = sessionUser.email.trim();
@@ -700,7 +744,37 @@ function mapRpcRowToUserRow(row: RpcUserWithRolesRow): UserRow | null {
     agency_id: row.agency_id ?? null,
     expo_id: row.expo_id ?? null,
     last_sign_in_at: typeof row.last_sign_in_at === "string" ? row.last_sign_in_at : null,
+    is_company_associate: row.is_company_associate === true,
   };
+}
+
+/** Enrichit la liste avec profiles.is_company_associate (indépendamment du RPC). */
+async function attachCompanyAssociateFlags(rows: UserRow[]): Promise<UserRow[]> {
+  const ids = [...new Set(rows.map((r) => r.id.trim()).filter(Boolean))];
+  if (ids.length === 0) return rows;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, is_company_associate")
+    .in("id", ids);
+
+  if (error || !data) {
+    if (import.meta.env.DEV && error) {
+      console.warn("[Users] is_company_associate :", error.message);
+    }
+    return rows;
+  }
+
+  const flagById = new Map<string, boolean>();
+  for (const row of data as Array<{ id?: string | null; is_company_associate?: boolean | null }>) {
+    const id = row.id?.trim();
+    if (id) flagById.set(id, row.is_company_associate === true);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    is_company_associate: flagById.get(r.id) === true,
+  }));
 }
 
 async function fetchUserProfileFallback(
@@ -715,7 +789,7 @@ async function fetchUserProfileFallback(
     supabase
       .from("profiles")
       .select(
-        "id, first_name, last_name, username, avatar_url, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, birth_year, role_id",
+        "id, first_name, last_name, username, avatar_url, phone, adresse_postale, compl_adresse, country, city, zip_code, country_code, birth_year, role_id, is_company_associate",
       )
       .eq("id", targetId)
       .maybeSingle(),
@@ -748,6 +822,7 @@ async function fetchUserProfileFallback(
     country_code?: string | null;
     birth_year?: number | null;
     role_id?: number | null;
+    is_company_associate?: boolean | null;
   } | null;
   const a = agencyRow as { agency_id?: string | null; role_id?: unknown } | null;
 
@@ -789,6 +864,7 @@ async function fetchUserProfileFallback(
     agency_id: a?.agency_id ?? connectedAgencyId ?? null,
     expo_id: expo_ids[0] ?? null,
     expo_ids,
+    is_company_associate: p?.is_company_associate === true,
   });
 }
 
@@ -904,6 +980,7 @@ const Users = ({
       }
 
       merged = await enrichUserRowsWithMergedRoles(merged);
+      merged = await attachCompanyAssociateFlags(merged);
       setRows(merged);
       setLoading(false);
       return;
@@ -914,7 +991,7 @@ const Users = ({
       { data: agencyData },
       { data: expoData },
     ] = await Promise.all([
-      supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone, role_id"),
+      supabase.from("profiles").select("id, first_name, last_name, username, avatar_url, phone, role_id, is_company_associate"),
       supabase
         .from("agency_users")
         .select("user_id, agency_id, role_id")
@@ -967,6 +1044,7 @@ const Users = ({
         avatar_url?: string | null;
         phone?: string | null;
         role_id?: number | null;
+        is_company_associate?: boolean | null;
       }> | null) ?? []
     )
       .filter((p) => typeof p.id === "string" && p.id.trim())
@@ -989,6 +1067,7 @@ const Users = ({
           role_id: resolveMergedAuthRoleId(null, globalRoleId, agencyRoleId),
           agency_id: agRec?.agency_id ?? null,
           expo_id: expoByUser.get(uid) ?? null,
+          is_company_associate: p.is_company_associate === true,
         });
       });
 
@@ -1570,6 +1649,7 @@ const Users = ({
       expo_ids: [],
       role_id: null,
       role_ids: [],
+      is_company_associate: false,
     };
     setEditing(emptyRow);
     setInitialEditing({ ...emptyRow, id: "" });
@@ -1712,6 +1792,7 @@ const Users = ({
         birth_year: Number.isFinite(birthYearNum) ? birthYearNum : null,
         // Niveaux 1-3 : role_id global dans profiles ; 4-6 via agency_users.
         role_id: globalRoleId,
+        is_company_associate: editing.is_company_associate === true,
       };
 
       if (mode === "create") {
@@ -2008,6 +2089,7 @@ const Users = ({
       "role_id",
     ];
     if (keys.some((key) => normalize(editing[key]) !== normalize(initialEditing[key]))) return true;
+    if (Boolean(editing.is_company_associate) !== Boolean(initialEditing.is_company_associate)) return true;
     const sameRoleIds =
       JSON.stringify(editing.role_ids ?? []) === JSON.stringify(initialEditing.role_ids ?? []);
     const sameExpoIds =
@@ -2283,6 +2365,10 @@ const Users = ({
                       : prev,
                   )
                 }
+                isCompanyAssociate={editing.is_company_associate === true}
+                onIsCompanyAssociateChange={(checked) =>
+                  setEditing((prev) => (prev ? { ...prev, is_company_associate: checked } : prev))
+                }
                 agencyId={editing.agency_id ?? null}
                 onAgencyIdChange={(v) => {
                   setField("agency_id", v);
@@ -2394,7 +2480,13 @@ const Users = ({
         )}
 
         {filteredUsers.map((u) => (
-          <Card key={u.id} className="glass-card hover:shadow-lg transition-all duration-300">
+          <Card
+            key={u.id}
+            className={cn(
+              "glass-card hover:shadow-lg transition-all duration-300",
+              u.is_company_associate === true && "border-4 border-[#E63946] shadow-[0_0_0_1px_rgba(230,57,70,0.35)]",
+            )}
+          >
             <CardContent
               className={`p-4 grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 sm:flex sm:flex-row sm:items-start sm:gap-4 cursor-pointer hover:bg-muted/10 ${A11Y_CLICKABLE_FOCUS_CLASS}`}
               role="button"
@@ -2450,7 +2542,11 @@ const Users = ({
                     {t("list.alias", { name: u.username.trim() })}
                   </p>
                 ) : null}
-                <p className="text-sm font-bold italic">{roleLabelFromUserRow(u, roleOptions)}</p>
+                <UserCardRolesLine
+                  user={u}
+                  roleOptions={roleOptions}
+                  associateLabel={t("form.company_associate")}
+                />
                 <p className="text-xs text-muted-foreground">
                   {t("list.last_sign_in")}&nbsp;: {formatUserLastSignIn(u.last_sign_in_at)}
                 </p>
@@ -2713,6 +2809,10 @@ const Users = ({
                         })
                       : prev,
                   )
+                }
+                isCompanyAssociate={editing.is_company_associate === true}
+                onIsCompanyAssociateChange={(checked) =>
+                  setEditing((prev) => (prev ? { ...prev, is_company_associate: checked } : prev))
                 }
                 agencyId={editing.agency_id ?? null}
                 onAgencyIdChange={(v) => {

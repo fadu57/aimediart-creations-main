@@ -57,6 +57,13 @@ export type CostFilters = {
   agencyId?: string;
   /** Nombre exact de langues de médiation remplies sur l'œuvre liée (0–5). */
   mediationLangCount?: string;
+  /**
+   * Dépenses société en formation (metadata.is_pre_incorporation).
+   * "" = tous, "yes" = uniquement avant immat., "no" = hors formation.
+   */
+  preIncorporation?: string;
+  /** Associé ayant payé (metadata.paid_by_user_id). */
+  paidByUserId?: string;
 };
 
 export type CostEntityOption = {
@@ -74,6 +81,8 @@ export type CostEntityFilterOptions = {
 export type CostLinkedFilterOptions = CostEntityFilterOptions & {
   selectOptions: CostSelectOptions;
   mediationLangCounts: number[];
+  /** Associés pouvant apparaître dans « Payé par » (dépenses société en formation). */
+  paidByAssociates: CostEntityOption[];
 };
 
 export const EMPTY_COST_LINKED_FILTER_OPTIONS: CostLinkedFilterOptions = {
@@ -90,6 +99,7 @@ export const EMPTY_COST_LINKED_FILTER_OPTIONS: CostLinkedFilterOptions = {
     currencies: [],
   },
   mediationLangCounts: [],
+  paidByAssociates: [],
 };
 
 export type CostArtworkDisplayMeta = {
@@ -578,6 +588,8 @@ export function hasActiveCostFilters(filters: CostFilters): boolean {
     filters.expoId,
     filters.agencyId,
     filters.mediationLangCount,
+    filters.preIncorporation,
+    filters.paidByUserId,
   ].some((v) => Boolean(v?.trim()));
 }
 
@@ -704,6 +716,22 @@ function applyScalarFilters(q: SupabaseQuery, filters: CostFilters): SupabaseQue
   if (filters.operationName) q = q.eq("operation_name", filters.operationName);
   if (filters.status)    q = q.eq("status",     filters.status);
   if (filters.currency)  q = q.eq("currency",   filters.currency);
+
+  const preInc = filters.preIncorporation?.trim();
+  if (preInc === "yes") {
+    q = q.eq("metadata->>is_pre_incorporation", "true");
+  } else if (preInc === "no") {
+    // Inclut absents / null / false — exclut uniquement true.
+    q = q.or(
+      "metadata->>is_pre_incorporation.is.null,metadata->>is_pre_incorporation.neq.true",
+    );
+  }
+
+  const paidBy = filters.paidByUserId?.trim();
+  if (paidBy) {
+    q = q.eq("metadata->>paid_by_user_id", paidBy);
+  }
+
   return q;
 }
 
@@ -1169,6 +1197,8 @@ function hasScalarCostFilters(filters: CostFilters): boolean {
     filters.operationName,
     filters.status,
     filters.currency,
+    filters.preIncorporation,
+    filters.paidByUserId,
   ].some((v) => Boolean(v?.trim()));
 }
 
@@ -1693,11 +1723,32 @@ export async function getCostSelectOptions(): Promise<CostSelectOptions> {
   };
 }
 
+/** Déduplique les options de filtre par id (garde le premier label). */
+function uniqCostEntityOptions(options: CostEntityOption[]): CostEntityOption[] {
+  const seen = new Set<string>();
+  const out: CostEntityOption[] = [];
+  for (const opt of options) {
+    if (seen.has(opt.id)) continue;
+    seen.add(opt.id);
+    out.push(opt);
+  }
+  return out;
+}
+
 /** Listes œuvre / expo / agence pour les filtres du tableau des coûts. */
 export async function getCostEntityFilterOptions(): Promise<CostEntityFilterOptions> {
   const [agenciesRes, exposRes, artworksRes] = await Promise.all([
-    supabase.from("agencies").select("id, name_agency").order("name_agency"),
-    supabase.from("expos").select("id, expo_name").order("expo_name").limit(500),
+    supabase
+      .from("agencies")
+      .select("id, name_agency")
+      .is("deleted_at", null)
+      .order("name_agency"),
+    supabase
+      .from("expos")
+      .select("id, expo_name")
+      .is("deleted_at", null)
+      .order("expo_name")
+      .limit(500),
     supabase
       .from("artworks")
       .select("artwork_id, artwork_title")
@@ -1706,32 +1757,38 @@ export async function getCostEntityFilterOptions(): Promise<CostEntityFilterOpti
       .limit(500),
   ]);
 
-  const agencies = ((agenciesRes.data ?? []) as Array<{ id?: string; name_agency?: string | null }>)
-    .map((row) => {
-      const id = row.id?.trim();
-      if (!id) return null;
-      const label = row.name_agency?.trim() || id.slice(0, 8);
-      return { id, label };
-    })
-    .filter((row): row is CostEntityOption => row != null);
+  const agencies = uniqCostEntityOptions(
+    ((agenciesRes.data ?? []) as Array<{ id?: string; name_agency?: string | null }>)
+      .map((row) => {
+        const id = row.id?.trim();
+        if (!id) return null;
+        const label = row.name_agency?.trim() || id.slice(0, 8);
+        return { id, label };
+      })
+      .filter((row): row is CostEntityOption => row != null),
+  );
 
-  const expos = ((exposRes.data ?? []) as Array<{ id?: string; expo_name?: string | null }>)
-    .map((row) => {
-      const id = row.id?.trim();
-      if (!id) return null;
-      const label = row.expo_name?.trim() || id.slice(0, 8);
-      return { id, label };
-    })
-    .filter((row): row is CostEntityOption => row != null);
+  const expos = uniqCostEntityOptions(
+    ((exposRes.data ?? []) as Array<{ id?: string; expo_name?: string | null }>)
+      .map((row) => {
+        const id = row.id?.trim();
+        if (!id) return null;
+        const label = row.expo_name?.trim() || id.slice(0, 8);
+        return { id, label };
+      })
+      .filter((row): row is CostEntityOption => row != null),
+  );
 
-  const artworks = ((artworksRes.data ?? []) as Array<{ artwork_id?: string; artwork_title?: string | null }>)
-    .map((row) => {
-      const id = row.artwork_id?.trim();
-      if (!id) return null;
-      const label = row.artwork_title?.trim() || id.slice(0, 8);
-      return { id, label };
-    })
-    .filter((row): row is CostEntityOption => row != null);
+  const artworks = uniqCostEntityOptions(
+    ((artworksRes.data ?? []) as Array<{ artwork_id?: string; artwork_title?: string | null }>)
+      .map((row) => {
+        const id = row.artwork_id?.trim();
+        if (!id) return null;
+        const label = row.artwork_title?.trim() || id.slice(0, 8);
+        return { id, label };
+      })
+      .filter((row): row is CostEntityOption => row != null),
+  );
 
   return { artworks, expos, agencies };
 }
@@ -1800,34 +1857,42 @@ async function fetchArtworkOptionsByIds(ids: string[]): Promise<CostEntityOption
 
 async function fetchExpoOptionsByIds(ids: string[]): Promise<CostEntityOption[]> {
   if (ids.length === 0) return [];
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   const { data } = await supabase
     .from("expos")
     .select("id, expo_name")
-    .in("id", ids)
+    .in("id", uniqueIds)
+    .is("deleted_at", null)
     .order("expo_name");
-  return ((data ?? []) as Array<{ id?: string | null; expo_name?: string | null }>)
-    .map((row) => {
-      const id = row.id?.trim();
-      if (!id) return null;
-      return { id, label: row.expo_name?.trim() || id.slice(0, 8) };
-    })
-    .filter((row): row is CostEntityOption => row != null);
+  return uniqCostEntityOptions(
+    ((data ?? []) as Array<{ id?: string | null; expo_name?: string | null }>)
+      .map((row) => {
+        const id = row.id?.trim();
+        if (!id) return null;
+        return { id, label: row.expo_name?.trim() || id.slice(0, 8) };
+      })
+      .filter((row): row is CostEntityOption => row != null),
+  );
 }
 
 async function fetchAgencyOptionsByIds(ids: string[]): Promise<CostEntityOption[]> {
   if (ids.length === 0) return [];
+  const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   const { data } = await supabase
     .from("agencies")
     .select("id, name_agency")
-    .in("id", ids)
+    .in("id", uniqueIds)
+    .is("deleted_at", null)
     .order("name_agency");
-  return ((data ?? []) as Array<{ id?: string | null; name_agency?: string | null }>)
-    .map((row) => {
-      const id = row.id?.trim();
-      if (!id) return null;
-      return { id, label: row.name_agency?.trim() || id.slice(0, 8) };
-    })
-    .filter((row): row is CostEntityOption => row != null);
+  return uniqCostEntityOptions(
+    ((data ?? []) as Array<{ id?: string | null; name_agency?: string | null }>)
+      .map((row) => {
+        const id = row.id?.trim();
+        if (!id) return null;
+        return { id, label: row.name_agency?.trim() || id.slice(0, 8) };
+      })
+      .filter((row): row is CostEntityOption => row != null),
+  );
 }
 
 async function expoIdsForArtworkIds(artworkIds: string[]): Promise<string[]> {
@@ -1925,6 +1990,29 @@ async function mediationLangCountsForArtworkScope(artworkIds: string[] | null): 
   return [...counts].sort((a, b) => a - b);
 }
 
+/** Associés de l'entreprise (profiles.is_company_associate) pour le filtre « Payé par ». */
+async function fetchPaidByAssociateOptions(): Promise<CostEntityOption[]> {
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, username")
+    .eq("is_company_associate", true);
+
+  if (error || !profiles?.length) return [];
+
+  return ((profiles ?? []) as Array<{
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    username: string | null;
+  }>)
+    .map((p) => {
+      const full = [p.first_name?.trim(), p.last_name?.trim()].filter(Boolean).join(" ");
+      const label = full || p.username?.trim() || p.id.slice(0, 8);
+      return { id: p.id, label };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"));
+}
+
 /**
  * Options de filtres en cascade selon la sélection courante.
  * Ex. expo sélectionnée → œuvres/agences/outils/langues de cette expo uniquement.
@@ -1957,6 +2045,7 @@ export async function getCostLinkedFilterOptions(filters: CostFilters): Promise<
       .from("expos")
       .select("id")
       .eq("agency_id", agencyId)
+      .is("deleted_at", null)
       .order("expo_name");
     expoIds = ((exposData ?? []) as Array<{ id?: string | null }>)
       .map((r) => r.id?.trim())
@@ -1986,21 +2075,23 @@ export async function getCostLinkedFilterOptions(filters: CostFilters): Promise<
   const scopeForLang = scopeFiltersOmit(filters, ["mediationLangCount"]);
   const langArtworkIds = await resolveArtworkIdsForCostQuery(scopeForLang);
 
-  const [artworks, expos, agencies, selectOptions, mediationLangCounts] = await Promise.all([
-    artworkIds === null
-      ? getCostEntityFilterOptions().then((o) => o.artworks)
-      : fetchArtworkOptionsByIds(artworkIds),
-    expoIds === null
-      ? getCostEntityFilterOptions().then((o) => o.expos)
-      : fetchExpoOptionsByIds(expoIds),
-    agencyIds === null
-      ? getCostEntityFilterOptions().then((o) => o.agencies)
-      : fetchAgencyOptionsByIds(agencyIds),
-    distinctSelectOptionsForScope(filters),
-    mediationLangCountsForArtworkScope(langArtworkIds),
-  ]);
+  const [artworks, expos, agencies, selectOptions, mediationLangCounts, paidByAssociates] =
+    await Promise.all([
+      artworkIds === null
+        ? getCostEntityFilterOptions().then((o) => o.artworks)
+        : fetchArtworkOptionsByIds(artworkIds),
+      expoIds === null
+        ? getCostEntityFilterOptions().then((o) => o.expos)
+        : fetchExpoOptionsByIds(expoIds),
+      agencyIds === null
+        ? getCostEntityFilterOptions().then((o) => o.agencies)
+        : fetchAgencyOptionsByIds(agencyIds),
+      distinctSelectOptionsForScope(filters),
+      mediationLangCountsForArtworkScope(langArtworkIds),
+      fetchPaidByAssociateOptions(),
+    ]);
 
-  return { artworks, expos, agencies, selectOptions, mediationLangCounts };
+  return { artworks, expos, agencies, selectOptions, mediationLangCounts, paidByAssociates };
 }
 
 /** Réinitialise les filtres enfants invalides après mise à jour des options liées. */
@@ -2017,6 +2108,15 @@ export function sanitizeCostFilters(filters: CostFilters, linked: CostLinkedFilt
   const lang = next.mediationLangCount?.trim();
   if (lang && !linked.mediationLangCounts.includes(Number.parseInt(lang, 10))) {
     next.mediationLangCount = "";
+  }
+  const pre = next.preIncorporation?.trim();
+  if (pre && pre !== "yes" && pre !== "no") next.preIncorporation = "";
+  if (
+    next.paidByUserId &&
+    linked.paidByAssociates.length > 0 &&
+    !linked.paidByAssociates.some((a) => a.id === next.paidByUserId)
+  ) {
+    next.paidByUserId = "";
   }
   return next;
 }

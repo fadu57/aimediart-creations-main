@@ -58,6 +58,7 @@
     "username_taken": "This username is already taken. The Save button is disabled.",
     "change_photo": "Change photo",
     "roles_title": "Roles",
+    "company_associate": "Company associate",
     "role_global": "Global role (one only)",
     "roles_org": "Organisation roles",
     "roles_org_with_global": " (stackable with a global role)",
