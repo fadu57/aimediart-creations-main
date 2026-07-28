@@ -1,40 +1,55 @@
 import type { jsPDF } from "jspdf";
 
 /**
- * Maquette de référence : A3 portrait 295 × 420 mm (capture utilisateur).
- * Tous les autres formats = scale uniforme min(w/295, h/420).
+ * Consignes STRICTES — réf. 80 × 80 mm (sinon × min(côté)/80) :
+ *
+ * 1. Stamp FREE     : 5 mm du haut, 5 mm de la gauche
+ * 2. Header         : 12 mm (1,2 cm) du haut, 12 mm (1,2 cm) de la gauche, aligné à gauche
+ * 3. QR + titres    : directement sous le header, vers le bas
+ *
+ * Taille QR de maquette = 43 mm sur 80×80 (proportion capture) — fixe, non « réduite ».
  */
+export const CARTEL_LAYOUT_BASE_MM = 80;
+export const CARTEL_STAMP_MARGIN_MM = 5;
+export const CARTEL_HEADER_TOP_MM = 12;
+export const CARTEL_HEADER_LEFT_MM = 12;
+
+/** Taille native PNG (non tourné) — AABB ≈ 17×14 mm après −32° (capture). */
+export const CARTEL_STAMP_NATIVE_W_MM = 16;
+export const CARTEL_STAMP_NATIVE_H_MM = (16 * 263) / 557;
+export const CARTEL_FREE_STAMP_ROTATION_DEG = -32;
+
+/** QR fixe sur maquette 80×80. */
+export const CARTEL_REF_QR_MM = 43;
+
+/** @deprecated aliases */
+export const CARTEL_STAMP_BASE_MM = CARTEL_LAYOUT_BASE_MM;
+export const CARTEL_REF_STAMP_W_MM = CARTEL_STAMP_NATIVE_W_MM;
+export const CARTEL_REF_STAMP_H_MM = CARTEL_STAMP_NATIVE_H_MM;
 export const CARTEL_REF_WIDTH_MM = 295;
 export const CARTEL_REF_HEIGHT_MM = 420;
 
-export const CARTEL_REF_STAMP_W_MM = 50;
-export const CARTEL_REF_STAMP_H_MM = 20;
-export const CARTEL_REF_QR_MM = 220;
+/** Typo sur 80×80 (pt). */
+export const CARTEL_REF_HEADER_PT = 11;
+export const CARTEL_REF_TITLE_PT = 12;
+export const CARTEL_REF_EXTRA_PT = 9;
+export const CARTEL_REF_ARTIST_PT = 11;
 
-/** Polices de référence A3 (pt jsPDF ≈ px demandés). */
-export const CARTEL_REF_HEADER_PT = 26;
-export const CARTEL_REF_TITLE_PT = 36;
-export const CARTEL_REF_EXTRA_PT = 24;
-export const CARTEL_REF_ARTIST_PT = 36;
-
-/** Minima absolus (ne jamais descendre en dessous après scale). */
-export const CARTEL_HEADER_MIN_PT = 10;
-export const CARTEL_TITLE_MIN_PT = 12;
-export const CARTEL_EXTRA_TITLE_MIN_PT = 9;
-export const CARTEL_ARTIST_MIN_PT = 12;
+export const CARTEL_HEADER_MIN_PT = 9;
+export const CARTEL_TITLE_MIN_PT = 10;
+export const CARTEL_EXTRA_TITLE_MIN_PT = 8;
+export const CARTEL_ARTIST_MIN_PT = 9;
 export const CARTEL_QR_MIN_MM = 35;
 
-/** Espacements verticaux de référence A3 (mm). */
-const REF_MARGIN_TOP = 8;
-const REF_MARGIN_BOTTOM = 8;
-const REF_GAP_STAMP_HEADER = 4;
-const REF_GAP_HEADER_QR = 5;
-const REF_GAP_QR_TITLE = 6;
-const REF_GAP_TITLE_EXTRA = 2.5;
-const REF_GAP_EXTRA_BLOCKS = 1.8;
-const REF_GAP_EXTRA_ARTIST = 5;
-const REF_TEXT_WIDTH_RATIO = 0.82;
+const GAP_HEADER_QR_MM = 2;
+const GAP_QR_TITLE_MM = 1.5;
+const GAP_TITLE_EXTRA_MM = 1.2;
+const GAP_EXTRA_BLOCKS_MM = 1;
+const GAP_TITLE_ARTIST_MM = 1.5;
+const MARGIN_BOTTOM_MM = 4;
+const MARGIN_RIGHT_MM = 5;
 const LINE_HEIGHT_RATIO = 1.12;
+const TEXT_WIDTH_RATIO = 0.88;
 
 type PdfFontStyle = "normal" | "bold" | "italic" | "bolditalic";
 
@@ -46,51 +61,43 @@ export function cartelLineHeightMm(fontPt: number): number {
   return ptToMm(fontPt) * LINE_HEIGHT_RATIO;
 }
 
-/** Facteur d'échelle par rapport à la maquette A3. */
 export function cartelScaleForSlot(slotW: number, slotH: number): number {
-  return Math.min(slotW / CARTEL_REF_WIDTH_MM, slotH / CARTEL_REF_HEIGHT_MM);
+  return Math.min(slotW / CARTEL_LAYOUT_BASE_MM, slotH / CARTEL_LAYOUT_BASE_MM);
 }
 
-/**
- * Dimensions minimales custom : scale tel que polices ≥ minima et QR ≥ 35 mm.
- */
 export function getCartelMinCustomSizeMm(extraTitleCount = 0): {
   widthMm: number;
   heightMm: number;
 } {
-  const scaleFonts = Math.max(
+  const s = Math.max(
     CARTEL_HEADER_MIN_PT / CARTEL_REF_HEADER_PT,
     CARTEL_TITLE_MIN_PT / CARTEL_REF_TITLE_PT,
-    CARTEL_EXTRA_TITLE_MIN_PT / CARTEL_REF_EXTRA_PT,
-    CARTEL_ARTIST_MIN_PT / CARTEL_REF_ARTIST_PT,
     CARTEL_QR_MIN_MM / CARTEL_REF_QR_MM,
   );
   const extraCount = Math.max(0, Math.floor(extraTitleCount));
-  // Hauteur contenu à ce scale (estimation) pour ne pas couper les traductions.
-  const s = scaleFonts;
   const headerH = cartelLineHeightMm(Math.max(CARTEL_HEADER_MIN_PT, CARTEL_REF_HEADER_PT * s));
   const titleH = 2 * cartelLineHeightMm(Math.max(CARTEL_TITLE_MIN_PT, CARTEL_REF_TITLE_PT * s));
   const extraH =
     extraCount *
     (2 * cartelLineHeightMm(Math.max(CARTEL_EXTRA_TITLE_MIN_PT, CARTEL_REF_EXTRA_PT * s)) +
-      REF_GAP_EXTRA_BLOCKS * s);
+      GAP_EXTRA_BLOCKS_MM * s);
   const artistH = cartelLineHeightMm(Math.max(CARTEL_ARTIST_MIN_PT, CARTEL_REF_ARTIST_PT * s));
   const contentH =
-    REF_MARGIN_TOP * s +
-    CARTEL_REF_STAMP_H_MM * s +
-    REF_GAP_STAMP_HEADER * s +
+    CARTEL_HEADER_TOP_MM * s +
     headerH +
-    REF_GAP_HEADER_QR * s +
+    GAP_HEADER_QR_MM * s +
     CARTEL_REF_QR_MM * s +
-    REF_GAP_QR_TITLE * s +
+    GAP_QR_TITLE_MM * s +
     titleH +
-    (extraCount > 0 ? REF_GAP_TITLE_EXTRA * s + extraH + REF_GAP_EXTRA_ARTIST * s : REF_GAP_EXTRA_ARTIST * s) +
+    (extraCount > 0 ? GAP_TITLE_EXTRA_MM * s + extraH : 0) +
+    GAP_TITLE_ARTIST_MM * s +
     artistH +
-    REF_MARGIN_BOTTOM * s;
+    MARGIN_BOTTOM_MM * s;
 
-  const widthMm = Math.ceil(CARTEL_REF_WIDTH_MM * s);
-  const heightMm = Math.ceil(Math.max(CARTEL_REF_HEIGHT_MM * s, contentH));
-  return { widthMm, heightMm };
+  return {
+    widthMm: Math.ceil(CARTEL_LAYOUT_BASE_MM * s),
+    heightMm: Math.ceil(Math.max(CARTEL_LAYOUT_BASE_MM * s, contentH)),
+  };
 }
 
 export type CartelLayoutSlot = { x: number; y: number; w: number; h: number };
@@ -108,6 +115,17 @@ export type CartelExtraBlock = {
   lineHeight: number;
 };
 
+export function rotatedStampBoundsMm(
+  stampW: number,
+  stampH: number,
+  rotationDeg = CARTEL_FREE_STAMP_ROTATION_DEG,
+): { w: number; h: number } {
+  const rad = (Math.abs(rotationDeg) * Math.PI) / 180;
+  const c = Math.cos(rad);
+  const s = Math.sin(rad);
+  return { w: stampW * c + stampH * s, h: stampW * s + stampH * c };
+}
+
 export type CartelComputedLayout = {
   scale: number;
   centerX: number;
@@ -116,6 +134,8 @@ export type CartelComputedLayout = {
   stampY: number;
   stampW: number;
   stampH: number;
+  stampRotationDeg: number;
+  headerX: number;
   headerLines: string[];
   headerFontSize: number;
   headerBaseline: number;
@@ -153,7 +173,13 @@ function fitEllipsis(pdf: jsPDF, text: string, maxWidth: number): string {
   return ell;
 }
 
-function wrapUpToTwoLines(pdf: jsPDF, text: string, maxWidth: number, style: PdfFontStyle, fontSize: number): string[] {
+function wrapUpToTwoLines(
+  pdf: jsPDF,
+  text: string,
+  maxWidth: number,
+  style: PdfFontStyle,
+  fontSize: number,
+): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
   setFont(pdf, style, fontSize);
@@ -162,7 +188,13 @@ function wrapUpToTwoLines(pdf: jsPDF, text: string, maxWidth: number, style: Pdf
   return [raw[0], fitEllipsis(pdf, raw.slice(1).join(" "), maxWidth)];
 }
 
-function wrapSingleLine(pdf: jsPDF, text: string, maxWidth: number, style: PdfFontStyle, fontSize: number): string {
+function wrapSingleLine(
+  pdf: jsPDF,
+  text: string,
+  maxWidth: number,
+  style: PdfFontStyle,
+  fontSize: number,
+): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
   setFont(pdf, style, fontSize);
@@ -170,55 +202,46 @@ function wrapSingleLine(pdf: jsPDF, text: string, maxWidth: number, style: PdfFo
   return fitEllipsis(pdf, trimmed, maxWidth);
 }
 
-function contentHeightAtScale(
+export function computeCartelLayout(
   pdf: jsPDF,
+  slot: CartelLayoutSlot,
   content: CartelLayoutContent,
-  scale: number,
-  maxTextWidth: number,
-): {
-  height: number;
-  headerLines: string[];
-  headerFontSize: number;
-  headerLineHeight: number;
-  titleLines: string[];
-  titleFontSize: number;
-  titleLineHeight: number;
-  extraBlocks: CartelExtraBlock[];
-  extraGap: number;
-  artistLines: string[];
-  artistFontSize: number;
-  artistLineHeight: number;
-  stampH: number;
-  qrSize: number;
-  gaps: {
-    stampHeader: number;
-    headerQr: number;
-    qrTitle: number;
-    titleExtra: number;
-    extraArtist: number;
-  };
-} {
-  const headerFontSize = Math.max(CARTEL_HEADER_MIN_PT, CARTEL_REF_HEADER_PT * scale);
-  const titleFontSize = Math.max(CARTEL_TITLE_MIN_PT, CARTEL_REF_TITLE_PT * scale);
-  const extraFontSize = Math.max(CARTEL_EXTRA_TITLE_MIN_PT, CARTEL_REF_EXTRA_PT * scale);
-  const artistFontSize = Math.max(CARTEL_ARTIST_MIN_PT, CARTEL_REF_ARTIST_PT * scale);
-  const stampH = CARTEL_REF_STAMP_H_MM * scale;
-  const qrSize = CARTEL_REF_QR_MM * scale;
+  options?: { strictQrMin?: boolean },
+): CartelComputedLayout | null {
+  const strictQrMin = options?.strictQrMin ?? false;
+  const { x: slotX, y: slotY, w: slotW, h: slotH } = slot;
+  const centerX = slotX + slotW / 2;
+  const k = cartelScaleForSlot(slotW, slotH);
+  if (k <= 0) return null;
 
-  const gaps = {
-    stampHeader: REF_GAP_STAMP_HEADER * scale,
-    headerQr: REF_GAP_HEADER_QR * scale,
-    qrTitle: REF_GAP_QR_TITLE * scale,
-    titleExtra: REF_GAP_TITLE_EXTRA * scale,
-    extraArtist: REF_GAP_EXTRA_ARTIST * scale,
-  };
-  const extraGap = REF_GAP_EXTRA_BLOCKS * scale;
-  const marginTop = REF_MARGIN_TOP * scale;
-  const marginBottom = REF_MARGIN_BOTTOM * scale;
+  // 1) Stamp — 5 mm / 5 mm
+  const stampX = slotX + CARTEL_STAMP_MARGIN_MM * k;
+  const stampY = slotY + CARTEL_STAMP_MARGIN_MM * k;
+  const stampBounds = rotatedStampBoundsMm(
+    CARTEL_STAMP_NATIVE_W_MM * k,
+    CARTEL_STAMP_NATIVE_H_MM * k,
+  );
+  const stampW = stampBounds.w;
+  const stampH = stampBounds.h;
+
+  // 2) Header — 12 mm / 12 mm
+  const headerX = slotX + CARTEL_HEADER_LEFT_MM * k;
+  const headerBaseline = slotY + CARTEL_HEADER_TOP_MM * k;
+  const headerMaxW = Math.max(8, slotW - CARTEL_HEADER_LEFT_MM * k - MARGIN_RIGHT_MM * k);
+  const maxTextWidth = Math.max(10, slotW * TEXT_WIDTH_RATIO);
+
+  const headerFontSize = Math.max(CARTEL_HEADER_MIN_PT, CARTEL_REF_HEADER_PT * k);
+  const titleFontSize = Math.max(CARTEL_TITLE_MIN_PT, CARTEL_REF_TITLE_PT * k);
+  const extraFontSize = Math.max(CARTEL_EXTRA_TITLE_MIN_PT, CARTEL_REF_EXTRA_PT * k);
+  const artistFontSize = Math.max(CARTEL_ARTIST_MIN_PT, CARTEL_REF_ARTIST_PT * k);
+  const qrSize = CARTEL_REF_QR_MM * k;
+
+  if (strictQrMin && qrSize < CARTEL_QR_MIN_MM) return null;
+  if (qrSize <= 0) return null;
 
   const headerText = content.explorationLines.map((l) => l.trim()).filter(Boolean).join(" ");
   const headerLine = headerText
-    ? wrapSingleLine(pdf, headerText, maxTextWidth, "bolditalic", headerFontSize)
+    ? wrapSingleLine(pdf, headerText, headerMaxW, "bolditalic", headerFontSize)
     : "";
   const headerLines = headerLine ? [headerLine] : [];
   const headerLineHeight = cartelLineHeightMm(headerFontSize);
@@ -229,18 +252,15 @@ function contentHeightAtScale(
     : [];
   const titleLineHeight = cartelLineHeightMm(titleFontSize);
 
-  const titleMain = titleTrim;
   const extraTitles = (content.extraTitles ?? [])
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && s !== titleMain);
-  const extraBlocks: CartelExtraBlock[] = extraTitles.map((text) => {
-    const lines = wrapUpToTwoLines(pdf, text, maxTextWidth, "italic", extraFontSize);
-    return {
-      lines,
-      fontSize: extraFontSize,
-      lineHeight: cartelLineHeightMm(extraFontSize),
-    };
-  });
+    .filter((s) => s.length > 0 && s !== titleTrim);
+  const extraGap = GAP_EXTRA_BLOCKS_MM * k;
+  const extraBlocks: CartelExtraBlock[] = extraTitles.map((text) => ({
+    lines: wrapUpToTwoLines(pdf, text, maxTextWidth, "italic", extraFontSize),
+    fontSize: extraFontSize,
+    lineHeight: cartelLineHeightMm(extraFontSize),
+  }));
 
   const artistLine = wrapSingleLine(
     pdf,
@@ -252,160 +272,61 @@ function contentHeightAtScale(
   const artistLines = artistLine ? [artistLine] : [];
   const artistLineHeight = cartelLineHeightMm(artistFontSize);
 
-  const headerH = headerLines.length * headerLineHeight;
-  const titleH = titleLines.length * titleLineHeight;
-  const extrasH = extraBlocks.reduce(
-    (sum, b) => sum + b.lines.length * b.lineHeight + extraGap,
-    0,
-  );
-  const artistH = artistLines.length * artistLineHeight;
-
-  const height =
-    marginTop +
-    stampH +
-    gaps.stampHeader +
-    headerH +
-    gaps.headerQr +
-    qrSize +
-    gaps.qrTitle +
-    titleH +
-    (extraBlocks.length > 0 ? gaps.titleExtra + extrasH : 0) +
-    gaps.extraArtist +
-    artistH +
-    marginBottom;
-
-  return {
-    height,
-    headerLines,
-    headerFontSize,
-    headerLineHeight,
-    titleLines,
-    titleFontSize,
-    titleLineHeight,
-    extraBlocks,
-    extraGap,
-    artistLines,
-    artistFontSize,
-    artistLineHeight,
-    stampH,
-    qrSize,
-    gaps,
-  };
-}
-
-/**
- * Layout proportionnel à la maquette A3.
- * Retourne null si mode strict et QR < 35 mm (ou contenu impossible).
- */
-export function computeCartelLayout(
-  pdf: jsPDF,
-  slot: CartelLayoutSlot,
-  content: CartelLayoutContent,
-  options?: { strictQrMin?: boolean },
-): CartelComputedLayout | null {
-  const strictQrMin = options?.strictQrMin ?? false;
-  const slotX = slot.x;
-  const slotY = slot.y;
-  const slotW = slot.w;
-  const slotH = slot.h;
-  const centerX = slotX + slotW / 2;
-
-  let scale = cartelScaleForSlot(slotW, slotH);
-  const maxTextWidth = Math.max(10, slotW * REF_TEXT_WIDTH_RATIO);
-
-  // Si trop de traductions : réduire un peu le scale pour tout faire tenir.
-  let measured = contentHeightAtScale(pdf, content, scale, maxTextWidth);
-  if (measured.height > slotH) {
-    let lo = scale * 0.35;
-    let hi = scale;
-    for (let i = 0; i < 14; i++) {
-      const mid = (lo + hi) / 2;
-      const m = contentHeightAtScale(pdf, content, mid, maxTextWidth);
-      if (m.height <= slotH) {
-        lo = mid;
-        measured = m;
-      } else {
-        hi = mid;
-      }
-    }
-    scale = lo;
-    measured = contentHeightAtScale(pdf, content, scale, maxTextWidth);
-  }
-
-  if (strictQrMin && measured.qrSize < CARTEL_QR_MIN_MM) {
-    return null;
-  }
-  if (measured.qrSize <= 0 || measured.height <= 0) return null;
-
-  const stampW = CARTEL_REF_STAMP_W_MM * scale;
-  const stampH = measured.stampH;
-  const marginTop = REF_MARGIN_TOP * scale;
-
-  // Centrer verticalement le bloc si de la place reste.
-  const blockTop = slotY + Math.max(0, (slotH - measured.height) / 2);
-  let y = blockTop + marginTop;
-
-  const stampX = centerX - stampW / 2;
-  const stampY = y;
-  y += stampH + measured.gaps.stampHeader;
-
-  const headerBaseline = y + measured.headerLineHeight * 0.85;
-  y += measured.headerLines.length * measured.headerLineHeight + measured.gaps.headerQr;
-
-  const qrSize = measured.qrSize;
+  // 3) QR sous le header — taille fixe (43 mm × k), puis titres / artiste
+  let y =
+    headerBaseline +
+    headerLines.length * headerLineHeight +
+    GAP_HEADER_QR_MM * k;
   const qrX = centerX - qrSize / 2;
   const qrY = y;
-  y += qrSize + measured.gaps.qrTitle;
+  y += qrSize + GAP_QR_TITLE_MM * k;
 
-  const titleY =
-    measured.titleLines.length > 0 ? y + measured.titleLineHeight * 0.85 : y;
-  y += measured.titleLines.length * measured.titleLineHeight;
+  const titleY = titleLines.length > 0 ? y + titleLineHeight * 0.85 : y;
+  y += titleLines.length * titleLineHeight;
 
   let extraStartY = y;
-  if (measured.extraBlocks.length > 0) {
-    y += measured.gaps.titleExtra;
-    const firstExtraLh = measured.extraBlocks[0]?.lineHeight ?? measured.titleLineHeight;
-    extraStartY = y + firstExtraLh * 0.85;
-    for (const b of measured.extraBlocks) {
-      y += b.lines.length * b.lineHeight + measured.extraGap;
+  if (extraBlocks.length > 0) {
+    y += GAP_TITLE_EXTRA_MM * k;
+    const firstLh = extraBlocks[0]?.lineHeight ?? titleLineHeight;
+    extraStartY = y + firstLh * 0.85;
+    for (const b of extraBlocks) {
+      y += b.lines.length * b.lineHeight + extraGap;
     }
   }
 
-  y += measured.gaps.extraArtist;
-  const artistY =
-    measured.artistLines.length > 0 ? y + measured.artistLineHeight * 0.85 : y;
+  y += GAP_TITLE_ARTIST_MM * k;
+  const artistY = artistLines.length > 0 ? y + artistLineHeight * 0.85 : y;
 
   return {
-    scale,
+    scale: k,
     centerX,
     maxTextWidth,
     stampX,
     stampY,
     stampW,
     stampH,
-    headerLines: measured.headerLines,
-    headerFontSize: measured.headerFontSize,
+    stampRotationDeg: CARTEL_FREE_STAMP_ROTATION_DEG,
+    headerX,
+    headerLines,
+    headerFontSize,
     headerBaseline,
-    headerLineHeight: measured.headerLineHeight,
+    headerLineHeight,
     qrX,
     qrY,
     qrSize,
-    titleLines: measured.titleLines,
-    titleFontSize: measured.titleFontSize,
-    titleLineHeight: measured.titleLineHeight,
+    titleLines,
+    titleFontSize,
+    titleLineHeight,
     titleY,
-    extraBlocks: measured.extraBlocks,
+    extraBlocks,
     extraStartY,
-    extraGap: measured.extraGap,
-    artistLines: measured.artistLines,
-    artistFontSize: measured.artistFontSize,
-    artistLineHeight: measured.artistLineHeight,
+    extraGap,
+    artistLines,
+    artistFontSize,
+    artistLineHeight,
     artistY,
   };
 }
 
-/** Rouge logo / marque AIMEDIArt. */
 export const CARTEL_BRAND_RED = "#E63946";
-
-/** Asset stamp FREE (tampon fourni). */
 export const CARTEL_FREE_STAMP_URL = "/brand/cartel-free-stamp.png";
