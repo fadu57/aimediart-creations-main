@@ -1,52 +1,60 @@
 import type { jsPDF } from "jspdf";
 
 /**
- * Consignes STRICTES — réf. 80 × 80 mm (sinon × min(côté)/80) :
+ * Maquette de référence : carré 80 × 80 mm.
+ * Tous les autres formats = scale uniforme k = min(slotW, slotH) / 80.
+ * Le bloc 80×k est centré dans le slot (formats rectangulaires inclus).
  *
- * 1. Stamp FREE     : 5 mm du haut, 5 mm de la gauche
- * 2. Header         : 12 mm (1,2 cm) du haut, 12 mm (1,2 cm) de la gauche, aligné à gauche
- * 3. QR + titres    : directement sous le header, vers le bas
- *
- * Taille QR de maquette = 43 mm sur 80×80 (proportion capture) — fixe, non « réduite ».
+ * Positions sur 80×80 :
+ * - Stamp FREE              : 5 mm / 3 mm
+ * - « Votre (audio) guide… » : 15 mm / 15,8 mm (aligné à gauche)
+ * - QR-Code                  : 23 mm / 17,6 mm
+ * - Taille QR-Code           : 36 mm × 36 mm
+ * Titres / artiste : sous le QR, vers le bas.
  */
 export const CARTEL_LAYOUT_BASE_MM = 80;
-export const CARTEL_STAMP_MARGIN_MM = 5;
-export const CARTEL_HEADER_TOP_MM = 12;
-export const CARTEL_HEADER_LEFT_MM = 12;
 
-/** Taille native PNG (non tourné) — AABB ≈ 17×14 mm après −32° (capture). */
+export const CARTEL_STAMP_LEFT_MM = 5;
+export const CARTEL_STAMP_TOP_MM = 3;
+/** @deprecated alias — marge gauche */
+export const CARTEL_STAMP_MARGIN_MM = CARTEL_STAMP_LEFT_MM;
+export const CARTEL_HEADER_LEFT_MM = 15;
+export const CARTEL_HEADER_TOP_MM = 15.8;
+export const CARTEL_QR_LEFT_MM = 23;
+export const CARTEL_QR_TOP_MM = 17.6;
+export const CARTEL_QR_SIZE_MM = 36;
+
+/** Taille native PNG (non tourné) — ratio asset 557×263. */
 export const CARTEL_STAMP_NATIVE_W_MM = 16;
 export const CARTEL_STAMP_NATIVE_H_MM = (16 * 263) / 557;
 export const CARTEL_FREE_STAMP_ROTATION_DEG = -32;
-
-/** QR fixe sur maquette 80×80. */
-export const CARTEL_REF_QR_MM = 43;
 
 /** @deprecated aliases */
 export const CARTEL_STAMP_BASE_MM = CARTEL_LAYOUT_BASE_MM;
 export const CARTEL_REF_STAMP_W_MM = CARTEL_STAMP_NATIVE_W_MM;
 export const CARTEL_REF_STAMP_H_MM = CARTEL_STAMP_NATIVE_H_MM;
-export const CARTEL_REF_WIDTH_MM = 295;
-export const CARTEL_REF_HEIGHT_MM = 420;
+/** Alias historiques — la maquette est désormais 80×80. */
+export const CARTEL_REF_WIDTH_MM = CARTEL_LAYOUT_BASE_MM;
+export const CARTEL_REF_HEIGHT_MM = CARTEL_LAYOUT_BASE_MM;
+export const CARTEL_REF_QR_MM = CARTEL_QR_SIZE_MM;
 
-/** Typo sur 80×80 (pt). */
+/** Typo sur 80×80 (pt) — scale proportionnel via k. */
 export const CARTEL_REF_HEADER_PT = 11;
 export const CARTEL_REF_TITLE_PT = 12;
 export const CARTEL_REF_EXTRA_PT = 9;
 export const CARTEL_REF_ARTIST_PT = 11;
 
-export const CARTEL_HEADER_MIN_PT = 9;
-export const CARTEL_TITLE_MIN_PT = 10;
-export const CARTEL_EXTRA_TITLE_MIN_PT = 8;
-export const CARTEL_ARTIST_MIN_PT = 9;
-export const CARTEL_QR_MIN_MM = 35;
+export const CARTEL_HEADER_MIN_PT = 6;
+export const CARTEL_TITLE_MIN_PT = 7;
+export const CARTEL_EXTRA_TITLE_MIN_PT = 5;
+export const CARTEL_ARTIST_MIN_PT = 6;
+/** Seuil QR sur maquette 80×80 (mm) — scale avec k pour les autres formats. */
+export const CARTEL_QR_MIN_MM = 30;
 
-const GAP_HEADER_QR_MM = 2;
 const GAP_QR_TITLE_MM = 1.5;
-const GAP_TITLE_EXTRA_MM = 1.2;
-const GAP_EXTRA_BLOCKS_MM = 1;
-const GAP_TITLE_ARTIST_MM = 1.5;
-const MARGIN_BOTTOM_MM = 4;
+const GAP_TITLE_EXTRA_MM = 1;
+const GAP_EXTRA_BLOCKS_MM = 0.8;
+const GAP_TITLE_ARTIST_MM = 0.6;
 const MARGIN_RIGHT_MM = 5;
 const LINE_HEIGHT_RATIO = 1.12;
 const TEXT_WIDTH_RATIO = 0.88;
@@ -72,31 +80,28 @@ export function getCartelMinCustomSizeMm(extraTitleCount = 0): {
   const s = Math.max(
     CARTEL_HEADER_MIN_PT / CARTEL_REF_HEADER_PT,
     CARTEL_TITLE_MIN_PT / CARTEL_REF_TITLE_PT,
-    CARTEL_QR_MIN_MM / CARTEL_REF_QR_MM,
+    CARTEL_QR_MIN_MM / CARTEL_QR_SIZE_MM,
   );
   const extraCount = Math.max(0, Math.floor(extraTitleCount));
-  const headerH = cartelLineHeightMm(Math.max(CARTEL_HEADER_MIN_PT, CARTEL_REF_HEADER_PT * s));
   const titleH = 2 * cartelLineHeightMm(Math.max(CARTEL_TITLE_MIN_PT, CARTEL_REF_TITLE_PT * s));
   const extraH =
     extraCount *
     (2 * cartelLineHeightMm(Math.max(CARTEL_EXTRA_TITLE_MIN_PT, CARTEL_REF_EXTRA_PT * s)) +
       GAP_EXTRA_BLOCKS_MM * s);
   const artistH = cartelLineHeightMm(Math.max(CARTEL_ARTIST_MIN_PT, CARTEL_REF_ARTIST_PT * s));
-  const contentH =
-    CARTEL_HEADER_TOP_MM * s +
-    headerH +
-    GAP_HEADER_QR_MM * s +
-    CARTEL_REF_QR_MM * s +
+  const contentBottom =
+    CARTEL_QR_TOP_MM * s +
+    CARTEL_QR_SIZE_MM * s +
     GAP_QR_TITLE_MM * s +
     titleH +
     (extraCount > 0 ? GAP_TITLE_EXTRA_MM * s + extraH : 0) +
     GAP_TITLE_ARTIST_MM * s +
     artistH +
-    MARGIN_BOTTOM_MM * s;
+    4 * s;
 
   return {
     widthMm: Math.ceil(CARTEL_LAYOUT_BASE_MM * s),
-    heightMm: Math.ceil(Math.max(CARTEL_LAYOUT_BASE_MM * s, contentH)),
+    heightMm: Math.ceil(Math.max(CARTEL_LAYOUT_BASE_MM * s, contentBottom)),
   };
 }
 
@@ -210,13 +215,19 @@ export function computeCartelLayout(
 ): CartelComputedLayout | null {
   const strictQrMin = options?.strictQrMin ?? false;
   const { x: slotX, y: slotY, w: slotW, h: slotH } = slot;
-  const centerX = slotX + slotW / 2;
   const k = cartelScaleForSlot(slotW, slotH);
   if (k <= 0) return null;
 
-  // 1) Stamp — 5 mm / 5 mm
-  const stampX = slotX + CARTEL_STAMP_MARGIN_MM * k;
-  const stampY = slotY + CARTEL_STAMP_MARGIN_MM * k;
+  // Bloc contenu = maquette 80×80 × k, centré dans le slot
+  const contentW = CARTEL_LAYOUT_BASE_MM * k;
+  const contentH = CARTEL_LAYOUT_BASE_MM * k;
+  const originX = slotX + (slotW - contentW) / 2;
+  const originY = slotY + (slotH - contentH) / 2;
+  const centerX = originX + contentW / 2;
+
+  // Stamp : 5 / 3
+  const stampX = originX + CARTEL_STAMP_LEFT_MM * k;
+  const stampY = originY + CARTEL_STAMP_TOP_MM * k;
   const stampBounds = rotatedStampBoundsMm(
     CARTEL_STAMP_NATIVE_W_MM * k,
     CARTEL_STAMP_NATIVE_H_MM * k,
@@ -224,19 +235,23 @@ export function computeCartelLayout(
   const stampW = stampBounds.w;
   const stampH = stampBounds.h;
 
-  // 2) Header — 12 mm / 12 mm
-  const headerX = slotX + CARTEL_HEADER_LEFT_MM * k;
-  const headerBaseline = slotY + CARTEL_HEADER_TOP_MM * k;
-  const headerMaxW = Math.max(8, slotW - CARTEL_HEADER_LEFT_MM * k - MARGIN_RIGHT_MM * k);
-  const maxTextWidth = Math.max(10, slotW * TEXT_WIDTH_RATIO);
+  // Header : 15 / 15,8
+  const headerX = originX + CARTEL_HEADER_LEFT_MM * k;
+  const headerBaseline = originY + CARTEL_HEADER_TOP_MM * k;
+  const headerMaxW = Math.max(4, contentW - CARTEL_HEADER_LEFT_MM * k - MARGIN_RIGHT_MM * k);
+  const maxTextWidth = Math.max(4, contentW * TEXT_WIDTH_RATIO);
 
   const headerFontSize = Math.max(CARTEL_HEADER_MIN_PT, CARTEL_REF_HEADER_PT * k);
   const titleFontSize = Math.max(CARTEL_TITLE_MIN_PT, CARTEL_REF_TITLE_PT * k);
   const extraFontSize = Math.max(CARTEL_EXTRA_TITLE_MIN_PT, CARTEL_REF_EXTRA_PT * k);
   const artistFontSize = Math.max(CARTEL_ARTIST_MIN_PT, CARTEL_REF_ARTIST_PT * k);
-  const qrSize = CARTEL_REF_QR_MM * k;
 
-  if (strictQrMin && qrSize < CARTEL_QR_MIN_MM) return null;
+  // QR : 23 / 17,6 — 36 × 36
+  const qrSize = CARTEL_QR_SIZE_MM * k;
+  const qrX = originX + CARTEL_QR_LEFT_MM * k;
+  const qrY = originY + CARTEL_QR_TOP_MM * k;
+
+  if (strictQrMin && qrSize < CARTEL_QR_MIN_MM * k) return null;
   if (qrSize <= 0) return null;
 
   const headerText = content.explorationLines.map((l) => l.trim()).filter(Boolean).join(" ");
@@ -272,15 +287,8 @@ export function computeCartelLayout(
   const artistLines = artistLine ? [artistLine] : [];
   const artistLineHeight = cartelLineHeightMm(artistFontSize);
 
-  // 3) QR sous le header — taille fixe (43 mm × k), puis titres / artiste
-  let y =
-    headerBaseline +
-    headerLines.length * headerLineHeight +
-    GAP_HEADER_QR_MM * k;
-  const qrX = centerX - qrSize / 2;
-  const qrY = y;
-  y += qrSize + GAP_QR_TITLE_MM * k;
-
+  // Titres / artiste sous le QR
+  let y = qrY + qrSize + GAP_QR_TITLE_MM * k;
   const titleY = titleLines.length > 0 ? y + titleLineHeight * 0.85 : y;
   y += titleLines.length * titleLineHeight;
 
