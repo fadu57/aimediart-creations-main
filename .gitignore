@@ -34,3 +34,6 @@ tmp-legal-pack/
 supabase/.temp/supabase/.branches/
 supabase/.branches/
 supabase/.temp/
+
+scripts/_creation_entreprise_pdfs/
+

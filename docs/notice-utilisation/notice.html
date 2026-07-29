@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIMEDIArt — Notice d’utilisation &amp; kit commercial</title>
+  <style>
+    :root {
+      --bg: #0f1114;
+      --surface: #1a1d22;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #5b6470;
+      --line: #e5e7eb;
+      --brand: #9d2525;
+      --accent: #c45c26;
+      --pin: #0b6bcb;
+      --pin-text: #fff;
+      --max: 980px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      background: #f4f5f7;
+      line-height: 1.45;
+    }
+    .hero {
+      background: linear-gradient(160deg, #1a1d22 0%, #2a1212 100%);
+      color: #fff;
+      padding: 48px 24px 40px;
+    }
+    .hero-inner { max-width: var(--max); margin: 0 auto; }
+    .brand {
+      color: #f2b8b8;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin: 0 0 12px;
+    }
+    h1 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 40px); font-weight: 700; }
+    .hero p { margin: 0; max-width: 62ch; color: #d7dbe2; font-size: 16px; }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px;
+    }
+    .pill {
+      display: inline-flex; align-items: center;
+      padding: 6px 12px; border-radius: 999px;
+      background: rgba(255,255,255,0.1); color: #fff; font-size: 12px;
+    }
+    nav.toc {
+      max-width: var(--max); margin: -18px auto 0; padding: 0 16px;
+      position: relative; z-index: 2;
+    }
+    nav.toc ul {
+      list-style: none; margin: 0; padding: 14px;
+      background: var(--card); border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    nav.toc a {
+      text-decoration: none; color: var(--text);
+      border: 1px solid var(--line); border-radius: 999px;
+      padding: 8px 12px; font-size: 13px; font-weight: 600;
+    }
+    nav.toc a:hover { border-color: var(--brand); color: var(--brand); }
+    main { max-width: var(--max); margin: 0 auto; padding: 32px 16px 80px; }
+    section { margin: 48px 0; }
+    h2 {
+      margin: 0 0 8px; font-size: 26px; color: #111;
+      border-left: 4px solid var(--brand); padding-left: 12px;
+    }
+    .lead { color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
+    .shot {
+      position: relative;
+      background: #111;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #d1d5db;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.14);
+    }
+    .shot img {
+      display: block; width: 100%; height: auto;
+      background: #111;
+    }
+    .caption {
+      background: #fff; padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 14px; color: var(--muted);
+    }
+    .caption strong { color: var(--text); }
+    .ann {
+      position: absolute;
+      z-index: 3;
+      display: flex; align-items: center; gap: 8px;
+      pointer-events: none;
+      max-width: 220px;
+    }
+    .pin {
+      flex: 0 0 auto;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--pin); color: var(--pin-text);
+      font-weight: 800; font-size: 13px;
+      display: grid; place-items: center;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.9);
+    }
+    .bubble {
+      background: rgba(255,255,255,0.96);
+      color: #111;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px; font-weight: 650;
+      line-height: 1.25;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    }
+    .arrow {
+      position: absolute; z-index: 2; pointer-events: none;
+      width: 56px; height: 56px;
+    }
+    .grid-2 {
+      display: grid; gap: 20px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 860px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    .steps {
+      background: #fff; border-radius: 14px; border: 1px solid var(--line);
+      padding: 16px 18px; margin-top: 16px;
+    }
+    .steps ol { margin: 0; padding-left: 18px; }
+    .steps li { margin: 8px 0; }
+    .note {
+      margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+      background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12;
+      font-size: 14px;
+    }
+    .info {
+      margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+      background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
+      font-size: 14px;
+    }
+    table {
+      width: 100%; border-collapse: collapse; background: #fff;
+      border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+      font-size: 14px;
+    }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: #f8fafc; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+    footer {
+      max-width: var(--max); margin: 0 auto; padding: 0 16px 48px;
+      color: var(--muted); font-size: 13px;
+    }
+    @media print {
+      body { background: #fff; }
+      .hero { break-after: avoid; }
+      .shot { box-shadow: none; break-inside: avoid; }
+      nav.toc { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="brand">AIMEDIArt · Notice &amp; kit commercial</p>
+      <h1>Notice d’utilisation illustrée</h1>
+      <p>
+        Document basé sur de <strong>vraies captures d’écran</strong> de l’application (studio + parcours visiteur).
+        Destiné à la formation interne, aux démonstrations partenaires et aux supports commerciaux.
+      </p>
+      <div class="meta">
+        <span class="pill">Captures juillet 2026</span>
+        <span class="pill">Studio backoffice</span>
+        <span class="pill">Parcours salle / QR</span>
+        <span class="pill">Prêt impression PDF</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Sommaire">
+    <ul>
+      <li><a href="#vitrine">1. Vitrine</a></li>
+      <li><a href="#connexion">2. Connexion</a></li>
+      <li><a href="#profil">3. Profil</a></li>
+      <li><a href="#expos">4. Expos</a></li>
+      <li><a href="#catalogue">5. Œuvres</a></li>
+      <li><a href="#fiche">6. Fiche œuvre</a></li>
+      <li><a href="#visiteur">7. Visiteur</a></li>
+      <li><a href="#stats">8. Stats</a></li>
+      <li><a href="#checklist">9. Checklist</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section id="vitrine">
+      <h2>1. Vitrine organisateur</h2>
+      <p class="lead">Page publique <code>/organisation</code> — argumentaire produit, parcours, tarifs. Point d’entrée commercial.</p>
+      <figure class="shot">
+        <img src="captures/01-vitrine-organisation.jpeg" alt="Vitrine AIMEDIArt — Quand l’expo respire avec ses visiteurs" width="1440" height="900" />
+        <div class="ann" style="top: 4%; left: 2%;">
+          <span class="pin">1</span><span class="bubble">Logo + langue FR</span>
+        </div>
+        <div class="ann" style="top: 3%; right: 2%;">
+          <span class="pin">2</span><span class="bubble">CTA « Vers le studio »</span>
+        </div>
+        <div class="ann" style="top: 38%; left: 3%;">
+          <span class="pin">3</span><span class="bubble">Promesse produit</span>
+        </div>
+        <div class="ann" style="bottom: 18%; left: 4%;">
+          <span class="pin">4</span><span class="bubble">Découvrir / parcours</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Accueil marketing. Utilisable en deck commercial.</figcaption>
+      </figure>
+    </section>
+
+    <section id="connexion">
+      <h2>2. Connexion studio</h2>
+      <p class="lead">Route <code>/login</code>. Création de compte via « Créer un compte » / inscription.</p>
+      <figure class="shot">
+        <img src="captures/09-connexion-login.jpeg" alt="Écran de connexion AIMEDIArt" width="1440" height="900" />
+        <div class="ann" style="top: 28%; left: 34%;">
+          <span class="pin">1</span><span class="bubble">E-mail + mot de passe</span>
+        </div>
+        <div class="ann" style="top: 52%; left: 28%;">
+          <span class="pin">2</span><span class="bubble">Créer un compte</span>
+        </div>
+        <div class="ann" style="top: 52%; right: 28%;">
+          <span class="pin">3</span><span class="bubble">Se connecter → dashboard</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Formulaire de connexion organisateur.</figcaption>
+      </figure>
+    </section>
+
+    <section id="profil">
+      <h2>3. Votre profil (hub)</h2>
+      <p class="lead">Après connexion : <code>/dashboard</code>. Compte, mode de navigation (admin global / organisation), périmètre expo, équipe.</p>
+      <figure class="shot">
+        <img src="captures/02-dashboard-profil.jpeg" alt="Dashboard profil utilisateur AIMEDIArt" width="1440" height="900" />
+        <div class="ann" style="top: 2%; left: 18%;">
+          <span class="pin">1</span><span class="bubble">Menu studio (pills)</span>
+        </div>
+        <div class="ann" style="top: 2%; right: 8%;">
+          <span class="pin">2</span><span class="bubble">Configuration + déconnexion</span>
+        </div>
+        <div class="ann" style="top: 48%; left: 4%;">
+          <span class="pin">3</span><span class="bubble">Mode Admin global / Org</span>
+        </div>
+        <div class="ann" style="top: 34%; right: 4%;">
+          <span class="pin">4</span><span class="bubble">Conditions / plans</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Hub « Votre profil » avec navigation métier en rouge.</figcaption>
+      </figure>
+      <div class="info">Astuce démo : basculez « Administration globale » ↔ « Mon organisation » pour montrer les deux casquettes.</div>
+    </section>
+
+    <section id="expos">
+      <h2>4. Expositions</h2>
+      <p class="lead"><code>/expos</code> — créer une expo, accéder visiteurs, sponsors, catalogue, présentation visitor.</p>
+      <figure class="shot">
+        <img src="captures/07-expos.jpeg" alt="Liste des expositions AIMEDIArt" width="1440" height="900" />
+        <div class="ann" style="top: 12%; right: 3%;">
+          <span class="pin">1</span><span class="bubble">+ Nouvelle exposition</span>
+        </div>
+        <div class="ann" style="top: 18%; right: 2%;">
+          <span class="pin">2</span><span class="bubble">Audio / visiteurs / sponsors</span>
+        </div>
+        <div class="ann" style="top: 48%; left: 28%;">
+          <span class="pin">3</span><span class="bubble">Fiche expo + coûts</span>
+        </div>
+        <div class="ann" style="bottom: 8%; left: 22%;">
+          <span class="pin">4</span><span class="bubble">Catalogue des œuvres</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Pilotage d’une exposition et accès secondaires.</figcaption>
+      </figure>
+    </section>
+
+    <section id="catalogue">
+      <h2>5. Catalogue des œuvres</h2>
+      <p class="lead"><code>/catalogue</code> — cœur opérationnel : création, badges IA, impression cartel, aperçu visiteur.</p>
+      <figure class="shot">
+        <img src="captures/03-catalogue-oeuvres.jpeg" alt="Catalogue des œuvres AIMEDIArt" width="1440" height="900" />
+        <div class="ann" style="top: 12%; right: 3%;">
+          <span class="pin">1</span><span class="bubble">+ Nouvelle œuvre</span>
+        </div>
+        <div class="ann" style="top: 42%; left: 2%;">
+          <span class="pin">2</span><span class="bubble">Carte œuvre + expo</span>
+        </div>
+        <div class="ann" style="top: 38%; right: 18%;">
+          <span class="pin">3</span><span class="bubble">Imprimer cartel</span>
+        </div>
+        <div class="ann" style="top: 45%; right: 14%;">
+          <span class="pin">4</span><span class="bubble">Visuel visiteurs</span>
+        </div>
+        <div class="ann" style="bottom: 10%; right: 3%;">
+          <span class="pin">5</span><span class="bubble">Badges Analyse / Médiations / Voix</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Vue opérationnelle idéale pour une démo « production ».</figcaption>
+      </figure>
+    </section>
+
+    <section id="fiche">
+      <h2>6. Fiche œuvre (workflow IA)</h2>
+      <p class="lead">Modal ouvert depuis le catalogue. Chaîne : Identité → Analyse → Médiations → Audio → QR-Code.</p>
+      <figure class="shot">
+        <img src="captures/11-fiche-oeuvre-modal.jpeg" alt="Modal fiche œuvre avec onglets IA" width="1440" height="900" />
+        <div class="ann" style="top: 14%; left: 18%;">
+          <span class="pin">1</span><span class="bubble">Stepper 5 étapes</span>
+        </div>
+        <div class="ann" style="top: 22%; left: 18%;">
+          <span class="pin">2</span><span class="bubble">Onglets Identité…QR</span>
+        </div>
+        <div class="ann" style="top: 8%; right: 18%;">
+          <span class="pin">3</span><span class="bubble">Enregistrer</span>
+        </div>
+        <div class="ann" style="top: 48%; left: 20%;">
+          <span class="pin">4</span><span class="bubble">Expo + titre + artiste + photo</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Argument commercial clé : de la photo au QR en un seul flux contrôlé.</figcaption>
+      </figure>
+      <div class="steps">
+        <ol>
+          <li><strong>Identité</strong> — rattacher expo / artiste / photo.</li>
+          <li><strong>Analyse</strong> — lancer l’analyse image IA.</li>
+          <li><strong>Médiations</strong> — générer personas × langues, puis valider humainement.</li>
+          <li><strong>Audio</strong> — générer les voix.</li>
+          <li><strong>QR-Code</strong> — générer, tester, imprimer le cartel.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="visiteur">
+      <h2>7. Parcours visiteur (salle)</h2>
+      <p class="lead">Entrée QR → gate expo → page œuvre (personas, émotions, cœurs). Sans application à installer.</p>
+
+      <div class="grid-2">
+        <figure class="shot">
+          <img src="captures/10-visiteur-gate.jpeg" alt="Gate espace visiteur Starting Block 2026" width="900" height="1200" />
+          <div class="ann" style="top: 8%; left: 6%;">
+            <span class="pin">1</span><span class="bubble">Espace visiteur</span>
+          </div>
+          <div class="ann" style="top: 55%; left: 8%;">
+            <span class="pin">2</span><span class="bubble">Présentation expo</span>
+          </div>
+          <div class="ann" style="bottom: 12%; left: 10%;">
+            <span class="pin">3</span><span class="bubble">Faire la visite</span>
+          </div>
+          <figcaption class="caption"><strong>Gate</strong> — Accueil expo avant le premier scan / dialogue.</figcaption>
+        </figure>
+
+        <figure class="shot">
+          <img src="captures/04-visiteur-oeuvre-desktop.jpeg" alt="Page œuvre visiteur — médiation Pote" width="900" height="1200" />
+          <div class="ann" style="top: 18%; left: 6%;">
+            <span class="pin">1</span><span class="bubble">Titre + artiste</span>
+          </div>
+          <div class="ann" style="top: 48%; left: 6%;">
+            <span class="pin">2</span><span class="bubble">Choix du guide IA</span>
+          </div>
+          <div class="ann" style="bottom: 18%; left: 6%;">
+            <span class="pin">3</span><span class="bubble">Texte de médiation</span>
+          </div>
+          <figcaption class="caption"><strong>Œuvre</strong> — Médiation dialoguée (ex. persona « Pote »).</figcaption>
+        </figure>
+      </div>
+
+      <figure class="shot" style="margin-top:20px;">
+        <img src="captures/06-visiteur-oeuvre-bas-coeurs.jpeg" alt="Émotions et notation en cœurs" width="1440" height="900" />
+        <div class="ann" style="top: 42%; left: 4%;">
+          <span class="pin">1</span><span class="bubble">Grille d’émotions</span>
+        </div>
+        <div class="ann" style="bottom: 10%; left: 4%;">
+          <span class="pin">2</span><span class="bubble">Note en cœurs (1–5)</span>
+        </div>
+        <figcaption class="caption"><strong>Feedback</strong> — Émotions + cœurs (matière live pour l’expo et les stats).</figcaption>
+      </figure>
+      <div class="note">Pitch salle : « Pas de questionnaire. Un dialogue, un ressenti, un geste — et l’expo respire. »</div>
+    </section>
+
+    <section id="stats">
+      <h2>8. Statistiques</h2>
+      <p class="lead"><code>/statistiques</code> — KPIs, distribution émotionnelle, fréquentation. Idéal pour comités et financeurs.</p>
+      <figure class="shot">
+        <img src="captures/08-statistiques.jpeg" alt="Tableau de bord statistiques AIMEDIArt" width="1440" height="900" />
+        <div class="ann" style="top: 22%; left: 4%;">
+          <span class="pin">1</span><span class="bubble">KPIs (visiteurs, cœurs…)</span>
+        </div>
+        <div class="ann" style="top: 48%; left: 4%;">
+          <span class="pin">2</span><span class="bubble">Distribution des émotions</span>
+        </div>
+        <div class="ann" style="top: 48%; right: 4%;">
+          <span class="pin">3</span><span class="bubble">Fréquentation horaire</span>
+        </div>
+        <div class="ann" style="top: 12%; right: 4%;">
+          <span class="pin">4</span><span class="bubble">Prévisualiser / imprimer</span>
+        </div>
+        <figcaption class="caption"><strong>Capture réelle</strong> — Preuve de valeur pour dossiers CNC / mécènes / partenaires.</figcaption>
+      </figure>
+    </section>
+
+    <section id="checklist">
+      <h2>9. Checklist jour J &amp; messages marketing</h2>
+      <table>
+        <thead>
+          <tr><th>Avant ouverture</th><th>Pendant / après</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              Œuvres Actives + bonne expo<br />
+              Médiations validées<br />
+              Voix clés générées<br />
+              Cartels imprimés + QR testés<br />
+              Test téléphone hors Wi‑Fi orga
+            </td>
+            <td>
+              Suivre /statistiques<br />
+              Surveillance audio si équipé<br />
+              Ajuster une médiation si besoin<br />
+              Export PDF partenaires<br />
+              Relancer via carnet / e-mail
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="steps" style="margin-top:16px;">
+        <strong>Phrases utiles en rendez-vous</strong>
+        <ol>
+          <li>« Une photo → analyse → 8 personas × langues → audio → cartel QR. »</li>
+          <li>« Le visiteur ne remplit pas un formulaire : il dialogue et vote en cœurs. »</li>
+          <li>« Vous gardez la main : l’IA accélère, l’humain valide. »</li>
+          <li>« Les stats émotionnelles partent en PDF pour vos financeurs. »</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    AIMEDIArt — notice illustrée · captures locales juillet 2026 · dossier
+    <code>docs/notice-utilisation/</code>. Pour un PDF : ouvrir cette page dans le navigateur → Imprimer → Enregistrer au format PDF.
+  </footer>
+</body>
+</html>
