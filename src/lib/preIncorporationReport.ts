@@ -122,6 +122,10 @@ function categoryLabelFr(toolType: string): string {
     marketing_acquisition: "Marketing, Prospection & Acquisition",
     materiel_equipements: "Matériel & Équipements",
     deplacement_representation: "Frais de Déplacement & Représentation",
+    beta_tests: "Bêta-tests",
+    marketing: "Marketing",
+    commercial: "Commercial",
+    sous_traitance: "Sous-traitance",
     other: "Autre",
   };
   return map[toolType] ?? toolType;

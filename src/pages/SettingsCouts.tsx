@@ -373,7 +373,7 @@ function CostAmountCell({
       ? formatUsdToEurHint(value, usdEurRate, decimals)
       : null;
   return (
-    <span className="inline-flex flex-col gap-0.5 leading-tight">
+    <span className="inline-flex flex-col items-end gap-0.5 leading-tight">
       <span>{formatCost(value, cur, decimals)}</span>
       {eurHint ? (
         <span className="text-[10px] font-normal text-emerald-700/90 dark:text-emerald-400/90">
@@ -553,6 +553,10 @@ const MANUAL_COST_TOOL_TYPES = [
   "marketing_acquisition",
   "materiel_equipements",
   "deplacement_representation",
+  "beta_tests",
+  "marketing",
+  "commercial",
+  "sous_traitance",
   "other",
 ] as const;
 
@@ -1412,7 +1416,6 @@ const COST_TABLE_SORTABLE_COLUMNS: { column: CostSortColumn; labelKey: string }[
   { column: "created_at", labelKey: "couts.col_date" },
   { column: "tool_type", labelKey: "couts.col_tool_type" },
   { column: "provider", labelKey: "couts.col_provider" },
-  { column: "model_name", labelKey: "couts.col_model" },
   { column: "operation_name", labelKey: "couts.col_operation" },
   { column: "cost_estimated", labelKey: "couts.col_cost" },
 ];
@@ -1425,7 +1428,6 @@ const COST_TABLE_STATIC_COLUMNS = [
   "couts.col_units_in",
   "couts.col_units_out",
   "couts.col_tokens_total",
-  "couts.col_source",
 ] as const;
 
 function nextCostSort(column: CostSortColumn, current: CostSort): CostSort {
@@ -1444,19 +1446,26 @@ type SortableThProps = {
   column: CostSortColumn;
   sort: CostSort;
   onSort: (column: CostSortColumn) => void;
+  align?: "left" | "right";
 };
 
-function SortableTh({ label, column, sort, onSort }: SortableThProps) {
+function SortableTh({ label, column, sort, onSort, align = "left" }: SortableThProps) {
   const active = sort.column === column;
   const SortIcon = active ? (sort.ascending ? ArrowUp : ArrowDown) : ArrowUpDown;
 
   return (
-    <th className="px-1.5 py-2.5 text-left text-[11px] font-semibold leading-tight text-muted-foreground">
+    <th
+      className={cn(
+        "px-1.5 py-2.5 text-[11px] font-semibold leading-tight text-muted-foreground",
+        align === "right" ? "text-right" : "text-left",
+      )}
+    >
       <button
         type="button"
         onClick={() => onSort(column)}
         className={cn(
-          "inline-flex items-start gap-0.5 rounded-sm text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex items-start gap-0.5 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          align === "right" ? "ml-auto flex-row-reverse text-right" : "text-left",
           active && "text-foreground",
         )}
         aria-sort={active ? (sort.ascending ? "ascending" : "descending") : "none"}
@@ -1484,11 +1493,16 @@ function CostUnitsCell({
   kind: CostUnitKind;
   t: (key: string) => string;
 }) {
-  if (value == null) return <>—</>;
+  if (value == null) {
+    return <span className="block w-full text-right">—</span>;
+  }
   const label = kind !== "unknown" ? t(`couts.units_kind_${kind}`) : null;
   const tooltip = kind !== "unknown" ? t(`couts.units_tooltip_${kind}`) : undefined;
   return (
-    <span className="inline-flex items-baseline justify-end gap-0.5" title={tooltip}>
+    <span
+      className="flex w-full items-baseline justify-end gap-0.5 tabular-nums"
+      title={tooltip}
+    >
       <span>{value.toLocaleString("fr-FR")}</span>
       {label ? (
         <span className={cn("text-[9px] font-semibold leading-none", costUnitKindClass(kind))}>
@@ -1528,7 +1542,10 @@ function CostsTable({
     if (!selectionMode) setSelectedIds(new Set());
   }, [selectionMode]);
 
-  const pageIds = useMemo(() => events.map((e) => e.id), [events]);
+  const pageIds = useMemo(
+    () => events.map((e) => e.id).filter((id) => !id.startsWith("usage_log:")),
+    [events],
+  );
   const selectedCount = selectedIds.size;
   const allPageSelected =
     pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
@@ -1561,16 +1578,24 @@ function CostsTable({
       return;
     }
     setBulkBusy(true);
-    const { updated, error: bulkErr } = await bulkSetCostEventsPreIncorporation(
+    const { updated, skipped, error: bulkErr } = await bulkSetCostEventsPreIncorporation(
       [...selectedIds],
       { isPreIncorporation: true, paidByUserId: bulkPaidByUserId.trim(), vatRate: 20 },
     );
     setBulkBusy(false);
+    if (bulkErr === "synthetic_usage_logs") {
+      toast.error(t("couts.bulk.error_synthetic_only"));
+      return;
+    }
     if (bulkErr) {
       toast.error(t("couts.bulk.error", { detail: bulkErr }));
       return;
     }
-    toast.success(t("couts.bulk.pre_inc_done", { count: updated }));
+    if (skipped > 0) {
+      toast.warning(t("couts.bulk.partial_skipped", { updated, skipped }));
+    } else {
+      toast.success(t("couts.bulk.pre_inc_done", { count: updated }));
+    }
     setPreIncDialogOpen(false);
     setCategoryDialogOpen(true);
     onDeleted?.();
@@ -1579,16 +1604,24 @@ function CostsTable({
   const handleBulkCategory = async () => {
     if (selectedCount === 0 || !bulkToolType.trim()) return;
     setBulkBusy(true);
-    const { updated, error: bulkErr } = await bulkSetCostEventsToolType(
+    const { updated, skipped, error: bulkErr } = await bulkSetCostEventsToolType(
       [...selectedIds],
       bulkToolType,
     );
     setBulkBusy(false);
+    if (bulkErr === "synthetic_usage_logs") {
+      toast.error(t("couts.bulk.error_synthetic_only"));
+      return;
+    }
     if (bulkErr) {
       toast.error(t("couts.bulk.error", { detail: bulkErr }));
       return;
     }
-    toast.success(t("couts.bulk.category_done", { count: updated }));
+    if (skipped > 0) {
+      toast.warning(t("couts.bulk.partial_skipped", { updated, skipped }));
+    } else {
+      toast.success(t("couts.bulk.category_done", { count: updated }));
+    }
     setCategoryDialogOpen(false);
     setSelectionMode(false);
     onDeleted?.();
@@ -1914,23 +1947,22 @@ function CostsTable({
         {t("couts.units_legend")}
       </p>
       <div className="max-h-[540px] overflow-x-auto overflow-y-auto rounded-xl border border-border/50">
-        <table className="w-full min-w-[1100px] table-fixed text-[12px]">
+        <table className="min-w-[980px] table-fixed text-[12px]" style={{ width: "max(100%, 980px)" }}>
           <colgroup>
-            {selectionMode ? <col className="w-[36px]" /> : null}
-            <col className="w-[96px]" />
-            <col className="w-[60px]" />
-            <col className="w-[78px]" />
-            <col className="w-[80px]" />
-            <col className="w-[92px]" />
-            <col className="w-[84px]" />
-            <col className="w-[100px]" />
-            <col className="w-[90px]" />
-            <col className="w-[90px]" />
-            <col className="w-[52px]" />
-            <col className="w-[46px]" />
-            <col className="w-[46px]" />
-            <col className="w-[52px]" />
-            <col className="w-[92px]" />
+            {selectionMode ? <col style={{ width: 36 }} /> : null}
+            <col style={{ width: 96 }} />
+            <col style={{ width: 72 }} />
+            <col style={{ width: 88 }} />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 88 }} />
+            <col />
+            <col style={{ width: 96 }} />
+            <col style={{ width: 96 }} />
+            <col style={{ width: 56 }} />
+            <col style={{ width: 52 }} />
+            <col style={{ width: 52 }} />
+            <col style={{ width: 56 }} />
+            <col style={{ width: 68 }} />
           </colgroup>
           <thead>
             <tr className="border-b border-border/50 bg-muted/40">
@@ -1950,6 +1982,7 @@ function CostsTable({
                   label={t(labelKey)}
                   sort={sort}
                   onSort={handleSort}
+                  align={column === "cost_estimated" ? "right" : "left"}
                 />
               ))}
               {COST_TABLE_STATIC_COLUMNS.map((labelKey) => {
@@ -2000,19 +2033,29 @@ function CostsTable({
                 return (
                   <th
                     key={labelKey}
-                    className="px-1.5 py-2.5 text-left text-[11px] font-semibold leading-tight text-muted-foreground"
+                    className={cn(
+                      "px-1.5 py-2.5 text-[11px] font-semibold leading-tight text-muted-foreground",
+                      labelKey === "couts.col_units_in" ||
+                        labelKey === "couts.col_units_out" ||
+                        labelKey === "couts.col_tokens_total"
+                        ? "text-right"
+                        : "text-left",
+                    )}
                   >
                     {t(labelKey)}
                   </th>
                 );
               })}
+              <th className="sticky right-0 z-20 w-[68px] min-w-[68px] max-w-[68px] bg-muted/95 px-1 py-2.5 text-right text-[11px] font-semibold leading-tight text-muted-foreground shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.25)]">
+                {t("couts.col_actions")}
+              </th>
             </tr>
             <tr className="border-b border-border/50 bg-muted/25">
               {selectionMode ? <td /> : null}
-              <td colSpan={5} className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <td colSpan={4} className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {t("couts.table_totals_label")}
               </td>
-              <td className="px-2 py-1.5 font-mono text-[12px] font-semibold text-primary">
+              <td className="px-2 py-1.5 text-right font-mono text-[12px] font-semibold text-primary">
                 {loadingTotals ? (
                   "…"
                 ) : (
@@ -2035,7 +2078,7 @@ function CostsTable({
                   ? "…"
                   : ((totals?.totalInputUnits ?? 0) + (totals?.totalOutputUnits ?? 0)).toLocaleString("fr-FR")}
               </td>
-              <td />
+              <td className="sticky right-0 z-20 w-[68px] min-w-[68px] max-w-[68px] bg-muted/90 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.25)]" />
             </tr>
           </thead>
           <tbody>
@@ -2052,6 +2095,7 @@ function CostsTable({
                 entityTitle ??
                 (entityPending ? "…" : (isCostBioEvent(e) && bioRowId ? "…" : "—"));
               const rowSelected = selectedIds.has(e.id);
+              const isSyntheticLog = e.id.startsWith("usage_log:");
 
               return (
               <tr
@@ -2067,8 +2111,14 @@ function CostsTable({
                   <td className="px-1.5 py-1 text-center align-middle">
                     <Checkbox
                       checked={rowSelected}
+                      disabled={isSyntheticLog}
                       onCheckedChange={(v) => toggleSelectId(e.id, v === true)}
-                      aria-label={t("couts.bulk.select_row")}
+                      aria-label={
+                        isSyntheticLog
+                          ? t("couts.bulk.select_row_disabled_log")
+                          : t("couts.bulk.select_row")
+                      }
+                      title={isSyntheticLog ? t("couts.bulk.select_row_disabled_log") : undefined}
                     />
                   </td>
                 ) : null}
@@ -2083,13 +2133,10 @@ function CostsTable({
                 <td className="px-2 py-1 text-[12px] font-medium truncate leading-tight" title={costProviderDisplayName(e.provider)}>
                   {costProviderDisplayName(e.provider)}
                 </td>
-                <td className="px-2 py-1 text-[12px] text-muted-foreground truncate leading-tight" title={e.model_name ?? undefined}>
-                  {e.model_name ?? "—"}
-                </td>
                 <td className="px-2 py-1 text-[12px] truncate leading-tight" title={e.operation_name ?? undefined}>
                   {e.operation_name ? costOperationLabel(e.operation_name, t) : "—"}
                 </td>
-                <td className="px-2 py-1 font-mono text-[12px] font-semibold text-primary leading-tight">
+                <td className="px-2 py-1 text-right font-mono text-[12px] font-semibold text-primary leading-tight">
                   <CostAmountCell
                     value={costAmountInUsd(e, usdEurRate)}
                     currency="USD"
@@ -2133,7 +2180,7 @@ function CostsTable({
                 <td className="px-1.5 py-1 text-[12px] text-right font-mono whitespace-nowrap leading-tight">
                   {(() => {
                     const total = costEventTotalUnits(e);
-                    if (total == null) return "—";
+                    if (total == null) return <span className="block w-full text-right">—</span>;
                     const inKind = costEventInputUnitKind(e);
                     const outKind = costEventOutputUnitKind(e);
                     const tooltip =
@@ -2141,15 +2188,20 @@ function CostsTable({
                         ? `${t(`couts.units_tooltip_${inKind}`)} + ${t(`couts.units_tooltip_${outKind}`)}`
                         : undefined;
                     return (
-                      <span className="font-medium" title={tooltip}>
+                      <span className="block w-full text-right font-medium tabular-nums" title={tooltip}>
                         {total.toLocaleString("fr-FR")}
                       </span>
                     );
                   })()}
                 </td>
-                <td className="px-2 py-1 text-[12px] text-muted-foreground leading-tight">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate" title={e.source ?? undefined}>{e.source ?? "—"}</span>
+                <td
+                  className={cn(
+                    "sticky right-0 z-10 w-[68px] min-w-[68px] max-w-[68px] px-1 py-1 leading-tight shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.25)]",
+                    i % 2 !== 0 ? "bg-muted/95" : "bg-background",
+                    selectionMode && rowSelected && "bg-primary/10",
+                  )}
+                >
+                  <div className="flex items-center justify-end gap-1">
                     <CostDocumentsCell documents={manualCostDocuments(e.metadata)} />
                     {isAdmin && !isManualCostEvent(e) && onAttachCost && (
                       <button

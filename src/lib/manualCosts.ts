@@ -11,6 +11,32 @@ import { supabase } from "./supabase";
 export const COST_DOCUMENTS_BUCKET = "cost-documents";
 export const MANUAL_COST_SOURCE = "manual_entry";
 
+/** UUID v4/v1-ish — ids réels de `ai_usage_events`. */
+const AI_USAGE_EVENT_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Sépare les ids éditables (`ai_usage_events.id`) des ids synthétiques
+ * (`usage_log:…` issus de `ai_usage_logs`, non persistés dans ai_usage_events).
+ */
+export function partitionAiUsageEventIds(ids: string[]): {
+  eventIds: string[];
+  skippedSynthetic: number;
+} {
+  const eventIds: string[] = [];
+  let skippedSynthetic = 0;
+  for (const raw of ids) {
+    const id = raw.trim();
+    if (!id) continue;
+    if (id.startsWith("usage_log:") || !AI_USAGE_EVENT_UUID_RE.test(id)) {
+      skippedSynthetic += 1;
+      continue;
+    }
+    eventIds.push(id);
+  }
+  return { eventIds: [...new Set(eventIds)], skippedSynthetic };
+}
+
 /** Durée de validité d'une URL signée de document (1 heure). */
 const SIGNED_URL_TTL_SEC = 3600;
 
@@ -206,16 +232,25 @@ export async function bulkSetCostEventsPreIncorporation(
     paidByUserId?: string | null;
     vatRate?: number;
   },
-): Promise<{ updated: number; error: string | null }> {
-  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
-  if (unique.length === 0) return { updated: 0, error: null };
+): Promise<{ updated: number; skipped: number; error: string | null }> {
+  const { eventIds, skippedSynthetic } = partitionAiUsageEventIds(ids);
+  if (eventIds.length === 0) {
+    return {
+      updated: 0,
+      skipped: skippedSynthetic,
+      error:
+        skippedSynthetic > 0
+          ? "synthetic_usage_logs"
+          : null,
+    };
+  }
 
   const { data, error: fetchErr } = await supabase
     .from("ai_usage_events")
     .select("id, metadata")
-    .in("id", unique);
+    .in("id", eventIds);
 
-  if (fetchErr) return { updated: 0, error: fetchErr.message };
+  if (fetchErr) return { updated: 0, skipped: skippedSynthetic, error: fetchErr.message };
 
   let updated = 0;
   for (const row of (data ?? []) as Array<{ id: string; metadata: Record<string, unknown> | null }>) {
@@ -241,29 +276,36 @@ export async function bulkSetCostEventsPreIncorporation(
       .update({ metadata: meta })
       .eq("id", row.id);
 
-    if (error) return { updated, error: error.message };
+    if (error) return { updated, skipped: skippedSynthetic, error: error.message };
     updated += 1;
   }
 
-  return { updated, error: null };
+  return { updated, skipped: skippedSynthetic, error: null };
 }
 
 /** Affecte en masse la catégorie (tool_type) aux événements sélectionnés. */
 export async function bulkSetCostEventsToolType(
   ids: string[],
   toolType: string,
-): Promise<{ updated: number; error: string | null }> {
-  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+): Promise<{ updated: number; skipped: number; error: string | null }> {
   const nextType = toolType.trim();
-  if (unique.length === 0 || !nextType) return { updated: 0, error: null };
+  const { eventIds, skippedSynthetic } = partitionAiUsageEventIds(ids);
+  if (!nextType) return { updated: 0, skipped: skippedSynthetic, error: null };
+  if (eventIds.length === 0) {
+    return {
+      updated: 0,
+      skipped: skippedSynthetic,
+      error: skippedSynthetic > 0 ? "synthetic_usage_logs" : null,
+    };
+  }
 
   const { error, count } = await supabase
     .from("ai_usage_events")
     .update({ tool_type: nextType })
-    .in("id", unique);
+    .in("id", eventIds);
 
-  if (error) return { updated: 0, error: error.message };
-  return { updated: count ?? unique.length, error: null };
+  if (error) return { updated: 0, skipped: skippedSynthetic, error: error.message };
+  return { updated: count ?? eventIds.length, skipped: skippedSynthetic, error: null };
 }
 
 /**
