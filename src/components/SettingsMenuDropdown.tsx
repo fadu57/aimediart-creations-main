@@ -15,6 +15,7 @@ import {
   Settings,
   Shield,
   Sparkles,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -49,6 +50,7 @@ const IA_LINKS = [
 
 const SUIVI_LINKS = [
   { to: "/settings/couts", labelKey: "settings_submenu_couts", Icon: Euro },
+  { to: "/settings/chiffre-affaires", labelKey: "settings_submenu_ca", Icon: TrendingUp },
   { to: "/suivi_tokens", labelKey: "settings_submenu_suivi_tokens", Icon: Coins },
   { to: "/suivi_temps", labelKey: "settings_submenu_suivi_temps", Icon: Clock },
   { to: "/suivi_supabase", labelKey: "settings_submenu_supabase_db", Icon: Database },

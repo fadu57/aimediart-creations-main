@@ -12,6 +12,8 @@ export const VITRINE_LEGAL_NAMESPACES = [
   "terms",
   "ai_policy",
   "legal_pack",
+  "legal_editor",
+  "juridique",
 ] as const;
 
 /** Backoffice + visiteur — chargés hors vitrine marketing. */
@@ -42,26 +44,32 @@ const LEGAL_PATH_TO_NAMESPACE: Record<string, (typeof VITRINE_LEGAL_NAMESPACES)[
   "/privacy": "privacy",
   "/terms": "terms",
   "/ai-policy": "ai_policy",
+  "/juridique": "juridique",
 };
 
 export function isPublicMarketingPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/organisation" || path.startsWith("/organisation/")) return true;
   if (path in LEGAL_PATH_TO_NAMESPACE) return true;
+  if (path.startsWith("/juridique/")) return true;
   if (path === "/expo") return true;
   return false;
 }
 
 export function legalNamespaceForPath(pathname: string): (typeof VITRINE_LEGAL_NAMESPACES)[number] | null {
   const path = pathname.replace(/\/+$/, "") || "/";
-  return LEGAL_PATH_TO_NAMESPACE[path] ?? null;
+  if (path in LEGAL_PATH_TO_NAMESPACE) return LEGAL_PATH_TO_NAMESPACE[path];
+  if (path.startsWith("/juridique/")) return "juridique";
+  return null;
 }
 
 /** Vitrine /organisation et pages légales publiques (CGV, cookies, etc.). */
 export function isOrganisationVitrineAreaPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/organisation" || path.startsWith("/organisation/")) return true;
-  return path in LEGAL_PATH_TO_NAMESPACE;
+  if (path in LEGAL_PATH_TO_NAMESPACE) return true;
+  if (path.startsWith("/juridique/")) return true;
+  return false;
 }
 
 export function getInitialLanguage(): SupportedLang {

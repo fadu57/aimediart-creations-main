@@ -13,7 +13,7 @@ export type AuthUserWithRole = {
   role_label: string | null;
   /** Niveau effectif fusionné (privilège le plus élevé). */
   role_id: number | null;
-  /** Rôle global SaaS (1–3), si présent. */
+  /** Rôle global SaaS (1–3 ou 8 juriste), si présent. */
   global_role_id: number | null;
   /** Rôle métier agence/expo (4–7), si présent. */
   agency_role_id: number | null;

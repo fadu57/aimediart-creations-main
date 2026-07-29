@@ -1,0 +1,44 @@
+[
+  {
+    "slug": "contrat_mise_disposition_locaux",
+    "title": "Contrat de mise à disposition de locaux",
+    "short": "Mise à disposition de locaux",
+    "htmlFile": "contrat_mise_disposition_locaux.html"
+  },
+  {
+    "slug": "pacte_associes",
+    "title": "Pacte d'associés",
+    "short": "Pacte d'associés",
+    "htmlFile": "pacte_associes.html"
+  },
+  {
+    "slug": "declaration_non_condamnation",
+    "title": "Déclaration de non-condamnation et de filiation",
+    "short": "Non-condamnation & filiation",
+    "htmlFile": "declaration_non_condamnation.html"
+  },
+  {
+    "slug": "etat_actes_formation",
+    "title": "État des actes accomplis pour le compte de la société en formation",
+    "short": "État des actes (formation)",
+    "htmlFile": "etat_actes_formation.html"
+  },
+  {
+    "slug": "liste_souscripteurs",
+    "title": "Liste des souscripteurs d'actions",
+    "short": "Liste des souscripteurs",
+    "htmlFile": "liste_souscripteurs.html"
+  },
+  {
+    "slug": "convention_associes_remuneration",
+    "title": "Convention d'associés — rémunération des dirigeants",
+    "short": "Rémunération dirigeants",
+    "htmlFile": "convention_associes_remuneration.html"
+  },
+  {
+    "slug": "statuts_sas",
+    "title": "Statuts de la SAS",
+    "short": "Statuts SAS",
+    "htmlFile": "statuts_sas.html"
+  }
+]

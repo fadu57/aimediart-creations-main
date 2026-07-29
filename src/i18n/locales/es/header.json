@@ -7,6 +7,7 @@
   "nav_home": "Tu perfil",
   "nav_accueil": "Inicio",
   "nav_to_studio": "Al estudio",
+  "nav_juridique": "Juridico",
   "nav_organisation": "Organización",
   "nav_users": "Usuarios",
   "nav_expos": "Exposiciones",
@@ -23,6 +24,7 @@
   "settings_submenu_ia_controle": "Control",
   "settings_submenu_suivis": "Seguimientos",
   "settings_submenu_couts": "Costes",
+  "settings_submenu_ca": "Facturación",
   "settings_submenu_suivi_temps": "Tiempo",
   "settings_submenu_online_presence": "Quién está en línea",
   "settings_submenu_presence_thresholds": "Umbrales de presencia",
@@ -53,5 +55,7 @@
   "not_found": {
     "title": "¡Vaya! Página no encontrada",
     "home": "Volver al inicio"
-  }
+  },
+  "nav_to_juridique": "Al juridico",
+  "nav_juridique_hub": "Todos los documentos"
 }

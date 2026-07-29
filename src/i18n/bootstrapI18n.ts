@@ -123,8 +123,10 @@ export function ensureVitrineNamespacesForPath(pathname: string): void {
 
   const registeredNs = i18n.options.ns;
   const nsList = Array.isArray(registeredNs) ? registeredNs : registeredNs ? [registeredNs] : [];
-  if (!nsList.includes(legalNs)) {
-    void i18n.loadNamespaces(legalNs);
+  for (const ns of [legalNs, "legal_editor"] as const) {
+    if (!nsList.includes(ns)) {
+      void i18n.loadNamespaces(ns);
+    }
   }
 }
 

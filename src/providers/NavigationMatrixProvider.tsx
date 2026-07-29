@@ -77,9 +77,9 @@ export function NavigationMatrixProvider({ children }: { children: ReactNode }) 
         return;
       }
 
-      // role_id 1 : acces total sans lire la matrice_securite
-      if (roleId === 1) {
-        setAccess(defaultNavAccessForRole(1));
+      // role_id 1 (admin) et 8 (juriste) : acces navigation total sans lire la matrice
+      if (roleId === 1 || roleId === 8) {
+        setAccess(defaultNavAccessForRole(roleId));
         return;
       }
 

@@ -16,6 +16,10 @@ export const ROLE_ADMIN_AGENCY = "admin_agency";
 export const ROLE_CURATOR_EXPO = "curator_expo";
 export const ROLE_EQUIPE_EXPO = "equipe_expo";
 export const ROLE_VISITEUR = "visiteur";
+export const ROLE_JURISTE = "juriste";
+
+/** role_id SaaS juriste (app_metadata), hors plage admin 1–3. */
+export const ROLE_ID_JURISTE = 8;
 
 export const ROLES_FULL_DATA_ACCESS = new Set<string>([
   ROLE_ADMIN_GENERAL,
@@ -71,8 +75,34 @@ export function isBackofficeRole(role_name: string | null | undefined): boolean 
   return (
     hasRoleInSet(role_name, ROLES_FULL_DATA_ACCESS) ||
     hasRoleInSet(role_name, ROLES_AGENCY_SCOPE) ||
-    hasRoleInSet(role_name, ROLES_SINGLE_EXPO)
+    hasRoleInSet(role_name, ROLES_SINGLE_EXPO) ||
+    n === normalizeRoleName(ROLE_JURISTE)
   );
+}
+
+/** Édition des pages légales publiques (CGV…) : admin général (1) ou juriste (8). */
+export function canEditLegalPages(
+  role_id: number | null | undefined,
+  role_name?: string | null,
+): boolean {
+  if (role_id === 1 || role_id === ROLE_ID_JURISTE) return true;
+  return normalizeRoleName(role_name) === normalizeRoleName(ROLE_JURISTE);
+}
+
+/**
+ * Publication définitive des pages légales :
+ * uniquement admin général SaaS (app_metadata role_id 1) — pas le juriste (8), ni 2/3.
+ */
+export function canPublishLegalPages(role_id: number | null | undefined): boolean {
+  return parseGlobalRoleId(role_id) === 1;
+}
+
+/** Menu / hub Juridique (création entreprise) : admin général (1) ou juriste (8). */
+export function canAccessJuridiqueWorkspace(
+  role_id: number | null | undefined,
+  role_name?: string | null,
+): boolean {
+  return canEditLegalPages(role_id, role_name);
 }
 
 /**
@@ -140,11 +170,13 @@ function parseAuthRoleId(raw: unknown): number | null {
   return null;
 }
 
-/** Rôle global SaaS (1–3) : JWT app_metadata uniquement côté client. */
+/** Rôle global SaaS : admins 1–3 ou juriste 8 (JWT app_metadata). */
 export function parseGlobalRoleId(raw: unknown): number | null {
   const n = parseAuthRoleId(raw);
-  if (n == null || n < 1 || n > 3) return null;
-  return n;
+  if (n == null) return null;
+  if (n >= 1 && n <= 3) return n;
+  if (n === ROLE_ID_JURISTE) return n;
+  return null;
 }
 
 /** Rôle métier agence/expo (4–7) : agency_users.role_id. */
@@ -315,6 +347,8 @@ export function mapRoleNameFromRoleId(roleId: number | null): string | null {
       return ROLE_EQUIPE_EXPO;
     case 7:
       return ROLE_VISITEUR;
+    case ROLE_ID_JURISTE:
+      return ROLE_JURISTE;
     default:
       return null;
   }

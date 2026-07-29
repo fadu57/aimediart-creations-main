@@ -15,6 +15,7 @@ export const CatalogueCorbeille = lazyWithRetry(() => import("@/pages/CatalogueC
 export const Statistics = lazyWithRetry(() => import("@/pages/Statistics"));
 export const SettingsPage = lazyWithRetry(() => import("@/pages/Settings"));
 export const SettingsCouts = lazyWithRetry(() => import("@/pages/SettingsCouts"));
+export const SettingsChiffreAffaires = lazyWithRetry(() => import("@/pages/SettingsChiffreAffaires"));
 export const SettingsAcces = lazyWithRetry(() => import("@/pages/SettingsAcces"));
 export const SettingsActu = lazyWithRetry(() => import("@/pages/SettingsActu"));
 export const SettingsGed = lazyWithRetry(() => import("@/pages/SettingsGed"));
@@ -62,6 +63,8 @@ export const CookiesPage = lazyWithRetry(() => import("@/pages/CookiesPage"));
 export const PrivacyPage = lazyWithRetry(() => import("@/pages/PrivacyPage"));
 export const TermsPage = lazyWithRetry(() => import("@/pages/TermsPage"));
 export const AiPolicyPage = lazyWithRetry(() => import("@/pages/AiPolicyPage"));
+export const JuridiqueHubPage = lazyWithRetry(() => import("@/pages/JuridiqueHubPage"));
+export const JuridiqueDocPage = lazyWithRetry(() => import("@/pages/JuridiqueDocPage"));
 export const AimediartDocSharePage = lazyWithRetry(() => import("@/pages/AimediartDocSharePage"));
 export const ExpoCastPage = lazyWithRetry(() => import("@/pages/ExpoCastPage"));
 export const OeuvresArtiste = lazyWithRetry(() => import("@/pages/OeuvresArtiste"));

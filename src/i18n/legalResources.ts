@@ -41,6 +41,18 @@ import deLegalPack from "./locales/de/legal_pack.json";
 import esLegalPack from "./locales/es/legal_pack.json";
 import itLegalPack from "./locales/it/legal_pack.json";
 
+import frLegalEditor from "./locales/fr/legal_editor.json";
+import enLegalEditor from "./locales/en/legal_editor.json";
+import deLegalEditor from "./locales/de/legal_editor.json";
+import esLegalEditor from "./locales/es/legal_editor.json";
+import itLegalEditor from "./locales/it/legal_editor.json";
+
+import frJuridique from "./locales/fr/juridique.json";
+import enJuridique from "./locales/en/juridique.json";
+import deJuridique from "./locales/de/juridique.json";
+import esJuridique from "./locales/es/juridique.json";
+import itJuridique from "./locales/it/juridique.json";
+
 type LegalNamespace = (typeof VITRINE_LEGAL_NAMESPACES)[number];
 
 type LegalBundle = Record<LegalNamespace, Record<string, unknown>>;
@@ -53,6 +65,8 @@ export const legalResources: Record<SupportedLang, LegalBundle> = {
     terms: frTerms,
     ai_policy: frAiPolicy,
     legal_pack: frLegalPack,
+    legal_editor: frLegalEditor,
+    juridique: frJuridique,
   },
   en: {
     cgv: enCgv,
@@ -61,6 +75,8 @@ export const legalResources: Record<SupportedLang, LegalBundle> = {
     terms: enTerms,
     ai_policy: enAiPolicy,
     legal_pack: enLegalPack,
+    legal_editor: enLegalEditor,
+    juridique: enJuridique,
   },
   de: {
     cgv: deCgv,
@@ -69,6 +85,8 @@ export const legalResources: Record<SupportedLang, LegalBundle> = {
     terms: deTerms,
     ai_policy: deAiPolicy,
     legal_pack: deLegalPack,
+    legal_editor: deLegalEditor,
+    juridique: deJuridique,
   },
   es: {
     cgv: esCgv,
@@ -77,6 +95,8 @@ export const legalResources: Record<SupportedLang, LegalBundle> = {
     terms: esTerms,
     ai_policy: esAiPolicy,
     legal_pack: esLegalPack,
+    legal_editor: esLegalEditor,
+    juridique: esJuridique,
   },
   it: {
     cgv: itCgv,
@@ -85,5 +105,7 @@ export const legalResources: Record<SupportedLang, LegalBundle> = {
     terms: itTerms,
     ai_policy: itAiPolicy,
     legal_pack: itLegalPack,
+    legal_editor: itLegalEditor,
+    juridique: itJuridique,
   },
 };

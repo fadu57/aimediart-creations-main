@@ -30,6 +30,7 @@ export const NAV_MATRIX_MENU_KEYS = [
 export const NAV_MATRIX_PAGE_DEFS = [
   // Pages unitaires
   { key: "page_settings_couts", label: "Coûts", paths: ["/settings/couts"] },
+  { key: "page_settings_ca", label: "Chiffre d'affaires", paths: ["/settings/chiffre-affaires"] },
   { key: "page_qui_en_ligne", label: "Qui est en ligne", paths: ["/settings/qui-est-en-ligne"] },
   { key: "page_presence_seuils", label: "Seuils de présence", paths: ["/settings/presence-seuils"] },
   { key: "page_prompts", label: "Prompts IA", paths: ["/prompts"] },
@@ -153,7 +154,8 @@ function allFalse(): NavAccessMap {
  * elles n’étaient pas filtrées auparavant) ; un admin peut ensuite les restreindre.
  */
 export function defaultNavAccessForRole(roleId: number | null | undefined): NavAccessMap {
-  if (roleId === 1) return allTrue();
+  // Admin général + juriste : navigation SaaS complète (écriture restreinte ailleurs).
+  if (roleId === 1 || roleId === 8) return allTrue();
   if (roleId === 7) return buildAccess({ menus: false, oeuvre: true, subpages: false });
   if (roleId != null && roleId >= 2 && roleId <= 6) {
     return buildAccess({ menus: false, oeuvre: false, subpages: true });

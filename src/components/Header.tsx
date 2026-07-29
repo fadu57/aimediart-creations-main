@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Building2, GalleryVerticalEnd, House, Loader2, LogIn, LogOut, Menu, Settings, UserPlus, Users, X } from "lucide-react";
+import { BarChart3, Building2, ChevronDown, GalleryVerticalEnd, House, Loader2, LogIn, LogOut, Menu, Settings, UserPlus, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useEffectiveAuth } from "@/hooks/useEffectiveAuth";
-import { normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
+import { canAccessJuridiqueWorkspace, normalizeRoleName, ROLE_ADMIN_AGENCY } from "@/lib/authUser";
 import { HEADER_NAV_ITEMS } from "@/lib/navigationMatrix";
+import {
+  CREATION_ENTREPRISE_DOCS,
+  CREATION_ENTREPRISE_SLUGS,
+  JURIDIQUE_HUB_PATH,
+  juridiqueDocPath,
+} from "@/lib/creationEntrepriseDocs";
 import { supabase } from "@/lib/supabase";
 import { endOrganizerErrorSession, logClientError } from "@/lib/clientErrorLogging";
 import { useNavigationMatrix } from "@/hooks/useNavigationMatrix";
@@ -16,6 +22,13 @@ import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { SettingsMenuDropdown } from "@/components/SettingsMenuDropdown";
 import { VitrineAnchorNav } from "@/components/VitrineAnchorNav";
 import { LanguageFlag } from "@/components/LanguageFlag";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { isOrganisationVitrineAreaPath } from "@/i18n/constants";
 import { UI_LANGUAGE_OPTIONS } from "@/lib/uiLanguageOptions";
 import { cn } from "@/lib/utils";
@@ -147,6 +160,7 @@ export default function Header() {
   const showVitrineNavInHeader =
     Boolean(session) && isOrganisationVitrinePage && !authLoading;
   const showVitrineNavInHeaderDesktop = showVitrineNavInHeader && isDesktopHeader;
+  const canSeeJuridique = canAccessJuridiqueWorkspace(role_id, role_name);
   const vitrineAnchorPrefix = pathname === "/organisation" ? "" : "/organisation";
   const navPillClass = showVitrineNavInHeaderDesktop ? HEADER_NAV_PILL_COMPACT_CLASS : HEADER_NAV_PILL_CLASS;
   const languageInNavRow = showVitrineNavInHeaderDesktop && isDesktopHeader;
@@ -385,19 +399,46 @@ export default function Header() {
             {showVitrineNavInHeaderDesktop ? (
               <div className="flex flex-nowrap items-center justify-end gap-1">
                 {languageInNavRow ? languageSelector : null}
-                <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
-                  <VitrineAnchorNav
-                    vitrinePathPrefix={vitrineAnchorPrefix}
-                    variant="header"
-                    align="end"
-                  />
-                  {session ? (
-                    <Link
-                      to={homePath}
-                      className={`${HEADER_NAV_PILL_COMPACT_CLASS} bg-[#E63946] text-white hover:bg-[#E63946]/90`}
-                    >
-                      {t("nav_to_studio")}
-                    </Link>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-[#faf9f7] px-0.5 py-0.5">
+                    <VitrineAnchorNav
+                      vitrinePathPrefix={vitrineAnchorPrefix}
+                      variant="header"
+                      align="end"
+                    />
+                    {session ? (
+                      <Link
+                        to={homePath}
+                        className={`${HEADER_NAV_PILL_COMPACT_CLASS} bg-[#E63946] text-white hover:bg-[#E63946]/90`}
+                      >
+                        {t("nav_to_studio")}
+                      </Link>
+                    ) : null}
+                  </div>
+                  {session && canSeeJuridique ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        className={`${HEADER_NAV_PILL_COMPACT_CLASS} inline-flex items-center gap-1 bg-[#E63946] text-white hover:bg-[#E63946]/90 outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                        aria-label={t("nav_to_juridique")}
+                      >
+                        {t("nav_to_juridique")}
+                        <ChevronDown className="h-3.5 w-3.5 opacity-90" aria-hidden />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[280px]">
+                        <DropdownMenuItem asChild>
+                          <Link to={JURIDIQUE_HUB_PATH}>{t("nav_juridique_hub")}</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {CREATION_ENTREPRISE_SLUGS.map((slug) => {
+                          const doc = CREATION_ENTREPRISE_DOCS[slug];
+                          return (
+                            <DropdownMenuItem key={slug} asChild>
+                              <Link to={juridiqueDocPath(slug)}>{doc.short}</Link>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   ) : null}
                 </div>
               </div>

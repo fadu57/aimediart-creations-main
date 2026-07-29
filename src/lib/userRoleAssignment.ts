@@ -9,7 +9,7 @@ export function derivePrimaryRoleId(roleIds: number[]): number | null {
 }
 
 export function deriveGlobalRoleId(roleIds: number[]): number | null {
-  const globals = roleIds.filter((id) => id >= 1 && id <= 3);
+  const globals = roleIds.filter((id) => (id >= 1 && id <= 3) || id === 8);
   return globals.length ? Math.min(...globals) : null;
 }
 
@@ -51,12 +51,14 @@ export function buildRoleIdsFromStorage(
 }
 
 export function normalizeUserRoleIds(roleIds: number[] | null | undefined): number[] {
-  const unique = [...new Set((roleIds ?? []).filter((id) => Number.isFinite(id) && id >= 1 && id <= 7))];
+  const unique = [
+    ...new Set((roleIds ?? []).filter((id) => Number.isFinite(id) && ((id >= 1 && id <= 7) || id === 8))),
+  ];
   return unique.sort((a, b) => a - b);
 }
 
 export function isGlobalRole(roleId: number): boolean {
-  return roleId >= 1 && roleId <= 3;
+  return (roleId >= 1 && roleId <= 3) || roleId === 8;
 }
 
 export function isAgencyRole(roleId: number): boolean {

@@ -281,6 +281,8 @@ const AppRoutes = () => (
     <Route path="/privacy" element={<Pages.PrivacyPage />} />
     <Route path="/terms" element={<Pages.TermsPage />} />
     <Route path="/ai-policy" element={<Pages.AiPolicyPage />} />
+    <Route path="/juridique" element={<Pages.JuridiqueHubPage />} />
+    <Route path="/juridique/:slug" element={<Pages.JuridiqueDocPage />} />
     <Route path="/aimediart-doc-share" element={<Pages.AimediartDocSharePage />} />
     <Route path="/expo" element={<Pages.ExpoCastPage />} />
     <Route path="/" element={<AppShell />}>
@@ -360,6 +362,7 @@ const AppRoutes = () => (
           <Route path="statistiques" element={<Pages.Statistics />} />
           <Route path="settings" element={<Pages.SettingsPage />} />
           <Route path="settings/couts" element={<Pages.SettingsCouts />} />
+          <Route path="settings/chiffre-affaires" element={<Pages.SettingsChiffreAffaires />} />
           <Route path="settings/acces" element={<Pages.SettingsAcces />} />
           <Route path="settings/actu" element={<Pages.SettingsActu />} />
           <Route path="settings/ged" element={<Pages.SettingsGed />} />

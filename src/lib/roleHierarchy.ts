@@ -13,6 +13,7 @@ const ROLE_NAME_TO_ID: Record<string, number> = {
   curator_expo: 5,
   equipe_expo: 6,
   visiteur: 7,
+  juriste: 8,
 };
 
 export function parseNumericRoleId(raw: unknown): number | null {

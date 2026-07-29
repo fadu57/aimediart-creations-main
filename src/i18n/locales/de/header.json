@@ -7,6 +7,7 @@
   "nav_home": "Ihr Profil",
   "nav_accueil": "Startseite",
   "nav_to_studio": "Zum Studio",
+  "nav_juridique": "Juridik",
   "nav_organisation": "Organisation",
   "nav_users": "Benutzer",
   "nav_expos": "Ausstellungen",
@@ -23,6 +24,7 @@
   "settings_submenu_ia_controle": "Steuerung",
   "settings_submenu_suivis": "Auswertungen",
   "settings_submenu_couts": "Kosten",
+  "settings_submenu_ca": "Umsatz",
   "settings_submenu_suivi_temps": "Zeit",
   "settings_submenu_online_presence": "Wer ist online",
   "settings_submenu_presence_thresholds": "Anwesenheitsschwellen",
@@ -53,5 +55,7 @@
   "not_found": {
     "title": "Hoppla! Seite nicht gefunden",
     "home": "Zurück zur Startseite"
-  }
+  },
+  "nav_to_juridique": "Zur Juridik",
+  "nav_juridique_hub": "Alle Dokumente"
 }
