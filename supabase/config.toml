@@ -120,3 +120,13 @@ entrypoint = "./functions/aimediart-doc-share/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-custom-email/index.ts"
+
+[functions.notify-legal-draft-saved]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/notify-legal-draft-saved/index.ts"
+
+[functions.publish-legal-page-final]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/publish-legal-page-final/index.ts"
