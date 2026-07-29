@@ -130,7 +130,8 @@
   "pdf_format_confirm": "Générer le PDF",
   "pdf_format_cancel": "Annuler",
   "pdf_extra_title_langs_label": "Titres dans d'autres langues",
-  "pdf_extra_title_langs_help": "Cochez les langues à ajouter sous le titre principal (italique, plus petit).",
+  "pdf_extra_title_langs_help": "Cochez les langues à ajouter sous le titre principal (même taille, italique). Les cases grisées n’ont pas de titre traduit distinct.",
+  "pdf_extra_title_langs_unavailable": "Aucun titre traduit distinct pour cette langue (l’audio seul ne suffit pas).",
 
   "badge_ia_image_yes": "Image analysée : Oui",
   "badge_ia_image_no": "Image analysée : Non",
