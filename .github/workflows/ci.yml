@@ -124,6 +124,7 @@ jobs:
       - name: Tenant isolation tests
         run: npm run test:tenant-isolation
       - name: expo_user_role FK regression tests (AIM-23)
+        if: always()
         run: npm run test:expo-user-role-fk
       - name: Arrêter le stack Supabase local
         if: always()

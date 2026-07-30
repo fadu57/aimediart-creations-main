@@ -5,8 +5,9 @@
 // Requiert un stack Supabase local démarré (`supabase start`) sur le port
 // par défaut, ou EXPO_USER_ROLE_FK_DB_URL.
 //
-// Chaque check tourne dans sa propre transaction psql (BEGIN ... ROLLBACK) :
-// aucune ligne n'est jamais persistée.
+// Les checks avec effets de bord tournent dans leur propre transaction psql
+// (BEGIN ... ROLLBACK) : aucune ligne n'est jamais persistée. Les checks
+// d'introspection pure (pg_constraint) n'ont pas besoin de transaction.
 
 import { execFileSync } from "node:child_process";
 
@@ -64,8 +65,8 @@ check("expo_user_role_expo_user_uniq empêche les doublons (expo_id, user_id)", 
      WHERE conname = 'expo_user_role_expo_user_uniq'
        AND conrelid = 'public.expo_user_role'::regclass;`,
   ).trim();
-  if (out !== "UNIQUE (expo_id, user_id)") {
-    throw new Error(`attendu "UNIQUE (expo_id, user_id)", obtenu "${out}"`);
+  if (out !== "UNIQUE NULLS NOT DISTINCT (expo_id, user_id)") {
+    throw new Error(`attendu "UNIQUE NULLS NOT DISTINCT (expo_id, user_id)", obtenu "${out}"`);
   }
 });
 
