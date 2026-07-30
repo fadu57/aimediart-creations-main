@@ -109,12 +109,12 @@ export async function persistVisitorProfile(
   }
 
   if (expoId) {
-    const { error: expoRoleErr } = await admin.from("expo_user_role").insert({
-      user_id: userId,
-      expo_id: expoId,
-    });
-    if (expoRoleErr && !/duplicate|unique/i.test(expoRoleErr.message)) {
-      console.error("[visitorProfile] expo_user_role insert failed", { userId, expoId, step: "expo_user_role.insert", error: expoRoleErr.message });
+    const { error: expoRoleErr } = await admin.from("expo_user_role").upsert(
+      { user_id: userId, expo_id: expoId },
+      { onConflict: "expo_id,user_id" },
+    );
+    if (expoRoleErr) {
+      console.error("[visitorProfile] expo_user_role upsert failed", { userId, expoId, step: "expo_user_role.upsert", error: expoRoleErr.message });
       return { ok: false, error: expoRoleErr.message };
     }
   }
