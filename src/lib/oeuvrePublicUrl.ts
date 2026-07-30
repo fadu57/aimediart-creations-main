@@ -136,6 +136,8 @@ export function parseArtworkGroupIdFromInput(raw: string | null | undefined): st
     return "";
   };
 
+  const isUrlLike = t.startsWith("/") || /^https?:\/\//i.test(t);
+
   if (t.startsWith("/")) {
     try {
       const base =
@@ -158,6 +160,11 @@ export function parseArtworkGroupIdFromInput(raw: string | null | undefined): st
       /* ignore */
     }
   }
+
+  // Une URL correctement analysée mais sans segment "artwork-group" ni paramètre group_id
+  // n'est pas un regroupement : ne pas se rabattre sur le premier UUID trouvé dans l'URL,
+  // qui serait alors l'identifiant de l'œuvre elle-même (cf. AIM-14 / AIM-144).
+  if (isUrlLike) return "";
 
   const m = t.match(UUID_IN_TEXT_RE);
   return m ? m[0] : "";
