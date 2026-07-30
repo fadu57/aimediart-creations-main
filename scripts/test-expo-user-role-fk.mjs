@@ -114,6 +114,21 @@ check("un second insert (expo_id, user_id) identique viole l'unicité (upsert ap
   }
 });
 
+check("l'unicité est NULLS NOT DISTINCT : deux lignes (expo_id, NULL) violent aussi la contrainte", () => {
+  const stderr = psqlExpectFailure(
+    `BEGIN;
+     INSERT INTO public.expos (id, expo_name) VALUES ('88888888-8888-8888-8888-888888888888', 'expo-test-aim-23-null');
+     INSERT INTO public.expo_user_role (expo_id, user_id)
+       VALUES ('88888888-8888-8888-8888-888888888888', NULL);
+     INSERT INTO public.expo_user_role (expo_id, user_id)
+       VALUES ('88888888-8888-8888-8888-888888888888', NULL);
+     ROLLBACK;`,
+  );
+  if (!stderr || !/violates unique constraint "expo_user_role_expo_user_uniq"/i.test(stderr)) {
+    throw new Error(`échec d'unicité attendu (NULLS NOT DISTINCT), obtenu: ${stderr ?? "succès"}`);
+  }
+});
+
 check("la suppression du compte auth.users entraîne bien la cascade sur expo_user_role", () => {
   const out = psql(
     `BEGIN;

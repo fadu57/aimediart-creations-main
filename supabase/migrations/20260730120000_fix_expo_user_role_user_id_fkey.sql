@@ -9,6 +9,9 @@
 --
 -- Le correctif lève ce blocage et rend les doublons (expo_id, user_id) possibles
 -- (retry front, reconciliation) — on ajoute donc l'unicité dans le même changement.
+-- Elle est aussi un prérequis direct : supabase/functions/_shared/visitorProfile.ts
+-- fait upsert(..., { onConflict: "expo_id,user_id" }), qui exige un index/contrainte
+-- unique sur ces colonnes (sinon PostgREST échoue avec 42P10).
 -- Une FK ne contrôle pas les valeurs NULL et ADD CONSTRAINT valide les lignes
 -- existantes : on ne suppose pas que la table est "forcément propre", on le
 -- vérifie explicitement ci-dessous et on échoue avec un message actionnable
@@ -33,11 +36,13 @@ BEGIN
             orphan_count;
     END IF;
 
+    -- Pas de filtre IS NOT NULL ici : GROUP BY traite les NULL comme égaux,
+    -- exactement la sémantique de UNIQUE NULLS NOT DISTINCT ci-dessous. Un
+    -- filtre les exclurait du garde tout en les laissant violer la contrainte.
     SELECT count(*) INTO dup_count
     FROM (
         SELECT expo_id, user_id
         FROM public.expo_user_role
-        WHERE expo_id IS NOT NULL AND user_id IS NOT NULL
         GROUP BY expo_id, user_id
         HAVING count(*) > 1
     ) d;
