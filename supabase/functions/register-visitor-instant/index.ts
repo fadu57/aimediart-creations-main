@@ -705,6 +705,17 @@ serve(async (req: Request) => {
     countryCode,
   });
   if (!profileResult.ok) {
+    console.error("[register-visitor-instant] persistVisitorProfile failed, rolling back auth user", {
+      userId,
+      error: profileResult.error,
+    });
+    const { error: deleteErr } = await admin.auth.admin.deleteUser(userId);
+    if (deleteErr) {
+      console.error("[register-visitor-instant] rollback deleteUser failed — orphan auth user left behind", {
+        userId,
+        error: deleteErr.message,
+      });
+    }
     return jsonResponse(500, {
       ok: false,
       code: "profile_upsert_failed",
