@@ -58,6 +58,7 @@
     "username_taken": "Dieser Benutzername ist bereits vergeben. Die Schaltfläche Speichern ist deaktiviert.",
     "change_photo": "Foto ändern",
     "roles_title": "Rollen",
+    "company_associate": "Gesellschafter(in) des Unternehmens",
     "role_global": "Globale Rolle (nur eine)",
     "roles_org": "Organisationsrollen",
     "roles_org_with_global": " (kombinierbar mit einer globalen Rolle)",

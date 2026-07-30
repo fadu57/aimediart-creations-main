@@ -38,6 +38,21 @@ export type ManualCostInput = {
   note?: string;
   /** Documents joints (liste — état final souhaité). */
   documents?: CostDocument[];
+  /**
+   * Dépense engagée avant immatriculation (société en formation).
+   * Par défaut false.
+   */
+  isPreIncorporation?: boolean;
+  /**
+   * Associé ayant avancé la dépense (profiles.id / auth.users.id).
+   * Requis si `isPreIncorporation` est true.
+   */
+  paidByUserId?: string | null;
+  /**
+   * Taux de TVA en % (ex. 20). Utilisé pour dériver HT/TVA depuis le montant TTC.
+   * Pertinent surtout pour les dépenses société en formation.
+   */
+  vatRate?: number;
 };
 
 /** Métadonnées typées d'une saisie manuelle (sous-ensemble de metadata jsonb). */
@@ -48,6 +63,12 @@ export type ManualCostMetadata = {
   note?: string;
   /** Liste des documents joints. */
   documents?: CostDocument[];
+  /** true = dépense avant immatriculation (société en formation). */
+  is_pre_incorporation?: boolean;
+  /** Associé ayant payé (profiles.id) — présent si is_pre_incorporation. */
+  paid_by_user_id?: string;
+  /** Taux de TVA en % appliqué au montant TTC (défaut métier 20). */
+  vat_rate?: number;
   /** Champs hérités (ancien format mono-document) — lus mais plus écrits. */
   document_path?: string;
   document_name?: string;
@@ -107,6 +128,15 @@ function buildManualMetadata(input: ManualCostInput): ManualCostMetadata {
   if (input.note?.trim()) metadata.note = input.note.trim();
   const docs = (input.documents ?? []).filter((d) => d.path);
   if (docs.length > 0) metadata.documents = docs;
+  if (input.isPreIncorporation) {
+    metadata.is_pre_incorporation = true;
+    const paidBy = input.paidByUserId?.trim();
+    if (paidBy) metadata.paid_by_user_id = paidBy;
+    const rate = input.vatRate;
+    if (typeof rate === "number" && Number.isFinite(rate) && rate >= 0) {
+      metadata.vat_rate = rate;
+    }
+  }
   return metadata;
 }
 
@@ -163,6 +193,77 @@ export async function updateManualCost(
 
   if (error) return { error: error.message };
   return { error: null };
+}
+
+/**
+ * Affecte en masse le flag « société en formation » (+ associé payeur optionnel).
+ * Fusionne metadata existante (manuel ou auto).
+ */
+export async function bulkSetCostEventsPreIncorporation(
+  ids: string[],
+  opts: {
+    isPreIncorporation: boolean;
+    paidByUserId?: string | null;
+    vatRate?: number;
+  },
+): Promise<{ updated: number; error: string | null }> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) return { updated: 0, error: null };
+
+  const { data, error: fetchErr } = await supabase
+    .from("ai_usage_events")
+    .select("id, metadata")
+    .in("id", unique);
+
+  if (fetchErr) return { updated: 0, error: fetchErr.message };
+
+  let updated = 0;
+  for (const row of (data ?? []) as Array<{ id: string; metadata: Record<string, unknown> | null }>) {
+    const meta: Record<string, unknown> = { ...(row.metadata ?? {}) };
+    if (opts.isPreIncorporation) {
+      meta.is_pre_incorporation = true;
+      const paidBy = opts.paidByUserId?.trim();
+      if (paidBy) meta.paid_by_user_id = paidBy;
+      else delete meta.paid_by_user_id;
+      if (typeof opts.vatRate === "number" && Number.isFinite(opts.vatRate) && opts.vatRate >= 0) {
+        meta.vat_rate = opts.vatRate;
+      } else if (meta.vat_rate == null) {
+        meta.vat_rate = 20;
+      }
+    } else {
+      delete meta.is_pre_incorporation;
+      delete meta.paid_by_user_id;
+      delete meta.vat_rate;
+    }
+
+    const { error } = await supabase
+      .from("ai_usage_events")
+      .update({ metadata: meta })
+      .eq("id", row.id);
+
+    if (error) return { updated, error: error.message };
+    updated += 1;
+  }
+
+  return { updated, error: null };
+}
+
+/** Affecte en masse la catégorie (tool_type) aux événements sélectionnés. */
+export async function bulkSetCostEventsToolType(
+  ids: string[],
+  toolType: string,
+): Promise<{ updated: number; error: string | null }> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  const nextType = toolType.trim();
+  if (unique.length === 0 || !nextType) return { updated: 0, error: null };
+
+  const { error, count } = await supabase
+    .from("ai_usage_events")
+    .update({ tool_type: nextType })
+    .in("id", unique);
+
+  if (error) return { updated: 0, error: error.message };
+  return { updated: count ?? unique.length, error: null };
 }
 
 /**

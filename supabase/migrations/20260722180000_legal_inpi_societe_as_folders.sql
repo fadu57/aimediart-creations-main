@@ -1,6 +1,21 @@
 -- INPI et Société deviennent des sous-dossiers dynamiques sous category = 'legal'.
 -- Migration des docs / dossiers legal_inpi et legal_societe.
 
+-- 0. category = 'legal' doit exister avant l'insert ci-dessous (FK
+--    aimediart_document_folders_category_fk → aimediart_ged_sections.slug).
+--    Cette migration précède 20260722200000_aimediart_ged_sections_dynamic.sql
+--    (qui crée la table et sème les slugs canoniques) : sur une base rejouée
+--    à froid depuis Git (AIM-173), la table n'a encore aucune ligne à ce
+--    stade. Semis minimal idempotent, valeurs identiques à celles semées par
+--    20260722200000 (name, sort_order) pour que cette ligne n'ait pas besoin
+--    d'être corrigée ensuite : ce dernier réutilise la même ligne
+--    (insert ... where not exists) sans la dupliquer ni la modifier.
+insert into public.aimediart_ged_sections (slug, name, sort_order)
+select 'legal', 'AIMEDIArt-Légal', 10
+where not exists (
+  select 1 from public.aimediart_ged_sections where slug = 'legal'
+);
+
 -- 1. Créer INPI et Société s'ils n'existent pas encore
 insert into public.aimediart_document_folders (category, name)
 select 'legal', 'INPI'

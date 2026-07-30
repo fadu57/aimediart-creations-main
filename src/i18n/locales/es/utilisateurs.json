@@ -58,6 +58,7 @@
     "username_taken": "Este alias ya está en uso. El botón Guardar está desactivado.",
     "change_photo": "Cambiar la foto",
     "roles_title": "Roles",
+    "company_associate": "Socio/a de la empresa",
     "role_global": "Rol global (uno solo)",
     "roles_org": "Roles de organización",
     "roles_org_with_global": " (acumulables con un rol global)",

@@ -156,6 +156,8 @@ export function tokenEntityFiltersToCostFilters(filters: TokenEntityFilters): Co
     operationName: "",
     status: "",
     currency: "",
+    preIncorporation: "",
+    paidByUserId: "",
   };
 }
 
