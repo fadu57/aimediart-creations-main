@@ -50,7 +50,9 @@ export async function persistVisitorProfile(
 
   const { data: existingUser, error: readUserErr } = await admin.auth.admin.getUserById(userId);
   if (readUserErr || !existingUser.user) {
-    return { ok: false, error: readUserErr?.message || "Utilisateur Auth introuvable." };
+    const error = readUserErr?.message || "Utilisateur Auth introuvable.";
+    console.error("[visitorProfile] getUserById failed", { userId, step: "getUserById", error });
+    return { ok: false, error };
   }
 
   const existingMeta =
@@ -81,6 +83,7 @@ export async function persistVisitorProfile(
 
   const { error: metaErr } = await admin.auth.admin.updateUserById(userId, { user_metadata: mergedMeta });
   if (metaErr) {
+    console.error("[visitorProfile] updateUserById failed", { userId, step: "updateUserById", error: metaErr.message });
     return { ok: false, error: metaErr.message };
   }
 
@@ -101,15 +104,17 @@ export async function persistVisitorProfile(
     { onConflict: "id" },
   );
   if (profileErr) {
+    console.error("[visitorProfile] profiles upsert failed", { userId, step: "profiles.upsert", error: profileErr.message });
     return { ok: false, error: profileErr.message };
   }
 
   if (expoId) {
-    const { error: expoRoleErr } = await admin.from("expo_user_role").insert({
-      user_id: userId,
-      expo_id: expoId,
-    });
-    if (expoRoleErr && !/duplicate|unique/i.test(expoRoleErr.message)) {
+    const { error: expoRoleErr } = await admin.from("expo_user_role").upsert(
+      { user_id: userId, expo_id: expoId },
+      { onConflict: "expo_id,user_id" },
+    );
+    if (expoRoleErr) {
+      console.error("[visitorProfile] expo_user_role upsert failed", { userId, expoId, step: "expo_user_role.upsert", error: expoRoleErr.message });
       return { ok: false, error: expoRoleErr.message };
     }
   }

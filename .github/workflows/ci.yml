@@ -11,6 +11,10 @@
 #   - `test:tenant-isolation` (AIM-30, scripts/test-tenant-isolation-audio-files.mjs) :
 #     démarre le stack Supabase local et vérifie l'isolation RLS/GRANT du
 #     rôle anon sur audio_files. À étendre table par table au fil des tickets.
+#   - `test:expo-user-role-fk` (AIM-23, scripts/test-expo-user-role-fk.mjs) :
+#     même stack, vérifie que expo_user_role_user_id_fkey référence bien
+#     auth.users (pas l'ancienne table orpheline users_legacy) et que la
+#     contrainte d'unicité (expo_id, user_id) est en place.
 
 name: CI
 
@@ -119,6 +123,9 @@ jobs:
             -v ON_ERROR_STOP=1 -c "select public.rls_is_global_admin();"
       - name: Tenant isolation tests
         run: npm run test:tenant-isolation
+      - name: expo_user_role FK regression tests (AIM-23)
+        if: always()
+        run: npm run test:expo-user-role-fk
       - name: Arrêter le stack Supabase local
         if: always()
         run: supabase stop

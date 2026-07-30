@@ -37,7 +37,8 @@
     "export:brand-logo": "node scripts/export-brand-logo.mjs",
     "make:avatars-transparent": "node scripts/make-avatars-transparent.mjs",
     "make:avatars-transparent:test": "cross-env LIMIT=5 node scripts/make-avatars-transparent.mjs",
-    "test:tenant-isolation": "node scripts/test-tenant-isolation-audio-files.mjs"
+    "test:tenant-isolation": "node scripts/test-tenant-isolation-audio-files.mjs",
+    "test:expo-user-role-fk": "node scripts/test-expo-user-role-fk.mjs"
   },
   "dependencies": {
     "@fingerprintjs/fingerprintjs": "^4.6.2",
