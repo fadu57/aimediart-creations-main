@@ -398,9 +398,16 @@ export function AudioPlayer({
 
     try {
 
-      const url = await getAudioUrl(file.storage_path);
+      // iOS Safari n'autorise play() qu'appelé de façon synchrone dans le
+      // geste utilisateur : un await réseau (signature de l'URL) avant le
+      // premier play() casse cette activation et la lecture échoue en
+      // silence (aucune erreur visible, le bouton semble ne rien faire).
+      // On crée donc l'élément et on l'amorce ici, avant l'attente réseau,
+      // puis on lui assigne la vraie source une fois l'URL signée obtenue.
+      const audio = new Audio();
+      audioRef.current = audio;
+      void audio.play().catch(() => {});
 
-      const audio = new Audio(url);
       const rate =
         typeof playbackRate === "number" && Number.isFinite(playbackRate) && playbackRate > 0
           ? Math.min(1.25, Math.max(0.85, playbackRate))
@@ -415,8 +422,6 @@ export function AudioPlayer({
         /* ignore */
       }
 
-      audioRef.current = audio;
-
       setPlayingGender(gender);
 
       claimMediationAudioPlayback(stopPlaybackRef.current);
@@ -430,6 +435,13 @@ export function AudioPlayer({
         stopPlayback();
 
       };
+
+      const url = await getAudioUrl(file.storage_path);
+
+      if (audioRef.current !== audio) return; // stoppé/remplacé pendant l'attente réseau
+
+      audio.src = url;
+      audio.load();
 
       await audio.play();
 
