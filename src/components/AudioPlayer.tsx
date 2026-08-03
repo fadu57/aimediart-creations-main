@@ -429,16 +429,23 @@ export function AudioPlayer({
       const audio = new Audio();
       audioRef.current = audio;
       const cachedUrl = urlCacheRef.current.get(file.storage_path) || undefined;
-      if (cachedUrl) audio.src = cachedUrl;
-      try {
-        // Safari peut lever NotSupportedError de façon SYNCHRONE (pas une
-        // promesse rejetée) quand play() est appelé sans src encore défini.
-        // Le .catch() ci-dessous ne couvre que le rejet de promesse ; sans ce
-        // try/catch, l'exception remonte au catch englobant et avorte tout le
-        // flux avant même la résolution de l'URL signée.
-        void audio.play().catch(() => {});
-      } catch {
-        /* ignore : l'activation du geste utilisateur reste effective pour le play() réel plus bas */
+      if (cachedUrl) {
+        // URL déjà préchargée : le VRAI play() (plus bas) portera directement
+        // cette source. Ne PAS faire aussi l'appel "à vide" ci-dessous ici :
+        // il deviendrait un second play() réel sur le même élément, séquence
+        // que WebKit rejette en NotSupportedError (constaté en production).
+        audio.src = cachedUrl;
+      } else {
+        try {
+          // Safari peut lever NotSupportedError de façon SYNCHRONE (pas une
+          // promesse rejetée) quand play() est appelé sans src encore défini.
+          // Le .catch() ci-dessous ne couvre que le rejet de promesse ; sans ce
+          // try/catch, l'exception remonte au catch englobant et avorte tout le
+          // flux avant même la résolution de l'URL signée.
+          void audio.play().catch(() => {});
+        } catch {
+          /* ignore : l'activation du geste utilisateur reste effective pour le play() réel plus bas */
+        }
       }
 
       const rate =
