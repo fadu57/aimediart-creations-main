@@ -501,7 +501,22 @@ export function AudioPlayer({
 
       if (audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M) : ne pas couper la lecture en cours
 
-      console.error("[AudioPlayer] play() a échoué :", e instanceof Error ? `${e.name} — ${e.message}` : e);
+      // Contexte de diagnostic conservé volontairement : deux correctifs
+      // précédents sur ce même symptôme (NotSupportedError WebKit) se sont
+      // révélés insuffisants une fois testés en prod. Si ce cas se
+      // représente, ces valeurs permettent d'identifier la branche
+      // exacte (cache ou réseau) et l'état réel du média sans un nouveau
+      // cycle de suppositions.
+      console.error(
+        "[AudioPlayer] play() a échoué :",
+        e instanceof Error ? `${e.name} — ${e.message}` : e,
+        {
+          fromCache: urlCacheRef.current.has(file.storage_path),
+          readyState: audio?.readyState,
+          networkState: audio?.networkState,
+          currentSrc: audio?.currentSrc,
+        },
+      );
 
       stopPlayback();
 
