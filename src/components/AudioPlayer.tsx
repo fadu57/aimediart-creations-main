@@ -406,7 +406,16 @@ export function AudioPlayer({
       // puis on lui assigne la vraie source une fois l'URL signée obtenue.
       const audio = new Audio();
       audioRef.current = audio;
-      void audio.play().catch(() => {});
+      try {
+        // Safari peut lever NotSupportedError de façon SYNCHRONE (pas une
+        // promesse rejetée) quand play() est appelé sans src encore défini.
+        // Le .catch() ci-dessous ne couvre que le rejet de promesse ; sans ce
+        // try/catch, l'exception remonte au catch englobant et avorte tout le
+        // flux avant même la résolution de l'URL signée.
+        void audio.play().catch(() => {});
+      } catch {
+        /* ignore : l'activation du geste utilisateur reste effective pour le play() réel plus bas */
+      }
 
       const rate =
         typeof playbackRate === "number" && Number.isFinite(playbackRate) && playbackRate > 0
