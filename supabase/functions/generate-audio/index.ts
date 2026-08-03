@@ -9,6 +9,12 @@ const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// L'API OpenAI TTS en "aac" retourne un flux ADTS brut (pas de conteneur MP4) :
+// le contentType déclaré à l'upload doit correspondre, sinon Safari refuse la
+// lecture (MEDIA_ERR_SRC_NOT_SUPPORTED) même si Chrome/Firefox tolèrent le mismatch.
+const TTS_RESPONSE_FORMAT = "aac";
+const TTS_AUDIO_CONTENT_TYPE = "audio/aac";
+
 interface GenerateAudioPayload {
   text_id:              string;
   text_type:            "bio" | "mediation";
@@ -209,7 +215,7 @@ serve(async (req) => {
         voice:           voiceId,
         input:           textContent,
         instructions:    personaVibe,
-        response_format: "aac",
+        response_format: TTS_RESPONSE_FORMAT,
       }),
     });
 
@@ -231,7 +237,7 @@ serve(async (req) => {
 
     const { error: uploadError } = await supabase.storage
       .from("audio-guides")
-      .upload(storagePath, audioBuffer, { contentType: "audio/mp4", upsert: true });
+      .upload(storagePath, audioBuffer, { contentType: TTS_AUDIO_CONTENT_TYPE, upsert: true });
 
     if (uploadError) {
       await insertUsageEvent(supabase, {
