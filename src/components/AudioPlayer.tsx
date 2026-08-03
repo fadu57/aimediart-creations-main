@@ -415,6 +415,18 @@ export function AudioPlayer({
     stopPlayback();
 
     let audio: HTMLAudioElement | undefined;
+    // Hors du try : doit rester lisible dans le catch et dans les handlers
+    // onended/onerror pour le diagnostic (quelle branche a été empruntée).
+    let cachedUrl: string | undefined;
+
+    const diagContext = () => ({
+      branch: cachedUrl ? "cache" : "network",
+      readyState: audio?.readyState,
+      networkState: audio?.networkState,
+      currentSrc: audio?.currentSrc,
+      mediaErrorCode: audio?.error?.code,
+      mediaErrorMessage: audio?.error?.message,
+    });
 
     try {
 
@@ -430,18 +442,14 @@ export function AudioPlayer({
       // cas rare : clic avant la fin du préchargement).
       audio = new Audio();
       audioRef.current = audio;
-      const cachedUrl = urlCacheRef.current.get(file.storage_path) || undefined;
+      cachedUrl = urlCacheRef.current.get(file.storage_path) || undefined;
       if (cachedUrl) {
-        // URL déjà préchargée : le VRAI play() (plus bas) portera directement
-        // cette source. Ne PAS faire aussi l'appel "à vide" ci-dessous ici :
-        // il deviendrait un second play() réel sur le même élément, séquence
-        // que WebKit rejette en NotSupportedError (constaté en production).
-        // .load() explicite indispensable : sur un élément Audio() jamais
-        // attaché au DOM, WebKit ne déclenche pas toujours de façon fiable
-        // l'algorithme de sélection de ressource via la seule assignation de
-        // .src — sans load(), play() peut lever NotSupportedError de façon
-        // synchrone même avec une source valide (asymétrie avec la branche
-        // non cachée ci-dessous, qui appelle déjà load()).
+        // URL déjà préchargée : le VRAI play() (plus bas) porte directement
+        // cette source, sans second play() réel sur le même élément (root
+        // cause suspectée du NotSupportedError observé en prod, non encore
+        // confirmée sur Safari réel — cf. AIM-30). .load() explicite ajouté
+        // par prudence : sur un élément jamais attaché au DOM, l'assignation
+        // seule de .src pourrait ne pas suffire sur WebKit.
         audio.src = cachedUrl;
         audio.load();
       } else {
@@ -457,6 +465,35 @@ export function AudioPlayer({
         }
       }
 
+      setPlayingGender(gender);
+
+      claimMediationAudioPlayback(stopPlaybackRef.current);
+
+      audio.onended = () => {
+        if (audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M)
+        stopPlayback();
+      };
+
+      audio.onerror = () => {
+        if (audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M)
+        console.error("[AudioPlayer] lecture impossible :", diagContext());
+        stopPlayback();
+      };
+
+      if (!cachedUrl) {
+        const url = await getAudioUrl(file.storage_path);
+
+        if (audioRef.current !== audio) return; // stoppé/remplacé pendant l'attente réseau
+
+        audio.src = url;
+        urlCacheRef.current.set(file.storage_path, url);
+        audio.load();
+      }
+
+      // playbackRate doit être (ré)appliqué après le(s) load() ci-dessus :
+      // l'algorithme de chargement HTML média remet playbackRate à sa valeur
+      // par défaut (1), donc l'assigner avant load() serait silencieusement
+      // écrasé dans la branche réseau.
       const rate =
         typeof playbackRate === "number" && Number.isFinite(playbackRate) && playbackRate > 0
           ? Math.min(1.25, Math.max(0.85, playbackRate))
@@ -471,51 +508,21 @@ export function AudioPlayer({
         /* ignore */
       }
 
-      setPlayingGender(gender);
-
-      claimMediationAudioPlayback(stopPlaybackRef.current);
-
-      audio.onended = () => stopPlayback();
-
-      audio.onerror = () => {
-
-        console.error("[AudioPlayer] lecture impossible");
-
-        stopPlayback();
-
-      };
-
-      if (!cachedUrl) {
-        const url = await getAudioUrl(file.storage_path);
-
-        if (audioRef.current !== audio) return; // stoppé/remplacé pendant l'attente réseau
-
-        audio.src = url;
-        urlCacheRef.current.set(file.storage_path, url);
-        audio.load();
-      }
-
       await audio.play();
 
     } catch (e) {
 
-      if (audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M) : ne pas couper la lecture en cours
+      if (audio && audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M) : ne pas couper la lecture en cours
 
       // Contexte de diagnostic conservé volontairement : deux correctifs
       // précédents sur ce même symptôme (NotSupportedError WebKit) se sont
-      // révélés insuffisants une fois testés en prod. Si ce cas se
-      // représente, ces valeurs permettent d'identifier la branche
-      // exacte (cache ou réseau) et l'état réel du média sans un nouveau
-      // cycle de suppositions.
+      // révélés insuffisants une fois testés en prod. Ces valeurs permettent
+      // de trancher au prochain échec plutôt que de recommencer un cycle de
+      // suppositions.
       console.error(
-        "[AudioPlayer] play() a échoué :",
+        "[AudioPlayer] échec de lecture :",
         e instanceof Error ? `${e.name} — ${e.message}` : e,
-        {
-          fromCache: urlCacheRef.current.has(file.storage_path),
-          readyState: audio?.readyState,
-          networkState: audio?.networkState,
-          currentSrc: audio?.currentSrc,
-        },
+        diagContext(),
       );
 
       stopPlayback();
