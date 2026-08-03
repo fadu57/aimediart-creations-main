@@ -414,6 +414,8 @@ export function AudioPlayer({
 
     stopPlayback();
 
+    let audio: HTMLAudioElement | undefined;
+
     try {
 
       // iOS Safari n'autorise play() qu'appelé de façon synchrone dans le
@@ -426,7 +428,7 @@ export function AudioPlayer({
       // attente réseau intercalée. Sinon, on retombe sur l'amorçage à vide
       // puis l'attente réseau ci-dessous (même risque WebKit que par le passé,
       // cas rare : clic avant la fin du préchargement).
-      const audio = new Audio();
+      audio = new Audio();
       audioRef.current = audio;
       const cachedUrl = urlCacheRef.current.get(file.storage_path) || undefined;
       if (cachedUrl) {
@@ -434,7 +436,14 @@ export function AudioPlayer({
         // cette source. Ne PAS faire aussi l'appel "à vide" ci-dessous ici :
         // il deviendrait un second play() réel sur le même élément, séquence
         // que WebKit rejette en NotSupportedError (constaté en production).
+        // .load() explicite indispensable : sur un élément Audio() jamais
+        // attaché au DOM, WebKit ne déclenche pas toujours de façon fiable
+        // l'algorithme de sélection de ressource via la seule assignation de
+        // .src — sans load(), play() peut lever NotSupportedError de façon
+        // synchrone même avec une source valide (asymétrie avec la branche
+        // non cachée ci-dessous, qui appelle déjà load()).
         audio.src = cachedUrl;
+        audio.load();
       } else {
         try {
           // Safari peut lever NotSupportedError de façon SYNCHRONE (pas une
@@ -490,7 +499,9 @@ export function AudioPlayer({
 
     } catch (e) {
 
-      console.error("[AudioPlayer] getAudioUrl:", e);
+      if (audioRef.current !== audio) return; // remplacé entre-temps (ex. re-clic F/M) : ne pas couper la lecture en cours
+
+      console.error("[AudioPlayer] play() a échoué :", e instanceof Error ? `${e.name} — ${e.message}` : e);
 
       stopPlayback();
 
