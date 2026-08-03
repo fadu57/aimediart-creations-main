@@ -276,7 +276,7 @@ export function AudioPlayer({
 
   }, []);
 
-
+  const urlCacheRef = useRef<Map<string, string>>(new Map());
 
   const refresh = useCallback(async () => {
 
@@ -319,6 +319,24 @@ export function AudioPlayer({
   const playF = pickFileForPlay(files, "F", lang, prompt_style_id);
 
   const playM = pickFileForPlay(files, "M", lang, prompt_style_id);
+
+
+
+  useEffect(() => {
+    // Précharge l'URL signée dès que les fichiers sont prêts, pour que le
+    // clic puisse appeler play() de façon synchrone avec la vraie source déjà
+    // en main — indispensable sur WebKit (Safari desktop/iOS, Chrome iOS) où
+    // un await réseau entre le geste utilisateur et audio.play() fait
+    // échouer la lecture en silence (aucune erreur visible côté visiteur).
+    [playF?.storage_path, playM?.storage_path]
+      .filter((p): p is string => !!p && !urlCacheRef.current.has(p))
+      .forEach((path) => {
+        urlCacheRef.current.set(path, "");
+        void getAudioUrl(path)
+          .then((url) => urlCacheRef.current.set(path, url))
+          .catch(() => urlCacheRef.current.delete(path));
+      });
+  }, [playF?.storage_path, playM?.storage_path]);
 
 
 
@@ -402,10 +420,16 @@ export function AudioPlayer({
       // geste utilisateur : un await réseau (signature de l'URL) avant le
       // premier play() casse cette activation et la lecture échoue en
       // silence (aucune erreur visible, le bouton semble ne rien faire).
-      // On crée donc l'élément et on l'amorce ici, avant l'attente réseau,
-      // puis on lui assigne la vraie source une fois l'URL signée obtenue.
+      // Si l'URL est déjà en cache (préchargée dès que les fichiers sont
+      // prêts, cf. useEffect plus haut), on l'assigne ici avant le premier
+      // play() : ce play() synchrone porte alors la VRAIE source, sans
+      // attente réseau intercalée. Sinon, on retombe sur l'amorçage à vide
+      // puis l'attente réseau ci-dessous (même risque WebKit que par le passé,
+      // cas rare : clic avant la fin du préchargement).
       const audio = new Audio();
       audioRef.current = audio;
+      const cachedUrl = urlCacheRef.current.get(file.storage_path) || undefined;
+      if (cachedUrl) audio.src = cachedUrl;
       try {
         // Safari peut lever NotSupportedError de façon SYNCHRONE (pas une
         // promesse rejetée) quand play() est appelé sans src encore défini.
@@ -445,12 +469,15 @@ export function AudioPlayer({
 
       };
 
-      const url = await getAudioUrl(file.storage_path);
+      if (!cachedUrl) {
+        const url = await getAudioUrl(file.storage_path);
 
-      if (audioRef.current !== audio) return; // stoppé/remplacé pendant l'attente réseau
+        if (audioRef.current !== audio) return; // stoppé/remplacé pendant l'attente réseau
 
-      audio.src = url;
-      audio.load();
+        audio.src = url;
+        urlCacheRef.current.set(file.storage_path, url);
+        audio.load();
+      }
 
       await audio.play();
 
