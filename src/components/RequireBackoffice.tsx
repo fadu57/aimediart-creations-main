@@ -21,7 +21,9 @@ export function RequireBackoffice() {
 
   const isExplicitVisitor = isVisitorRole(role_name, role_id);
 
-  if (loading) {
+  // Spinner uniquement au boot sans session — pas sur un refresh de token
+  // (sinon l'Outlet est démonté et l'état local des pages est perdu).
+  if (loading && !session) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 px-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden />

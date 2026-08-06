@@ -98,12 +98,17 @@ export function useAuthUser() {
       return;
     }
 
-    setState((s) => ({
-      ...s,
-      session,
-      user: session.user,
-      loading: true,
-    }));
+    // Token refresh / même user déjà hydraté : ne pas remettre loading à true
+    // (sinon les guards backoffice démontent l'Outlet et perdent l'état local, ex. filtres).
+    setState((s) => {
+      const sameUserHydrated = s.user?.id === session.user.id && s.loading === false;
+      return {
+        ...s,
+        session,
+        user: session.user,
+        loading: sameUserHydrated ? false : true,
+      };
+    });
 
     try {
       let dbProfile: DbProfile;
