@@ -100,10 +100,24 @@ export async function generateCartelPdf(input: GenerateCartelPdfInput): Promise<
   return generateCartelPdfBatch([input]);
 }
 
-export async function generateCartelPdfBatch(items: GenerateCartelPdfInput[]): Promise<string> {
+export type CartelPdfBatchProgress = {
+  done: number;
+  total: number;
+};
+
+export async function generateCartelPdfBatch(
+  items: GenerateCartelPdfInput[],
+  options?: { onProgress?: (progress: CartelPdfBatchProgress) => void },
+): Promise<string> {
   if (items.length === 0) {
     throw new Error("Aucune œuvre pour générer les cartels");
   }
+
+  const onProgress = options?.onProgress;
+  /** 1 étape par œuvre + 1 pour l’assemblage PDF final. */
+  const total = items.length + 1;
+  const report = (done: number) => onProgress?.({ done, total });
+  report(0);
 
   const selection: CartelFormatSelection = {
     formatId: items[0].formatId,
@@ -124,7 +138,8 @@ export async function generateCartelPdfBatch(items: GenerateCartelPdfInput[]): P
 
   const pages: CartelPdfPageProps[] = [];
 
-  for (const input of items) {
+  for (let i = 0; i < items.length; i++) {
+    const input = items[i];
     const qrDataUrl = await QRCode.toDataURL(input.qrTargetUrl, QR_CODE_PRINT_OPTIONS);
     const headerText = input.explorationLines.map((l) => l.trim()).filter(Boolean).join(" ");
 
@@ -147,8 +162,10 @@ export async function generateCartelPdfBatch(items: GenerateCartelPdfInput[]): P
         logoSrc,
       });
     }
+    report(i + 1);
   }
 
   const blob = await pdf(createElement(CartelPdfDocument, { pages })).toBlob();
+  report(total);
   return URL.createObjectURL(blob);
 }

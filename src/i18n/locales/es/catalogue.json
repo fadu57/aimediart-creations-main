@@ -77,6 +77,8 @@
   "pdf_format_dialog_desc_batch": "Elija el formato de impresión para los {{count}} carteles seleccionados.",
   "pdf_batch_success": "{{count}} carteles generados en un solo PDF.",
   "pdf_batch_error": "No se pueden generar los carteles PDF.",
+  "pdf_batch_progress": "{{done}} / {{total}}",
+  "pdf_batch_progress_aria": "Generación de carteles: {{done}} de {{total}}",
   "pdf_format_group_rectangular": "Formatos rectangulares",
   "pdf_format_group_square": "Formatos cuadrados",
   "pdf_format_group_custom": "Dimensiones libres",

@@ -101,6 +101,8 @@
   "pdf_format_dialog_desc_batch": "Choose the print format for the {{count}} selected labels.",
   "pdf_batch_success": "{{count}} labels generated in a single PDF.",
   "pdf_batch_error": "Unable to generate the label PDFs.",
+  "pdf_batch_progress": "{{done}} / {{total}}",
+  "pdf_batch_progress_aria": "Generating labels: {{done}} of {{total}}",
   "pdf_format_group_rectangular": "Rectangular formats",
   "pdf_format_group_square": "Square formats",
   "pdf_format_group_custom": "Custom size",
