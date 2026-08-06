@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { isVisitorRole } from "@/lib/authUser";
@@ -49,8 +50,6 @@ import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
 
-// Doit rester aligné avec la validation serveur (supabase/functions/register-visitor-instant/index.ts).
-const PASSWORD_MIN_LENGTH = 8;
 const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
 
 function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
@@ -139,12 +138,14 @@ const Register = () => {
   }, []);
 
   const formatSignUpError = useCallback(
-    (message: string): string => {
+    (message: string, code?: string): string => {
       const m = message.toLowerCase();
-      if (isDuplicateEmailSignUpError(message)) {
+      if (isDuplicateEmailSignUpError(message, code)) {
         return t("register_visitor.error_duplicate_email_signup");
       }
-      if (m.includes("password") && (m.includes("short") || m.includes("least") || m.includes(String(PASSWORD_MIN_LENGTH)))) {
+      // Le message serveur est en français ("Mot de passe trop court…") : on ne peut pas
+      // s'y fier pour la détection, d'où la priorité au code machine renvoyé par l'Edge Function.
+      if (code === "weak_password" || (m.includes("password") && (m.includes("short") || m.includes("least")))) {
         return t("register_visitor.error_password_short_signup", { min: PASSWORD_MIN_LENGTH });
       }
       if (m.includes("invalid email") || (m.includes("email") && m.includes("invalid"))) {
@@ -488,7 +489,7 @@ const Register = () => {
           setEmailDuplicateOpen(true);
           return;
         }
-        toast.error(formatSignUpError(msg));
+        toast.error(formatSignUpError(msg, code));
         return;
       }
 
