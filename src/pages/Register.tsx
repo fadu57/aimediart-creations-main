@@ -49,7 +49,8 @@ import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
 
-const PASSWORD_MIN_LENGTH = 6;
+// Doit rester aligné avec la validation serveur (supabase/functions/register-visitor-instant/index.ts).
+const PASSWORD_MIN_LENGTH = 8;
 const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
 
 function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
