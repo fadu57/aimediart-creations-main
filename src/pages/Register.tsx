@@ -18,10 +18,11 @@ import { isVisitorRole } from "@/lib/authUser";
 import { getStoredVisitorUuid } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import {
+  clearVisitorRegisterOAuthFlag,
+  hasVisitorRegisterOAuthFlag,
   hasVisitorRegistrationMetadata,
   readOAuthNameParts,
   startVisitorOAuthSignIn,
-  VISITOR_REGISTER_OAUTH_FLAG,
 } from "@/lib/visitorOAuth";
 import { getAnonymousTrackingConsent, loadOrCreateFingerprintJsId } from "@/lib/fingerprintConsent";
 import {
@@ -253,21 +254,15 @@ const Register = () => {
       // Purge un éventuel VISITOR_REGISTER_OAUTH_FLAG périmé (tentative Google commencée puis
       // annulée/abandonnée sans jamais revenir avec une session) pour ne pas polluer un parcours
       // d'inscription classique ultérieur sur la même page.
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
-      }
+      clearVisitorRegisterOAuthFlag();
       setPostAuthHandled(true);
       return;
     }
 
-    const oauthReturn =
-      searchParams.get("oauth") === "1" ||
-      (typeof window !== "undefined" && sessionStorage.getItem(VISITOR_REGISTER_OAUTH_FLAG) === "1");
+    const oauthReturn = searchParams.get("oauth") === "1" || hasVisitorRegisterOAuthFlag();
 
     if (oauthReturn) {
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
-      }
+      clearVisitorRegisterOAuthFlag();
       if (searchParams.get("oauth") === "1") {
         const next = new URL(window.location.href);
         next.searchParams.delete("oauth");
