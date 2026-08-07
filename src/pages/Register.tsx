@@ -11,6 +11,7 @@ import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
+import { clearPostRegistrationTarget, consumePostRegistrationTarget } from "@/lib/postAuthRedirect";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { isVisitorRole } from "@/lib/authUser";
@@ -66,30 +67,8 @@ function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
   );
 }
 
-/**
- * Résout la page vers laquelle renvoyer le visiteur après une inscription réussie.
- * Priorité à la page d'où il a cliqué sur "S'inscrire" (stockée par VisitorPageShell/VisitorView
- * dans `redirectAfterAuth`), avec repli sur l'écran de scan si rien n'est stocké ou si la valeur
- * n'est pas une URL du même site (évite tout open redirect via une valeur de sessionStorage altérée).
- */
-function resolvePostRegistrationTarget(expoIdFromUrl: string): string {
-  const fallback = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-  if (typeof window === "undefined") return fallback;
-
-  const stored = sessionStorage.getItem("redirectAfterAuth")?.trim();
-  sessionStorage.removeItem("redirectAfterAuth");
-  sessionStorage.removeItem("redirectAfterLogin");
-  if (!stored) return fallback;
-
-  try {
-    const url = new URL(stored, window.location.origin);
-    if (url.origin !== window.location.origin) return fallback;
-    // Ne pas rebondir sur une page d'auth (boucle register/login).
-    if (/^\/(register|login)(\/|$)/.test(url.pathname)) return fallback;
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return fallback;
-  }
+function postRegistrationFallback(expoIdFromUrl: string): string {
+  return expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
 }
 
 /** Lorsque `functions.invoke` reçoit un statut hors 2xx, le SDK ne parse pas le corps : il est encore lisible via la Response attachée à l’erreur. */
@@ -284,7 +263,7 @@ const Register = () => {
       }
 
       if (hasVisitorRegistrationMetadata(session.user)) {
-        navigate(resolvePostRegistrationTarget(expoIdFromUrl), { replace: true });
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
@@ -310,6 +289,9 @@ const Register = () => {
   }
 
   if (session && !oauthProfileFlow) {
+    // Session déjà active hors flux d'inscription (ex. arrivée directe sur /register) : purge
+    // un éventuel redirectAfterAuth/redirectAfterLogin périmé pour ne pas polluer un flux ultérieur.
+    clearPostRegistrationTarget();
     const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/";
     return <Navigate to={target} replace />;
   }
@@ -455,14 +437,7 @@ const Register = () => {
           }
         }
 
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("redirectAfterAuth");
-          sessionStorage.removeItem("redirectAfterLogin");
-          const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-          navigate(target, { replace: true });
-        } else {
-          navigate("/scan-work1", { replace: true });
-        }
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
@@ -544,7 +519,7 @@ const Register = () => {
         }
       }
 
-      navigate(resolvePostRegistrationTarget(expoIdFromUrl), { replace: true });
+      navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("register_visitor.toast_visitor_signup_failed");
       toast.error(formatSignUpError(msg));
