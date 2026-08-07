@@ -242,8 +242,20 @@ const Register = () => {
 
   useEffect(() => {
     if (authLoading) return;
+    // handleFinalize (parcours e-mail/mot de passe) tourne encore : signInWithPassword fait déjà
+    // passer `session` à true avant la fin de l'upload du selfie. Sans ce garde, si un
+    // VISITOR_REGISTER_OAUTH_FLAG périmé traîne (ex. tentative Google annulée avant de revenir
+    // s'inscrire par e-mail), cet effet se rejoue avec `oauthReturn` vrai et navigue en avance,
+    // consommant/purgeant la cible mémorisée pendant que handleFinalize attend encore.
+    if (submitting) return;
 
     if (!session?.user) {
+      // Purge un éventuel VISITOR_REGISTER_OAUTH_FLAG périmé (tentative Google commencée puis
+      // annulée/abandonnée sans jamais revenir avec une session) pour ne pas polluer un parcours
+      // d'inscription classique ultérieur sur la même page.
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
+      }
       setPostAuthHandled(true);
       return;
     }
@@ -278,7 +290,7 @@ const Register = () => {
     }
 
     setPostAuthHandled(true);
-  }, [authLoading, session, searchParams, expoIdFromUrl, navigate]);
+  }, [authLoading, session, searchParams, expoIdFromUrl, navigate, submitting]);
 
   if (authLoading || (session && !postAuthHandled)) {
     return (
@@ -292,7 +304,7 @@ const Register = () => {
     // Session déjà active hors flux d'inscription (ex. arrivée directe sur /register). Le garde
     // `!submitting` est nécessaire : côté inscription e-mail/mot de passe, `signInWithPassword`
     // (dans handleFinalize) fait passer `session` à true avant que handleFinalize ait fini
-    // l'upload du selfie et son propre navigate() — sans ce garde, cette branche gagnait la
+    // l'upload du selfie et sa propre navigation finale — sans ce garde, cette branche gagnait la
     // course, purgeait la cible mémorisée et redirigeait vers /scan-work1 en dur (perte de
     // expo_id et de l'écran d'origine).
     const target = consumePostRegistrationTarget(

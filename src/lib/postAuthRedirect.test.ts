@@ -74,22 +74,35 @@ describe("consumePostRegistrationTarget", () => {
     expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
   });
 
-  it("retombe sur le fallback et purge quand même les deux clés si la lecture sessionStorage lève (Safari privé / iframe sandboxée)", () => {
+  it("retombe sur le fallback et purge réellement les deux clés même si la lecture sessionStorage lève (Safari privé / iframe sandboxée)", () => {
+    sessionStorage.setItem("redirectAfterAuth", `${window.location.origin}/oeuvres/1`);
+    sessionStorage.setItem("redirectAfterLogin", `${window.location.origin}/oeuvres/2`);
+
     // Sous jsdom, `Storage.prototype` global ne correspond pas toujours au prototype réel de
     // l'instance sessionStorage : on spy sur le prototype effectif pour être sûr d'intercepter.
     const storageProto = Object.getPrototypeOf(sessionStorage) as Storage;
     const getItemSpy = vi.spyOn(storageProto, "getItem").mockImplementation(() => {
       throw new DOMException("Access is denied for this document.", "SecurityError");
     });
-    const removeItemSpy = vi.spyOn(storageProto, "removeItem");
+
+    let result: string;
+    let getItemCallCount: number;
     try {
-      expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
-      expect(removeItemSpy).toHaveBeenCalledWith("redirectAfterAuth");
-      expect(removeItemSpy).toHaveBeenCalledWith("redirectAfterLogin");
+      result = consumePostRegistrationTarget(FALLBACK);
+      getItemCallCount = getItemSpy.mock.calls.length;
     } finally {
       getItemSpy.mockRestore();
-      removeItemSpy.mockRestore();
     }
+
+    // Preuve que le mock a bien intercepté l'appel : un spy qui n'intercepte rien (le piège
+    // Storage.prototype vs prototype réel constaté sous ce jsdom) laisserait ce test passer pour
+    // la mauvaise raison, en lisant simplement les valeurs pré-remplies normalement.
+    expect(getItemCallCount).toBeGreaterThan(0);
+    expect(result).toBe(FALLBACK);
+    // Preuve de purge réelle (pas seulement "removeItem a été appelé sur un mock") : lecture avec
+    // le vrai sessionStorage, une fois le spy restauré.
+    expect(sessionStorage.getItem("redirectAfterAuth")).toBeNull();
+    expect(sessionStorage.getItem("redirectAfterLogin")).toBeNull();
   });
 });
 

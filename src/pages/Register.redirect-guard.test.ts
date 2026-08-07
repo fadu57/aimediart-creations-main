@@ -22,21 +22,46 @@ describe("Register.tsx — cohérence des sorties post-inscription", () => {
     ).toBe(1);
   });
 
-  it("chaque navigate(...) impératif consomme consumePostRegistrationTarget(...)", () => {
-    const navigateCalls = source.match(/navigate\(consumePostRegistrationTarget\([^)]*\)[^)]*\)/g) ?? [];
+  it("chaque navigate(...) impératif consomme consumePostRegistrationTarget(...) — aucun autre site", () => {
+    // Compte le nombre TOTAL de navigate( dans le fichier, pas seulement ceux qui matchent déjà
+    // le bon pattern : un 3e commit rejeté avait justement un site de sortie qui n'apparaissait
+    // dans aucun des deux comptages précédents (repli implicite, pas de match ni positif ni
+    // négatif). Si ce total dépasse le nombre de sites qui consomment le helper, une redirection
+    // en dur (navigate("/"), navigate(`/scan-work1?...`), etc.) s'est glissée sans passer dessus.
+    const totalNavigateCalls = source.match(/\bnavigate\(/g) ?? [];
+    const helperNavigateCalls = source.match(/navigate\(consumePostRegistrationTarget\([^)]*\)[^)]*\)/g) ?? [];
     // 4 sites connus : early-return déjà-enregistré (OAuth), finalisation OAuth, bypass e-mail de
     // test, finalisation e-mail/mot de passe classique. Si ce nombre baisse, une sortie a régressé
     // vers une navigation en dur ; s'il grimpe sans mise à jour de ce test, un nouveau site a été
     // ajouté sans revue de cette garde.
-    expect(navigateCalls.length).toBe(4);
+    expect(helperNavigateCalls.length).toBe(4);
+    expect(
+      totalNavigateCalls.length,
+      "un navigate(...) existe dans le fichier sans passer par consumePostRegistrationTarget(...)",
+    ).toBe(helperNavigateCalls.length);
   });
 
-  it("le <Navigate> de rendu (session déjà active) consomme aussi la cible mémorisée", () => {
+  it("le <Navigate> de rendu (session déjà active) consomme aussi la cible mémorisée — aucun autre <Navigate>", () => {
+    const totalNavigateElements = source.match(/<Navigate\b/g) ?? [];
+    expect(totalNavigateElements.length).toBe(1);
     expect(source).toMatch(/const target = consumePostRegistrationTarget\(/);
     expect(source).toMatch(/<Navigate to=\{target\} replace \/>/);
   });
 
-  it("l'early-return de session déjà active est gardé par !submitting (anti-course avec handleFinalize)", () => {
+  it("aucune redirection ne contourne React Router (window.location / location.assign)", () => {
+    expect(source).not.toMatch(/window\.location\.(href|assign)\s*=/);
+    expect(source).not.toMatch(/location\.assign\(/);
+  });
+
+  it("l'early-return de rendu (session déjà active) est gardé par !submitting (anti-course avec handleFinalize)", () => {
     expect(source).toMatch(/if \(session && !oauthProfileFlow && !submitting\)/);
+  });
+
+  it("l'effet de retour post-auth (navigate OAuth déjà-enregistré) est aussi gardé par submitting", () => {
+    // Revue tier-1 (3e passe) : ce garde manquait sur l'effet, distinct de l'early-return de
+    // rendu ci-dessus — un VISITOR_REGISTER_OAUTH_FLAG périmé (tentative Google annulée) pouvait
+    // le faire naviguer pendant qu'un parcours e-mail/mot de passe classique finalisait encore.
+    expect(source).toMatch(/if \(submitting\) return;/);
+    expect(source).toMatch(/\}, \[authLoading, session, searchParams, expoIdFromUrl, navigate, submitting\]\);/);
   });
 });

@@ -34,7 +34,10 @@ export function consumePostRegistrationTarget(fallback: string): string {
   }
 }
 
-/** Purge sans consommer — pour les sorties qui n'utilisent pas la valeur stockée (ex. session déjà active). */
+/**
+ * Purge sans consommer. Utilisé en interne par `consumePostRegistrationTarget` (y compris quand
+ * la lecture échoue) ; exporté surtout pour être testé isolément.
+ */
 export function clearPostRegistrationTarget(): void {
   if (typeof window === "undefined") return;
   try {
