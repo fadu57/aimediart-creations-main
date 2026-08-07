@@ -66,6 +66,32 @@ function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
   );
 }
 
+/**
+ * Résout la page vers laquelle renvoyer le visiteur après une inscription réussie.
+ * Priorité à la page d'où il a cliqué sur "S'inscrire" (stockée par VisitorPageShell/VisitorView
+ * dans `redirectAfterAuth`), avec repli sur l'écran de scan si rien n'est stocké ou si la valeur
+ * n'est pas une URL du même site (évite tout open redirect via une valeur de sessionStorage altérée).
+ */
+function resolvePostRegistrationTarget(expoIdFromUrl: string): string {
+  const fallback = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
+  if (typeof window === "undefined") return fallback;
+
+  const stored = sessionStorage.getItem("redirectAfterAuth")?.trim();
+  sessionStorage.removeItem("redirectAfterAuth");
+  sessionStorage.removeItem("redirectAfterLogin");
+  if (!stored) return fallback;
+
+  try {
+    const url = new URL(stored, window.location.origin);
+    if (url.origin !== window.location.origin) return fallback;
+    // Ne pas rebondir sur une page d'auth (boucle register/login).
+    if (/^\/(register|login)(\/|$)/.test(url.pathname)) return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Lorsque `functions.invoke` reçoit un statut hors 2xx, le SDK ne parse pas le corps : il est encore lisible via la Response attachée à l’erreur. */
 async function readFunctionsHttpErrorJson<T extends Record<string, unknown>>(err: unknown): Promise<T | null> {
   if (!(err instanceof FunctionsHttpError)) return null;
@@ -258,8 +284,7 @@ const Register = () => {
       }
 
       if (hasVisitorRegistrationMetadata(session.user)) {
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
+        navigate(resolvePostRegistrationTarget(expoIdFromUrl), { replace: true });
         return;
       }
 
@@ -519,14 +544,7 @@ const Register = () => {
         }
       }
 
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem("redirectAfterAuth");
-        sessionStorage.removeItem("redirectAfterLogin");
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
-      } else {
-        navigate("/scan-work1", { replace: true });
-      }
+      navigate(resolvePostRegistrationTarget(expoIdFromUrl), { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("register_visitor.toast_visitor_signup_failed");
       toast.error(formatSignUpError(msg));
