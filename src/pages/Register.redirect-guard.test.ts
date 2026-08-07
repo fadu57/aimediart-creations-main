@@ -64,4 +64,12 @@ describe("Register.tsx — cohérence des sorties post-inscription", () => {
     expect(source).toMatch(/if \(submitting\) return;/);
     expect(source).toMatch(/\}, \[authLoading, session, searchParams, expoIdFromUrl, navigate, submitting\]\);/);
   });
+
+  it("n'accède jamais directement à sessionStorage (passe par les accesseurs défensifs try/catch)", () => {
+    // Revue tier-1 (4e passe) : trois accès sessionStorage bruts n'étaient protégés que par un
+    // typeof window !== "undefined", sans try/catch, sur un chemin qui s'exécute pour tout
+    // visiteur anonyme atterrissant sur /register — corrigé en passant par
+    // hasVisitorRegisterOAuthFlag()/clearVisitorRegisterOAuthFlag() (src/lib/visitorOAuth.ts).
+    expect(source).not.toMatch(/sessionStorage/);
+  });
 });
