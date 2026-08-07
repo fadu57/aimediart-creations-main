@@ -42,28 +42,53 @@ describe("consumePostRegistrationTarget", () => {
     ["https://evil.com/x", "origine absolue étrangère"],
     ["javascript:alert(1)", "scheme javascript:"],
     ["data:text/html,<script>alert(1)</script>", "scheme data:"],
-    [`https://evil.com@${typeof window !== "undefined" ? window.location.host : "localhost"}/x`, "userinfo trompeur"],
+    // Piège userinfo : la chaîne COMMENCE par la vraie origine (déjouerait un contrôle naïf en
+    // startsWith), mais structurellement l'hôte est evil.com — `new URL(...).origin` doit le voir.
+    [`${window.location.origin}@evil.com/x`, "userinfo trompeur (hôte réel = evil.com)"],
   ])("rejette une valeur stockée dangereuse (%s : %s)", (malicious) => {
     sessionStorage.setItem("redirectAfterAuth", malicious);
     expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
   });
 
-  it.each(["/register", "/register?expo_id=1", "/register/", "/Register", "/login", "/LOGIN"])(
-    "rejette un rebond vers une page d'auth quelle que soit la casse (%s)",
-    (authPath) => {
-      sessionStorage.setItem("redirectAfterAuth", `${window.location.origin}${authPath}`);
-      expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
-    },
-  );
+  it("accepte un userinfo légitime sur la vraie origine (le userinfo ne fait pas partie de l'origin)", () => {
+    const scheme = window.location.origin.match(/^https?:\/\//)?.[0] ?? "http://";
+    const withUserinfo = window.location.origin.replace(scheme, `${scheme}visiteur@`);
+    sessionStorage.setItem("redirectAfterAuth", `${withUserinfo}/oeuvres/1`);
+    expect(consumePostRegistrationTarget(FALLBACK)).toBe("/oeuvres/1");
+  });
 
-  it("retombe sur le fallback et purge quand même les clés si sessionStorage lève (Safari privé / iframe sandboxée)", () => {
-    const getItemSpy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+  it.each([
+    "/register",
+    "/register?expo_id=1",
+    "/register/",
+    "/Register",
+    "/register_visitor",
+    "/register_visitor?expo_id=1",
+    "/REGISTER_VISITOR",
+    "/login",
+    "/LOGIN",
+    "/signup",
+    "/SIGNUP",
+  ])("rejette un rebond vers une page d'auth quelle que soit la casse (%s)", (authPath) => {
+    sessionStorage.setItem("redirectAfterAuth", `${window.location.origin}${authPath}`);
+    expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
+  });
+
+  it("retombe sur le fallback et purge quand même les deux clés si la lecture sessionStorage lève (Safari privé / iframe sandboxée)", () => {
+    // Sous jsdom, `Storage.prototype` global ne correspond pas toujours au prototype réel de
+    // l'instance sessionStorage : on spy sur le prototype effectif pour être sûr d'intercepter.
+    const storageProto = Object.getPrototypeOf(sessionStorage) as Storage;
+    const getItemSpy = vi.spyOn(storageProto, "getItem").mockImplementation(() => {
       throw new DOMException("Access is denied for this document.", "SecurityError");
     });
+    const removeItemSpy = vi.spyOn(storageProto, "removeItem");
     try {
       expect(consumePostRegistrationTarget(FALLBACK)).toBe(FALLBACK);
+      expect(removeItemSpy).toHaveBeenCalledWith("redirectAfterAuth");
+      expect(removeItemSpy).toHaveBeenCalledWith("redirectAfterLogin");
     } finally {
       getItemSpy.mockRestore();
+      removeItemSpy.mockRestore();
     }
   });
 });

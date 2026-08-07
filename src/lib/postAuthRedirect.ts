@@ -10,17 +10,24 @@
 export function consumePostRegistrationTarget(fallback: string): string {
   if (typeof window === "undefined") return fallback;
 
+  // Lecture et purge séparées : si la lecture lève (storage inaccessible), la purge doit quand
+  // même être tentée pour ne pas laisser une clé périmée polluer le prochain flux.
+  let stored: string | undefined;
   try {
-    const stored =
+    stored =
       sessionStorage.getItem("redirectAfterAuth")?.trim() || sessionStorage.getItem("redirectAfterLogin")?.trim();
-    sessionStorage.removeItem("redirectAfterAuth");
-    sessionStorage.removeItem("redirectAfterLogin");
-    if (!stored) return fallback;
+  } catch {
+    stored = undefined;
+  }
+  clearPostRegistrationTarget();
+  if (!stored) return fallback;
 
+  try {
     const url = new URL(stored, window.location.origin);
     if (url.origin !== window.location.origin) return fallback;
-    // Ne pas rebondir sur une page d'auth (boucle register/login), quelle que soit la casse.
-    if (/^\/(register|login)(\/|$)/i.test(url.pathname)) return fallback;
+    // Ne pas rebondir sur une page d'auth (boucle register/register_visitor/login/signup),
+    // quelle que soit la casse.
+    if (/^\/(register(_visitor)?|login|signup)(\/|$)/i.test(url.pathname)) return fallback;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return fallback;

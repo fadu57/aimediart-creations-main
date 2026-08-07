@@ -11,7 +11,7 @@ import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
 import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
-import { clearPostRegistrationTarget, consumePostRegistrationTarget } from "@/lib/postAuthRedirect";
+import { consumePostRegistrationTarget } from "@/lib/postAuthRedirect";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { isVisitorRole } from "@/lib/authUser";
@@ -288,11 +288,16 @@ const Register = () => {
     );
   }
 
-  if (session && !oauthProfileFlow) {
-    // Session déjà active hors flux d'inscription (ex. arrivée directe sur /register) : purge
-    // un éventuel redirectAfterAuth/redirectAfterLogin périmé pour ne pas polluer un flux ultérieur.
-    clearPostRegistrationTarget();
-    const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/";
+  if (session && !oauthProfileFlow && !submitting) {
+    // Session déjà active hors flux d'inscription (ex. arrivée directe sur /register). Le garde
+    // `!submitting` est nécessaire : côté inscription e-mail/mot de passe, `signInWithPassword`
+    // (dans handleFinalize) fait passer `session` à true avant que handleFinalize ait fini
+    // l'upload du selfie et son propre navigate() — sans ce garde, cette branche gagnait la
+    // course, purgeait la cible mémorisée et redirigeait vers /scan-work1 en dur (perte de
+    // expo_id et de l'écran d'origine).
+    const target = consumePostRegistrationTarget(
+      isVisitorRole(role_name, role_id) ? postRegistrationFallback(expoIdFromUrl) : "/",
+    );
     return <Navigate to={target} replace />;
   }
 
@@ -454,8 +459,7 @@ const Register = () => {
         if (bypassSignInError) {
           toast.message(t("register_visitor.toast_test_bypass"));
         }
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
