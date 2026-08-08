@@ -77,6 +77,8 @@
   "pdf_format_dialog_desc_batch": "Scegli il formato di stampa per i {{count}} cartelli selezionati.",
   "pdf_batch_success": "{{count}} cartelli generati in un unico PDF.",
   "pdf_batch_error": "Impossibile generare i cartelli PDF.",
+  "pdf_batch_progress": "{{done}} / {{total}}",
+  "pdf_batch_progress_aria": "Generazione cartelli: {{done}} di {{total}}",
   "pdf_format_group_rectangular": "Formati rettangolari",
   "pdf_format_group_square": "Formati quadrati",
   "pdf_format_group_custom": "Dimensioni libere",

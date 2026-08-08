@@ -34,6 +34,8 @@ export type CartelExtraTitleLangOption = {
   lang: MediationUiLang;
   label: string;
   preview: string;
+  /** false = pas de titre traduit distinct → case désactivée. */
+  available: boolean;
 };
 
 type CartelFormatDialogProps = {
@@ -47,7 +49,7 @@ type CartelFormatDialogProps = {
   extraTitleLangOptions?: readonly CartelExtraTitleLangOption[];
 };
 
-const DEFAULT_FORMAT: CartelPresetFormatId = "a6-portrait";
+const DEFAULT_FORMAT: CartelPresetFormatId = "square-80";
 const DEFAULT_CUSTOM_WIDTH_MM = 105;
 const DEFAULT_CUSTOM_HEIGHT_MM = 148;
 
@@ -199,14 +201,20 @@ export function CartelFormatDialog({
         w != null && h != null
           ? { widthMm: sizeValueToMm(w, sizeUnit), heightMm: sizeValueToMm(h, sizeUnit) }
           : minCustomSize;
-      const customSizeMmResolved = isValidCartelCustomSizeMm(raw, selectedExtraLangs.length)
+      const langs = selectedExtraLangs.filter((lang) =>
+        extraTitleLangOptions.some((o) => o.lang === lang && o.available),
+      );
+      const customSizeMmResolved = isValidCartelCustomSizeMm(raw, langs.length)
         ? raw
-        : clampCartelCustomSizeToMinimum(raw, selectedExtraLangs.length);
-      onConfirm({ formatId: "custom", customSizeMm: customSizeMmResolved }, selectedExtraLangs);
+        : clampCartelCustomSizeToMinimum(raw, langs.length);
+      onConfirm({ formatId: "custom", customSizeMm: customSizeMmResolved }, langs);
       onOpenChange(false);
       return;
     }
-    onConfirm({ formatId: selectedId }, selectedExtraLangs);
+    const langs = selectedExtraLangs.filter((lang) =>
+      extraTitleLangOptions.some((o) => o.lang === lang && o.available),
+    );
+    onConfirm({ formatId: selectedId }, langs);
     onOpenChange(false);
   };
 
@@ -379,20 +387,31 @@ export function CartelFormatDialog({
             <div className="flex flex-wrap gap-1">
               {extraTitleLangOptions.map((opt) => {
                 const checked = selectedExtraLangs.includes(opt.lang);
+                const disabled = !opt.available;
                 return (
                   <label
                     key={opt.lang}
-                    title={opt.preview || undefined}
+                    title={
+                      disabled
+                        ? t("pdf_extra_title_langs_unavailable")
+                        : opt.preview || undefined
+                    }
                     className={cn(
-                      "flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border border-border/50 px-2 py-1 text-xs hover:bg-muted/40",
-                      checked && "border-[#E63946]/40 bg-muted/50",
+                      "flex max-w-full items-center gap-1.5 rounded-md border border-border/50 px-2 py-1 text-xs",
+                      disabled
+                        ? "cursor-not-allowed opacity-45"
+                        : "cursor-pointer hover:bg-muted/40",
+                      checked && !disabled && "border-[#E63946]/40 bg-muted/50",
                     )}
                   >
                     <input
                       type="checkbox"
                       className="h-3.5 w-3.5 accent-[#E63946]"
-                      checked={checked}
-                      onChange={() => toggleExtraLang(opt.lang)}
+                      checked={checked && !disabled}
+                      disabled={disabled}
+                      onChange={() => {
+                        if (!disabled) toggleExtraLang(opt.lang);
+                      }}
                     />
                     <span className="font-semibold uppercase">{opt.label}</span>
                   </label>

@@ -1964,6 +1964,24 @@ export function ArtworkModal({
     [mediationPrimaryLang, title],
   );
 
+  // Auto-activation : si l'utilisateur sélectionne plusieurs langues de médiation
+  // (nouvelle œuvre), on active aussi les champs i18n du titre.
+  useEffect(() => {
+    if (!experimentalWorkflow) return;
+    if (persistedArtworkId) return; // ne pas écraser une œuvre existante
+    if (titleI18nEnabled) return;
+    if (new Set(mediationGenerateLangs).size <= 1) return;
+    if (!title.trim()) return;
+    handleTitleI18nEnabledChange(true);
+  }, [
+    experimentalWorkflow,
+    persistedArtworkId,
+    titleI18nEnabled,
+    mediationGenerateLangs,
+    title,
+    handleTitleI18nEnabledChange,
+  ]);
+
   /** Langues pour les titres i18n : langues de médiation + FR si UI / primaire ≠ FR. */
   const titleI18nLangs = useMemo((): MediationUiLang[] => {
     const set = new Set<MediationUiLang>(mediationGenerateLangs);

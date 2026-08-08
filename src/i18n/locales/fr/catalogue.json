@@ -107,6 +107,8 @@
   "pdf_format_dialog_desc_batch": "Choisissez le format d'impression pour les {{count}} cartels sélectionnés.",
   "pdf_batch_success": "{{count}} cartels générés dans un seul PDF.",
   "pdf_batch_error": "Impossible de générer les cartels PDF.",
+  "pdf_batch_progress": "{{done}} / {{total}}",
+  "pdf_batch_progress_aria": "Génération des cartels : {{done}} sur {{total}}",
   "pdf_format_group_rectangular": "Formats rectangulaires",
   "pdf_format_group_square": "Formats carrés",
   "pdf_format_group_custom": "Dimensions libres",
@@ -130,7 +132,8 @@
   "pdf_format_confirm": "Générer le PDF",
   "pdf_format_cancel": "Annuler",
   "pdf_extra_title_langs_label": "Titres dans d'autres langues",
-  "pdf_extra_title_langs_help": "Cochez les langues à ajouter sous le titre principal (italique, plus petit).",
+  "pdf_extra_title_langs_help": "Cochez les langues à ajouter sous le titre principal (même taille, italique). Les cases grisées n’ont pas de titre traduit distinct.",
+  "pdf_extra_title_langs_unavailable": "Aucun titre traduit distinct pour cette langue (l’audio seul ne suffit pas).",
 
   "badge_ia_image_yes": "Image analysée : Oui",
   "badge_ia_image_no": "Image analysée : Non",

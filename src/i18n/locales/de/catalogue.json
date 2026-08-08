@@ -77,6 +77,8 @@
   "pdf_format_dialog_desc_batch": "Druckformat für die {{count}} ausgewählten Etiketten wählen.",
   "pdf_batch_success": "{{count}} Etiketten in einer PDF erstellt.",
   "pdf_batch_error": "Etikett-PDFs konnten nicht generiert werden.",
+  "pdf_batch_progress": "{{done}} / {{total}}",
+  "pdf_batch_progress_aria": "Etiketten werden erstellt: {{done}} von {{total}}",
   "pdf_format_group_rectangular": "Rechteckformate",
   "pdf_format_group_square": "Quadratformate",
   "pdf_format_group_custom": "Freie Maße",

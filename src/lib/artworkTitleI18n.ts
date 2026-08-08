@@ -16,8 +16,26 @@ export function normalizeTitleToByLang(
   const out = createEmptyTitleByLang();
   const legacy = (legacyTitle ?? "").trim();
 
+  let obj: Record<string, unknown> | null = null;
   if (rawI18n != null && typeof rawI18n === "object" && !Array.isArray(rawI18n)) {
-    const o = rawI18n as Record<string, unknown>;
+    obj = rawI18n as Record<string, unknown>;
+  } else if (typeof rawI18n === "string") {
+    const s = rawI18n.trim();
+    // Cas legacy : certains enregistrements ont pu stocker le JSON i18n en chaîne.
+    if (s.startsWith("{") && s.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(s) as unknown;
+        if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
+          obj = parsed as Record<string, unknown>;
+        }
+      } catch {
+        /* ignore — format non JSON exploitable */
+      }
+    }
+  }
+
+  if (obj) {
+    const o = obj;
     for (const L of MEDIATION_UI_LANGS) {
       const v = o[L];
       if (typeof v === "string") out[L] = v.trim();

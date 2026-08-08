@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { ArtworkModalWorkflow } from "@/components/artwork-workflow/ArtworkModalWorkflow";
 import { getArtworkIdsWithPendingAudio, getPendingAudioJobsByLang, subscribeAudioQueue } from "@/services/audioService";
 import { BackofficeStickyAgencyLogoSlot } from "@/components/BackofficeStickyAgencyLogo";
@@ -170,23 +171,30 @@ function artworkDisplayTitle(
   return (aw.artwork_title ?? "").trim() || untitledFallback;
 }
 
-/** Langues de titre i18n disponibles en plus de la langue UI (pour le PDF cartel). */
+/** Langues proposées pour titres i18n sous le titre principal (PDF cartel).
+ * Toujours toutes les langues UI sauf la langue courante — `available` selon titre traduit distinct.
+ */
 function artworkExtraTitleLangOptions(
-  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n" | "artwork_title_i18n_enabled">,
+  aw: Pick<ArtworkRow, "artwork_title" | "artwork_title_i18n">,
   uiLanguageTag: string,
 ): CartelExtraTitleLangOption[] {
-  if (!aw.artwork_title_i18n_enabled) return [];
   const byLang = normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title);
   const mainLang = resolveMediationUiLang(uiLanguageTag);
-  const mainTitle = (byLang[mainLang] ?? "").trim() || (aw.artwork_title ?? "").trim();
-  const options: CartelExtraTitleLangOption[] = [];
-  for (const lang of MEDIATION_UI_LANGS) {
-    if (lang === mainLang) continue;
+  const mainTitle =
+    (byLang[mainLang] ?? "").trim() ||
+    artworkDisplayTitle(aw, uiLanguageTag, "") ||
+    (aw.artwork_title ?? "").trim();
+
+  return MEDIATION_UI_LANGS.filter((lang) => lang !== mainLang).map((lang) => {
     const preview = (byLang[lang] ?? "").trim();
-    if (!preview || preview === mainTitle) continue;
-    options.push({ lang, label: lang.toUpperCase(), preview });
-  }
-  return options;
+    const available = Boolean(preview && preview !== mainTitle);
+    return {
+      lang,
+      label: lang.toUpperCase(),
+      preview: available ? preview : "",
+      available,
+    };
+  });
 }
 
 function artworkExtraTitlesForLangs(
@@ -194,7 +202,7 @@ function artworkExtraTitlesForLangs(
   langs: readonly MediationUiLang[],
   uiLanguageTag: string,
 ): string[] {
-  if (!aw.artwork_title_i18n_enabled || langs.length === 0) return [];
+  if (langs.length === 0) return [];
   const byLang = normalizeTitleToByLang(aw.artwork_title_i18n, aw.artwork_title);
   const mainTitle = artworkDisplayTitle(aw, uiLanguageTag, "");
   const out: string[] = [];
@@ -274,6 +282,9 @@ const Catalogue = () => {
   const [cartelBatchMode, setCartelBatchMode] = useState(false);
   const [selectedArtworkIds, setSelectedArtworkIds] = useState<Set<string>>(() => new Set());
   const [batchCartelGenerating, setBatchCartelGenerating] = useState(false);
+  const [batchCartelProgress, setBatchCartelProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
   const [expoMovePending, setExpoMovePending] = useState<ExpoMovePending | null>(null);
   const [expoUndoByArtwork, setExpoUndoByArtwork] = useState<Record<string, string | null>>({});
   const { scope, loading: authLoading } = useDataScope();
@@ -1326,6 +1337,7 @@ const Catalogue = () => {
     }
 
     setBatchCartelGenerating(true);
+    setBatchCartelProgress({ done: 0, total: Math.max(1, rows.length + 1) });
     try {
       const originOverride = await fetchQrPublicSiteOriginFromSettings();
       const items: GenerateCartelPdfInput[] = [];
@@ -1362,7 +1374,9 @@ const Catalogue = () => {
         return;
       }
 
-      const blobUrl = await generateCartelPdfBatch(items);
+      const blobUrl = await generateCartelPdfBatch(items, {
+        onProgress: (progress) => setBatchCartelProgress(progress),
+      });
 
       navigate(catalogueFiltersPath(), { replace: true });
 
@@ -1384,26 +1398,36 @@ const Catalogue = () => {
       toast.error(e instanceof Error ? e.message : t("pdf_batch_error"));
     } finally {
       setBatchCartelGenerating(false);
+      setBatchCartelProgress(null);
     }
   };
 
   const cartelExtraTitleLangOptions = useMemo((): CartelExtraTitleLangOption[] => {
     if (cartelGroup) return [];
+    const mainLang = resolveMediationUiLang(i18n.language);
+
     if (cartelBatchMode) {
-      const byLang = new Map<MediationUiLang, string>();
+      const availableByLang = new Map<MediationUiLang, string>();
       for (const id of selectedArtworkIds) {
         const aw = filteredArtworkById.get(id) ?? artworkByIdScoped.get(id);
         if (!aw) continue;
         for (const opt of artworkExtraTitleLangOptions(aw, i18n.language)) {
-          if (!byLang.has(opt.lang)) byLang.set(opt.lang, opt.preview);
+          if (opt.available && !availableByLang.has(opt.lang)) {
+            availableByLang.set(opt.lang, opt.preview);
+          }
         }
       }
-      return MEDIATION_UI_LANGS.filter((lang) => byLang.has(lang)).map((lang) => ({
-        lang,
-        label: lang.toUpperCase(),
-        preview: byLang.get(lang) ?? "",
-      }));
+      return MEDIATION_UI_LANGS.filter((lang) => lang !== mainLang).map((lang) => {
+        const preview = availableByLang.get(lang) ?? "";
+        return {
+          lang,
+          label: lang.toUpperCase(),
+          preview,
+          available: Boolean(preview),
+        };
+      });
     }
+
     if (cartelArtwork) return artworkExtraTitleLangOptions(cartelArtwork, i18n.language);
     return [];
   }, [
@@ -1705,6 +1729,32 @@ const Catalogue = () => {
                   ) : null}
                   {t("btn_print_cartels_batch")}
                 </Button>
+                {batchCartelGenerating && batchCartelProgress ? (
+                  <div
+                    className="flex min-w-[8rem] max-w-[16rem] flex-1 items-center gap-2"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={t("pdf_batch_progress_aria", {
+                      done: batchCartelProgress.done,
+                      total: batchCartelProgress.total,
+                    })}
+                  >
+                    <Progress
+                      value={
+                        batchCartelProgress.total > 0
+                          ? (batchCartelProgress.done / batchCartelProgress.total) * 100
+                          : 0
+                      }
+                      className="h-2 flex-1"
+                    />
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {t("pdf_batch_progress", {
+                        done: batchCartelProgress.done,
+                        total: batchCartelProgress.total,
+                      })}
+                    </span>
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>

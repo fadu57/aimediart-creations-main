@@ -2009,7 +2009,7 @@ const VisitorViewCore = () => {
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_prev")}
                   onClick={goMediationPrev}
-                  className="absolute inset-y-0 left-0 z-30 flex w-8 items-center justify-center bg-[#E63946]/15 text-[#E63946] transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute inset-y-0 left-0 z-30 flex w-8 items-start justify-center bg-[#E63946]/15 pt-3 text-white transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
                 >
                   <ChevronLeft className="h-6 w-6" strokeWidth={2.5} aria-hidden />
                 </button>
@@ -2110,7 +2110,7 @@ const VisitorViewCore = () => {
                   disabled={mediationSlideCount <= 1}
                   aria-label={t("aria_mediation_next")}
                   onClick={goMediationNext}
-                  className="absolute inset-y-0 right-0 z-30 flex w-8 items-center justify-center bg-[#E63946]/15 text-[#E63946] transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
+                  className="absolute inset-y-0 right-0 z-30 flex w-8 items-start justify-center bg-[#E63946]/15 pt-3 text-white transition-colors hover:bg-[#E63946]/30 disabled:pointer-events-none disabled:opacity-20"
                 >
                   <ChevronRight className="h-6 w-6" strokeWidth={2.5} aria-hidden />
                 </button>

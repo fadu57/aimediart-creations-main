@@ -22,6 +22,7 @@ import {
   startNativeCameraQrScanner,
   type NativeCameraQrSession,
 } from "@/lib/qrNativeCameraScanner";
+import { classifyCameraError } from "@/lib/cameraErrorClassification";
 import { useVisitorExitDiaryFlow } from "@/hooks/useVisitorExitDiaryFlow";
 import {
   reportQrCameraError,
@@ -198,14 +199,15 @@ const WorkScanner = () => {
       if (import.meta.env.DEV) {
         console.error("[scanner] démarrage caméra", e);
       }
+      const cameraErrorKind = classifyCameraError(e);
       setCameraError(
         isInsecureContext
           ? t("scanner.camera_blocked_https")
-          : /permission|denied|notallowed|not allowed/i.test(msg)
+          : cameraErrorKind === "denied"
             ? t("scanner.camera_denied")
-            : /notfound|no camera|device not found|requested device not found/i.test(msg)
+            : cameraErrorKind === "not_found"
               ? t("scanner.camera_not_found")
-              : /notreadable|in use|busy|track start/i.test(msg)
+              : cameraErrorKind === "in_use"
                 ? t("scanner.camera_in_use")
                 : import.meta.env.DEV && msg.trim()
                   ? msg
@@ -397,7 +399,7 @@ const WorkScanner = () => {
             }}
           />
 
-          {cameraReady && (
+          {(cameraReady || cameraError) && (
             <Button
               type="button"
               variant="outline"
