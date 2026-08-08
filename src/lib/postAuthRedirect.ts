@@ -1,0 +1,49 @@
+/**
+ * Consomme (lit puis purge) la page vers laquelle renvoyer un visiteur après une inscription
+ * réussie. Priorité à `redirectAfterAuth` (posé par VisitorPageShell/VisitorView au clic sur
+ * "S'inscrire"), repli sur `redirectAfterLogin` (posé au clic sur "Se connecter" — cas
+ * œuvre → Se connecter → Créer un compte), puis sur `fallback` si rien n'est stocké, si le
+ * storage est inaccessible (Safari privé / iframe sandboxée), ou si la valeur n'est pas une URL
+ * du même site (évite tout open redirect via une valeur sessionStorage altérée).
+ * Effet de bord volontaire : purge toujours les deux clés pour ne pas polluer un flux ultérieur.
+ */
+export function consumePostRegistrationTarget(fallback: string): string {
+  if (typeof window === "undefined") return fallback;
+
+  // Lecture et purge séparées : si la lecture lève (storage inaccessible), la purge doit quand
+  // même être tentée pour ne pas laisser une clé périmée polluer le prochain flux.
+  let stored: string | undefined;
+  try {
+    stored =
+      sessionStorage.getItem("redirectAfterAuth")?.trim() || sessionStorage.getItem("redirectAfterLogin")?.trim();
+  } catch {
+    stored = undefined;
+  }
+  clearPostRegistrationTarget();
+  if (!stored) return fallback;
+
+  try {
+    const url = new URL(stored, window.location.origin);
+    if (url.origin !== window.location.origin) return fallback;
+    // Ne pas rebondir sur une page d'auth (boucle register/register_visitor/login/signup),
+    // quelle que soit la casse.
+    if (/^\/(register(_visitor)?|login|signup)(\/|$)/i.test(url.pathname)) return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Purge sans consommer. Utilisé en interne par `consumePostRegistrationTarget` (y compris quand
+ * la lecture échoue) ; exporté surtout pour être testé isolément.
+ */
+export function clearPostRegistrationTarget(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem("redirectAfterAuth");
+    sessionStorage.removeItem("redirectAfterLogin");
+  } catch {
+    // Storage inaccessible (Safari privé / iframe sandboxée) : rien à purger.
+  }
+}

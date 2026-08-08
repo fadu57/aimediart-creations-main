@@ -5,6 +5,29 @@ import { supabase } from "@/lib/supabase";
 export const VISITOR_REGISTER_OAUTH_FLAG = "visitor_register_oauth";
 export const VISITOR_DIARY_OAUTH_FLAG = "visitor_diary_oauth";
 
+/**
+ * Accès défensif à VISITOR_REGISTER_OAUTH_FLAG : en iframe sandboxée (sans allow-same-origin) ou
+ * données de site bloquées, le getter window.sessionStorage lui-même peut lever une SecurityError
+ * — un flag périmé ne doit jamais faire planter le rendu de /register pour autant.
+ */
+export function hasVisitorRegisterOAuthFlag(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(VISITOR_REGISTER_OAUTH_FLAG) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function clearVisitorRegisterOAuthFlag(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
+  } catch {
+    // Storage inaccessible : rien à purger.
+  }
+}
+
 export function getDiaryOAuthRedirectUrl(): string {
   const base =
     import.meta.env.VITE_PUBLIC_SITE_URL?.trim() ||

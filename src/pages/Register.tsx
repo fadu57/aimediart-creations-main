@@ -10,16 +10,19 @@ import { supabase } from "@/lib/supabase";
 import { prepareImageForSupabaseUpload } from "@/lib/imageUpload";
 import { uploadVisitorSelfiePhoto } from "@/lib/storagePaths";
 import { getPasswordResetRedirectUrl } from "@/lib/passwordReset";
+import { PASSWORD_MIN_LENGTH } from "@/lib/passwordPolicy";
+import { consumePostRegistrationTarget } from "@/lib/postAuthRedirect";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useUiLanguage } from "@/providers/UiLanguageProvider";
 import { isVisitorRole } from "@/lib/authUser";
 import { getStoredVisitorUuid } from "@/lib/visitorIdentity";
 import { setCurrentExpoId } from "@/lib/expoContext";
 import {
+  clearVisitorRegisterOAuthFlag,
+  hasVisitorRegisterOAuthFlag,
   hasVisitorRegistrationMetadata,
   readOAuthNameParts,
   startVisitorOAuthSignIn,
-  VISITOR_REGISTER_OAUTH_FLAG,
 } from "@/lib/visitorOAuth";
 import { getAnonymousTrackingConsent, loadOrCreateFingerprintJsId } from "@/lib/fingerprintConsent";
 import {
@@ -49,7 +52,6 @@ import { AimediartBrandLogoBlock } from "@/components/AimediartBrandLogoBlock";
 import { VisitorPoolAvatarPicker } from "@/components/VisitorPoolAvatarPicker";
 import type { VisitorPoolAvatar } from "@/lib/visitorAvatarPool";
 
-const PASSWORD_MIN_LENGTH = 6;
 const TEST_EMAIL_BYPASS = "fadu57@gmail.com";
 
 function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
@@ -64,6 +66,10 @@ function isDuplicateEmailSignUpError(message: string, code?: string): boolean {
     m.includes("email address is already registered") ||
     m.includes("déjà lié à un compte")
   );
+}
+
+function postRegistrationFallback(expoIdFromUrl: string): string {
+  return expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
 }
 
 /** Lorsque `functions.invoke` reçoit un statut hors 2xx, le SDK ne parse pas le corps : il est encore lisible via la Response attachée à l’erreur. */
@@ -138,12 +144,14 @@ const Register = () => {
   }, []);
 
   const formatSignUpError = useCallback(
-    (message: string): string => {
+    (message: string, code?: string): string => {
       const m = message.toLowerCase();
-      if (isDuplicateEmailSignUpError(message)) {
+      if (isDuplicateEmailSignUpError(message, code)) {
         return t("register_visitor.error_duplicate_email_signup");
       }
-      if (m.includes("password") && (m.includes("short") || m.includes("least") || m.includes(String(PASSWORD_MIN_LENGTH)))) {
+      // Le message serveur est en français ("Mot de passe trop court…") : on ne peut pas
+      // s'y fier pour la détection, d'où la priorité au code machine renvoyé par l'Edge Function.
+      if (code === "weak_password" || (m.includes("password") && (m.includes("short") || m.includes("least")))) {
         return t("register_visitor.error_password_short_signup", { min: PASSWORD_MIN_LENGTH });
       }
       if (m.includes("invalid email") || (m.includes("email") && m.includes("invalid"))) {
@@ -235,20 +243,26 @@ const Register = () => {
 
   useEffect(() => {
     if (authLoading) return;
+    // handleFinalize (parcours e-mail/mot de passe) tourne encore : signInWithPassword fait déjà
+    // passer `session` à true avant la fin de l'upload du selfie. Sans ce garde, si un
+    // VISITOR_REGISTER_OAUTH_FLAG périmé traîne (ex. tentative Google annulée avant de revenir
+    // s'inscrire par e-mail), cet effet se rejoue avec `oauthReturn` vrai et navigue en avance,
+    // consommant/purgeant la cible mémorisée pendant que handleFinalize attend encore.
+    if (submitting) return;
 
     if (!session?.user) {
+      // Purge un éventuel VISITOR_REGISTER_OAUTH_FLAG périmé (tentative Google commencée puis
+      // annulée/abandonnée sans jamais revenir avec une session) pour ne pas polluer un parcours
+      // d'inscription classique ultérieur sur la même page.
+      clearVisitorRegisterOAuthFlag();
       setPostAuthHandled(true);
       return;
     }
 
-    const oauthReturn =
-      searchParams.get("oauth") === "1" ||
-      (typeof window !== "undefined" && sessionStorage.getItem(VISITOR_REGISTER_OAUTH_FLAG) === "1");
+    const oauthReturn = searchParams.get("oauth") === "1" || hasVisitorRegisterOAuthFlag();
 
     if (oauthReturn) {
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem(VISITOR_REGISTER_OAUTH_FLAG);
-      }
+      clearVisitorRegisterOAuthFlag();
       if (searchParams.get("oauth") === "1") {
         const next = new URL(window.location.href);
         next.searchParams.delete("oauth");
@@ -256,8 +270,7 @@ const Register = () => {
       }
 
       if (hasVisitorRegistrationMetadata(session.user)) {
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
@@ -272,7 +285,7 @@ const Register = () => {
     }
 
     setPostAuthHandled(true);
-  }, [authLoading, session, searchParams, expoIdFromUrl, navigate]);
+  }, [authLoading, session, searchParams, expoIdFromUrl, navigate, submitting]);
 
   if (authLoading || (session && !postAuthHandled)) {
     return (
@@ -282,8 +295,16 @@ const Register = () => {
     );
   }
 
-  if (session && !oauthProfileFlow) {
-    const target = isVisitorRole(role_name, role_id) ? "/scan-work1" : "/";
+  if (session && !oauthProfileFlow && !submitting) {
+    // Session déjà active hors flux d'inscription (ex. arrivée directe sur /register). Le garde
+    // `!submitting` est nécessaire : côté inscription e-mail/mot de passe, `signInWithPassword`
+    // (dans handleFinalize) fait passer `session` à true avant que handleFinalize ait fini
+    // l'upload du selfie et sa propre navigation finale — sans ce garde, cette branche gagnait la
+    // course, purgeait la cible mémorisée et redirigeait vers /scan-work1 en dur (perte de
+    // expo_id et de l'écran d'origine).
+    const target = consumePostRegistrationTarget(
+      isVisitorRole(role_name, role_id) ? postRegistrationFallback(expoIdFromUrl) : "/",
+    );
     return <Navigate to={target} replace />;
   }
 
@@ -428,14 +449,7 @@ const Register = () => {
           }
         }
 
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("redirectAfterAuth");
-          sessionStorage.removeItem("redirectAfterLogin");
-          const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-          navigate(target, { replace: true });
-        } else {
-          navigate("/scan-work1", { replace: true });
-        }
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
@@ -452,8 +466,7 @@ const Register = () => {
         if (bypassSignInError) {
           toast.message(t("register_visitor.toast_test_bypass"));
         }
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
+        navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
         return;
       }
 
@@ -487,7 +500,7 @@ const Register = () => {
           setEmailDuplicateOpen(true);
           return;
         }
-        toast.error(formatSignUpError(msg));
+        toast.error(formatSignUpError(msg, code));
         return;
       }
 
@@ -517,14 +530,7 @@ const Register = () => {
         }
       }
 
-      if (typeof window !== "undefined") {
-        sessionStorage.removeItem("redirectAfterAuth");
-        sessionStorage.removeItem("redirectAfterLogin");
-        const target = expoIdFromUrl ? `/scan-work1?expo_id=${encodeURIComponent(expoIdFromUrl)}` : "/scan-work1";
-        navigate(target, { replace: true });
-      } else {
-        navigate("/scan-work1", { replace: true });
-      }
+      navigate(consumePostRegistrationTarget(postRegistrationFallback(expoIdFromUrl)), { replace: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("register_visitor.toast_visitor_signup_failed");
       toast.error(formatSignUpError(msg));
